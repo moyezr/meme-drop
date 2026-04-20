@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.local
+backend/data/memes/*
+!backend/data/memes/.gitkeep
+.DS_Store
