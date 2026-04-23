@@ -85,10 +85,7 @@ async function fetchSuggestions(tweetText: string) {
 
       return {
         ...suggestion,
-        name: normalizeSuggestionName(
-          suggestion.name,
-          suggestion.use_case_label
-        ),
+        name: (suggestion.name || "").trim(),
         image_url: absoluteImageUrl,
         image_data_url: imageDataUrl,
       };
@@ -156,19 +153,6 @@ function guessMimeType(imageUrl: string): string {
   if (ext === "gif") return "image/gif";
   if (ext === "webp") return "image/webp";
   return "image/jpeg";
-}
-
-function normalizeSuggestionName(name: string, useCaseLabel: string): string {
-  const cleaned = (name || "").trim();
-  if (cleaned && !/^unnamed\s+meme$/i.test(cleaned)) {
-    return cleaned;
-  }
-
-  if (useCaseLabel?.trim()) {
-    return useCaseLabel.replace(/_/g, " ");
-  }
-
-  return "Untitled meme";
 }
 
 console.log("[MemeDrop] Background service worker started");

@@ -5,6 +5,7 @@ import { eq, and, desc, asc, ilike, sql } from "drizzle-orm";
 import { autoTagMeme } from "../services/auto-tagger.js";
 import { generateEmbedding } from "../services/embedding.js";
 import { downloadImage } from "../services/image-downloader.js";
+import { buildMemeDescriptor } from "../services/descriptor.js";
 
 const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -22,13 +23,17 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
     // 2. Auto-tag with GPT-4o Vision
     const tags = await autoTagMeme(filePath);
 
-    // 3. Generate embedding from tags
-    const embeddingText = [
-      tags.name,
-      ...tags.use_cases,
-      ...tags.example_contexts,
-    ].join(" ");
-    const embedding = await generateEmbedding(embeddingText);
+    // 3. Generate embedding from the full descriptor (same shape as the
+    // descriptor we embed for queries — keeps the vector space aligned).
+    const descriptor = buildMemeDescriptor({
+      name: tags.name,
+      emotion: tags.emotion,
+      format_type: tags.format_type,
+      use_cases: tags.use_cases,
+      example_contexts: tags.example_contexts,
+      vibes: tags.vibes,
+    });
+    const embedding = await generateEmbedding(descriptor);
 
     // 4. Insert into user_memes
     const [meme] = await db
@@ -42,6 +47,7 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
           emotion: tags.emotion,
           use_cases: tags.use_cases,
           example_contexts: tags.example_contexts,
+          vibes: tags.vibes,
         },
         embedding,
         useCount: 0,

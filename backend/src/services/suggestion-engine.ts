@@ -1,170 +1,146 @@
-import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { z } from "zod";
+import { analyzeTweet, type TweetContext } from "./context-analyzer.js";
 import { generateEmbedding } from "./embedding.js";
-import { db } from "../db/index.js";
-import { sql } from "drizzle-orm";
+import { buildTweetDescriptor } from "./descriptor.js";
+import { retrieveCandidates, type Candidate } from "./retrieval.js";
+import { loadUserPreferences, applyPreferences } from "./personalization.js";
+import { rerankCandidates, type RerankInput } from "./reranker.js";
+import { mmrSelect } from "./diversity.js";
 
 const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
-
-const tweetContextSchema = z.object({
-  sentiment: z.enum(["positive", "negative", "neutral"]),
-  tone: z.enum([
-    "sarcastic",
-    "earnest",
-    "rant",
-    "celebratory",
-    "hot-take",
-    "question",
-  ]),
-  topic: z.enum([
-    "tech",
-    "finance",
-    "politics",
-    "sports",
-    "entertainment",
-    "personal",
-    "culture",
-  ]),
-  intent: z.enum([
-    "counter-argument",
-    "agreement",
-    "sharing-opinion",
-    "venting",
-    "asking",
-  ]),
-  intensity: z.number().min(0).max(1),
-  reply_style: z
-    .string()
-    .describe(
-      "Brief description of the ideal meme reply style, e.g. 'sarcastic agreement' or 'exaggerated disappointment'"
-    ),
-});
 
 export interface SuggestionResult {
   meme_id: string;
   name: string;
   image_url: string;
-  use_case_label: string;
+  use_case_label: string; // the "punch reason" from the re-ranker
   match_explanation: string;
   score: number;
   source: "user" | "global";
+  tweet_context?: TweetContext;
 }
 
+/**
+ * Pipeline:
+ *   1. Analyze tweet  → structured context + natural-language "ideal vibe"
+ *   2. Embed the vibe descriptor
+ *   3. Retrieve top candidates from user + global memes (pgvector)
+ *   4. Personalize scores using recent usage events
+ *   5. LLM re-rank top 20 with punchy explanations
+ *   6. MMR diversity pass so the returned strip isn't 5 near-dupes
+ *
+ * Every stage has a graceful degradation path so local dev works even if
+ * one service hiccups (e.g. re-ranker times out → fall back to vector score).
+ */
 export async function getSuggestions(
   tweetText: string
 ): Promise<SuggestionResult[]> {
-  // 1. Analyze tweet context with gpt-4o-mini
-  const { object: context } = await generateObject({
-    model: openai("gpt-4o-mini"),
-    schema: tweetContextSchema,
-    prompt: `Analyze this tweet and classify its context for meme reply matching:\n\n"${tweetText}"`,
-    temperature: 0.2,
-  });
-
+  const context = await analyzeTweet(tweetText);
   console.log("[MemeDrop] Tweet context:", context);
 
-  // 2. Generate embedding from context
-  const embeddingText = [
-    context.sentiment,
-    context.tone,
-    context.topic,
-    context.intent,
-    context.reply_style,
-  ].join(" ");
-  const embedding = await generateEmbedding(embeddingText);
+  const descriptor = buildTweetDescriptor({
+    tweet_text: tweetText,
+    sentiment: context.sentiment,
+    tone: context.tone,
+    topic: context.topic,
+    intent: context.intent,
+    reply_style: context.reply_style,
+    ideal_meme_vibe: context.ideal_meme_vibe,
+  });
+  const queryEmbedding = await generateEmbedding(descriptor);
 
-  const embeddingStr = `[${embedding.join(",")}]`;
+  const [candidates, prefs] = await Promise.all([
+    retrieveCandidates({
+      userId: DEV_USER_ID,
+      queryEmbedding,
+      userLimit: 15,
+      globalLimit: 20,
+    }),
+    loadUserPreferences(DEV_USER_ID),
+  ]);
 
-  // 3. Query user memes via pgvector cosine similarity
-  const userResults = await db.execute(sql`
-    SELECT
-      id,
-      user_name as name,
-      file_path,
-      system_tags,
-      use_count,
-      last_used_at,
-      1 - (embedding <=> ${embeddingStr}::vector) as similarity
-    FROM user_memes
-    WHERE user_id = ${DEV_USER_ID}
-      AND embedding IS NOT NULL
-    ORDER BY embedding <=> ${embeddingStr}::vector
-    LIMIT 10
-  `);
+  if (candidates.length === 0) {
+    return [];
+  }
 
-  // 4. Query global seed memes
-  const globalResults = await db.execute(sql`
-    SELECT
-      id,
-      name,
-      file_path,
-      system_tags,
-      1 - (embedding <=> ${embeddingStr}::vector) as similarity
-    FROM memes
-    WHERE embedding IS NOT NULL
-    ORDER BY embedding <=> ${embeddingStr}::vector
-    LIMIT 10
-  `);
+  // Personalized score (similarity + emotion/use_case nudges + recency penalty).
+  const personalized = candidates.map((c) => ({
+    ...c,
+    adjusted_score: applyPreferences(
+      { meme_id: c.meme_id, similarity: c.similarity, system_tags: c.system_tags },
+      prefs
+    ),
+  }));
 
-  // 5. Combine and score results
-  const now = Date.now();
-  const fortyEightHours = 48 * 60 * 60 * 1000;
-  const candidates: SuggestionResult[] = [];
+  personalized.sort((a, b) => b.adjusted_score - a.adjusted_score);
+  const rerankPool = personalized.slice(0, 20);
 
-  for (const row of userResults.rows) {
-    const similarity = Number(row.similarity) || 0;
-    const lastUsed = row.last_used_at
-      ? new Date(row.last_used_at as string).getTime()
-      : 0;
-    const recentlyUsed = lastUsed > 0 && now - lastUsed < fortyEightHours;
+  // LLM re-rank → punchy explanations.
+  let rerankResults: Awaited<ReturnType<typeof rerankCandidates>> = [];
+  try {
+    const input: RerankInput[] = rerankPool.map((c) => ({
+      meme_id: c.meme_id,
+      name: c.name,
+      emotion: c.system_tags.emotion,
+      use_cases: c.system_tags.use_cases || [],
+      vibes: c.system_tags.vibes || [],
+      example_contexts: c.system_tags.example_contexts || [],
+      prior_score: c.adjusted_score,
+    }));
+    rerankResults = await rerankCandidates(tweetText, context, input, 12);
+  } catch (err) {
+    console.warn("[MemeDrop] Re-rank failed, falling back to vector order:", err);
+  }
 
-    // Scoring: 80% context match, -20% recency penalty
-    let score = similarity * 0.8;
-    if (recentlyUsed) score -= 0.2;
+  // Stitch re-rank results back onto the candidate objects.
+  const rerankById = new Map(rerankResults.map((r) => [r.meme_id, r]));
 
-    const systemTags = row.system_tags as Record<string, unknown> | null;
-    const useCases = (systemTags?.use_cases as string[]) || [];
-
-    candidates.push({
-      meme_id: row.id as string,
-      name: row.name as string,
-      image_url: row.file_path as string,
-      use_case_label: useCases[0] || "reaction",
-      match_explanation: `${Math.round(similarity * 100)}% context match`,
+  const finalScored = rerankPool.map((c) => {
+    const r = rerankById.get(c.meme_id);
+    // If the re-ranker picked this meme, use its rank (inverted to a score
+    // so higher=better); else fall back to the adjusted vector score.
+    const score = r
+      ? 1 - (r.rank - 1) * 0.05 + r.confidence * 0.1
+      : c.adjusted_score * 0.8; // slight penalty so re-ranked picks win ties
+    return {
+      ...c,
+      punch_reason: r?.punch_reason,
       score,
-      source: "user",
-    });
-  }
+    };
+  });
 
-  for (const row of globalResults.rows) {
-    const similarity = Number(row.similarity) || 0;
-    const score = similarity * 0.8;
+  // MMR to spread the top results across vibes.
+  const mmrInput = finalScored.map((c) => ({
+    id: c.meme_id,
+    score: c.score,
+    embedding: c.embedding,
+    _ref: c,
+  }));
+  const diversified = mmrSelect(mmrInput, 10, 0.7).map((item) => item._ref);
 
-    const systemTags = row.system_tags as Record<string, unknown> | null;
-    const useCases = (systemTags?.use_cases as string[]) || [];
+  return diversified.map((c) => ({
+    meme_id: c.meme_id,
+    name: c.name,
+    image_url: c.image_url,
+    use_case_label:
+      c.punch_reason ||
+      (c.system_tags.use_cases?.[0] || "reaction").replace(/_/g, " "),
+    match_explanation: buildMatchExplanation(c, context),
+    score: c.score,
+    source: c.source,
+    tweet_context: context,
+  }));
+}
 
-    candidates.push({
-      meme_id: row.id as string,
-      name: row.name as string,
-      image_url: row.file_path as string,
-      use_case_label: useCases[0] || "reaction",
-      match_explanation: `${Math.round(similarity * 100)}% context match`,
-      score,
-      source: "global",
-    });
-  }
-
-  // Deduplicate by meme_id, keeping highest score
-  const seen = new Map<string, SuggestionResult>();
-  for (const c of candidates) {
-    const existing = seen.get(c.meme_id);
-    if (!existing || c.score > existing.score) {
-      seen.set(c.meme_id, c);
-    }
-  }
-
-  return Array.from(seen.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 10);
+function buildMatchExplanation(
+  c: { similarity: number; system_tags: { emotion?: string; vibes?: string[] } },
+  ctx: TweetContext
+): string {
+  const pct = Math.round(Math.max(0, Math.min(1, c.similarity)) * 100);
+  const vibe = (c.system_tags.vibes || [])[0];
+  const emo = c.system_tags.emotion;
+  const parts: string[] = [`${pct}% vibe match`];
+  if (vibe) parts.push(vibe);
+  else if (emo) parts.push(emo);
+  parts.push(`for ${ctx.tone} ${ctx.intent.replace(/_/g, " ")}`);
+  return parts.join(" • ");
 }

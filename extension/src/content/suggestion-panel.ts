@@ -80,28 +80,40 @@ const PANEL_STYLES = `
   .meme-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
   .meme-card {
     flex-shrink: 0;
-    width: 88px;
+    width: 96px;
     cursor: pointer;
     border-radius: 8px;
     overflow: hidden;
     border: 2px solid transparent;
     transition: border-color 0.15s, transform 0.15s;
     background: rgba(255,255,255,0.05);
+    position: relative;
   }
   .meme-card:hover {
     border-color: #1d9bf0;
     transform: translateY(-2px);
   }
   .meme-card img {
-    width: 88px;
-    height: 88px;
+    width: 96px;
+    height: 96px;
     object-fit: cover;
     display: block;
   }
-  .meme-label {
-    padding: 4px 6px;
-    font-size: 10px;
-    color: rgba(255,255,255,0.7);
+  .meme-reason {
+    padding: 5px 6px 3px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.2px;
+  }
+  .meme-name {
+    padding: 0 6px 5px;
+    font-size: 9px;
+    color: rgba(255,255,255,0.45);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -206,12 +218,20 @@ function renderSuggestions(suggestions: Suggestion[]) {
       img.alt = s.name;
       img.loading = "lazy";
 
-      const label = document.createElement("div");
-      label.className = "meme-label";
-      label.textContent = getDisplayName(s);
+      // The LLM re-ranker emits the punchy reason in use_case_label
+      // (e.g. "perfect dunk"). Show it as the primary label — it tells the
+      // user *why* this meme is here, which the image alone doesn't.
+      const reason = document.createElement("div");
+      reason.className = "meme-reason";
+      reason.textContent = getPunchReason(s);
+
+      const name = document.createElement("div");
+      name.className = "meme-name";
+      name.textContent = (s.name || "").trim() || "";
 
       card.appendChild(img);
-      card.appendChild(label);
+      card.appendChild(reason);
+      if (name.textContent) card.appendChild(name);
 
       card.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -355,17 +375,15 @@ function getBestImageSrc(suggestion: Suggestion): string {
   return `${API_BASE_URL}${suggestion.image_url}`;
 }
 
-function getDisplayName(suggestion: Suggestion): string {
+function getPunchReason(suggestion: Suggestion): string {
+  const label = (suggestion.use_case_label || "").trim();
+  if (label) return label.replace(/_/g, " ");
+
   const cleanedName = (suggestion.name || "").trim();
   if (cleanedName && !/^unnamed\s+meme$/i.test(cleanedName)) {
     return cleanedName;
   }
-
-  if (suggestion.use_case_label?.trim()) {
-    return suggestion.use_case_label.replace(/_/g, " ");
-  }
-
-  return "Untitled meme";
+  return "use it";
 }
 
 async function resolveMemeBlob(
