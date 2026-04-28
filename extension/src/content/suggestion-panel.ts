@@ -3,7 +3,10 @@
  * Shows meme suggestions in a horizontal strip when a reply composer is detected.
  */
 
+import { SELECTORS } from "./selectors";
+
 const API_BASE_URL = "http://localhost:3001";
+const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 
 interface Suggestion {
   meme_id: string;
@@ -212,15 +215,14 @@ function renderSuggestions(suggestions: Suggestion[]) {
       const card = document.createElement("div");
       card.className = "meme-card";
       card.title = `${s.name}\n${s.match_explanation}`;
+      card.draggable = true;
 
       const img = document.createElement("img");
       img.src = getBestImageSrc(s);
       img.alt = s.name;
       img.loading = "lazy";
+      img.draggable = false;
 
-      // The LLM re-ranker emits the punchy reason in use_case_label
-      // (e.g. "perfect dunk"). Show it as the primary label — it tells the
-      // user *why* this meme is here, which the image alone doesn't.
       const reason = document.createElement("div");
       reason.className = "meme-reason";
       reason.textContent = getPunchReason(s);
@@ -236,6 +238,38 @@ function renderSuggestions(suggestions: Suggestion[]) {
       card.addEventListener("click", (e) => {
         e.stopPropagation();
         insertMemeIntoComposer(s);
+      });
+
+      card.addEventListener("dragstart", (e) => {
+        if (!e.dataTransfer) return;
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = "copy";
+
+        // Our custom payload is the reliable path — the drop handler reads
+        // meme_id + the original backend URL directly, so we don't have to
+        // round-trip through a data URL at drag time.
+        e.dataTransfer.setData(
+          MEME_DROP_MIME_TYPE,
+          JSON.stringify({
+            imageUrl: s.image_url,
+            memeId: s.meme_id,
+            imageDataUrl: s.image_data_url ?? undefined,
+          })
+        );
+
+        // Fallback for generic drop targets — but only ever an http(s) URL.
+        // A `data:` URL in text/uri-list breaks other consumers (including
+        // our own older drop handling) and is what caused the
+        // "could not load image" regression.
+        const httpUrl = /^https?:\/\//i.test(s.image_url)
+          ? s.image_url
+          : `${API_BASE_URL}${s.image_url.startsWith("/") ? "" : "/"}${s.image_url}`;
+        e.dataTransfer.setData("text/uri-list", httpUrl);
+        e.dataTransfer.setData("text/plain", httpUrl);
+
+        if (img.complete && img.naturalWidth > 0) {
+          e.dataTransfer.setDragImage(img, img.width / 2, img.height / 2);
+        }
       });
 
       strip.appendChild(card);
@@ -304,38 +338,116 @@ type InsertMemeInput = {
   memeId?: string;
 };
 
+/**
+ * Re-encode the blob as PNG through a canvas.
+ *
+ * Why: (1) `ClipboardItem` reliably accepts only image/png in Chrome — jpeg
+ * sometimes throws NotAllowedError. (2) X's upload handler prefers PNG/JPEG
+ * Files coming through its file input; re-encoding normalizes everything
+ * (including unknown types served by `/memes/...`) into a format X accepts.
+ */
+async function toPngFile(blob: Blob, filename = "meme.png"): Promise<File> {
+  if (blob.type === "image/png") {
+    return new File([blob], filename, { type: "image/png" });
+  }
+
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2d context unavailable");
+  ctx.drawImage(bitmap, 0, 0);
+
+  const pngBlob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("toBlob returned null"))),
+      "image/png"
+    );
+  });
+
+  return new File([pngBlob], filename, { type: "image/png" });
+}
+
+/**
+ * Hand the file to X's real upload pipeline via its hidden file input.
+ *
+ * This is the only approach that consistently triggers X's image-attach
+ * flow. Synthetic paste events don't — X reads `isTrusted` in a few places
+ * and the React tree ignores un-trusted clipboard events in some layouts.
+ */
+async function attachViaFileInput(file: File): Promise<boolean> {
+  const inputs = Array.from(
+    document.querySelectorAll<HTMLInputElement>(SELECTORS.composerFileInput)
+  );
+
+  // Fallback lookup: any image-accepting file input nearby.
+  const candidates =
+    inputs.length > 0
+      ? inputs
+      : Array.from(
+          document.querySelectorAll<HTMLInputElement>('input[type="file"]')
+        ).filter((i) => (i.accept || "").includes("image"));
+
+  if (candidates.length === 0) return false;
+
+  // Prefer one that is currently in the DOM *and* not disabled. Most X
+  // layouts only have one composer open at a time, but reply-from-feed
+  // modals can coexist with an inline composer — pick the last one since
+  // that's typically the most recently opened.
+  const input = candidates[candidates.length - 1];
+
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  // `files` is a read-only FileList on the prototype, but setting it on the
+  // instance works in Chromium and is the standard trick used across the
+  // extension community.
+  input.files = dt.files;
+
+  input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  return true;
+}
+
+/**
+ * Fallback — synthetic paste event into the contentEditable composer. Works
+ * on some X surface variants, and when it does it produces the same result
+ * as a real paste (X auto-attaches the pasted image).
+ */
+function attachViaPasteEvent(file: File): boolean {
+  const composer = document.querySelector<HTMLElement>(
+    SELECTORS.tweetTextarea
+  );
+  if (!composer) return false;
+
+  composer.focus();
+
+  const dt = new DataTransfer();
+  dt.items.add(file);
+
+  const evt = new ClipboardEvent("paste", {
+    bubbles: true,
+    cancelable: true,
+    clipboardData: dt,
+  });
+  composer.dispatchEvent(evt);
+  return true;
+}
+
 export async function insertMemeByUrl(payload: InsertMemeInput) {
+  let file: File | null = null;
+
   try {
-    const blob = await resolveMemeBlob(payload.imageUrl, payload.imageDataUrl);
+    const raw = await resolveMemeBlob(payload.imageUrl, payload.imageDataUrl);
+    file = await toPngFile(raw);
+  } catch (err) {
+    console.error("[MemeDrop] Could not load meme image:", err);
+    const { showToast } = await import("./toast");
+    showToast("Could not load meme image", "error");
+    return;
+  }
 
-    // Create a File object
-    const ext = payload.imageUrl.split(".").pop() || "jpg";
-    const mimeType = blob.type || `image/${ext === "jpg" ? "jpeg" : ext}`;
-    const file = new File([blob], `meme.${ext}`, { type: mimeType });
-
-    // Use clipboard API to paste into the compose box
-    const clipboardItem = new ClipboardItem({ [mimeType]: blob });
-    await navigator.clipboard.write([clipboardItem]);
-
-    // Focus the composer and simulate paste
-    const composer = document.querySelector(
-      'div[data-testid="tweetTextarea_0"]'
-    ) as HTMLElement;
-    if (composer) {
-      composer.focus();
-
-      // Dispatch paste event with the file
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      const pasteEvent = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      });
-      composer.dispatchEvent(pasteEvent);
-    }
-
-    // Log usage
+  const logUsage = () => {
     if (payload.memeId) {
       chrome.runtime.sendMessage({
         type: "LOG_USAGE",
@@ -346,20 +458,45 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
         },
       });
     }
+  };
 
-    // Brief visual feedback then hide
-    setTimeout(() => hidePanel(), 500);
-  } catch (err) {
-    console.error("[MemeDrop] Failed to insert meme:", err);
-    // Fallback: copy image URL to clipboard
-    try {
-      await navigator.clipboard.writeText(payload.imageUrl);
-      const { showToast } = await import("./toast");
-      showToast("Image URL copied — paste it manually", "success");
-    } catch {
-      const { showToast } = await import("./toast");
-      showToast("Could not insert meme", "error");
+  // Strategy 1: file input — the reliable path.
+  try {
+    if (await attachViaFileInput(file)) {
+      logUsage();
+      setTimeout(() => hidePanel(), 400);
+      return;
     }
+  } catch (err) {
+    console.warn("[MemeDrop] File input attach failed:", err);
+  }
+
+  // Strategy 2: synthetic paste event on the contentEditable composer.
+  try {
+    if (attachViaPasteEvent(file)) {
+      logUsage();
+      setTimeout(() => hidePanel(), 400);
+      return;
+    }
+  } catch (err) {
+    console.warn("[MemeDrop] Synthetic paste failed:", err);
+  }
+
+  // Strategy 3: put the PNG on the clipboard so Cmd+V into the composer
+  // works. We deliberately do NOT writeText here — a text URL on the
+  // clipboard would paste as a link / base64 blob into X's text field,
+  // which is exactly the bug we're fixing.
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": file }),
+    ]);
+    const { showToast } = await import("./toast");
+    showToast("Meme copied — click composer then Cmd+V", "success");
+    logUsage();
+  } catch (err) {
+    console.error("[MemeDrop] Clipboard fallback failed:", err);
+    const { showToast } = await import("./toast");
+    showToast("Couldn't attach meme — open the image tab in X first", "error");
   }
 }
 
@@ -395,9 +532,16 @@ async function resolveMemeBlob(
     return response.blob();
   }
 
+  // A data: URL can flow in through drag-and-drop (text/uri-list) or
+  // through direct calls. `fetch` handles it natively.
+  if (imageUrl.startsWith("data:")) {
+    const response = await fetch(imageUrl);
+    return response.blob();
+  }
+
   const directUrl = /^https?:\/\//i.test(imageUrl)
     ? imageUrl
-    : `${API_BASE_URL}${imageUrl}`;
+    : `${API_BASE_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
 
   try {
     const directResponse = await fetch(directUrl);

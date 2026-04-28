@@ -8,6 +8,51 @@ import { mmrSelect } from "./diversity.js";
 
 const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
+const SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
+const SUGGESTION_CACHE_MAX = 200;
+
+interface CacheEntry {
+  result: SuggestionResult[];
+  expiresAt: number;
+}
+
+const suggestionCache = new Map<string, CacheEntry>();
+
+function normalizeCacheKey(tweetText: string): string {
+  return tweetText.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function readCache(key: string): SuggestionResult[] | null {
+  const entry = suggestionCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    suggestionCache.delete(key);
+    return null;
+  }
+  suggestionCache.delete(key);
+  suggestionCache.set(key, entry);
+  return entry.result;
+}
+
+function writeCache(key: string, result: SuggestionResult[]) {
+  suggestionCache.set(key, {
+    result,
+    expiresAt: Date.now() + SUGGESTION_CACHE_TTL_MS,
+  });
+  if (suggestionCache.size > SUGGESTION_CACHE_MAX) {
+    const oldestKey = suggestionCache.keys().next().value;
+    if (oldestKey) suggestionCache.delete(oldestKey);
+  }
+}
+
+/**
+ * Clear all cached suggestions. Called when the meme library changes so
+ * stale responses don't hide a newly-saved meme.
+ */
+export function invalidateSuggestionCache() {
+  suggestionCache.clear();
+}
+
 export interface SuggestionResult {
   meme_id: string;
   name: string;
@@ -34,8 +79,15 @@ export interface SuggestionResult {
 export async function getSuggestions(
   tweetText: string
 ): Promise<SuggestionResult[]> {
+  const cacheKey = normalizeCacheKey(tweetText);
+  const cached = readCache(cacheKey);
+  if (cached) return cached;
+
+  // Prefs don't depend on the tweet, so start them up front and let them
+  // overlap with the (serial) LLM + embed + retrieve chain.
+  const prefsPromise = loadUserPreferences(DEV_USER_ID);
+
   const context = await analyzeTweet(tweetText);
-  console.log("[MemeDrop] Tweet context:", context);
 
   const descriptor = buildTweetDescriptor({
     tweet_text: tweetText,
@@ -55,7 +107,7 @@ export async function getSuggestions(
       userLimit: 15,
       globalLimit: 20,
     }),
-    loadUserPreferences(DEV_USER_ID),
+    prefsPromise,
   ]);
 
   if (candidates.length === 0) {
@@ -117,7 +169,7 @@ export async function getSuggestions(
   }));
   const diversified = mmrSelect(mmrInput, 10, 0.7).map((item) => item._ref);
 
-  return diversified.map((c) => ({
+  const result: SuggestionResult[] = diversified.map((c) => ({
     meme_id: c.meme_id,
     name: c.name,
     image_url: c.image_url,
@@ -129,6 +181,9 @@ export async function getSuggestions(
     source: c.source,
     tweet_context: context,
   }));
+
+  writeCache(cacheKey, result);
+  return result;
 }
 
 function buildMatchExplanation(

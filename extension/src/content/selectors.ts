@@ -18,6 +18,11 @@ export const SELECTORS = {
 
   /** The tweet compose text input area */
   tweetTextarea: 'div[data-testid="tweetTextarea_0"]',
+
+  /** X's hidden file input used by the image-attach button on the composer.
+   *  Setting .files + dispatching `change` on this is the only reliable way
+   *  to hand X a File; synthetic paste events don't trigger its upload flow. */
+  composerFileInput: 'input[data-testid="fileInput"]',
 } as const;
 
 /**

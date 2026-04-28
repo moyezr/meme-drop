@@ -10,11 +10,47 @@ interface Suggestion {
   image_data_url?: string | null;
 }
 
+interface CacheEntry {
+  suggestions: Suggestion[];
+  expiresAt: number;
+}
+
+const SUGGESTION_TTL_MS = 5 * 60 * 1000;
+const SUGGESTION_CACHE_MAX = 100;
+const suggestionCache = new Map<string, CacheEntry>();
+
+function normalizeTweetText(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function readCachedSuggestions(key: string): Suggestion[] | null {
+  const entry = suggestionCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    suggestionCache.delete(key);
+    return null;
+  }
+  // Refresh LRU ordering.
+  suggestionCache.delete(key);
+  suggestionCache.set(key, entry);
+  return entry.suggestions;
+}
+
+function writeCachedSuggestions(key: string, suggestions: Suggestion[]) {
+  suggestionCache.set(key, {
+    suggestions,
+    expiresAt: Date.now() + SUGGESTION_TTL_MS,
+  });
+  if (suggestionCache.size > SUGGESTION_CACHE_MAX) {
+    const oldestKey = suggestionCache.keys().next().value;
+    if (oldestKey) suggestionCache.delete(oldestKey);
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_SUGGESTIONS") {
     fetchSuggestions(message.payload.tweet_text)
       .then((suggestions) => {
-        // Forward results to the content script tab
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
@@ -31,9 +67,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             suggestions: [],
           });
         }
-        sendResponse({ suggestions: [], error: err.message });
+        sendResponse({ suggestions: [], error: err?.message });
       });
-    return true; // keep message channel open for async response
+    return true;
   }
 
   if (message.type === "SAVE_MEME") {
@@ -41,13 +77,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((meme) => sendResponse({ meme }))
       .catch((err) => {
         console.error("[MemeDrop] Save error:", err);
-        sendResponse({ meme: null, error: err.message });
+        sendResponse({ meme: null, error: err?.message });
       });
     return true;
   }
 
   if (message.type === "LOG_USAGE") {
-    logUsage(message.payload).catch(console.error);
+    logUsage(message.payload).catch((err) => {
+      console.error("[MemeDrop] Usage log error:", err);
+    });
     return false;
   }
 
@@ -57,40 +95,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((image_data_url) => sendResponse({ image_data_url }))
       .catch((err) => {
         console.error("[MemeDrop] Media fetch error:", err);
-        sendResponse({ image_data_url: null, error: err.message });
+        sendResponse({ image_data_url: null, error: err?.message });
       });
     return true;
   }
 });
 
-async function fetchSuggestions(tweetText: string) {
+async function fetchSuggestions(tweetText: string): Promise<Suggestion[]> {
+  const cacheKey = normalizeTweetText(tweetText);
+  const cached = readCachedSuggestions(cacheKey);
+  if (cached) return cached;
+
   const res = await fetch(`${API_BASE_URL}/api/v1/suggest`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tweet_text: tweetText }),
   });
+  if (!res.ok) {
+    throw new Error(`Suggest request failed with status ${res.status}`);
+  }
   const data = await res.json();
-  const suggestions = (data.suggestions ?? []) as Suggestion[];
+  const raw = (data.suggestions ?? []) as Suggestion[];
 
-  return Promise.all(
-    suggestions.map(async (suggestion) => {
-      const absoluteImageUrl = toAbsoluteMediaUrl(suggestion.image_url);
-      let imageDataUrl: string | null = null;
+  // No pre-fetch of image data URLs here — the panel loads images directly
+  // via <img src="http://localhost:3001/memes/...">, which streams in
+  // parallel with the response. The old Promise.all over 10 fetches +
+  // base64 encodes was adding multiple seconds of latency for no benefit.
+  const suggestions = raw.map((suggestion) => ({
+    ...suggestion,
+    name: (suggestion.name || "").trim(),
+    image_url: toAbsoluteMediaUrl(suggestion.image_url),
+    image_data_url: null,
+  }));
 
-      try {
-        imageDataUrl = await fetchMediaDataUrl(absoluteImageUrl);
-      } catch (err) {
-        console.warn("[MemeDrop] Could not resolve suggestion media:", err);
-      }
-
-      return {
-        ...suggestion,
-        name: (suggestion.name || "").trim(),
-        image_url: absoluteImageUrl,
-        image_data_url: imageDataUrl,
-      };
-    })
-  );
+  writeCachedSuggestions(cacheKey, suggestions);
+  return suggestions;
 }
 
 async function saveMeme(imageUrl: string, sourceTweetId?: string) {
@@ -99,6 +138,12 @@ async function saveMeme(imageUrl: string, sourceTweetId?: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image_url: imageUrl, source_tweet_id: sourceTweetId }),
   });
+  if (!res.ok) {
+    throw new Error(`Save request failed with status ${res.status}`);
+  }
+  // A fresh save invalidates any prior suggestion responses — the new meme
+  // should be eligible to appear next time.
+  suggestionCache.clear();
   const data = await res.json();
   return data.meme;
 }
@@ -154,5 +199,3 @@ function guessMimeType(imageUrl: string): string {
   if (ext === "webp") return "image/webp";
   return "image/jpeg";
 }
-
-console.log("[MemeDrop] Background service worker started");
