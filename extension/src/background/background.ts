@@ -163,6 +163,7 @@ async function logUsage(payload: {
 function toAbsoluteMediaUrl(imageUrl: string): string {
   if (!imageUrl) return imageUrl;
   if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
+  if (/^(data:|blob:|filesystem:)/i.test(imageUrl)) return imageUrl;
   return `${API_BASE_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
 }
 

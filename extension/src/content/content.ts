@@ -160,10 +160,21 @@ function isComposerTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest(SELECTORS.tweetTextarea));
 }
 
+function isComposerEvent(event: Event): boolean {
+  const path = event.composedPath();
+  for (const node of path) {
+    if (node instanceof Element && node.closest(SELECTORS.tweetTextarea)) {
+      return true;
+    }
+  }
+
+  return isComposerTarget(event.target);
+}
+
 document.addEventListener(
   "dragover",
   (event) => {
-    if (!isComposerTarget(event.target)) return;
+    if (!isComposerEvent(event)) return;
 
     const draggedMeme = parseDraggedMeme(event.dataTransfer ?? null);
     if (!draggedMeme) return;
@@ -179,7 +190,7 @@ document.addEventListener(
 document.addEventListener(
   "drop",
   (event) => {
-    if (!isComposerTarget(event.target)) return;
+    if (!isComposerEvent(event)) return;
 
     const draggedMeme = parseDraggedMeme(event.dataTransfer ?? null);
     if (!draggedMeme) return;
