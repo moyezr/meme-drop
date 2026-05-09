@@ -7,6 +7,14 @@ interface Suggestion {
   use_case_label: string;
   match_explanation: string;
   score: number;
+  source: "user" | "global";
+  tweet_context?: Record<string, unknown>;
+  score_breakdown?: {
+    similarity: number;
+    personalized: number;
+    rerank?: number;
+    diversity: number;
+  };
   image_data_url?: string | null;
 }
 
@@ -49,7 +57,20 @@ function writeCachedSuggestions(key: string, suggestions: Suggestion[]) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_SUGGESTIONS") {
-    fetchSuggestions(message.payload.tweet_text)
+    fetchSuggestions(message.payload.tweet_text, {
+      refresh: message.payload.refresh,
+      limit: message.payload.limit,
+      source: message.payload.source,
+      mode: message.payload.mode,
+      onInitial: (suggestions) => {
+        if (sender.tab?.id) {
+          chrome.tabs.sendMessage(sender.tab.id, {
+            type: "SUGGESTIONS_RESULT",
+            suggestions,
+          });
+        }
+      },
+    })
       .then((suggestions) => {
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
@@ -101,32 +122,63 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function fetchSuggestions(tweetText: string): Promise<Suggestion[]> {
-  const cacheKey = normalizeTweetText(tweetText);
-  const cached = readCachedSuggestions(cacheKey);
-  if (cached) return cached;
+async function fetchSuggestions(
+  tweetText: string,
+  options: {
+    refresh?: boolean;
+    limit?: number;
+    source?: "all" | "user" | "global";
+    mode?: "fast" | "smart";
+    onInitial?: (suggestions: Suggestion[]) => void;
+  } = {}
+): Promise<Suggestion[]> {
+  const cacheKey = `${normalizeTweetText(tweetText)}|limit:${options.limit || 10}|source:${options.source || "all"}|mode:${options.mode || "fast"}`;
+  if (!options.refresh) {
+    const cached = readCachedSuggestions(cacheKey);
+    if (cached) return cached;
+  }
 
-  const res = await fetch(`${API_BASE_URL}/api/v1/suggest`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tweet_text: tweetText }),
-  });
-  if (!res.ok) {
-    throw new Error(`Suggest request failed with status ${res.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/api/v1/suggest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        tweet_text: tweetText,
+        limit: options.limit,
+        source: options.source,
+        refresh: options.refresh,
+        mode: options.mode || "fast",
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Suggest request failed with status ${res.status}`);
+    }
+  } finally {
+    clearTimeout(timer);
   }
   const data = await res.json();
   const raw = (data.suggestions ?? []) as Suggestion[];
 
-  // No pre-fetch of image data URLs here — the panel loads images directly
-  // via <img src="http://localhost:3001/memes/...">, which streams in
-  // parallel with the response. The old Promise.all over 10 fetches +
-  // base64 encodes was adding multiple seconds of latency for no benefit.
-  const suggestions = raw.map((suggestion) => ({
+  const suggestions: Suggestion[] = raw.map((suggestion) => ({
     ...suggestion,
     name: (suggestion.name || "").trim(),
     image_url: toAbsoluteMediaUrl(suggestion.image_url),
     image_data_url: null,
   }));
+
+  options.onInitial?.(suggestions);
+
+  // X's page CSP can block injected localhost images. Fetch through the
+  // extension background and render data URLs so cards display reliably.
+  await Promise.allSettled(
+    suggestions.map(async (suggestion) => {
+      suggestion.image_data_url = await fetchMediaDataUrl(suggestion.image_url);
+    })
+  );
 
   writeCachedSuggestions(cacheKey, suggestions);
   return suggestions;
@@ -152,6 +204,7 @@ async function logUsage(payload: {
   meme_id: string;
   action: string;
   tweet_context: Record<string, unknown>;
+  source?: "user" | "global";
 }) {
   await fetch(`${API_BASE_URL}/api/v1/usage`, {
     method: "POST",

@@ -6,7 +6,9 @@ export interface TweetContext {
     | "rant"
     | "celebratory"
     | "hot-take"
-    | "question";
+    | "question"
+    | "absurdist"
+    | "wholesome";
   topic:
     | "tech"
     | "finance"
@@ -14,18 +16,30 @@ export interface TweetContext {
     | "sports"
     | "entertainment"
     | "personal"
-    | "culture";
+    | "culture"
+    | "relationships"
+    | "other";
   intent:
     | "counter-argument"
     | "agreement"
     | "sharing-opinion"
     | "venting"
-    | "asking";
+    | "asking"
+    | "celebrating"
+    | "dunking"
+    | "self-deprecating";
   intensity: number;
+  reply_style: string;
+  ideal_meme_vibe: string;
+  keywords: string[];
 }
 
 export interface SuggestionRequest {
   tweet_text: string;
+  limit?: number;
+  source?: "all" | "user" | "global";
+  refresh?: boolean;
+  mode?: "fast" | "smart";
 }
 
 export interface SuggestionResult {
@@ -35,4 +49,12 @@ export interface SuggestionResult {
   use_case_label: string;
   match_explanation: string;
   score: number;
+  source: "user" | "global";
+  tweet_context?: TweetContext;
+  score_breakdown?: {
+    similarity: number;
+    personalized: number;
+    rerank?: number;
+    diversity: number;
+  };
 }

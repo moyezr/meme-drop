@@ -5,6 +5,7 @@ import {
   updateSuggestions,
   insertMemeByUrl,
   hidePanel,
+  isPanelVisible,
 } from "./suggestion-panel";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
@@ -20,6 +21,7 @@ chrome.runtime.onMessage.addListener((message) => {
     insertMemeByUrl({
       imageUrl: message.payload.image_url,
       memeId: message.payload.meme_id,
+      source: message.payload.source,
     }).catch((err) => {
       console.error("[MemeDrop] Failed to insert meme from popup:", err);
     });
@@ -28,6 +30,36 @@ chrome.runtime.onMessage.addListener((message) => {
 
 function extractTweetText(tweetTextEl: Element): string {
   return tweetTextEl.textContent?.trim() ?? "";
+}
+
+function findVisibleComposeDialog(): HTMLElement | null {
+  const dialogs = Array.from(
+    document.querySelectorAll<HTMLElement>(SELECTORS.composeDialog)
+  ).filter((dialog) => {
+    if (!dialog.querySelector(SELECTORS.tweetTextarea)) return false;
+    const rect = dialog.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  });
+
+  return dialogs.at(-1) || null;
+}
+
+function getTweetTextForActiveCompose(): string | null {
+  const dialog = findVisibleComposeDialog();
+  const scopedTweetEls = dialog
+    ? Array.from(dialog.querySelectorAll(SELECTORS.tweetText))
+    : [];
+  const tweetEls =
+    scopedTweetEls.length > 0
+      ? scopedTweetEls
+      : Array.from(document.querySelectorAll(SELECTORS.tweetText));
+
+  const candidates = tweetEls
+    .map(extractTweetText)
+    .filter((text) => text.length > 0)
+    .sort((a, b) => b.length - a.length);
+
+  return candidates[0] || null;
 }
 
 // The composer URL we last fired suggestions for. Prevents duplicate fires
@@ -41,46 +73,45 @@ let lastRequestedTweetText: string | null = null;
 let waitToken = 0;
 
 async function waitForTweetText(token: number): Promise<string | null> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + 2500;
   while (Date.now() < deadline) {
     if (token !== waitToken) return null;
-    const el = document.querySelector(SELECTORS.tweetText);
-    if (el) {
-      const text = extractTweetText(el);
-      if (text) return text;
-    }
+    const text = getTweetTextForActiveCompose();
+    if (text) return text;
     await new Promise((r) => setTimeout(r, 100));
   }
   return null;
 }
 
-async function requestSuggestionsForCurrentCompose() {
+async function requestSuggestionsForCurrentCompose(refresh = false) {
   const token = ++waitToken;
   showSuggestionPanel();
 
   const text = await waitForTweetText(token);
   if (token !== waitToken) return; // URL changed while waiting
-  if (!text) {
-    // Couldn't find a tweet to reply to — likely a fresh compose (not a reply).
-    hidePanel();
-    return;
-  }
+  const suggestionText = text || "A new X post where a funny, broadly useful reaction meme would help.";
 
-  if (text === lastRequestedTweetText) return;
-  lastRequestedTweetText = text;
+  if (!refresh && suggestionText === lastRequestedTweetText && isPanelVisible()) return;
+  lastRequestedTweetText = suggestionText;
 
   chrome.runtime.sendMessage({
     type: "GET_SUGGESTIONS",
-    payload: { tweet_text: text },
+    payload: { tweet_text: suggestionText, limit: 10, source: "all", refresh, mode: "fast" },
   });
 }
+
+window.addEventListener("memedrop:refresh-suggestions", () => {
+  requestSuggestionsForCurrentCompose(true).catch((err) => {
+    console.error("[MemeDrop] Refresh suggestions failed:", err);
+  });
+});
 
 function onUrlChanged() {
   const url = window.location.href;
   const isCompose = URL_PATTERNS.composeModal.test(url);
 
   if (isCompose) {
-    if (url !== lastComposeUrl) {
+    if (url !== lastComposeUrl || !isPanelVisible()) {
       lastComposeUrl = url;
       lastRequestedTweetText = null;
       requestSuggestionsForCurrentCompose();
@@ -116,13 +147,39 @@ function onUrlChanged() {
   window.addEventListener("popstate", onUrlChanged);
 })();
 
+let lastSeenUrl = window.location.href;
+function checkForComposeState() {
+  const currentUrl = window.location.href;
+  if (currentUrl !== lastSeenUrl) {
+    lastSeenUrl = currentUrl;
+    onUrlChanged();
+    return;
+  }
+
+  if (URL_PATTERNS.composeModal.test(currentUrl) && !isPanelVisible()) {
+    onUrlChanged();
+  }
+}
+
+const composeObserver = new MutationObserver(() => {
+  queueMicrotask(checkForComposeState);
+});
+composeObserver.observe(document.documentElement, {
+  childList: true,
+  subtree: true,
+});
+window.addEventListener("focus", checkForComposeState);
+document.addEventListener("visibilitychange", checkForComposeState);
+setInterval(checkForComposeState, 1000);
+
 // Initial URL check — handles direct loads of /compose/post.
-onUrlChanged();
+checkForComposeState();
 
 function parseDraggedMeme(dataTransfer: DataTransfer | null): {
   imageUrl: string;
   memeId?: string;
   imageDataUrl?: string;
+  source?: "user" | "global";
 } | null {
   if (!dataTransfer) return null;
 
@@ -133,12 +190,14 @@ function parseDraggedMeme(dataTransfer: DataTransfer | null): {
         imageUrl?: string;
         memeId?: string;
         imageDataUrl?: string;
+        source?: "user" | "global";
       };
       if (parsed.imageUrl) {
         return {
           imageUrl: parsed.imageUrl,
           memeId: parsed.memeId,
           imageDataUrl: parsed.imageDataUrl,
+          source: parsed.source,
         };
       }
     } catch {
@@ -155,29 +214,48 @@ function parseDraggedMeme(dataTransfer: DataTransfer | null): {
   return null;
 }
 
+function mayBeDraggedMeme(dataTransfer: DataTransfer | null): boolean {
+  if (!dataTransfer) return false;
+  const types = Array.from(dataTransfer.types || []);
+  return (
+    types.includes(MEME_DROP_MIME_TYPE) ||
+    types.includes("text/uri-list") ||
+    types.includes("text/plain")
+  );
+}
+
 function isComposerTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
-  return Boolean(target.closest(SELECTORS.tweetTextarea));
+  return Boolean(
+    target.closest(SELECTORS.tweetTextarea) ||
+      target.querySelector(SELECTORS.tweetTextarea)
+  );
 }
 
 function isComposerEvent(event: Event): boolean {
   const path = event.composedPath();
   for (const node of path) {
-    if (node instanceof Element && node.closest(SELECTORS.tweetTextarea)) {
+    if (node instanceof Element && isComposerTarget(node)) {
       return true;
     }
   }
 
-  return isComposerTarget(event.target);
+  if (isComposerTarget(event.target)) return true;
+
+  if (event instanceof DragEvent) {
+    return document
+      .elementsFromPoint(event.clientX, event.clientY)
+      .some((el) => isComposerTarget(el));
+  }
+
+  return false;
 }
 
 document.addEventListener(
   "dragover",
   (event) => {
     if (!isComposerEvent(event)) return;
-
-    const draggedMeme = parseDraggedMeme(event.dataTransfer ?? null);
-    if (!draggedMeme) return;
+    if (!mayBeDraggedMeme(event.dataTransfer ?? null)) return;
 
     event.preventDefault();
     if (event.dataTransfer) {
@@ -202,6 +280,8 @@ document.addEventListener(
       imageUrl: draggedMeme.imageUrl,
       imageDataUrl: draggedMeme.imageDataUrl,
       memeId: draggedMeme.memeId,
+      source: draggedMeme.source,
+      composerTarget: event.target instanceof Element ? event.target : null,
     }).catch((err) => {
       console.error("[MemeDrop] Drop insert failed:", err);
     });

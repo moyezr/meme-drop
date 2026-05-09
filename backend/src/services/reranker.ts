@@ -75,7 +75,7 @@ export async function rerankCandidates(
     .join("\n");
 
   const { object } = await generateObject({
-    model: openai("gpt-4o-mini"),
+    model: openai(process.env.MEMEDROP_RERANK_MODEL || "gpt-4o-mini"),
     schema,
     temperature: 0.4,
     system: `You are a meme curator picking the funniest, most on-point meme replies to a tweet.

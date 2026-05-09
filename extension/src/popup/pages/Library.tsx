@@ -28,6 +28,7 @@ interface LibraryResponse {
 interface DraggedMemePayload {
   memeId: string;
   imageUrl: string;
+  source: "user";
 }
 
 type SortOption = "recent" | "most_used" | "alphabetical";
@@ -86,6 +87,7 @@ export default function Library() {
     const payload: DraggedMemePayload = {
       memeId: meme.id,
       imageUrl: getMemeImageUrl(meme),
+      source: "user",
     };
 
     event.dataTransfer.effectAllowed = "copy";

@@ -24,6 +24,7 @@ interface RetrieveArgs {
   queryEmbedding: number[];
   userLimit: number;
   globalLimit: number;
+  source?: "all" | "user" | "global";
 }
 
 /**
@@ -36,40 +37,47 @@ export async function retrieveCandidates({
   queryEmbedding,
   userLimit,
   globalLimit,
+  source = "all",
 }: RetrieveArgs): Promise<Candidate[]> {
   const embeddingStr = `[${queryEmbedding.join(",")}]`;
 
-  const userResults = await db.execute(sql`
-    SELECT
-      id,
-      user_name AS name,
-      file_path,
-      system_tags,
-      use_count,
-      last_used_at,
-      embedding,
-      1 - (embedding <=> ${embeddingStr}::vector) AS similarity
-    FROM user_memes
-    WHERE user_id = ${userId}
-      AND embedding IS NOT NULL
-    ORDER BY embedding <=> ${embeddingStr}::vector
-    LIMIT ${userLimit}
-  `);
+  const userResults =
+    source === "global"
+      ? { rows: [] }
+      : await db.execute(sql`
+          SELECT
+            id,
+            user_name AS name,
+            file_path,
+            system_tags,
+            use_count,
+            last_used_at,
+            embedding,
+            1 - (embedding <=> ${embeddingStr}::vector) AS similarity
+          FROM user_memes
+          WHERE user_id = ${userId}
+            AND embedding IS NOT NULL
+          ORDER BY embedding <=> ${embeddingStr}::vector
+          LIMIT ${userLimit}
+        `);
 
-  const globalResults = await db.execute(sql`
-    SELECT
-      id,
-      name,
-      file_path,
-      system_tags,
-      is_evergreen,
-      embedding,
-      1 - (embedding <=> ${embeddingStr}::vector) AS similarity
-    FROM memes
-    WHERE embedding IS NOT NULL
-    ORDER BY embedding <=> ${embeddingStr}::vector
-    LIMIT ${globalLimit}
-  `);
+  const globalResults =
+    source === "user"
+      ? { rows: [] }
+      : await db.execute(sql`
+          SELECT
+            id,
+            name,
+            file_path,
+            system_tags,
+            is_evergreen,
+            embedding,
+            1 - (embedding <=> ${embeddingStr}::vector) AS similarity
+          FROM memes
+          WHERE embedding IS NOT NULL
+          ORDER BY embedding <=> ${embeddingStr}::vector
+          LIMIT ${globalLimit}
+        `);
 
   const parseEmbedding = (raw: unknown): number[] => {
     if (Array.isArray(raw)) return raw.map(Number);
@@ -124,4 +132,99 @@ export async function retrieveCandidates({
     }
   }
   return Array.from(seen.values());
+}
+
+/**
+ * Cheap fallback used when embeddings are slow/unavailable. It keeps the app
+ * responsive in local dev and still returns sensible memes based on recency,
+ * user ownership, evergreen status, and tag overlap scored in application code.
+ */
+export async function retrieveFallbackCandidates({
+  userId,
+  userLimit,
+  globalLimit,
+  source = "all",
+}: Omit<RetrieveArgs, "queryEmbedding">): Promise<Candidate[]> {
+  const userResults =
+    source === "global"
+      ? { rows: [] }
+      : await db.execute(sql`
+          SELECT
+            id,
+            user_name AS name,
+            file_path,
+            system_tags,
+            use_count,
+            last_used_at,
+            embedding
+          FROM user_memes
+          WHERE user_id = ${userId}
+          ORDER BY
+            last_used_at DESC NULLS LAST,
+            use_count DESC,
+            created_at DESC
+          LIMIT ${userLimit}
+        `);
+
+  const globalResults =
+    source === "user"
+      ? { rows: [] }
+      : await db.execute(sql`
+          SELECT
+            id,
+            name,
+            file_path,
+            system_tags,
+            is_evergreen,
+            embedding
+          FROM memes
+          ORDER BY
+            is_evergreen DESC,
+            created_at DESC
+          LIMIT ${globalLimit}
+        `);
+
+  const parseEmbedding = (raw: unknown): number[] => {
+    if (Array.isArray(raw)) return raw.map(Number);
+    if (typeof raw === "string") {
+      const trimmed = raw.replace(/^\[|\]$/g, "");
+      if (!trimmed) return [];
+      return trimmed.split(",").map(Number);
+    }
+    return [];
+  };
+
+  const candidates: Candidate[] = [];
+
+  for (const row of userResults.rows) {
+    candidates.push({
+      meme_id: row.id as string,
+      source: "user",
+      name: (row.name as string) || "Untitled",
+      image_url: row.file_path as string,
+      system_tags: (row.system_tags as Candidate["system_tags"]) || {},
+      embedding: parseEmbedding(row.embedding),
+      similarity: 0.5,
+      use_count: Number(row.use_count) || 0,
+      last_used_at: (row.last_used_at as string | null) ?? null,
+      is_evergreen: true,
+    });
+  }
+
+  for (const row of globalResults.rows) {
+    candidates.push({
+      meme_id: row.id as string,
+      source: "global",
+      name: (row.name as string) || "Untitled",
+      image_url: row.file_path as string,
+      system_tags: (row.system_tags as Candidate["system_tags"]) || {},
+      embedding: parseEmbedding(row.embedding),
+      similarity: 0.45,
+      use_count: 0,
+      last_used_at: null,
+      is_evergreen: Boolean(row.is_evergreen),
+    });
+  }
+
+  return candidates;
 }

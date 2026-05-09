@@ -7,6 +7,8 @@ import { SELECTORS } from "./selectors";
 
 const API_BASE_URL = "http://localhost:3001";
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
+const IMAGE_PLACEHOLDER =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 interface Suggestion {
   meme_id: string;
@@ -16,13 +18,17 @@ interface Suggestion {
   use_case_label: string;
   match_explanation: string;
   score: number;
+  source: "user" | "global";
+  tweet_context?: Record<string, unknown>;
 }
 
 let panelHost: HTMLDivElement | null = null;
 let shadowRoot: ShadowRoot | null = null;
 let isDragging = false;
+let dragListenersInstalled = false;
 let dragOffset = { x: 0, y: 0 };
 let currentSuggestions: Suggestion[] = [];
+let usedSuggestionIds = new Set<string>();
 
 const PANEL_STYLES = `
   :host {
@@ -71,6 +77,22 @@ const PANEL_STYLES = `
     line-height: 1;
   }
   .close-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .refresh-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.62);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .refresh-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
   .meme-strip {
     display: flex;
     gap: 8px;
@@ -101,6 +123,19 @@ const PANEL_STYLES = `
     height: 96px;
     object-fit: cover;
     display: block;
+  }
+  .source-badge {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.68);
+    color: rgba(255,255,255,0.86);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
   }
   .meme-reason {
     padding: 5px 6px 3px;
@@ -172,12 +207,16 @@ function renderLoading() {
   panel.innerHTML = `
     <div class="header">
       <span class="title"><span class="title-icon">&#x1f4a7;</span> MemeDrop</span>
-      <button class="close-btn">&times;</button>
+      <div class="header-actions">
+        <button class="refresh-btn" title="Refresh suggestions">↻</button>
+        <button class="close-btn" title="Close">&times;</button>
+      </div>
     </div>
     <div class="loading">Finding the perfect meme...</div>
   `;
 
   panel.querySelector(".close-btn")!.addEventListener("click", hidePanel);
+  panel.querySelector(".refresh-btn")!.addEventListener("click", requestRefresh);
   setupDrag(panel);
   shadowRoot.appendChild(panel);
 }
@@ -185,6 +224,7 @@ function renderLoading() {
 function renderSuggestions(suggestions: Suggestion[]) {
   if (!shadowRoot) return;
   currentSuggestions = suggestions;
+  usedSuggestionIds.clear();
 
   const existing = shadowRoot.querySelector(".panel");
   if (existing) existing.remove();
@@ -196,7 +236,10 @@ function renderSuggestions(suggestions: Suggestion[]) {
     panel.innerHTML = `
       <div class="header">
         <span class="title"><span class="title-icon">&#x1f4a7;</span> MemeDrop</span>
-        <button class="close-btn">&times;</button>
+        <div class="header-actions">
+          <button class="refresh-btn" title="Refresh suggestions">↻</button>
+          <button class="close-btn" title="Close">&times;</button>
+        </div>
       </div>
       <div class="empty">No meme suggestions yet. Save some memes first!</div>
     `;
@@ -205,7 +248,10 @@ function renderSuggestions(suggestions: Suggestion[]) {
     header.className = "header";
     header.innerHTML = `
       <span class="title"><span class="title-icon">&#x1f4a7;</span> MemeDrop</span>
-      <button class="close-btn">&times;</button>
+      <div class="header-actions">
+        <button class="refresh-btn" title="Refresh suggestions">↻</button>
+        <button class="close-btn" title="Close">&times;</button>
+      </div>
     `;
 
     const strip = document.createElement("div");
@@ -227,11 +273,16 @@ function renderSuggestions(suggestions: Suggestion[]) {
       reason.className = "meme-reason";
       reason.textContent = getPunchReason(s);
 
+      const badge = document.createElement("div");
+      badge.className = "source-badge";
+      badge.textContent = s.source === "user" ? "saved" : "global";
+
       const name = document.createElement("div");
       name.className = "meme-name";
       name.textContent = (s.name || "").trim() || "";
 
       card.appendChild(img);
+      card.appendChild(badge);
       card.appendChild(reason);
       if (name.textContent) card.appendChild(name);
 
@@ -254,6 +305,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
             imageUrl: s.image_url,
             memeId: s.meme_id,
             imageDataUrl: s.image_data_url ?? undefined,
+            source: s.source,
           })
         );
 
@@ -261,9 +313,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
         // A `data:` URL in text/uri-list breaks other consumers (including
         // our own older drop handling) and is what caused the
         // "could not load image" regression.
-        const httpUrl = /^https?:\/\//i.test(s.image_url)
-          ? s.image_url
-          : `${API_BASE_URL}${s.image_url.startsWith("/") ? "" : "/"}${s.image_url}`;
+        const httpUrl = getFetchableImageUrl(s);
         e.dataTransfer.setData("text/uri-list", httpUrl);
         e.dataTransfer.setData("text/plain", httpUrl);
 
@@ -287,6 +337,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
   }
 
   panel.querySelector(".close-btn")!.addEventListener("click", hidePanel);
+  panel.querySelector(".refresh-btn")!.addEventListener("click", requestRefresh);
   setupDrag(panel);
   shadowRoot.appendChild(panel);
 }
@@ -295,7 +346,7 @@ function setupDrag(panel: HTMLElement) {
   panel.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
     // Don't drag when clicking cards or close button
-    if (target.closest(".meme-card") || target.closest(".close-btn")) return;
+    if (target.closest(".meme-card") || target.closest(".close-btn") || target.closest(".refresh-btn")) return;
 
     isDragging = true;
     panel.classList.add("dragging");
@@ -306,6 +357,9 @@ function setupDrag(panel: HTMLElement) {
 
     e.preventDefault();
   });
+
+  if (dragListenersInstalled) return;
+  dragListenersInstalled = true;
 
   document.addEventListener("mousemove", (e) => {
     if (!isDragging || !panelHost) return;
@@ -324,11 +378,17 @@ function setupDrag(panel: HTMLElement) {
   });
 }
 
+function requestRefresh(e: Event) {
+  e.stopPropagation();
+  window.dispatchEvent(new CustomEvent("memedrop:refresh-suggestions"));
+}
+
 async function insertMemeIntoComposer(suggestion: Suggestion) {
   await insertMemeByUrl({
     imageUrl: suggestion.image_url,
     imageDataUrl: suggestion.image_data_url ?? null,
     memeId: suggestion.meme_id,
+    source: suggestion.source,
   });
 }
 
@@ -336,6 +396,8 @@ type InsertMemeInput = {
   imageUrl: string;
   imageDataUrl?: string | null;
   memeId?: string;
+  source?: "user" | "global";
+  composerTarget?: Element | null;
 };
 
 /**
@@ -376,15 +438,24 @@ async function toPngFile(blob: Blob, filename = "meme.png"): Promise<File> {
  * flow. Synthetic paste events don't — X reads `isTrusted` in a few places
  * and the React tree ignores un-trusted clipboard events in some layouts.
  */
-async function attachViaFileInput(file: File): Promise<boolean> {
-  const inputs = Array.from(
+async function attachViaFileInput(
+  file: File,
+  composerTarget?: Element | null
+): Promise<boolean> {
+  const scope = findComposerScope(composerTarget);
+  const scopedInputs = scope
+    ? Array.from(scope.querySelectorAll<HTMLInputElement>(SELECTORS.composerFileInput))
+    : [];
+  const allInputs = Array.from(
     document.querySelectorAll<HTMLInputElement>(SELECTORS.composerFileInput)
   );
 
   // Fallback lookup: any image-accepting file input nearby.
   const candidates =
-    inputs.length > 0
-      ? inputs
+    scopedInputs.length > 0
+      ? scopedInputs
+      : allInputs.length > 0
+        ? preferDialogElements(allInputs)
       : Array.from(
           document.querySelectorAll<HTMLInputElement>('input[type="file"]')
         ).filter((i) => (i.accept || "").includes("image"));
@@ -414,10 +485,15 @@ async function attachViaFileInput(file: File): Promise<boolean> {
  * on some X surface variants, and when it does it produces the same result
  * as a real paste (X auto-attaches the pasted image).
  */
-function attachViaPasteEvent(file: File): boolean {
-  const composer = document.querySelector<HTMLElement>(
-    SELECTORS.tweetTextarea
-  );
+function attachViaPasteEvent(
+  file: File,
+  composerTarget?: Element | null
+): boolean {
+  const scope = findComposerScope(composerTarget);
+  const composer =
+    scope.querySelector<HTMLElement>(SELECTORS.tweetTextarea) ||
+    findVisibleModalComposer() ||
+    document.querySelector<HTMLElement>(SELECTORS.tweetTextarea);
   if (!composer) return false;
 
   composer.focus();
@@ -432,6 +508,47 @@ function attachViaPasteEvent(file: File): boolean {
   });
   composer.dispatchEvent(evt);
   return true;
+}
+
+function findComposerScope(preferredTarget?: Element | null): Element | Document {
+  const preferredDialog = preferredTarget?.closest(SELECTORS.composeDialog);
+  if (preferredDialog && preferredDialog.querySelector(SELECTORS.tweetTextarea)) {
+    return preferredDialog;
+  }
+
+  const activeDialog = findVisibleComposeDialog();
+  if (activeDialog) return activeDialog;
+
+  const activeComposer = document.activeElement?.closest(SELECTORS.tweetTextarea);
+  const activeScope = activeComposer?.closest(SELECTORS.composeDialog);
+  if (activeScope) return activeScope;
+
+  return document;
+}
+
+function findVisibleComposeDialog(): HTMLElement | null {
+  const dialogs = Array.from(
+    document.querySelectorAll<HTMLElement>(SELECTORS.composeDialog)
+  ).filter((dialog) => {
+    if (!dialog.querySelector(SELECTORS.tweetTextarea)) return false;
+    const rect = dialog.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  });
+
+  return dialogs.at(-1) || null;
+}
+
+function findVisibleModalComposer(): HTMLElement | null {
+  return findVisibleComposeDialog()?.querySelector<HTMLElement>(
+    SELECTORS.tweetTextarea
+  ) || null;
+}
+
+function preferDialogElements<T extends Element>(elements: T[]): T[] {
+  const dialog = findVisibleComposeDialog();
+  if (!dialog) return elements;
+  const scoped = elements.filter((element) => dialog.contains(element));
+  return scoped.length > 0 ? scoped : elements;
 }
 
 export async function insertMemeByUrl(payload: InsertMemeInput) {
@@ -449,12 +566,15 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
 
   const logUsage = () => {
     if (payload.memeId) {
+      const suggestion = currentSuggestions.find((s) => s.meme_id === payload.memeId);
+      usedSuggestionIds.add(payload.memeId);
       chrome.runtime.sendMessage({
         type: "LOG_USAGE",
         payload: {
           meme_id: payload.memeId,
           action: "used",
-          tweet_context: {},
+          source: suggestion?.source || payload.source,
+          tweet_context: suggestion?.tweet_context || {},
         },
       });
     }
@@ -462,7 +582,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
 
   // Strategy 1: file input — the reliable path.
   try {
-    if (await attachViaFileInput(file)) {
+    if (await attachViaFileInput(file, payload.composerTarget)) {
       logUsage();
       setTimeout(() => hidePanel(), 400);
       return;
@@ -473,7 +593,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
 
   // Strategy 2: synthetic paste event on the contentEditable composer.
   try {
-    if (attachViaPasteEvent(file)) {
+    if (attachViaPasteEvent(file, payload.composerTarget)) {
       logUsage();
       setTimeout(() => hidePanel(), 400);
       return;
@@ -505,11 +625,21 @@ function getBestImageSrc(suggestion: Suggestion): string {
     return suggestion.image_data_url;
   }
 
+  if (/^(data:|blob:|filesystem:)/i.test(suggestion.image_url)) {
+    return suggestion.image_url;
+  }
+
+  // Avoid broken localhost images inside X while the background worker is
+  // still hydrating data URLs.
+  return IMAGE_PLACEHOLDER;
+}
+
+function getFetchableImageUrl(suggestion: Suggestion): string {
   if (/^https?:\/\//i.test(suggestion.image_url)) {
     return suggestion.image_url;
   }
 
-  return `${API_BASE_URL}${suggestion.image_url}`;
+  return `${API_BASE_URL}${suggestion.image_url.startsWith("/") ? "" : "/"}${suggestion.image_url}`;
 }
 
 function getPunchReason(suggestion: Suggestion): string {
@@ -595,16 +725,19 @@ export function hidePanel() {
   // Log dismissal if suggestions were showing
   if (currentSuggestions.length > 0) {
     for (const s of currentSuggestions) {
+      if (usedSuggestionIds.has(s.meme_id)) continue;
       chrome.runtime.sendMessage({
         type: "LOG_USAGE",
         payload: {
           meme_id: s.meme_id,
           action: "dismissed",
-          tweet_context: {},
+          source: s.source,
+          tweet_context: s.tweet_context || {},
         },
       });
     }
     currentSuggestions = [];
+    usedSuggestionIds.clear();
   }
 }
 

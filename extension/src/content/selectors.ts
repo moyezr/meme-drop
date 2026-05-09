@@ -17,7 +17,10 @@ export const SELECTORS = {
   inlineReply: 'div[data-testid="inline_reply_offscreen"]',
 
   /** The tweet compose text input area */
-  tweetTextarea: 'div[data-testid="tweetTextarea_0"]',
+  tweetTextarea: 'div[data-testid^="tweetTextarea_"]',
+
+  /** X compose/reply modal dialog */
+  composeDialog: 'div[role="dialog"]',
 
   /** X's hidden file input used by the image-attach button on the composer.
    *  Setting .files + dispatching `change` on this is the only reliable way
