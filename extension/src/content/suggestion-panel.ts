@@ -14,12 +14,33 @@ interface Suggestion {
   meme_id: string;
   name: string;
   image_url: string;
+  tailored_overlay?: MemeTextOverlay | null;
+  tailored_image_data_url?: string | null;
   image_data_url?: string | null;
   use_case_label: string;
   match_explanation: string;
   score: number;
   source: "user" | "global";
   tweet_context?: Record<string, unknown>;
+}
+
+interface MemeTextOverlay {
+  enabled: boolean;
+  style: "impact";
+  alt_text: string;
+  regions: MemeTextRegion[];
+}
+
+interface MemeTextRegion {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  align?: "left" | "center" | "right";
+  valign?: "top" | "middle" | "bottom";
+  font_scale?: number;
 }
 
 let panelHost: HTMLDivElement | null = null;
@@ -134,6 +155,19 @@ const PANEL_STYLES = `
     color: rgba(255,255,255,0.86);
     font-size: 8px;
     font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+  .tailored-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    background: rgba(29,155,240,0.88);
+    color: #fff;
+    font-size: 8px;
+    font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
   }
@@ -260,7 +294,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
     for (const s of suggestions.slice(0, 10)) {
       const card = document.createElement("div");
       card.className = "meme-card";
-      card.title = `${s.name}\n${s.match_explanation}`;
+      card.title = getCardTitle(s);
       card.draggable = true;
 
       const img = document.createElement("img");
@@ -277,14 +311,21 @@ function renderSuggestions(suggestions: Suggestion[]) {
       badge.className = "source-badge";
       badge.textContent = s.source === "user" ? "saved" : "global";
 
+      const tailoredBadge = document.createElement("div");
+      tailoredBadge.className = "tailored-badge";
+      tailoredBadge.textContent = "text";
+
       const name = document.createElement("div");
       name.className = "meme-name";
       name.textContent = (s.name || "").trim() || "";
 
       card.appendChild(img);
       card.appendChild(badge);
+      if (s.tailored_overlay?.enabled) card.appendChild(tailoredBadge);
       card.appendChild(reason);
       if (name.textContent) card.appendChild(name);
+
+      hydrateTailoredPreview(s, img);
 
       card.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -304,7 +345,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
           JSON.stringify({
             imageUrl: s.image_url,
             memeId: s.meme_id,
-            imageDataUrl: s.image_data_url ?? undefined,
+            imageDataUrl: s.tailored_image_data_url ?? s.image_data_url ?? undefined,
             source: s.source,
           })
         );
@@ -384,9 +425,15 @@ function requestRefresh(e: Event) {
 }
 
 async function insertMemeIntoComposer(suggestion: Suggestion) {
+  if (suggestion.tailored_overlay?.enabled && !suggestion.tailored_image_data_url) {
+    suggestion.tailored_image_data_url = await renderTailoredMemeDataUrl(suggestion).catch(
+      () => null
+    );
+  }
+
   await insertMemeByUrl({
     imageUrl: suggestion.image_url,
-    imageDataUrl: suggestion.image_data_url ?? null,
+    imageDataUrl: suggestion.tailored_image_data_url ?? suggestion.image_data_url ?? null,
     memeId: suggestion.meme_id,
     source: suggestion.source,
   });
@@ -429,6 +476,142 @@ async function toPngFile(blob: Blob, filename = "meme.png"): Promise<File> {
   });
 
   return new File([pngBlob], filename, { type: "image/png" });
+}
+
+async function hydrateTailoredPreview(suggestion: Suggestion, img: HTMLImageElement) {
+  if (!suggestion.tailored_overlay?.enabled) return;
+
+  try {
+    const dataUrl = await renderTailoredMemeDataUrl(suggestion);
+    suggestion.tailored_image_data_url = dataUrl;
+    if (currentSuggestions.some((s) => s.meme_id === suggestion.meme_id)) {
+      img.src = dataUrl;
+    }
+  } catch (err) {
+    console.warn("[MemeDrop] Tailored meme preview failed:", err);
+  }
+}
+
+async function renderTailoredMemeDataUrl(suggestion: Suggestion): Promise<string> {
+  if (suggestion.tailored_image_data_url) return suggestion.tailored_image_data_url;
+  const overlay = suggestion.tailored_overlay;
+  if (!overlay?.enabled || overlay.regions.length === 0) {
+    return suggestion.image_data_url || suggestion.image_url;
+  }
+
+  const raw = await resolveMemeBlob(suggestion.image_url, suggestion.image_data_url);
+  const bitmap = await createImageBitmap(raw);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2d context unavailable");
+
+  ctx.drawImage(bitmap, 0, 0);
+
+  for (const region of overlay.regions) {
+    drawImpactText(ctx, canvas.width, canvas.height, region);
+  }
+
+  return canvas.toDataURL("image/png");
+}
+
+function drawImpactText(
+  ctx: CanvasRenderingContext2D,
+  canvasWidth: number,
+  canvasHeight: number,
+  region: MemeTextRegion
+) {
+  const x = region.x * canvasWidth;
+  const y = region.y * canvasHeight;
+  const width = region.width * canvasWidth;
+  const height = region.height * canvasHeight;
+  const text = region.text.trim().toUpperCase();
+  if (!text) return;
+
+  const fontScale = region.font_scale ?? 1;
+  const maxFont = Math.max(16, Math.min(width / 5.2, height / 1.25) * fontScale);
+  const minFont = Math.max(12, Math.min(canvasWidth, canvasHeight) * 0.035);
+  let fontSize = maxFont;
+  let lines = wrapImpactLines(ctx, text, width, fontSize);
+
+  while (
+    fontSize > minFont &&
+    (lines.length * fontSize * 1.08 > height ||
+      lines.some((line) => measureImpactText(ctx, line, fontSize) > width))
+  ) {
+    fontSize -= 2;
+    lines = wrapImpactLines(ctx, text, width, fontSize);
+  }
+
+  ctx.textAlign = region.align || "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+
+  const lineHeight = fontSize * 1.08;
+  const totalHeight = lineHeight * lines.length;
+  const startY =
+    region.valign === "top"
+      ? y + lineHeight / 2
+      : region.valign === "bottom"
+        ? y + height - totalHeight + lineHeight / 2
+        : y + height / 2 - totalHeight / 2 + lineHeight / 2;
+  const textX =
+    region.align === "left"
+      ? x
+      : region.align === "right"
+        ? x + width
+        : x + width / 2;
+
+  ctx.font = impactFont(fontSize);
+  ctx.fillStyle = "#fff";
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = Math.max(3, fontSize * 0.12);
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineY = startY + i * lineHeight;
+    ctx.strokeText(lines[i], textX, lineY);
+    ctx.fillText(lines[i], textX, lineY);
+  }
+}
+
+function wrapImpactLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  fontSize: number
+): string[] {
+  ctx.font = impactFont(fontSize);
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (ctx.measureText(test).width <= maxWidth || !current) {
+      current = test;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.slice(0, 4);
+}
+
+function measureImpactText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  fontSize: number
+): number {
+  ctx.font = impactFont(fontSize);
+  return ctx.measureText(text).width;
+}
+
+function impactFont(fontSize: number): string {
+  return `${Math.floor(fontSize)}px Impact, Haettenschweiler, 'Arial Black', sans-serif`;
 }
 
 /**
@@ -621,6 +804,10 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
 }
 
 function getBestImageSrc(suggestion: Suggestion): string {
+  if (suggestion.tailored_image_data_url) {
+    return suggestion.tailored_image_data_url;
+  }
+
   if (suggestion.image_data_url) {
     return suggestion.image_data_url;
   }
@@ -632,6 +819,16 @@ function getBestImageSrc(suggestion: Suggestion): string {
   // Avoid broken localhost images inside X while the background worker is
   // still hydrating data URLs.
   return IMAGE_PLACEHOLDER;
+}
+
+function getCardTitle(suggestion: Suggestion): string {
+  const overlayText = suggestion.tailored_overlay?.regions
+    .map((region) => region.text)
+    .filter(Boolean)
+    .join(" / ");
+  return [suggestion.name, overlayText, suggestion.match_explanation]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function getFetchableImageUrl(suggestion: Suggestion): string {

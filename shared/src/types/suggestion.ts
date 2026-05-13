@@ -46,6 +46,7 @@ export interface SuggestionResult {
   meme_id: string;
   name: string;
   image_url: string;
+  tailored_overlay?: MemeTextOverlay | null;
   use_case_label: string;
   match_explanation: string;
   score: number;
@@ -57,4 +58,23 @@ export interface SuggestionResult {
     rerank?: number;
     diversity: number;
   };
+}
+
+export interface MemeTextOverlay {
+  enabled: boolean;
+  style: "impact";
+  alt_text: string;
+  regions: MemeTextRegion[];
+}
+
+export interface MemeTextRegion {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  align?: "left" | "center" | "right";
+  valign?: "top" | "middle" | "bottom";
+  font_scale?: number;
 }

@@ -6,6 +6,7 @@ export interface Candidate {
   source: "user" | "global";
   name: string;
   image_url: string;
+  format_type: "reaction_image" | "text_overlay" | string;
   system_tags: {
     emotion?: string;
     use_cases?: string[];
@@ -46,18 +47,20 @@ export async function retrieveCandidates({
       ? { rows: [] }
       : await db.execute(sql`
           SELECT
-            id,
-            user_name AS name,
-            file_path,
-            system_tags,
-            use_count,
-            last_used_at,
-            embedding,
-            1 - (embedding <=> ${embeddingStr}::vector) AS similarity
+            user_memes.id,
+            user_memes.user_name AS name,
+            user_memes.file_path,
+            COALESCE(m.format_type, 'text_overlay') AS format_type,
+            user_memes.system_tags,
+            user_memes.use_count,
+            user_memes.last_used_at,
+            user_memes.embedding,
+            1 - (user_memes.embedding <=> ${embeddingStr}::vector) AS similarity
           FROM user_memes
+          LEFT JOIN memes m ON user_memes.global_meme_id = m.id
           WHERE user_id = ${userId}
-            AND embedding IS NOT NULL
-          ORDER BY embedding <=> ${embeddingStr}::vector
+            AND user_memes.embedding IS NOT NULL
+          ORDER BY user_memes.embedding <=> ${embeddingStr}::vector
           LIMIT ${userLimit}
         `);
 
@@ -69,6 +72,7 @@ export async function retrieveCandidates({
             id,
             name,
             file_path,
+            format_type,
             system_tags,
             is_evergreen,
             embedding,
@@ -98,6 +102,7 @@ export async function retrieveCandidates({
       source: "user",
       name: (row.name as string) || "Untitled",
       image_url: row.file_path as string,
+      format_type: (row.format_type as string) || "text_overlay",
       system_tags: (row.system_tags as Candidate["system_tags"]) || {},
       embedding: parseEmbedding(row.embedding),
       similarity: Number(row.similarity) || 0,
@@ -113,6 +118,7 @@ export async function retrieveCandidates({
       source: "global",
       name: (row.name as string) || "Untitled",
       image_url: row.file_path as string,
+      format_type: (row.format_type as string) || "reaction_image",
       system_tags: (row.system_tags as Candidate["system_tags"]) || {},
       embedding: parseEmbedding(row.embedding),
       similarity: Number(row.similarity) || 0,
@@ -150,19 +156,21 @@ export async function retrieveFallbackCandidates({
       ? { rows: [] }
       : await db.execute(sql`
           SELECT
-            id,
-            user_name AS name,
-            file_path,
-            system_tags,
-            use_count,
-            last_used_at,
-            embedding
+            user_memes.id,
+            user_memes.user_name AS name,
+            user_memes.file_path,
+            COALESCE(m.format_type, 'text_overlay') AS format_type,
+            user_memes.system_tags,
+            user_memes.use_count,
+            user_memes.last_used_at,
+            user_memes.embedding
           FROM user_memes
+          LEFT JOIN memes m ON user_memes.global_meme_id = m.id
           WHERE user_id = ${userId}
           ORDER BY
-            last_used_at DESC NULLS LAST,
-            use_count DESC,
-            created_at DESC
+            user_memes.last_used_at DESC NULLS LAST,
+            user_memes.use_count DESC,
+            user_memes.created_at DESC
           LIMIT ${userLimit}
         `);
 
@@ -174,6 +182,7 @@ export async function retrieveFallbackCandidates({
             id,
             name,
             file_path,
+            format_type,
             system_tags,
             is_evergreen,
             embedding
@@ -202,6 +211,7 @@ export async function retrieveFallbackCandidates({
       source: "user",
       name: (row.name as string) || "Untitled",
       image_url: row.file_path as string,
+      format_type: (row.format_type as string) || "text_overlay",
       system_tags: (row.system_tags as Candidate["system_tags"]) || {},
       embedding: parseEmbedding(row.embedding),
       similarity: 0.5,
@@ -217,6 +227,7 @@ export async function retrieveFallbackCandidates({
       source: "global",
       name: (row.name as string) || "Untitled",
       image_url: row.file_path as string,
+      format_type: (row.format_type as string) || "reaction_image",
       system_tags: (row.system_tags as Candidate["system_tags"]) || {},
       embedding: parseEmbedding(row.embedding),
       similarity: 0.45,

@@ -4,6 +4,7 @@ interface Suggestion {
   meme_id: string;
   name: string;
   image_url: string;
+  tailored_overlay?: MemeTextOverlay | null;
   use_case_label: string;
   match_explanation: string;
   score: number;
@@ -16,6 +17,25 @@ interface Suggestion {
     diversity: number;
   };
   image_data_url?: string | null;
+}
+
+interface MemeTextOverlay {
+  enabled: boolean;
+  style: "impact";
+  alt_text: string;
+  regions: MemeTextRegion[];
+}
+
+interface MemeTextRegion {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  align?: "left" | "center" | "right";
+  valign?: "top" | "middle" | "bottom";
+  font_scale?: number;
 }
 
 interface CacheEntry {

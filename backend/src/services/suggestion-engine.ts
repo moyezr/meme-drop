@@ -13,6 +13,7 @@ import {
 import { loadUserPreferences, applyPreferences } from "./personalization.js";
 import { rerankCandidates, type RerankInput } from "./reranker.js";
 import { mmrSelect } from "./diversity.js";
+import { buildTailoredOverlay, type MemeTextOverlay } from "./meme-text.js";
 
 const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -68,6 +69,7 @@ export interface SuggestionResult {
   meme_id: string;
   name: string;
   image_url: string;
+  tailored_overlay?: MemeTextOverlay | null;
   use_case_label: string; // the "punch reason" from the re-ranker
   match_explanation: string;
   score: number;
@@ -231,6 +233,7 @@ export async function getSuggestions(
     meme_id: c.meme_id,
     name: c.name,
     image_url: c.image_url,
+    tailored_overlay: buildTailoredOverlay(tweetText, context, c),
     use_case_label:
       c.punch_reason ||
       (c.system_tags.use_cases?.[0] || "reaction").replace(/_/g, " "),
