@@ -1,9 +1,11 @@
+import { findMemeTemplate, type MemeTemplate } from "@memedrop/shared";
 import type { TweetContext } from "./context-analyzer.js";
 import type { Candidate } from "./retrieval.js";
 
 export interface MemeTextOverlay {
   enabled: boolean;
   style: "impact";
+  template_id?: string;
   alt_text: string;
   regions: MemeTextRegion[];
 }
@@ -18,307 +20,339 @@ export interface MemeTextRegion {
   align?: "left" | "center" | "right";
   valign?: "top" | "middle" | "bottom";
   font_scale?: number;
+  max_lines?: number;
+  max_chars?: number;
+  font?: {
+    family: "Impact";
+    min_size: number;
+    max_size: number;
+    stroke_ratio: number;
+  };
 }
 
-type RegionTemplate = Omit<MemeTextRegion, "text"> & {
-  role: string;
-};
-
-interface OverlayTemplate {
-  match: RegExp;
-  regions: RegionTemplate[];
-  build: (args: BuildArgs) => Record<string, string>;
+interface CaptionCandidate {
+  meme_id: string;
+  name: string;
+  template: MemeTemplate;
 }
 
-interface BuildArgs {
-  tweetText: string;
-  context: TweetContext;
-  candidate: Candidate;
-  subject: string;
-  shortSubject: string;
+interface CaptionBatchResponse {
+  captions?: Array<{
+    meme_id?: string;
+    regions?: Record<string, string>;
+  }>;
 }
 
-const TEMPLATE_REGISTRY: OverlayTemplate[] = [
-  {
-    match: /drake hotline/i,
-    regions: [
-      topRegion("reject", "bad option"),
-      bottomRegion("approve", "better option"),
-    ],
-    build: ({ context, shortSubject }) => ({
-      reject: context.intent === "celebrating" ? "playing it cool" : `being normal about ${shortSubject}`,
-      approve: context.intent === "celebrating" ? `${shortSubject} victory lap` : `making it about ${shortSubject}`,
-    }),
-  },
-  {
-    match: /two buttons/i,
-    regions: [
-      box("left_button", "first choice", 0.13, 0.14, 0.26, 0.13, 0.72),
-      box("right_button", "second choice", 0.48, 0.14, 0.26, 0.13, 0.72),
-      box("person", "person stuck choosing", 0.28, 0.69, 0.46, 0.12, 0.86),
-    ],
-    build: ({ shortSubject }) => ({
-      left_button: "post through it",
-      right_button: "log off",
-      person: shortSubject,
-    }),
-  },
-  {
-    match: /distracted boyfriend/i,
-    regions: [
-      box("boyfriend", "person making the choice", 0.33, 0.37, 0.2, 0.11, 0.74),
-      box("girlfriend", "responsible option", 0.58, 0.34, 0.22, 0.11, 0.74),
-      box("temptation", "tempting bad option", 0.02, 0.22, 0.28, 0.13, 0.78),
-    ],
-    build: ({ shortSubject }) => ({
-      boyfriend: shortSubject,
-      girlfriend: "reasonable take",
-      temptation: "choosing chaos",
-    }),
-  },
-  {
-    match: /change my mind/i,
-    regions: [box("sign", "hot take", 0.18, 0.39, 0.42, 0.18, 0.86)],
-    build: ({ shortSubject, context }) => ({
-      sign: `${verdictFor(context)} ${shortSubject}. change my mind`,
-    }),
-  },
-  {
-    match: /one does not simply/i,
-    regions: [box("caption", "solemn warning", 0.05, 0.05, 0.9, 0.2, 0.9)],
-    build: ({ shortSubject }) => ({
-      caption: `one does not simply survive ${shortSubject}`,
-    }),
-  },
-  {
-    match: /always has been/i,
-    regions: [
-      box("realization", "realization", 0.05, 0.05, 0.45, 0.18, 0.84),
-      box("answer", "answer", 0.5, 0.07, 0.42, 0.16, 0.84),
-    ],
-    build: ({ shortSubject }) => ({
-      realization: `wait, it's all ${shortSubject}?`,
-      answer: "always has been",
-    }),
-  },
-  {
-    match: /bernie/i,
-    regions: [box("ask", "repeated ask", 0.07, 0.06, 0.86, 0.2, 0.92)],
-    build: ({ shortSubject }) => ({
-      ask: `i am once again asking about ${shortSubject}`,
-    }),
-  },
-  {
-    match: /trade offer/i,
-    regions: [
-      box("i_receive", "what I get", 0.05, 0.16, 0.32, 0.18, 0.8),
-      box("you_receive", "what you get", 0.62, 0.16, 0.32, 0.18, 0.8),
-    ],
-    build: ({ shortSubject }) => ({
-      i_receive: `${shortSubject} discourse`,
-      you_receive: "one reaction meme",
-    }),
-  },
-  {
-    match: /roll safe/i,
-    regions: [box("wisdom", "bad logic", 0.05, 0.05, 0.9, 0.2, 0.92)],
-    build: ({ shortSubject }) => ({
-      wisdom: `can't lose ${shortSubject} discourse if you never had hope`,
-    }),
-  },
-  {
-    match: /evil kermit/i,
-    regions: [
-      box("good", "good impulse", 0.05, 0.05, 0.9, 0.14, 0.82),
-      box("bad", "bad impulse", 0.05, 0.82, 0.9, 0.14, 0.82),
-    ],
-    build: ({ shortSubject }) => ({
-      good: `me: be normal about ${shortSubject}`,
-      bad: "also me: post the meme",
-    }),
-  },
-  {
-    match: /panik kalm panik/i,
-    regions: [
-      box("panic_1", "first panic", 0.48, 0.05, 0.46, 0.14, 0.72),
-      box("calm", "calm", 0.48, 0.38, 0.46, 0.14, 0.72),
-      box("panic_2", "second panic", 0.48, 0.72, 0.46, 0.14, 0.72),
-    ],
-    build: ({ shortSubject }) => ({
-      panic_1: `${shortSubject} happened`,
-      calm: "it's probably fine",
-      panic_2: "the replies loaded",
-    }),
-  },
-  {
-    match: /surprised pikachu/i,
-    regions: [topRegion("caption", "predictable consequence")],
-    build: ({ shortSubject }) => ({
-      caption: `${shortSubject} has consequences`,
-    }),
-  },
-  {
-    match: /this is fine/i,
-    regions: [topRegion("caption", "calm denial")],
-    build: ({ shortSubject }) => ({
-      caption: `${shortSubject} is fine`,
-    }),
-  },
-  {
-    match: /mocking spongebob/i,
-    regions: [topRegion("caption", "mocking quote")],
-    build: ({ subject }) => ({
-      caption: toMockingCase(subject),
-    }),
-  },
-];
+const CAPTION_TIMEOUT_MS = 1800;
+const CAPTION_CACHE_TTL_MS = 30 * 60 * 1000;
+const CAPTION_CACHE_MAX = 400;
 
-export function buildTailoredOverlay(
+const captionCache = new Map<string, { expiresAt: number; regions: Record<string, string> }>();
+
+export async function buildTailoredOverlays(
   tweetText: string,
   context: TweetContext,
-  candidate: Candidate
-): MemeTextOverlay | null {
-  const template = TEMPLATE_REGISTRY.find((t) => t.match.test(candidate.name));
-  const subject = readableSubject(context, tweetText);
-  const shortSubject = limitWords(subject, 4);
-  const selected = template || genericTopBottomTemplate();
-  const textByRegion = selected.build({
-    tweetText,
-    context,
-    candidate,
-    subject,
-    shortSubject,
-  });
+  candidates: Candidate[]
+): Promise<Map<string, MemeTextOverlay>> {
+  const captionCandidates = candidates
+    .map((candidate) => {
+      const template = findMemeTemplate(candidate.name);
+      return template ? { meme_id: candidate.meme_id, name: candidate.name, template } : null;
+    })
+    .filter((item): item is CaptionCandidate => Boolean(item))
+    .slice(0, 8);
 
-  const regions = selected.regions
-    .map((region) => ({
-      ...region,
-      text: sanitizeOverlayText(textByRegion[region.id] || textByRegion[region.role] || subject),
-    }))
-    .filter((region) => region.text.length > 0);
+  if (captionCandidates.length === 0) return new Map();
+
+  const captions = await generateCaptions(tweetText, context, captionCandidates);
+  const overlays = new Map<string, MemeTextOverlay>();
+
+  for (const item of captionCandidates) {
+    const regions = captions.get(item.meme_id) || fallbackCaptions(item.template);
+    const overlay = buildOverlay(item, regions);
+    if (overlay) overlays.set(item.meme_id, overlay);
+  }
+
+  return overlays;
+}
+
+function buildOverlay(
+  item: CaptionCandidate,
+  textByRegion: Record<string, string>
+): MemeTextOverlay | null {
+  const regions = item.template.regions
+    .map((region): MemeTextRegion | null => {
+      const rawText = textByRegion[region.id] || "";
+      const text = sanitizeText(rawText, region.max_chars);
+      if (!text) return null;
+
+      return {
+        id: region.id,
+        text,
+        x: region.x,
+        y: region.y,
+        width: region.width,
+        height: region.height,
+        align: region.align,
+        valign: region.valign,
+        max_lines: region.max_lines,
+        max_chars: region.max_chars,
+        font: region.font,
+      };
+    })
+    .filter((region): region is MemeTextRegion => Boolean(region));
 
   if (regions.length === 0) return null;
 
   return {
     enabled: true,
     style: "impact",
-    alt_text: `Personalized ${candidate.name} meme about ${shortSubject}`,
+    template_id: item.template.template_id,
+    alt_text: `Personalized ${item.name} meme`,
     regions,
   };
 }
 
-function genericTopBottomTemplate(): OverlayTemplate {
-  return {
-    match: /.*/,
-    regions: [topRegion("setup", "setup"), bottomRegion("punchline", "punchline")],
-    build: ({ context, shortSubject }) => ({
-      setup: setupFor(context, shortSubject),
-      punchline: punchlineFor(context, shortSubject),
+async function generateCaptions(
+  tweetText: string,
+  context: TweetContext,
+  candidates: CaptionCandidate[]
+): Promise<Map<string, Record<string, string>>> {
+  const result = new Map<string, Record<string, string>>();
+  const uncached: CaptionCandidate[] = [];
+
+  for (const candidate of candidates) {
+    const cached = readCache(cacheKey(tweetText, candidate.template));
+    if (cached) {
+      result.set(candidate.meme_id, cached);
+    } else {
+      uncached.push(candidate);
+    }
+  }
+
+  if (uncached.length === 0) return result;
+
+  try {
+    const generated = await withTimeout(
+      requestDeepSeekCaptions(tweetText, context, uncached),
+      CAPTION_TIMEOUT_MS,
+      null
+    );
+
+    for (const candidate of uncached) {
+      const regions = generated?.get(candidate.meme_id);
+      if (!regions) continue;
+      const cleaned = cleanGeneratedRegions(regions, candidate.template);
+      if (Object.keys(cleaned).length === 0) continue;
+      result.set(candidate.meme_id, cleaned);
+      writeCache(cacheKey(tweetText, candidate.template), cleaned);
+    }
+  } catch (err) {
+    console.warn("[MemeDrop] Tailored caption generation failed:", err);
+  }
+
+  return result;
+}
+
+async function requestDeepSeekCaptions(
+  tweetText: string,
+  context: TweetContext,
+  candidates: CaptionCandidate[]
+): Promise<Map<string, Record<string, string>>> {
+  if (!process.env.DEEPSEEK_API_KEY) return new Map();
+
+  const response = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: process.env.MEMEDROP_CAPTION_MODEL || "deepseek-chat",
+      response_format: { type: "json_object" },
+      temperature: 0.75,
+      max_tokens: 1400,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You write genuinely funny, internet-native meme overlay captions. Return JSON only. No markdown. Keep text short enough to fit each region.",
+        },
+        {
+          role: "user",
+          content: buildCaptionPrompt(tweetText, context, candidates),
+        },
+      ],
     }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`DeepSeek caption request failed ${response.status}: ${body.slice(0, 400)}`);
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
   };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) return new Map();
+
+  const parsed = JSON.parse(stripJsonFence(content)) as CaptionBatchResponse;
+  const map = new Map<string, Record<string, string>>();
+  for (const item of parsed.captions || []) {
+    if (!item.meme_id || !item.regions) continue;
+    map.set(item.meme_id, item.regions);
+  }
+  return map;
 }
 
-function topRegion(id: string, role: string): RegionTemplate {
-  return box(id, role, 0.04, 0.04, 0.92, 0.2, 1);
+function buildCaptionPrompt(
+  tweetText: string,
+  context: TweetContext,
+  candidates: CaptionCandidate[]
+): string {
+  const templates = candidates.map((candidate) => ({
+    meme_id: candidate.meme_id,
+    meme_name: candidate.name,
+    template_id: candidate.template.template_id,
+    pattern: candidate.template.caption_guidance.pattern,
+    regions: candidate.template.regions.map((region) => ({
+      id: region.id,
+      role: region.role,
+      max_chars: region.max_chars,
+      max_lines: region.max_lines,
+    })),
+    good_examples: candidate.template.caption_guidance.good_examples.slice(0, 2),
+    bad_examples: candidate.template.caption_guidance.bad_examples.slice(0, 1),
+  }));
+
+  return `Post to reply to:
+"${tweetText}"
+
+Post analysis:
+- tone: ${context.tone}
+- sentiment: ${context.sentiment}
+- topic: ${context.topic}
+- intent: ${context.intent}
+- ideal reply style: ${context.reply_style}
+- keywords: ${context.keywords.join(", ")}
+
+Write meme overlay captions for these templates:
+${JSON.stringify(templates, null, 2)}
+
+Rules:
+- Sound like a sharp meme reply, not an explanation.
+- Avoid corporate phrasing, SEO phrasing, hashtags, and long noun piles.
+- Prefer concrete, simple, conversational words.
+- Respect max_chars for every region.
+- Use each meme's pattern and examples.
+- If a meme has multiple regions, the regions must work together as one joke.
+- Return JSON only with this exact shape:
+{
+  "captions": [
+    {
+      "meme_id": "same id from input",
+      "regions": {
+        "region_id": "caption text"
+      }
+    }
+  ]
+}`;
 }
 
-function bottomRegion(id: string, role: string): RegionTemplate {
-  return box(id, role, 0.04, 0.76, 0.92, 0.2, 1);
+function fallbackCaptions(template: MemeTemplate): Record<string, string> {
+  const example = template.caption_guidance.good_examples[0];
+  if (example) return example;
+  return Object.fromEntries(template.regions.map((region) => [region.id, region.role]));
 }
 
-function box(
-  id: string,
-  role: string,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  fontScale = 1
-): RegionTemplate {
-  return {
-    id,
-    role,
-    x,
-    y,
-    width,
-    height,
-    align: "center",
-    valign: "middle",
-    font_scale: fontScale,
-  };
+function cleanGeneratedRegions(
+  regions: Record<string, string>,
+  template: MemeTemplate
+): Record<string, string> {
+  const cleaned: Record<string, string> = {};
+  const allowed = new Map(template.regions.map((region) => [region.id, region]));
+
+  for (const [id, text] of Object.entries(regions)) {
+    const region = allowed.get(id);
+    if (!region) continue;
+    const sanitized = sanitizeText(text, region.max_chars);
+    if (sanitized) cleaned[id] = sanitized;
+  }
+
+  return cleaned;
 }
 
-function readableSubject(context: TweetContext, tweetText: string): string {
-  const keywordSubject = context.keywords
-    .map((k) => k.trim())
-    .filter((k) => k.length > 2 && !GENERIC_KEYWORDS.has(k.toLowerCase()))
-    .slice(0, 3)
-    .join(" ");
-  if (keywordSubject) return keywordSubject;
-
-  const words = tweetText.match(/[a-z0-9][a-z0-9_'’-]*/gi) || [];
-  const fallback = words
-    .filter((w) => w.length > 3 && !GENERIC_KEYWORDS.has(w.toLowerCase()))
-    .slice(0, 3)
-    .join(" ");
-  return fallback || context.topic || "the timeline";
-}
-
-function setupFor(context: TweetContext, subject: string): string {
-  if (context.intent === "asking") return `trying to understand ${subject}`;
-  if (context.intent === "celebrating" || context.sentiment === "positive") return `${subject} just dropped`;
-  if (context.intent === "self-deprecating") return `me handling ${subject}`;
-  if (context.intent === "venting") return `pretending ${subject} is fine`;
-  return `the ${subject} discourse`;
-}
-
-function punchlineFor(context: TweetContext, subject: string): string {
-  if (context.intent === "asking") return "the timeline has no answers";
-  if (context.intent === "celebrating" || context.sentiment === "positive") return "absolute cinema";
-  if (context.intent === "self-deprecating") return "skill issue, apparently";
-  if (context.intent === "venting") return "it is not fine";
-  if (context.intent === "dunking") return "beating the allegations challenge failed";
-  return `${subject} got meme'd`;
-}
-
-function verdictFor(context: TweetContext): string {
-  if (context.intent === "celebrating" || context.sentiment === "positive") return "big win for";
-  if (context.intent === "asking") return "nobody understands";
-  if (context.intent === "venting") return "we need to discuss";
-  return "not beating";
-}
-
-function toMockingCase(input: string): string {
-  return limitWords(input, 7)
-    .split("")
-    .map((char, index) => (index % 2 === 0 ? char.toLowerCase() : char.toUpperCase()))
-    .join("");
-}
-
-function limitWords(input: string, maxWords: number): string {
-  const words = input.trim().split(/\s+/).filter(Boolean);
-  return words.slice(0, maxWords).join(" ");
-}
-
-function sanitizeOverlayText(input: string): string {
-  return input
+function sanitizeText(input: string, maxChars: number): string {
+  const text = String(input || "")
     .replace(/\s+/g, " ")
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
-    .trim()
-    .slice(0, 96);
+    .replace(/^["']|["']$/g, "")
+    .trim();
+
+  if (text.length <= maxChars) return text;
+
+  const words = text.split(" ");
+  let result = "";
+  for (const word of words) {
+    const next = result ? `${result} ${word}` : word;
+    if (next.length > maxChars) break;
+    result = next;
+  }
+  return result || text.slice(0, maxChars).trim();
 }
 
-const GENERIC_KEYWORDS = new Set([
-  "tweet",
-  "reaction",
-  "post",
-  "this",
-  "that",
-  "with",
-  "from",
-  "they",
-  "have",
-  "just",
-  "about",
-]);
+function cacheKey(tweetText: string, template: MemeTemplate): string {
+  return `${normalizeTweet(tweetText)}|template:${template.template_id}|v1`;
+}
+
+function readCache(key: string): Record<string, string> | null {
+  const entry = captionCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    captionCache.delete(key);
+    return null;
+  }
+  captionCache.delete(key);
+  captionCache.set(key, entry);
+  return entry.regions;
+}
+
+function writeCache(key: string, regions: Record<string, string>) {
+  captionCache.set(key, {
+    regions,
+    expiresAt: Date.now() + CAPTION_CACHE_TTL_MS,
+  });
+
+  if (captionCache.size > CAPTION_CACHE_MAX) {
+    const oldest = captionCache.keys().next().value;
+    if (oldest) captionCache.delete(oldest);
+  }
+}
+
+function normalizeTweet(tweetText: string): string {
+  return tweetText.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function stripJsonFence(content: string): string {
+  return content
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "");
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 *.local
+.memedrop/
 backend/data/memes/*
 !backend/data/memes/.gitkeep
 .DS_Store

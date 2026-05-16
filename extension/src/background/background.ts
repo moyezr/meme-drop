@@ -22,6 +22,7 @@ interface Suggestion {
 interface MemeTextOverlay {
   enabled: boolean;
   style: "impact";
+  template_id?: string;
   alt_text: string;
   regions: MemeTextRegion[];
 }
@@ -36,6 +37,14 @@ interface MemeTextRegion {
   align?: "left" | "center" | "right";
   valign?: "top" | "middle" | "bottom";
   font_scale?: number;
+  max_lines?: number;
+  max_chars?: number;
+  font?: {
+    family: "Impact";
+    min_size: number;
+    max_size: number;
+    stroke_ratio: number;
+  };
 }
 
 interface CacheEntry {

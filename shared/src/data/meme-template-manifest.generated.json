@@ -1,0 +1,5179 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-14T15:34:39.388Z",
+  "generator": {
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "note": "Generated offline from meme images with OpenAI Batch API. Treat quality=draft as review-required before runtime use."
+  },
+  "templates": [
+    {
+      "template_id": "absolute-cinema",
+      "meme_id": "b2066d32-a91f-4a01-b9d4-0828234e05f7",
+      "name": "Absolute Cinema",
+      "aliases": [
+        "Absolute Cinema"
+      ],
+      "source_image": "/memes/seed-absolute-cinema-50ba416b.png",
+      "image_width": 936,
+      "image_height": 725,
+      "image_aspect_ratio": 1.291,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_left_caption",
+          "role": "setup or reaction label",
+          "x": 0.02,
+          "y": 0.02,
+          "width": 0.22,
+          "height": 0.16,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use only the empty sky area; keep clear of the raised left hand."
+        },
+        {
+          "id": "top_right_caption",
+          "role": "setup or reaction label",
+          "x": 0.76,
+          "y": 0.02,
+          "width": 0.22,
+          "height": 0.16,
+          "align": "right",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use only the empty sky area; keep clear of the raised right hand."
+        },
+        {
+          "id": "bottom_center_punchline",
+          "role": "punchline or verdict",
+          "x": 0.18,
+          "y": 0.8,
+          "width": 0.64,
+          "height": 0.16,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 30,
+            "max_size": 48,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the dark lower area; avoid the chair arms and torso edges."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the two upper corners for a short setup or opposing labels, then place the punchline in the lower center as a dramatic verdict or absurd conclusion.",
+        "good_examples": [
+          {
+            "top_left_caption": "ME EXPLAINING"
+          },
+          {
+            "bottom_center_punchline": "WHY THIS IS ACTUALLY ART"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_right_caption": "A LONG MULTI-LINE PARAGRAPH THAT COVERS THE HAND"
+          },
+          {
+            "bottom_center_punchline": "TEXT PLACED OVER THE FACE OR HANDS"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "always-has-been",
+      "meme_id": "dcc18c87-edda-4291-a413-87ec19a0d469",
+      "name": "Always Has Been",
+      "aliases": [
+        "Always Has Been"
+      ],
+      "source_image": "/memes/seed-always-has-been-d268dcdb.png",
+      "image_width": 960,
+      "image_height": 540,
+      "image_aspect_ratio": 1.7778,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup text that frames the scene or question",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the dark sky; keep short and high contrast."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline text that delivers the reveal or answer",
+          "x": 0.06,
+          "y": 0.82,
+          "width": 0.88,
+          "height": 0.14,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower sky area; avoid covering the astronauts and Earth."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a two-part setup-and-reveal caption where the second line reframes the first with an obvious or ironic truth.",
+        "good_examples": [
+          {
+            "top_caption": "ME THINKING I FOUND THE ANSWER",
+            "bottom_caption": "ALWAYS HAS BEEN"
+          },
+          {
+            "top_caption": "WHO REALLY RUNS THE WORLD?",
+            "bottom_caption": "ALWAYS HAS BEEN"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A LONG PARAGRAPH ABOUT SPACE POLITICS",
+            "bottom_caption": "WITH TOO MUCH DETAIL TO READ"
+          },
+          {
+            "top_caption": "TEXT PLACED OVER THE EARTH",
+            "bottom_caption": "TEXT PLACED OVER THE ASTRONAUTS"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "american-chopper-argument",
+      "meme_id": "d6224eb4-d290-47fb-86b3-b5e1601b966e",
+      "name": "American Chopper Argument",
+      "aliases": [
+        "American Chopper Argument"
+      ],
+      "source_image": "/memes/seed-american-chopper-argument-78194829.jpg",
+      "image_width": 640,
+      "image_height": 1800,
+      "image_aspect_ratio": 0.3556,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_argument",
+          "role": "setup or first side of the argument",
+          "x": 0.03,
+          "y": 0.02,
+          "width": 0.94,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the top panel sky/wall area; avoid the man’s head and arm."
+        },
+        {
+          "id": "middle_argument",
+          "role": "counterpoint or escalating response",
+          "x": 0.03,
+          "y": 0.22,
+          "width": 0.94,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open wall space above the second man; keep clear of his cap and face."
+        },
+        {
+          "id": "third_argument",
+          "role": "heated rebuttal or overreaction",
+          "x": 0.03,
+          "y": 0.42,
+          "width": 0.94,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best in the upper wall area of the third panel; avoid the chair and subject."
+        },
+        {
+          "id": "chaos_action",
+          "role": "the moment the argument becomes physical or absurd",
+          "x": 0.03,
+          "y": 0.62,
+          "width": 0.94,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 46,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the top band of the fourth panel; leave the center clear because of motion blur and action."
+        },
+        {
+          "id": "final_point",
+          "role": "final accusation, punchline, or ultimatum",
+          "x": 0.03,
+          "y": 0.82,
+          "width": 0.94,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the empty wall space in the bottom panel; avoid the pointing hand and face."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Each panel escalates the same argument from complaint to rebuttal to shouting to chaos, with the final panel delivering the decisive punchline or accusation.",
+        "good_examples": [
+          {
+            "top_argument": "YOU SAID THE PROJECT WAS EASY"
+          },
+          {
+            "final_point": "THEN WHY IS IT STILL BROKEN?"
+          }
+        ],
+        "bad_examples": [
+          {
+            "middle_argument": "A long paragraph explaining the whole backstory in detail"
+          },
+          {
+            "chaos_action": "Tiny caption placed over the moving arm and face"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "anakin-padme-4-panel",
+      "meme_id": "fc2ea659-0906-4319-8b1a-927215aa0004",
+      "name": "Anakin Padme 4 Panel",
+      "aliases": [
+        "Anakin Padme 4 Panel"
+      ],
+      "source_image": "/memes/seed-anakin-padme-4-panel-f3430f3a.png",
+      "image_width": 768,
+      "image_height": 768,
+      "image_aspect_ratio": 1,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_left_setup",
+          "role": "setup / first statement",
+          "x": 0.02,
+          "y": 0.02,
+          "width": 0.46,
+          "height": 0.22,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 26,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the sky/grass area above Anakin; avoid his face."
+        },
+        {
+          "id": "top_right_response",
+          "role": "reaction / contrasting reply",
+          "x": 0.54,
+          "y": 0.02,
+          "width": 0.44,
+          "height": 0.22,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 26,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open upper area above Padme's face; keep text clear of her headband and eyes."
+        },
+        {
+          "id": "bottom_left_escalation",
+          "role": "escalation / more intense follow-up",
+          "x": 0.02,
+          "y": 0.52,
+          "width": 0.46,
+          "height": 0.22,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 30,
+          "font": {
+            "family": "Impact",
+            "min_size": 26,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the lower-left grass area above the bottom edge, avoiding Anakin's face."
+        },
+        {
+          "id": "bottom_right_conclusion",
+          "role": "final reaction / punchline",
+          "x": 0.54,
+          "y": 0.52,
+          "width": 0.44,
+          "height": 0.22,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 30,
+          "font": {
+            "family": "Impact",
+            "min_size": 26,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower-right area above Padme's shoulders; avoid her face and headband."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A four-panel back-and-forth where the first two panels set up a situation and the bottom two panels escalate it into a more serious or awkward reaction.",
+        "good_examples": [
+          {
+            "top_left_setup": "Me: I can handle one more task"
+          },
+          {
+            "bottom_right_conclusion": "Also me, 5 minutes later: completely overwhelmed"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_right_response": "A long paragraph that needs 5+ lines and covers the face"
+          },
+          {
+            "bottom_left_escalation": "Tiny caption placed directly over Anakin's eyes"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "batman-slapping-robin",
+      "meme_id": "53779f1c-982c-44c6-afde-17b4f1b86901",
+      "name": "Batman Slapping Robin",
+      "aliases": [
+        "Batman Slapping Robin"
+      ],
+      "source_image": "/memes/seed-batman-slapping-robin-1edf594a.jpg",
+      "image_width": 400,
+      "image_height": 387,
+      "image_aspect_ratio": 1.0336,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_left_speech",
+          "role": "setup text for Batman's side of the argument",
+          "x": 0.03,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 28,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place inside the left speech bubble; keep short and avoid the bubble tail."
+        },
+        {
+          "id": "top_right_speech",
+          "role": "setup text for Robin's side of the argument",
+          "x": 0.55,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 28,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place inside the right speech bubble; keep short and avoid the bubble tail."
+        },
+        {
+          "id": "bottom_center_caption",
+          "role": "punchline or reaction text describing the slap moment",
+          "x": 0.18,
+          "y": 0.72,
+          "width": 0.64,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 20,
+            "max_size": 32,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open lower area above Batman's shoulders and Robin's back; avoid covering faces."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the two speech bubbles for a back-and-forth setup, then add a short punchline or reaction in the open lower area to frame the slap as the consequence.",
+        "good_examples": [
+          {
+            "top_left_speech": "I said the meeting was at 3",
+            "top_right_speech": "It is 3",
+            "bottom_center_caption": "Batman has had enough"
+          },
+          {
+            "top_left_speech": "This plan is flawless",
+            "top_right_speech": "You forgot the exit",
+            "bottom_center_caption": "Immediate correction"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_left_speech": "A very long paragraph that overflows the bubble and becomes unreadable",
+            "top_right_speech": "Another long paragraph that does the same thing",
+            "bottom_center_caption": "Too much text for the scene"
+          },
+          {
+            "top_left_speech": "Random label",
+            "top_right_speech": "Random label",
+            "bottom_center_caption": "Putting the punchline over Batman's face"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "bernie-i-am-once-again-asking-for-your-support",
+      "meme_id": "c271e7fe-c07c-4980-b44d-7315f2c7dbee",
+      "name": "Bernie I Am Once Again Asking For Your Support",
+      "aliases": [
+        "Bernie I Am Once Again Asking For Your Support"
+      ],
+      "source_image": "/memes/seed-bernie-i-am-once-again-asking-for-your-support-78aa5856.jpg",
+      "image_width": 750,
+      "image_height": 750,
+      "image_aspect_ratio": 1,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or subject-specific lead-in text",
+          "x": 0.08,
+          "y": 0.03,
+          "width": 0.84,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 48,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the sky area; avoid the Bernie logo in the top-right if possible."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or repeated demand text",
+          "x": 0.12,
+          "y": 0.74,
+          "width": 0.76,
+          "height": 0.16,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 30,
+          "font": {
+            "family": "Impact",
+            "min_size": 30,
+            "max_size": 52,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed across the lower torso/coat area; keep text short and bold."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a short setup at the top and a repeated or escalating request at the bottom to mimic Bernie’s earnest plea.",
+        "good_examples": [
+          {
+            "top_caption": "When the group project starts"
+          },
+          {
+            "bottom_caption": "I am once again asking for your support"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A long multi-line paragraph that covers the sky and logo"
+          },
+          {
+            "bottom_caption": "Tiny text placed over Bernie’s face and glasses"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "boardroom-meeting-suggestion",
+      "meme_id": "6e3f921f-fec7-4cf2-b11f-08735cf1fbfe",
+      "name": "Boardroom Meeting Suggestion",
+      "aliases": [
+        "Boardroom Meeting Suggestion"
+      ],
+      "source_image": "/memes/seed-boardroom-meeting-suggestion-acb46ec0.jpg",
+      "image_width": 500,
+      "image_height": 649,
+      "image_aspect_ratio": 0.7704,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_speaker",
+          "role": "main setup text for the first boardroom speaker",
+          "x": 0.24,
+          "y": 0,
+          "width": 0.52,
+          "height": 0.18,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place inside the large speech bubble in the top panel."
+        },
+        {
+          "id": "middle_left_speaker",
+          "role": "supporting suggestion text for the second panel left character",
+          "x": 0.03,
+          "y": 0.5,
+          "width": 0.22,
+          "height": 0.14,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 32,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Fits the small speech bubble on the left side of the middle panel."
+        },
+        {
+          "id": "middle_center_speaker",
+          "role": "supporting suggestion text for the middle panel center character",
+          "x": 0.31,
+          "y": 0.5,
+          "width": 0.22,
+          "height": 0.14,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 32,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Fits the small speech bubble above the center character in the middle panel."
+        },
+        {
+          "id": "middle_right_speaker",
+          "role": "punchline suggestion text for the relaxed right character",
+          "x": 0.62,
+          "y": 0.47,
+          "width": 0.3,
+          "height": 0.18,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 30,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the larger speech bubble on the right side of the middle panel."
+        },
+        {
+          "id": "bottom_top_left_caption",
+          "role": "reaction caption for the angry top-left inset character",
+          "x": 0.03,
+          "y": 0.79,
+          "width": 0.42,
+          "height": 0.1,
+          "align": "left",
+          "valign": "middle",
+          "max_lines": 1,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Keep short; this inset is narrow and should not cover the face."
+        },
+        {
+          "id": "bottom_bottom_left_caption",
+          "role": "reaction caption for the relaxed bottom-left inset character",
+          "x": 0.03,
+          "y": 0.9,
+          "width": 0.42,
+          "height": 0.09,
+          "align": "left",
+          "valign": "middle",
+          "max_lines": 1,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place in the lower pink inset without overlapping the face."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke escalates from a normal boardroom suggestion to increasingly absurd responses, ending with a dramatic reaction or consequence.",
+        "good_examples": [
+          {
+            "top_speaker": "We should improve the product by listening to users."
+          },
+          {
+            "middle_right_speaker": "Or we could just delete the bad reviews."
+          }
+        ],
+        "bad_examples": [
+          {
+            "middle_left_speaker": "This is a very long explanation that will not fit in the small bubble and will cover the art."
+          },
+          {
+            "bottom_top_left_caption": "A full paragraph of setup text that belongs in the top panel instead of the reaction inset."
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "buff-doge-vs-cheems",
+      "meme_id": "85f95caa-17f3-46d6-9960-3bc5e5c5b4f0",
+      "name": "Buff Doge vs. Cheems",
+      "aliases": [
+        "Buff Doge vs. Cheems"
+      ],
+      "source_image": "/memes/seed-buff-doge-vs-cheems-66c52ac6.png",
+      "image_width": 937,
+      "image_height": 720,
+      "image_aspect_ratio": 1.3014,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "buff_doge_label",
+          "role": "left-side label for the exaggerated strong version",
+          "x": 0.03,
+          "y": 0.06,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 54,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place above the muscular Doge; keep clear of the head and shoulders."
+        },
+        {
+          "id": "cheems_label",
+          "role": "right-side label for the weak or timid version",
+          "x": 0.68,
+          "y": 0.1,
+          "width": 0.28,
+          "height": 0.22,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 54,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place above the seated Doge; avoid the face and body."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the left label for the powerful, overbuilt, or confident version and the right label for the weaker, anxious, or inferior version to contrast the same thing in two states.",
+        "good_examples": [
+          {
+            "buff_doge_label": "Me after\none workout"
+          },
+          {
+            "cheems_label": "Me before\ncoffee"
+          }
+        ],
+        "bad_examples": [
+          {
+            "buff_doge_label": "Long sentence that needs three or four lines and covers the dog"
+          },
+          {
+            "cheems_label": "Tiny caption placed over the face or on the body"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "change-my-mind",
+      "meme_id": "d8f8c3a3-e47f-4518-87b3-8d7827d28da3",
+      "name": "Change My Mind",
+      "aliases": [
+        "Change My Mind"
+      ],
+      "source_image": "/memes/seed-change-my-mind-43de7ac8.jpg",
+      "image_width": 482,
+      "image_height": 361,
+      "image_aspect_ratio": 1.3352,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "sign_statement",
+          "role": "main controversial claim or opinion to be challenged",
+          "x": 0.23,
+          "y": 0.63,
+          "width": 0.54,
+          "height": 0.24,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place text in the blank white sign area; avoid the printed 'CHANGE MY MIND' strip at the bottom."
+        },
+        {
+          "id": "top_caption",
+          "role": "optional setup or context line above the main claim",
+          "x": 0.24,
+          "y": 0.48,
+          "width": 0.5,
+          "height": 0.12,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 1,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 16,
+            "max_size": 26,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use sparingly; keep short so it does not compete with the sign text."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke is a bold, debatable claim on the sign, often phrased as an opinion so extreme or specific that it invites disagreement.",
+        "good_examples": [
+          {
+            "sign_statement": "Pineapple Belongs on Pizza"
+          },
+          {
+            "sign_statement": "Meetings Could Have Been Emails"
+          }
+        ],
+        "bad_examples": [
+          {
+            "sign_statement": "A long paragraph explaining why everyone is wrong and listing five reasons"
+          },
+          {
+            "top_caption": "This is the funniest thing ever and here's the entire setup"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "charlie-conspiracy-always-sunny-in-philidelphia",
+      "meme_id": "52cdf6cc-19f3-4d99-affa-9007c009dd04",
+      "name": "Charlie Conspiracy (Always Sunny in Philidelphia)",
+      "aliases": [
+        "Charlie Conspiracy (Always Sunny in Philidelphia)"
+      ],
+      "source_image": "/memes/seed-charlie-conspiracy-always-sunny-in-philidelphia-55bf4837.jpg",
+      "image_width": 1024,
+      "image_height": 768,
+      "image_aspect_ratio": 1.3333,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_left_claim",
+          "role": "setup or claim being argued",
+          "x": 0.03,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.18,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open wall area above and left of Charlie; avoid the central face and red string cluster."
+        },
+        {
+          "id": "top_right_counterclaim",
+          "role": "contradicting detail or escalation",
+          "x": 0.56,
+          "y": 0.03,
+          "width": 0.4,
+          "height": 0.18,
+          "align": "right",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 40,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the upper-right wall space; keep clear of the right-edge person and existing papers."
+        },
+        {
+          "id": "bottom_left_reveal",
+          "role": "punchline or reveal",
+          "x": 0.03,
+          "y": 0.78,
+          "width": 0.44,
+          "height": 0.18,
+          "align": "left",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 44,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower-left open area near the chair and desk; avoid Charlie's torso and the foreground cart."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke is a frantic conspiracy-board explanation where the text should read like an increasingly unhinged chain of logic, with the final line delivering the absurd conclusion.",
+        "good_examples": [
+          {
+            "top_left_claim": "WHEN THE GROUP CHAT GOES SILENT"
+          },
+          {
+            "bottom_left_reveal": "BECAUSE THEY'RE ALL SECRETLY PLANNING MY SURPRISE PARTY"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_right_counterclaim": "HAPPY BIRTHDAY"
+          },
+          {
+            "top_left_claim": "A very long sentence that keeps going and going past the safe box and becomes unreadable"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "clown-applying-makeup",
+      "meme_id": "f5c9dbaa-559d-4785-80b1-cac4737733ac",
+      "name": "Clown Applying Makeup",
+      "aliases": [
+        "Clown Applying Makeup"
+      ],
+      "source_image": "/memes/seed-clown-applying-makeup-803f234c.jpg",
+      "image_width": 750,
+      "image_height": 798,
+      "image_aspect_ratio": 0.9398,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup",
+          "x": 0,
+          "y": 0,
+          "width": 0.72,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Large empty white space on the left/top is the safest editable area."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline",
+          "x": 0,
+          "y": 0.82,
+          "width": 0.72,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower-left white space; keep clear of the clown image stack on the right."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A setup line introduces a normal or modest goal, and the punchline shows it escalating into an absurd over-the-top clown transformation.",
+        "good_examples": [
+          {
+            "top_caption": "Just a quick touch-up before the meeting"
+          },
+          {
+            "bottom_caption": "Me 10 minutes later after 'fixing' one tiny thing"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "Put text over the clown's face"
+          },
+          {
+            "bottom_caption": "Use a long paragraph that fills the whole image"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "disaster-girl",
+      "meme_id": "0c67e99e-a57c-4b50-8a58-3230ca623d0c",
+      "name": "Disaster Girl",
+      "aliases": [
+        "Disaster Girl"
+      ],
+      "source_image": "/memes/seed-disaster-girl-ac6d1b2e.jpg",
+      "image_width": 500,
+      "image_height": 375,
+      "image_aspect_ratio": 1.3333,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use for the ironic setup or situation description; keep clear of smoke and the girl's head."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline",
+          "x": 0.04,
+          "y": 0.78,
+          "width": 0.92,
+          "height": 0.2,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 48,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use for the punchline or self-satisfied twist; avoid covering the girl's face and the foreground road."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A dramatic disaster scene is paired with a smug or mischievous reaction, making the joke about the narrator or subject seeming responsible or pleased by the chaos.",
+        "good_examples": [
+          {
+            "top_caption": "When the group project starts falling apart"
+          },
+          {
+            "bottom_caption": "and I realize I was the one who sent the wrong file"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A detailed paragraph about fire safety procedures and emergency response"
+          },
+          {
+            "bottom_caption": "The girl is clearly terrified and wants help immediately"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "distracted-boyfriend",
+      "meme_id": "687f8cea-3c18-446d-a77b-c8ac9593c00e",
+      "name": "Distracted Boyfriend",
+      "aliases": [
+        "Distracted Boyfriend"
+      ],
+      "source_image": "/memes/seed-distracted-boyfriend-e1ea62aa.jpg",
+      "image_width": 1200,
+      "image_height": 800,
+      "image_aspect_ratio": 1.5,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "girlfriend",
+          "role": "label the thing being ignored or rejected",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.34,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 58,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the left foreground area; keep clear of the face and shoulders."
+        },
+        {
+          "id": "boyfriend",
+          "role": "label the person making the distracted choice",
+          "x": 0.43,
+          "y": 0.02,
+          "width": 0.28,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 22,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 58,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the upper middle sky area above the man."
+        },
+        {
+          "id": "other_woman",
+          "role": "label the tempting alternative or new obsession",
+          "x": 0.74,
+          "y": 0.02,
+          "width": 0.22,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 20,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 58,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the upper right area; avoid the woman's head and shoulder."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the three labels to frame a situation where someone abandons the obvious choice for a more tempting distraction.",
+        "good_examples": [
+          {
+            "girlfriend": "My current project"
+          },
+          {
+            "other_woman": "A shiny new side quest"
+          }
+        ],
+        "bad_examples": [
+          {
+            "boyfriend": "A full paragraph explaining the joke"
+          },
+          {
+            "girlfriend": "Text placed over the face or body"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "drake-hotline-bling",
+      "meme_id": "315866ff-a9f1-46ba-8699-bc2cecd1cb9f",
+      "name": "Drake Hotline Bling",
+      "aliases": [
+        "Drake Hotline Bling"
+      ],
+      "source_image": "/memes/seed-drake-hotline-bling-897dfe26.jpg",
+      "image_width": 1200,
+      "image_height": 1200,
+      "image_aspect_ratio": 1,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "reject",
+          "role": "top panel: the thing being dismissed or disliked",
+          "x": 0.02,
+          "y": 0.03,
+          "width": 0.46,
+          "height": 0.22,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 58,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place in the empty yellow space above/left of Drake's head; avoid covering face and raised hand."
+        },
+        {
+          "id": "approve",
+          "role": "bottom panel: the preferred alternative or punchline",
+          "x": 0.02,
+          "y": 0.52,
+          "width": 0.46,
+          "height": 0.22,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 58,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place in the empty yellow space on the lower panel, left of Drake's torso and above the bottom edge."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the top box for the rejected option and the bottom box for the better choice or ironic preference.",
+        "good_examples": [
+          {
+            "reject": "Studying all night",
+            "approve": "Cramming 10 minutes before class"
+          },
+          {
+            "reject": "Long meetings",
+            "approve": "An email that could've been sent instead"
+          }
+        ],
+        "bad_examples": [
+          {
+            "reject": "I love this",
+            "approve": "This is also great"
+          },
+          {
+            "reject": "A very long sentence that will not fit in the box",
+            "approve": "Another overly long sentence that breaks the layout"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "epic-handshake",
+      "meme_id": "36157fab-0b8d-4c2b-a3bc-94943ffb1748",
+      "name": "Epic Handshake",
+      "aliases": [
+        "Epic Handshake"
+      ],
+      "source_image": "/memes/seed-epic-handshake-92a59c69.jpg",
+      "image_width": 900,
+      "image_height": 645,
+      "image_aspect_ratio": 1.3953,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "left_side_label",
+          "role": "labels the left participant or idea",
+          "x": 0,
+          "y": 0.08,
+          "width": 0.28,
+          "height": 0.28,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 54,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the empty gray background near the upper-left; avoid the arm and shoulder."
+        },
+        {
+          "id": "right_side_label",
+          "role": "labels the right participant or idea",
+          "x": 0.72,
+          "y": 0.08,
+          "width": 0.28,
+          "height": 0.28,
+          "align": "right",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 54,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the empty gray background near the upper-right; avoid the red shirt and arm."
+        },
+        {
+          "id": "shared_agreement",
+          "role": "states the thing both sides agree on",
+          "x": 0.28,
+          "y": 0,
+          "width": 0.44,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 1,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 26,
+            "max_size": 48,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use only if a short shared phrase fits in the top-center sky area without covering the clasped hands."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the two sides to represent unlikely allies or opposing groups, then add a short shared agreement that explains what they both want or hate.",
+        "good_examples": [
+          {
+            "left_side_label": "People who hate meetings"
+          },
+          {
+            "right_side_label": "People who love meetings"
+          }
+        ],
+        "bad_examples": [
+          {
+            "left_side_label": "A very long sentence that wraps awkwardly and covers the arm"
+          },
+          {
+            "shared_agreement": "Something extremely specific that needs three lines and blocks the handshake"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "evil-kermit",
+      "meme_id": "3d1cc48b-fbb1-4fe6-ab8d-84cb760d02ca",
+      "name": "Evil Kermit",
+      "aliases": [
+        "Evil Kermit"
+      ],
+      "source_image": "/memes/seed-evil-kermit-4f5ed126.jpg",
+      "image_width": 700,
+      "image_height": 325,
+      "image_aspect_ratio": 2.1538,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "kermit_conscience",
+          "role": "the cautious or wholesome thought",
+          "x": 0.03,
+          "y": 0.06,
+          "width": 0.34,
+          "height": 0.34,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the left Kermit side, keeping clear of the eyes and head outline."
+        },
+        {
+          "id": "evil_kermit",
+          "role": "the tempting or bad idea",
+          "x": 0.5,
+          "y": 0.08,
+          "width": 0.42,
+          "height": 0.38,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the hooded Kermit side; avoid covering the face area too heavily."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The left side presents the sensible choice while the right side delivers the tempting, self-sabotaging, or mischievous alternative.",
+        "good_examples": [
+          {
+            "kermit_conscience": "Go to bed early"
+          },
+          {
+            "evil_kermit": "Stay up and watch one more episode"
+          }
+        ],
+        "bad_examples": [
+          {
+            "kermit_conscience": "This is a detailed paragraph about my life choices"
+          },
+          {
+            "evil_kermit": "A neutral label with no contrast or temptation"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "expanding-brain",
+      "meme_id": "22498745-f5c5-41e7-8dc8-b9c2a24582d5",
+      "name": "Expanding Brain",
+      "aliases": [
+        "Expanding Brain"
+      ],
+      "source_image": "/memes/seed-expanding-brain-104ce251.jpg",
+      "image_width": 857,
+      "image_height": 1202,
+      "image_aspect_ratio": 0.713,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "level_1",
+          "role": "baseline or simplest idea",
+          "x": 0,
+          "y": 0,
+          "width": 0.5,
+          "height": 0.25,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Top-left blank panel; keep text centered and short."
+        },
+        {
+          "id": "level_2",
+          "role": "slightly better or more advanced idea",
+          "x": 0,
+          "y": 0.25,
+          "width": 0.5,
+          "height": 0.25,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Second blank panel on the left; matches the classic escalating-brain structure."
+        },
+        {
+          "id": "level_3",
+          "role": "more enlightened or absurdly advanced idea",
+          "x": 0,
+          "y": 0.5,
+          "width": 0.5,
+          "height": 0.25,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Third blank panel on the left; best for the punchier escalation step."
+        },
+        {
+          "id": "level_4",
+          "role": "ultimate galaxy-brain conclusion",
+          "x": 0,
+          "y": 0.75,
+          "width": 0.5,
+          "height": 0.25,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Bottom-left blank panel; usually the funniest or most extreme statement."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Each left-side panel gets a progressively more extreme or absurd version of the same idea, ending with the most enlightened punchline in the bottom panel.",
+        "good_examples": [
+          {
+            "level_1": "Use paper planner"
+          },
+          {
+            "level_4": "Become a sentient spreadsheet"
+          }
+        ],
+        "bad_examples": [
+          {
+            "level_1": "A very long sentence that wraps awkwardly across four lines and overwhelms the panel"
+          },
+          {
+            "level_4": "A normal, non-escalating statement that does not feel bigger or funnier than the earlier panels"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "finding-neverland",
+      "meme_id": "eb89f5c4-2d53-4f63-bd0b-0074cf89a7ad",
+      "name": "Finding Neverland",
+      "aliases": [
+        "Finding Neverland"
+      ],
+      "source_image": "/memes/seed-finding-neverland-284816ec.jpg",
+      "image_width": 423,
+      "image_height": 600,
+      "image_aspect_ratio": 0.705,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_reaction",
+          "role": "setup / emotional reaction",
+          "x": 0.56,
+          "y": 0.03,
+          "width": 0.38,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the upper-right sky/blurred background area; avoid the boy's face and the adult's head."
+        },
+        {
+          "id": "middle_reaction",
+          "role": "counterreaction / judgment",
+          "x": 0.05,
+          "y": 0.36,
+          "width": 0.42,
+          "height": 0.18,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 26,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the left side of the middle panel where the background is softer; keep clear of both faces."
+        },
+        {
+          "id": "bottom_punchline",
+          "role": "punchline / emotional payoff",
+          "x": 0.06,
+          "y": 0.78,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 38,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed across the lower bench/grass area, but avoid covering the seated figures too much; works as the final reveal."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the first two panels for escalating concern or skepticism, then land the joke in the final panel with an unexpectedly tender, dramatic, or absurd payoff.",
+        "good_examples": [
+          {
+            "top_reaction": "WHEN THE GROUP CHAT GOES SILENT"
+          },
+          {
+            "bottom_punchline": "AND THEN HE SAID: 'I BROUGHT SNACKS'"
+          }
+        ],
+        "bad_examples": [
+          {
+            "middle_reaction": "A VERY LONG SENTENCE THAT COVERS BOTH FACES AND THE WHOLE PANEL"
+          },
+          {
+            "top_reaction": "tiny caption in lowercase with no contrast"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "flex-tape",
+      "meme_id": "cac851a1-397f-44c3-b4eb-b9d4ee58e5d5",
+      "name": "Flex Tape",
+      "aliases": [
+        "Flex Tape"
+      ],
+      "source_image": "/memes/seed-flex-tape-597d7dd4.png",
+      "image_width": 510,
+      "image_height": 572,
+      "image_aspect_ratio": 0.8916,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or reaction text describing the absurd demo",
+          "x": 0.05,
+          "y": 0.03,
+          "width": 0.9,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the upper empty area; avoid the man's head and the product label."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or consequence text tied to the taped hand/demo",
+          "x": 0.06,
+          "y": 0.72,
+          "width": 0.88,
+          "height": 0.22,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 44,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 42,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower half where the hand and tape are visible; keep text above the very bottom edge."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a short setup on top and a punchline on the bottom that contrasts a dramatic claim with the obvious over-the-top tape solution.",
+        "good_examples": [
+          {
+            "top_caption": "WHEN THE LEAK IS 'TEMPORARY'"
+          },
+          {
+            "bottom_caption": "SO I FIXED IT WITH 14 FEET OF TAPE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A long paragraph explaining the entire backstory and every step of the repair"
+          },
+          {
+            "bottom_caption": "Tiny text placed over the hand and tape so it becomes unreadable"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "futurama-fry",
+      "meme_id": "fe62814f-ff30-4390-8603-01eba52bbe5f",
+      "name": "Futurama Fry",
+      "aliases": [
+        "Futurama Fry"
+      ],
+      "source_image": "/memes/seed-futurama-fry-e3b60758.jpg",
+      "image_width": 552,
+      "image_height": 414,
+      "image_aspect_ratio": 1.3333,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_reaction_caption",
+          "role": "setup or reaction text",
+          "x": 0.04,
+          "y": 0.04,
+          "width": 0.92,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place short reaction/setup text in the open sky area above Fry's head; keep it away from the hair and frame edges."
+        },
+        {
+          "id": "bottom_reaction_caption",
+          "role": "punchline or conclusion text",
+          "x": 0.04,
+          "y": 0.78,
+          "width": 0.92,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower blue background area for the punchline; avoid covering Fry's shoulders and face."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a short setup at the top and a punchline at the bottom to frame Fry's skeptical, unimpressed reaction.",
+        "good_examples": [
+          {
+            "top_reaction_caption": "WHEN THE GROUP CHAT SAYS"
+          },
+          {
+            "bottom_reaction_caption": "‘LET'S DO A QUICK CALL’"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_reaction_caption": "A LONG PARAGRAPH ABOUT EVERYTHING THAT HAPPENED TODAY"
+          },
+          {
+            "bottom_reaction_caption": "THIS IS A VERY SPECIFIC TECHNICAL EXPLANATION WITH MULTIPLE CLAUSES AND NO PUNCHLINE"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "grandma-finds-the-internet",
+      "meme_id": "a17305b4-10fd-4ad4-9273-ef665b277d0f",
+      "name": "Grandma Finds The Internet",
+      "aliases": [
+        "Grandma Finds The Internet"
+      ],
+      "source_image": "/memes/seed-grandma-finds-the-internet-ac710f04.jpg",
+      "image_width": 640,
+      "image_height": 480,
+      "image_aspect_ratio": 1.3333,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or reaction label",
+          "x": 0.05,
+          "y": 0.03,
+          "width": 0.9,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place over the empty upper wall area; keep text short and high-contrast."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or reaction payoff",
+          "x": 0.05,
+          "y": 0.78,
+          "width": 0.9,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use the lower dark foreground area, but avoid covering the laptop screen and the woman's face."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A simple setup-and-punchline joke where Grandma is confused or amazed by something on the internet, with the top text introducing the situation and the bottom text delivering the absurd reaction.",
+        "good_examples": [
+          {
+            "top_caption": "GRANDMA DISCOVERS\nTHE INTERNET"
+          },
+          {
+            "bottom_caption": "AND NOW SHE'S\nA TECH SUPPORT EXPERT"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A LONG PARAGRAPH ABOUT HOW WIFI WORKS AND WHY ROUTERS ARE CONFUSING"
+          },
+          {
+            "bottom_caption": "PUT TEXT OVER HER FACE, GLASSES, OR THE LAPTOP SCREEN"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "grim-reaper-knocking-door",
+      "meme_id": "2204c081-d304-4fbc-8083-6a624d4b15ed",
+      "name": "Grim Reaper Knocking Door",
+      "aliases": [
+        "Grim Reaper Knocking Door"
+      ],
+      "source_image": "/memes/seed-grim-reaper-knocking-door-e1878f71.jpg",
+      "image_width": 500,
+      "image_height": 312,
+      "image_aspect_ratio": 1.6026,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the premise or situation; keep text high and centered to avoid the doors and figure."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline",
+          "x": 0.06,
+          "y": 0.8,
+          "width": 0.88,
+          "height": 0.16,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 28,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the twist or reaction; place low but above the watermark and away from the reaper."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A setup line describes an ordinary or tense situation, and the punchline reveals an unexpectedly grim or over-the-top consequence.",
+        "good_examples": [
+          {
+            "top_caption": "When the landlord says he just wants to talk"
+          },
+          {
+            "bottom_caption": "Me opening the door after 3 missed rent payments"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "Tiny text placed over the reaper's face and scythe"
+          },
+          {
+            "bottom_caption": "Long paragraph covering the blood trail and watermark"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "gru-s-plan",
+      "meme_id": "96bbbf88-e4ba-4e12-b207-3eb9c90acf45",
+      "name": "Gru's Plan",
+      "aliases": [
+        "Gru's Plan"
+      ],
+      "source_image": "/memes/seed-gru-s-plan-aaa3fe50.jpg",
+      "image_width": 700,
+      "image_height": 449,
+      "image_aspect_ratio": 1.559,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_left",
+          "role": "setup",
+          "x": 0,
+          "y": 0,
+          "width": 0.5,
+          "height": 0.5,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text in the blank sign area; avoid Gru's face and hand."
+        },
+        {
+          "id": "top_right",
+          "role": "escalation",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 0.5,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text in the blank sign area; avoid Gru's face and body."
+        },
+        {
+          "id": "bottom_left",
+          "role": "twist",
+          "x": 0,
+          "y": 0.5,
+          "width": 0.5,
+          "height": 0.5,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text in the blank sign area; keep clear of Gru's hands and face."
+        },
+        {
+          "id": "bottom_right",
+          "role": "punchline",
+          "x": 0.5,
+          "y": 0.5,
+          "width": 0.5,
+          "height": 0.5,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text in the blank sign area; avoid Gru's head and body."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the four panels as a progression from setup to increasingly absurd escalation, with the final panel delivering the punchline.",
+        "good_examples": [
+          {
+            "top_left": "Me: I'll just check one thing"
+          },
+          {
+            "bottom_right": "Three hours later, I'm still scrolling"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_left": "A full paragraph that won't fit"
+          },
+          {
+            "bottom_right": "Text placed over Gru's face instead of the sign"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "gus-fring-we-are-not-the-same",
+      "meme_id": "d5ee6505-2c5c-4a9f-bb30-bc98d555e336",
+      "name": "Gus Fring we are not the same",
+      "aliases": [
+        "Gus Fring we are not the same"
+      ],
+      "source_image": "/memes/seed-gus-fring-we-are-not-the-same-2b984f6d.png",
+      "image_width": 700,
+      "image_height": 1000,
+      "image_aspect_ratio": 0.7,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_statement",
+          "role": "setup or claim being contrasted",
+          "x": 0.08,
+          "y": 0.03,
+          "width": 0.84,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 54,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place over the empty upper background; keep away from the head and shoulders."
+        },
+        {
+          "id": "bottom_comparison",
+          "role": "contrasting punchline or rebuttal",
+          "x": 0.1,
+          "y": 0.78,
+          "width": 0.8,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 44,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 54,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use the lower dark area for the comparison line; avoid covering the hands and suit details too much."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "State a confident claim or self-image on top, then undercut it with a sharper comparison or contradiction below using Gus Fring's stern, superior expression.",
+        "good_examples": [
+          {
+            "top_statement": "ME WHEN I SAY I'M THE MOST ORGANIZED PERSON I KNOW"
+          },
+          {
+            "bottom_comparison": "MY DESK: LOOKS LIKE A CRIME SCENE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_statement": "tiny text packed into three lines with no contrast"
+          },
+          {
+            "bottom_comparison": "text placed over his face and tie knot"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "hide-the-pain-harold",
+      "meme_id": "a456ab81-d6a5-4d8c-8293-df3186ff59d3",
+      "name": "Hide the Pain Harold",
+      "aliases": [
+        "Hide the Pain Harold"
+      ],
+      "source_image": "/memes/seed-hide-the-pain-harold-5594557a.jpg",
+      "image_width": 480,
+      "image_height": 601,
+      "image_aspect_ratio": 0.7987,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or situation text",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.88,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the upper white space above the man; avoid covering his head and the shelf objects."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or reaction text",
+          "x": 0.06,
+          "y": 0.84,
+          "width": 0.88,
+          "height": 0.14,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower white margin beneath the second panel; keep clear of the desk edge and laptop."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a simple setup-and-punchline or expectation-vs-reality caption, with Harold's polite smile selling the awkward or resigned reaction.",
+        "good_examples": [
+          {
+            "top_caption": "When the meeting is almost over",
+            "bottom_caption": "and they ask if anyone has 'one quick question'"
+          },
+          {
+            "top_caption": "Me pretending everything is fine",
+            "bottom_caption": "after reading the email I definitely should not have opened"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "Detailed paragraph about office policy",
+            "bottom_caption": "with too much text to fit comfortably"
+          },
+          {
+            "top_caption": "A label placed over Harold's face",
+            "bottom_caption": "or text covering the laptop and mug"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "i-m-the-captain-now",
+      "meme_id": "27fc6f18-54a9-46a4-a3f5-cd2878dea9c3",
+      "name": "I'm The Captain Now",
+      "aliases": [
+        "I'm The Captain Now"
+      ],
+      "source_image": "/memes/seed-i-m-the-captain-now-c27e5bff.jpg",
+      "image_width": 478,
+      "image_height": 350,
+      "image_aspect_ratio": 1.3657,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or context text",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 20,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the bright empty upper area; avoid the subject's head and the ceiling beam."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or reaction text",
+          "x": 0.48,
+          "y": 0.58,
+          "width": 0.48,
+          "height": 0.34,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower-right darker area; keep clear of the face and hand for readability."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a short setup at the top and a decisive, bossy punchline at the bottom that matches the character's intense 'take charge' expression.",
+        "good_examples": [
+          {
+            "top_caption": "When the group project goes off the rails"
+          },
+          {
+            "bottom_caption": "Fine. I'm the captain now."
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A long paragraph explaining the whole situation in detail"
+          },
+          {
+            "bottom_caption": "Tiny text placed over the face and fingers where it becomes unreadable"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "inhaling-seagull",
+      "meme_id": "436097e4-67c4-4294-b045-13a117e06448",
+      "name": "Inhaling Seagull",
+      "aliases": [
+        "Inhaling Seagull"
+      ],
+      "source_image": "/memes/seed-inhaling-seagull-82fa7183.jpg",
+      "image_width": 1269,
+      "image_height": 2825,
+      "image_aspect_ratio": 0.4492,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "setup",
+          "role": "top caption for the situation or premise",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.88,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 42,
+            "max_size": 72,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the dark upper margin; keep away from the seagull head and roof edge."
+        },
+        {
+          "id": "reaction",
+          "role": "main punchline or escalating reaction text",
+          "x": 0.08,
+          "y": 0.72,
+          "width": 0.84,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 55,
+          "font": {
+            "family": "Impact",
+            "min_size": 44,
+            "max_size": 78,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the red glow area at the bottom; high contrast and least obstruction."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a short setup at the top and a dramatic, over-the-top reaction at the bottom as the seagull escalates from calm to screaming.",
+        "good_examples": [
+          {
+            "setup": "When the group chat says 'quick question'",
+            "reaction": "and then sends a 12-message essay"
+          },
+          {
+            "setup": "Me trying to stay calm during the meeting",
+            "reaction": "when they say 'let's go around and introduce ourselves'"
+          }
+        ],
+        "bad_examples": [
+          {
+            "setup": "A detailed paragraph about bird biology",
+            "reaction": "with no punchline or escalation"
+          },
+          {
+            "setup": "Bottom text only",
+            "reaction": "that depends on reading the bird's face as a literal quote"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "is-this-a-pigeon",
+      "meme_id": "cd73e085-f37a-4a7d-8765-224e5c56de5f",
+      "name": "Is This A Pigeon",
+      "aliases": [
+        "Is This A Pigeon"
+      ],
+      "source_image": "/memes/seed-is-this-a-pigeon-595698db.jpg",
+      "image_width": 1587,
+      "image_height": 1425,
+      "image_aspect_ratio": 1.1137,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup",
+          "x": 0.04,
+          "y": 0.02,
+          "width": 0.92,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 42,
+            "max_size": 74,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open sky/wall area above the character; keep clear of the window frame and butterfly."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline",
+          "x": 0.03,
+          "y": 0.82,
+          "width": 0.94,
+          "height": 0.16,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 44,
+          "font": {
+            "family": "Impact",
+            "min_size": 42,
+            "max_size": 74,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the lower margin and darker foreground; avoid covering the hand and book too much."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A clueless or mistaken interpretation is introduced in the top text, then the bottom text reveals the absurdly wrong label or conclusion.",
+        "good_examples": [
+          {
+            "top_caption": "When you think you've found a rare butterfly..."
+          },
+          {
+            "bottom_caption": "Is this a pigeon?"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "This is definitely a butterfly."
+          },
+          {
+            "bottom_caption": "Look at the beautiful window behind him."
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "laughing-leo",
+      "meme_id": "fc01f7f9-770d-48a7-9259-29a424ec4d48",
+      "name": "Laughing Leo",
+      "aliases": [
+        "Laughing Leo"
+      ],
+      "source_image": "/memes/seed-laughing-leo-b1c503dc.png",
+      "image_width": 470,
+      "image_height": 470,
+      "image_aspect_ratio": 1,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or reaction label",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the situation being described; keep text short to avoid covering the face."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or reaction payoff",
+          "x": 0.06,
+          "y": 0.78,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best for the ironic or amused payoff; avoid the drink and flower on the right side if possible."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A setup at the top describes an awkward, classy, or overconfident situation, and the bottom delivers the amused, smug, or disbelieving reaction.",
+        "good_examples": [
+          {
+            "top_caption": "When you say 'I can handle it'..."
+          },
+          {
+            "bottom_caption": "...and then immediately regret it"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A very long sentence that tries to explain the entire joke in one box and covers the face"
+          },
+          {
+            "bottom_caption": "Tiny text placed over the drink and jacket details so it becomes unreadable"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "left-exit-12-off-ramp",
+      "meme_id": "970d89af-f27e-4c1f-a843-589ab2a2f5b1",
+      "name": "Left Exit 12 Off Ramp",
+      "aliases": [
+        "Left Exit 12 Off Ramp"
+      ],
+      "source_image": "/memes/seed-left-exit-12-off-ramp-cecf05ec.jpg",
+      "image_width": 804,
+      "image_height": 767,
+      "image_aspect_ratio": 1.0482,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "left_exit_sign",
+          "role": "setup or label for the obvious choice being presented",
+          "x": 0.22,
+          "y": 0.02,
+          "width": 0.52,
+          "height": 0.18,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the top highway sign area; keep text short and bold."
+        },
+        {
+          "id": "car_drift_action",
+          "role": "punchline or reaction text describing the wrong turn / chaotic choice",
+          "x": 0.18,
+          "y": 0.56,
+          "width": 0.58,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 48,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open road area above the drifting car; avoid covering the car itself too much."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke contrasts a clear, sensible direction with a sudden, absurdly wrong choice, usually by labeling the sign as the intended plan and the drifting car as the actual behavior.",
+        "good_examples": [
+          {
+            "left_exit_sign": "ME: TAKE THE SAFE OPTION",
+            "car_drift_action": "ALSO ME: SWERVES INTO CHAOS"
+          },
+          {
+            "left_exit_sign": "LOGICAL DECISION",
+            "car_drift_action": "WHAT I DO INSTEAD"
+          }
+        ],
+        "bad_examples": [
+          {
+            "left_exit_sign": "A LONG PARAGRAPH ABOUT MY DAY",
+            "car_drift_action": "ANOTHER LONG PARAGRAPH"
+          },
+          {
+            "left_exit_sign": "UNRELATED SETUP",
+            "car_drift_action": "UNRELATED PUNCHLINE"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "leonardo-dicaprio-cheers",
+      "meme_id": "3c11f070-588b-468a-b0f0-443d82bf9c55",
+      "name": "Leonardo Dicaprio Cheers",
+      "aliases": [
+        "Leonardo Dicaprio Cheers"
+      ],
+      "source_image": "/memes/seed-leonardo-dicaprio-cheers-ba2ae9b2.jpg",
+      "image_width": 600,
+      "image_height": 400,
+      "image_aspect_ratio": 1.5,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or subject label",
+          "x": 0.08,
+          "y": 0.03,
+          "width": 0.84,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the upper background; keep clear of the head and glass."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or reaction payoff",
+          "x": 0.08,
+          "y": 0.78,
+          "width": 0.84,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower dark area; avoid the hand and glass."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a classic top-and-bottom reaction setup where the top line frames the situation and the bottom line delivers the smug approval or celebratory punchline.",
+        "good_examples": [
+          {
+            "top_caption": "WHEN THE GROUP CHAT FINALLY AGREES"
+          },
+          {
+            "bottom_caption": "CHEERS TO MY TERRIBLE IDEA WORKING"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A very long sentence that wraps awkwardly across too many lines and covers his face"
+          },
+          {
+            "bottom_caption": "Tiny text placed over the glass and hand so it becomes unreadable"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "megamind-peeking",
+      "meme_id": "c7bbd861-ef58-4ee1-badd-1df82a945921",
+      "name": "Megamind peeking",
+      "aliases": [
+        "Megamind peeking"
+      ],
+      "source_image": "/memes/seed-megamind-peeking-b5887e0c.png",
+      "image_width": 540,
+      "image_height": 540,
+      "image_aspect_ratio": 1,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or reaction text placed above the face to frame the scene",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Keep text high and centered; avoid covering the forehead and eyes."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or reveal text placed below the face",
+          "x": 0.06,
+          "y": 0.8,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower dark area for contrast; avoid the chin and shoulder edges."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a short setup at the top and a surprised, suspicious, or ironic punchline at the bottom to match Megamind's peeking expression.",
+        "good_examples": [
+          {
+            "top_caption": "WHEN YOU HEAR YOUR NAME"
+          },
+          {
+            "bottom_caption": "BUT YOU WERE JUST TALKING ABOUT ME"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A VERY LONG SENTENCE THAT WRAPS TOO MUCH AND COVERS THE FACE"
+          },
+          {
+            "bottom_caption": "tiny text with low contrast placed over the eyes"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "mocking-spongebob",
+      "meme_id": "3b5d3a88-b379-47d7-87b1-8e4d6d0d3f9c",
+      "name": "Mocking Spongebob",
+      "aliases": [
+        "Mocking Spongebob"
+      ],
+      "source_image": "/memes/seed-mocking-spongebob-74cf9e48.jpg",
+      "image_width": 502,
+      "image_height": 353,
+      "image_aspect_ratio": 1.4221,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or quoted text that frames the mocking tone",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the open blue background at the top; keep away from the character's hat and rope."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or mocked paraphrase that completes the joke",
+          "x": 0.06,
+          "y": 0.8,
+          "width": 0.88,
+          "height": 0.17,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower floor area; avoid the character's feet and body."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a short statement in one region and a mocking, exaggerated repetition or paraphrase in the other to imitate the character's taunting tone.",
+        "good_examples": [
+          {
+            "top_caption": "YOU SAID YOU WERE BUSY",
+            "bottom_caption": "yOu SaId YoU wErE bUsY"
+          },
+          {
+            "top_caption": "THIS IS A SERIOUS PLAN",
+            "bottom_caption": "tHiS iS a SeRiOuS pLaN"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A long paragraph about my day",
+            "bottom_caption": "Another long paragraph with no contrast"
+          },
+          {
+            "top_caption": "Completely unrelated setup",
+            "bottom_caption": "Random punchline with no mocking repetition"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "monkey-puppet",
+      "meme_id": "42df9b78-a57c-493d-841f-656ebd920ed6",
+      "name": "Monkey Puppet",
+      "aliases": [
+        "Monkey Puppet"
+      ],
+      "source_image": "/memes/seed-monkey-puppet-e1ddb29d.jpg",
+      "image_width": 923,
+      "image_height": 768,
+      "image_aspect_ratio": 1.2018,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "left_reaction",
+          "role": "setup / initial reaction",
+          "x": 0.02,
+          "y": 0.03,
+          "width": 0.46,
+          "height": 0.94,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 54,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text in the open upper and lower space around the left monkey; avoid covering the face."
+        },
+        {
+          "id": "right_reaction",
+          "role": "follow-up / second reaction",
+          "x": 0.52,
+          "y": 0.03,
+          "width": 0.46,
+          "height": 0.94,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 54,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text in the open upper and lower space around the right monkey; avoid covering the face."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the two panels as a before-and-after reaction: the left side shows the first thought or response, and the right side shows the awkward, suspicious, or resigned follow-up.",
+        "good_examples": [
+          {
+            "left_reaction": "Me hearing the plan"
+          },
+          {
+            "right_reaction": "Me realizing I'm the plan"
+          }
+        ],
+        "bad_examples": [
+          {
+            "left_reaction": "A long paragraph explaining the whole situation in detail"
+          },
+          {
+            "right_reaction": "A label placed directly over the monkey's eyes"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "one-does-not-simply",
+      "meme_id": "8e93137b-1c06-453d-a898-33bfae1c406c",
+      "name": "One Does Not Simply",
+      "aliases": [
+        "One Does Not Simply"
+      ],
+      "source_image": "/memes/seed-one-does-not-simply-d57d64a0.jpg",
+      "image_width": 568,
+      "image_height": 335,
+      "image_aspect_ratio": 1.6955,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_statement",
+          "role": "setup statement",
+          "x": 0.08,
+          "y": 0.03,
+          "width": 0.84,
+          "height": 0.2,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place the classic opening line here; keep it short and centered above the character's head."
+        },
+        {
+          "id": "bottom_statement",
+          "role": "punchline statement",
+          "x": 0.1,
+          "y": 0.74,
+          "width": 0.8,
+          "height": 0.22,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 44,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use for the second half of the joke; avoid covering the face and hand too much by keeping text low and centered."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The meme works by pairing a serious, impossible, or overconfident setup with a blunt punchline that frames the speaker as unable or unwilling to do something simple.",
+        "good_examples": [
+          {
+            "top_statement": "When the assignment says 'just submit it online'",
+            "bottom_statement": "and the website asks me to create an account first"
+          },
+          {
+            "top_statement": "Me trying to explain my plan",
+            "bottom_statement": "One does not simply 'wing it'"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_statement": "A random unrelated sentence",
+            "bottom_statement": "Another random unrelated sentence"
+          },
+          {
+            "top_statement": "Too much text that wraps into a paragraph and covers the face",
+            "bottom_statement": "A tiny punchline that doesn't complete the joke"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "oprah-you-get-a",
+      "meme_id": "7f10b0da-a795-4c93-9e7c-9e23542e855f",
+      "name": "Oprah You Get A",
+      "aliases": [
+        "Oprah You Get A"
+      ],
+      "source_image": "/memes/seed-oprah-you-get-a-d094a9fd.jpg",
+      "image_width": 620,
+      "image_height": 464,
+      "image_aspect_ratio": 1.3362,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_statement",
+          "role": "setup or premise text",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place over the blue upper background; keep clear of Oprah's head and arms."
+        },
+        {
+          "id": "bottom_reveal",
+          "role": "punchline or repeated reward text",
+          "x": 0.08,
+          "y": 0.78,
+          "width": 0.84,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 40,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 38,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use the lower beige area; avoid the audience heads at the very bottom edge."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "State a thing people want or a situation, then repeat it as the ecstatic giveaway/reward for comedic emphasis.",
+        "good_examples": [
+          {
+            "top_statement": "WHEN THE GROUP CHAT SAYS"
+          },
+          {
+            "bottom_reveal": "YOU GET A THREE-DAY WEEKEND!"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_statement": "LONG PARAGRAPH ABOUT OFFICE POLITICS AND TAXES"
+          },
+          {
+            "bottom_reveal": "tiny caption crammed into the crowd at the bottom"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "panik-kalm-panik",
+      "meme_id": "45adca3a-ec34-4123-a87b-883da624f120",
+      "name": "Panik Kalm Panik",
+      "aliases": [
+        "Panik Kalm Panik"
+      ],
+      "source_image": "/memes/seed-panik-kalm-panik-d155a15b.png",
+      "image_width": 640,
+      "image_height": 881,
+      "image_aspect_ratio": 0.7264,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_panik",
+          "role": "top reaction label",
+          "x": 0.52,
+          "y": 0.02,
+          "width": 0.42,
+          "height": 0.28,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 1,
+          "max_chars": 10,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the open white space in the upper-right panel; avoid the head and existing word if replacing it."
+        },
+        {
+          "id": "middle_kalm",
+          "role": "middle calm label",
+          "x": 0.52,
+          "y": 0.36,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 1,
+          "max_chars": 10,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the lower-right area of the middle panel, near the existing label zone."
+        },
+        {
+          "id": "bottom_panik",
+          "role": "bottom reaction label",
+          "x": 0.52,
+          "y": 0.7,
+          "width": 0.42,
+          "height": 0.28,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 1,
+          "max_chars": 10,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open white space in the lower-right panel; keep clear of the head and hands."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Three stacked reactions escalate from panic to calm and back to panic, with each panel labeled by the emotional state or situation.",
+        "good_examples": [
+          {
+            "top_panik": "PANIK"
+          },
+          {
+            "middle_kalm": "KALM"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_panik": "A long sentence that wraps into the face area"
+          },
+          {
+            "bottom_panik": "Tiny caption placed over the head or hands"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "pawn-stars-best-i-can-do",
+      "meme_id": "b100d0a4-23ac-4284-862e-27f280dffc3f",
+      "name": "Pawn Stars Best I Can Do",
+      "aliases": [
+        "Pawn Stars Best I Can Do"
+      ],
+      "source_image": "/memes/seed-pawn-stars-best-i-can-do-b48ccef3.jpg",
+      "image_width": 624,
+      "image_height": 352,
+      "image_aspect_ratio": 1.7727,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "left_speaker",
+          "role": "setup or negotiation line from the left man",
+          "x": 0.02,
+          "y": 0.05,
+          "width": 0.42,
+          "height": 0.28,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the first half of the joke; keep clear of the face and shoulder."
+        },
+        {
+          "id": "right_reaction",
+          "role": "deadpan response or refusal from the right man",
+          "x": 0.56,
+          "y": 0.06,
+          "width": 0.4,
+          "height": 0.3,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the punchline or counteroffer; avoid the head and upper torso."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The left side presents an offer or request, and the right side delivers the blunt, lowball, or absurdly practical response.",
+        "good_examples": [
+          {
+            "left_speaker": "Can you fix it for free?"
+          },
+          {
+            "right_reaction": "Best I can do is $5 and a handshake."
+          }
+        ],
+        "bad_examples": [
+          {
+            "left_speaker": "A long paragraph explaining the entire backstory and setup."
+          },
+          {
+            "right_reaction": "A tiny one-word reply that does not feel like a negotiation or refusal."
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "roll-safe-think-about-it",
+      "meme_id": "bd1779fe-5ffc-4d03-b012-fcbaf206025e",
+      "name": "Roll Safe Think About It",
+      "aliases": [
+        "Roll Safe Think About It"
+      ],
+      "source_image": "/memes/seed-roll-safe-think-about-it-be0fa0a4.jpg",
+      "image_width": 702,
+      "image_height": 395,
+      "image_aspect_ratio": 1.7772,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "thought_caption",
+          "role": "main joke setup or conclusion",
+          "x": 0.03,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place in the open sky/building area above and left of the face; keep clear of the head and hand."
+        },
+        {
+          "id": "punchline_caption",
+          "role": "secondary punchline or implication",
+          "x": 0.03,
+          "y": 0.72,
+          "width": 0.52,
+          "height": 0.22,
+          "align": "left",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower-left open area; avoid the face, hand, and jacket details."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the character's thinking pose to present a clever but flawed realization, with the text stating the 'obvious' logic that is actually the joke.",
+        "good_examples": [
+          {
+            "thought_caption": "If I don't check my email, I can't get more work"
+          },
+          {
+            "punchline_caption": "So technically I'm already ahead"
+          }
+        ],
+        "bad_examples": [
+          {
+            "thought_caption": "A long paragraph with too many details to fit cleanly in the top-left space"
+          },
+          {
+            "punchline_caption": "Text placed over the face or hand where it blocks the iconic thinking gesture"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "running-away-balloon",
+      "meme_id": "d68fe24e-fb81-4695-bcf7-7e6e5fe641ef",
+      "name": "Running Away Balloon",
+      "aliases": [
+        "Running Away Balloon"
+      ],
+      "source_image": "/memes/seed-running-away-balloon-741cda07.jpg",
+      "image_width": 761,
+      "image_height": 1024,
+      "image_aspect_ratio": 0.7432,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_setup",
+          "role": "setup text for the initial desire or goal",
+          "x": 0.05,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place in the open sky area on the upper-left; avoid the character's head and arms."
+        },
+        {
+          "id": "top_target",
+          "role": "label for the desired object or temptation",
+          "x": 0.6,
+          "y": 0.03,
+          "width": 0.35,
+          "height": 0.22,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 22,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the empty space above or around the balloon; keep text clear of the balloon edge."
+        },
+        {
+          "id": "bottom_interference",
+          "role": "twist text showing the unwanted complication or distraction",
+          "x": 0.05,
+          "y": 0.56,
+          "width": 0.42,
+          "height": 0.38,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 26,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the lower-left pink character area, but keep away from the face and hands; works as the punchline or reveal."
+        },
+        {
+          "id": "bottom_target",
+          "role": "label for the same goal now being blocked or pursued under pressure",
+          "x": 0.74,
+          "y": 0.56,
+          "width": 0.22,
+          "height": 0.34,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 38,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Optional small label near the lower balloon edge if a second caption is needed; keep it short."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The top panel shows someone eagerly reaching for a goal, while the bottom panel reveals a more chaotic or embarrassing reality that blocks or complicates that goal.",
+        "good_examples": [
+          {
+            "top_setup": "ME TRYING TO STAY PRODUCTIVE"
+          },
+          {
+            "bottom_interference": "MY PHONE, MY BED, AND EVERY DISTRACTION POSSIBLE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_setup": "A LONG PARAGRAPH ABOUT MY ENTIRE LIFE STORY"
+          },
+          {
+            "bottom_target": "AN EXTREMELY DETAILED EXPLANATION OF THE ECONOMY"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "sad-pablo-escobar",
+      "meme_id": "e351b606-937e-4790-aa5f-1e647f2e1e48",
+      "name": "Sad Pablo Escobar",
+      "aliases": [
+        "Sad Pablo Escobar"
+      ],
+      "source_image": "/memes/seed-sad-pablo-escobar-eb0e5d4e.jpg",
+      "image_width": 720,
+      "image_height": 709,
+      "image_aspect_ratio": 1.0155,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or reaction label for the top image",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 54,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place in the open sky/grass area above the seated figure; avoid covering the face."
+        },
+        {
+          "id": "bottom_left_caption",
+          "role": "reaction label for the left bottom panel",
+          "x": 0.02,
+          "y": 0.52,
+          "width": 0.46,
+          "height": 0.44,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 46,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Best placed in the darker left side of the panel; keep clear of the seated man and table."
+        },
+        {
+          "id": "bottom_right_caption",
+          "role": "reaction label for the right bottom panel",
+          "x": 0.52,
+          "y": 0.52,
+          "width": 0.44,
+          "height": 0.44,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 46,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use the open pool deck area; avoid the standing figure and the wall edge."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the top image as the emotional setup, then contrast the two bottom panels as different reactions or outcomes to the same situation.",
+        "good_examples": [
+          {
+            "top_caption": "WHEN THE GROUP CHAT GOES SILENT"
+          },
+          {
+            "bottom_left_caption": "ME OVERTHINKING EVERY MESSAGE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A VERY LONG SENTENCE THAT RUNS ACROSS THE WHOLE IMAGE AND COVERS THE FACE"
+          },
+          {
+            "bottom_right_caption": "TEXT PLACED ON TOP OF THE MAN'S HEAD OR TOO CLOSE TO THE IMAGE EDGE"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "say-the-line-bart-simpsons",
+      "meme_id": "791893d6-0396-4050-916f-457a8b555fcc",
+      "name": "say the line bart! simpsons",
+      "aliases": [
+        "say the line bart! simpsons"
+      ],
+      "source_image": "/memes/seed-say-the-line-bart-simpsons-70b5fded.jpg",
+      "image_width": 395,
+      "image_height": 650,
+      "image_aspect_ratio": 0.6077,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "bart_prompt",
+          "role": "setup line / prompt",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the top panel sky/upper background; keep clear of faces."
+        },
+        {
+          "id": "bart_reaction",
+          "role": "reaction / reluctant response",
+          "x": 0.1,
+          "y": 0.34,
+          "width": 0.8,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 36,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 38,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the middle panel's open green chalkboard area, avoiding Bart's head and desk."
+        },
+        {
+          "id": "crowd_chant",
+          "role": "crowd chant / payoff line",
+          "x": 0.04,
+          "y": 0.78,
+          "width": 0.92,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 48,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use over the bottom panel, preferably in the lower open area above the desks or across the crowd."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A setup line demands a specific quote, the reluctant character refuses or hesitates, and the crowd repeats the line for the payoff.",
+        "good_examples": [
+          {
+            "bart_prompt": "Say the line, Bart!"
+          },
+          {
+            "crowd_chant": "Say the line, Bart!"
+          }
+        ],
+        "bad_examples": [
+          {
+            "bart_reaction": "A long paragraph explaining the joke in detail"
+          },
+          {
+            "bart_prompt": "Tiny caption squeezed into the corner over faces"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "scooby-doo-mask-reveal",
+      "meme_id": "42bf740a-36a5-4c79-90d4-71610ea305e1",
+      "name": "Scooby doo mask reveal",
+      "aliases": [
+        "Scooby doo mask reveal"
+      ],
+      "source_image": "/memes/seed-scooby-doo-mask-reveal-07c9031c.jpg",
+      "image_width": 720,
+      "image_height": 960,
+      "image_aspect_ratio": 0.75,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "masked_identity",
+          "role": "setup label for the fake identity or surface appearance before the reveal",
+          "x": 0.06,
+          "y": 0.1,
+          "width": 0.34,
+          "height": 0.3,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the masked figure on the left in the top panel; keep text short and centered."
+        },
+        {
+          "id": "revealed_identity",
+          "role": "punchline label for the true identity after the mask is removed",
+          "x": 0.06,
+          "y": 0.58,
+          "width": 0.34,
+          "height": 0.3,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the revealed character on the left in the bottom panel; this is the main joke payoff."
+        },
+        {
+          "id": "revealer_action",
+          "role": "optional label for the act of pulling off the mask or exposing the truth",
+          "x": 0.48,
+          "y": 0.18,
+          "width": 0.22,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 36,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use sparingly near the hand/mask area on the right side of either panel if a third label is needed."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke works by showing a fake or expected identity first, then revealing the surprising true identity underneath.",
+        "good_examples": [
+          {
+            "masked_identity": "Corporate Expert"
+          },
+          {
+            "revealed_identity": "Intern Who Googled It"
+          }
+        ],
+        "bad_examples": [
+          {
+            "masked_identity": "This is a very long sentence that will not fit well in the mask area"
+          },
+          {
+            "revealed_identity": "Same thing as above, just repeated with no contrast or reveal"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "sleeping-shaq",
+      "meme_id": "0273a5a0-3a0e-49f9-8c08-f0166962a496",
+      "name": "Sleeping Shaq",
+      "aliases": [
+        "Sleeping Shaq"
+      ],
+      "source_image": "/memes/seed-sleeping-shaq-3a56eb8a.jpg",
+      "image_width": 640,
+      "image_height": 631,
+      "image_aspect_ratio": 1.0143,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_reaction_caption",
+          "role": "setup text for the sleeping/indifferent state",
+          "x": 0.52,
+          "y": 0.02,
+          "width": 0.44,
+          "height": 0.44,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the upper-right image area, avoiding the face and the existing small 'i sleep' text if possible."
+        },
+        {
+          "id": "bottom_reaction_caption",
+          "role": "punchline text for the awakened/intense state",
+          "x": 0.52,
+          "y": 0.56,
+          "width": 0.44,
+          "height": 0.42,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the lower-right image area, avoiding the face and the existing small 'real shit' text if possible."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke contrasts a calm, uninterested reaction with an intense, awakened reaction when something unexpectedly becomes important or exciting.",
+        "good_examples": [
+          {
+            "top_reaction_caption": "me at work"
+          },
+          {
+            "bottom_reaction_caption": "when payday hits"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_reaction_caption": "this is fine"
+          },
+          {
+            "bottom_reaction_caption": "I am very tired"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "spider-man-triple",
+      "meme_id": "b2ade262-af6c-4395-ab41-0796aaaa1575",
+      "name": "Spider Man Triple",
+      "aliases": [
+        "Spider Man Triple"
+      ],
+      "source_image": "/memes/seed-spider-man-triple-10afab8b.jpg",
+      "image_width": 600,
+      "image_height": 551,
+      "image_aspect_ratio": 1.0889,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "left_spider_man",
+          "role": "first accusation / initial blame",
+          "x": 0,
+          "y": 0,
+          "width": 0.34,
+          "height": 0.62,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place in the open left side above and around the left Spider-Man, avoiding the face and body."
+        },
+        {
+          "id": "center_spider_man",
+          "role": "counterpoint / middle accusation",
+          "x": 0.34,
+          "y": 0,
+          "width": 0.34,
+          "height": 0.58,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the upper middle area; keep text clear of the central Spider-Man's head and pointing arms."
+        },
+        {
+          "id": "right_spider_man",
+          "role": "final accusation / punchline target",
+          "x": 0.66,
+          "y": 0,
+          "width": 0.34,
+          "height": 0.62,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the upper-right open space; avoid the right Spider-Man and the crate."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Three nearly identical characters point at each other to show escalating blame, disagreement, or self-contradiction across three labels.",
+        "good_examples": [
+          {
+            "left_spider_man": "People who use dark mode"
+          },
+          {
+            "center_spider_man": "People who use light mode"
+          }
+        ],
+        "bad_examples": [
+          {
+            "left_spider_man": "A very long sentence that wraps into five lines and covers the character"
+          },
+          {
+            "right_spider_man": "Tiny caption placed over the crate and lower body"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "squidward-window",
+      "meme_id": "efd1da84-70d5-4580-abcc-a064ee690ece",
+      "name": "Squidward window",
+      "aliases": [
+        "Squidward window"
+      ],
+      "source_image": "/memes/seed-squidward-window-578c7b4a.jpg",
+      "image_width": 598,
+      "image_height": 420,
+      "image_aspect_ratio": 1.4238,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_reaction_caption",
+          "role": "setup or reaction text describing Squidward's viewpoint",
+          "x": 0.03,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use the dark upper-left area; keep text away from Squidward's head silhouette."
+        },
+        {
+          "id": "right_window_caption",
+          "role": "punchline or contrasting text about what Squidward sees",
+          "x": 0.56,
+          "y": 0.06,
+          "width": 0.38,
+          "height": 0.24,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 30,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place in the open window area above/around the characters, avoiding faces and the horizontal blinds."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the left side for Squidward's reaction or setup, and the right side for the thing he is judging, admiring, or being annoyed by.",
+        "good_examples": [
+          {
+            "top_reaction_caption": "When you hear the party start"
+          },
+          {
+            "right_window_caption": "and it's your neighbors being loud again"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_reaction_caption": "A long paragraph that covers Squidward's face and body"
+          },
+          {
+            "right_window_caption": "Text placed directly over SpongeBob and Patrick's faces"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "surprised-pikachu",
+      "meme_id": "9694bea2-6c3b-41cd-9b6d-6a283473cc69",
+      "name": "Surprised Pikachu",
+      "aliases": [
+        "Surprised Pikachu"
+      ],
+      "source_image": "/memes/seed-surprised-pikachu-57a20241.jpg",
+      "image_width": 1893,
+      "image_height": 1892,
+      "image_aspect_ratio": 1.0005,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_reaction_caption",
+          "role": "setup or situation text placed above the shocked face",
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 0.33,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 90,
+          "font": {
+            "family": "Impact",
+            "min_size": 54,
+            "max_size": 120,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Large blank white area is ideal for classic top caption text; keep centered and high contrast."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use a short setup that describes an expectation, then let the image deliver the surprised reaction.",
+        "good_examples": [
+          {
+            "top_reaction_caption": "Me opening the fridge for the 5th time expecting new food"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_reaction_caption": "Tiny text placed over Pikachu's face or body"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "the-rock-driving",
+      "meme_id": "a7c5bad9-d4d6-4e81-98e0-2cc792f1ebfd",
+      "name": "The Rock Driving",
+      "aliases": [
+        "The Rock Driving"
+      ],
+      "source_image": "/memes/seed-the-rock-driving-b5c68ffd.jpg",
+      "image_width": 568,
+      "image_height": 700,
+      "image_aspect_ratio": 0.8114,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_speech_bubble",
+          "role": "setup_or_statement",
+          "x": 0.56,
+          "y": 0.05,
+          "width": 0.41,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 20,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text inside the white speech bubble on the top panel; keep away from the black outline and notch."
+        },
+        {
+          "id": "middle_speech_bubble",
+          "role": "counterpoint_or_response",
+          "x": 0.56,
+          "y": 0.39,
+          "width": 0.41,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 20,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text inside the white speech bubble on the middle panel; avoid the outline and the left notch."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The first two panels present a claim and a response, while the third panel shows the driver’s shocked realization or punchline reaction.",
+        "good_examples": [
+          {
+            "top_speech_bubble": "This plan is totally safe."
+          },
+          {
+            "middle_speech_bubble": "Yeah, nothing can go wrong."
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_speech_bubble": "A long paragraph that fills the whole bubble and becomes unreadable."
+          },
+          {
+            "middle_speech_bubble": "Text placed outside the bubble over the character’s face or car interior."
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "the-scroll-of-truth",
+      "meme_id": "ea1f18f2-aa37-4e24-b3f9-82db2234dad3",
+      "name": "The Scroll Of Truth",
+      "aliases": [
+        "The Scroll Of Truth"
+      ],
+      "source_image": "/memes/seed-the-scroll-of-truth-fe819b80.jpg",
+      "image_width": 1280,
+      "image_height": 1236,
+      "image_aspect_ratio": 1.0356,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "scroll_text",
+          "role": "main punchline text on the revealed scroll",
+          "x": 0.18,
+          "y": 0.4,
+          "width": 0.24,
+          "height": 0.34,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 4,
+          "max_chars": 70,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 72,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text inside the blank parchment area; keep margins away from the decorative top and bottom flourishes."
+        },
+        {
+          "id": "top_left_reaction",
+          "role": "setup or discovery line in the opening panel",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.38,
+          "height": 0.14,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 30,
+            "max_size": 58,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Fits the speech bubble area in the top-left panel; avoid the bubble tail and edges."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the top-left bubble as the setup and the scroll as the reveal, with the joke landing on whatever absurd or disappointing 'truth' is written on the scroll.",
+        "good_examples": [
+          {
+            "top_left_reaction": "I FINALLY FOUND THE ANSWER"
+          },
+          {
+            "scroll_text": "IT WAS JUST\nA REALLY LONG\nERROR MESSAGE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_left_reaction": "tiny caption in the corner"
+          },
+          {
+            "scroll_text": "A single word that doesn't use the scroll reveal"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "they-don-t-know",
+      "meme_id": "a86f9ae7-6f12-4b91-a18a-e91912ee9a7c",
+      "name": "They don't know",
+      "aliases": [
+        "They don't know"
+      ],
+      "source_image": "/memes/seed-they-don-t-know-5ac7e661.png",
+      "image_width": 671,
+      "image_height": 673,
+      "image_aspect_ratio": 0.997,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_left_observer",
+          "role": "setup / outsider who knows the truth",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.24,
+          "height": 0.28,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place above or around the standing figure on the left; avoid covering the face and cup."
+        },
+        {
+          "id": "bottom_left_pair",
+          "role": "group being ignored / the people who don't know",
+          "x": 0,
+          "y": 0.64,
+          "width": 0.42,
+          "height": 0.34,
+          "align": "left",
+          "valign": "bottom",
+          "max_lines": 3,
+          "max_chars": 34,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 38,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best for a short label describing the unaware pair in the lower-left corner; keep clear of heads and arms."
+        },
+        {
+          "id": "right_couple",
+          "role": "main subject / the oblivious couple on the right",
+          "x": 0.56,
+          "y": 0.22,
+          "width": 0.4,
+          "height": 0.56,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 4,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 38,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the central joke text about what the couple does not realize; avoid the heads and shoulders."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke contrasts one person who knows something important with the others who are oblivious to it.",
+        "good_examples": [
+          {
+            "top_left_observer": "Me knowing the group chat is about to explode"
+          },
+          {
+            "right_couple": "Everyone else\nstill acting normal\nwhile the drama\nis already happening"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_left_observer": "A long paragraph explaining the entire backstory"
+          },
+          {
+            "bottom_left_pair": "Tiny text placed over the faces and arms"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "they-re-the-same-picture",
+      "meme_id": "a3214953-c39b-4785-a127-8173be9f44c9",
+      "name": "They're The Same Picture",
+      "aliases": [
+        "They're The Same Picture"
+      ],
+      "source_image": "/memes/seed-they-re-the-same-picture-884342d6.jpg",
+      "image_width": 1363,
+      "image_height": 1524,
+      "image_aspect_ratio": 0.8944,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_comparison_caption",
+          "role": "setup text describing the two items being compared",
+          "x": 0.12,
+          "y": 0.42,
+          "width": 0.76,
+          "height": 0.09,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 70,
+          "font": {
+            "family": "Impact",
+            "min_size": 34,
+            "max_size": 54,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the dark band between the two top images; keep text short and high-contrast."
+        },
+        {
+          "id": "bottom_reveal_caption",
+          "role": "punchline reveal that the two things are identical",
+          "x": 0.3,
+          "y": 0.9,
+          "width": 0.48,
+          "height": 0.07,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 1,
+          "max_chars": 40,
+          "font": {
+            "family": "Impact",
+            "min_size": 36,
+            "max_size": 58,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the lower center area above the bottom edge; avoid covering the face."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Present two supposedly different things in the top panel, then reveal in the bottom panel that they are actually the same.",
+        "good_examples": [
+          {
+            "top_comparison_caption": "My boss's 'urgent' request vs. my actual workload"
+          },
+          {
+            "bottom_reveal_caption": "They're the same picture."
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_comparison_caption": "A long paragraph explaining the entire office politics situation in detail"
+          },
+          {
+            "bottom_reveal_caption": "This is a completely unrelated joke with no comparison or reveal"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "this-is-fine",
+      "meme_id": "e1b38292-efdc-42b3-9b98-971a91934503",
+      "name": "This Is Fine",
+      "aliases": [
+        "This Is Fine"
+      ],
+      "source_image": "/memes/seed-this-is-fine-907eec71.jpg",
+      "image_width": 580,
+      "image_height": 282,
+      "image_aspect_ratio": 2.0567,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "speech_bubble_text",
+          "role": "setup_or_reaction",
+          "x": 0.56,
+          "y": 0.02,
+          "width": 0.34,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place short reaction text inside the existing speech bubble area; keep it concise and centered."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline_or_context",
+          "x": 0.05,
+          "y": 0.78,
+          "width": 0.9,
+          "height": 0.18,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for a short caption spanning the lower margin; avoid covering the dog or flames too much."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke is a calm, deadpan statement or caption placed over a chaotic disaster scene, creating irony by pretending everything is normal.",
+        "good_examples": [
+          {
+            "speech_bubble_text": "THIS IS FINE."
+          },
+          {
+            "bottom_caption": "Me at work after deleting the wrong file"
+          }
+        ],
+        "bad_examples": [
+          {
+            "speech_bubble_text": "A long multi-line paragraph about my entire day"
+          },
+          {
+            "bottom_caption": "Tiny text crammed into the flames with no contrast"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "trade-offer",
+      "meme_id": "24868a9d-7f45-4857-acde-b209ed84f2ba",
+      "name": "Trade Offer",
+      "aliases": [
+        "Trade Offer"
+      ],
+      "source_image": "/memes/seed-trade-offer-0801f782.jpg",
+      "image_width": 607,
+      "image_height": 794,
+      "image_aspect_ratio": 0.7645,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "trade_offer_title",
+          "role": "header title announcing the meme setup",
+          "x": 0.18,
+          "y": 0.02,
+          "width": 0.64,
+          "height": 0.08,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 1,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place over the existing top banner area; keep short and bold."
+        },
+        {
+          "id": "i_receive",
+          "role": "left-side offer label for what the speaker gets",
+          "x": 0.08,
+          "y": 0.14,
+          "width": 0.34,
+          "height": 0.07,
+          "align": "left",
+          "valign": "middle",
+          "max_lines": 1,
+          "max_chars": 16,
+          "font": {
+            "family": "Impact",
+            "min_size": 20,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Position in the upper-left open space above the subject's head."
+        },
+        {
+          "id": "you_receive",
+          "role": "right-side offer label for what the other party gets",
+          "x": 0.58,
+          "y": 0.14,
+          "width": 0.34,
+          "height": 0.07,
+          "align": "left",
+          "valign": "middle",
+          "max_lines": 1,
+          "max_chars": 16,
+          "font": {
+            "family": "Impact",
+            "min_size": 20,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Position in the upper-right open space above the subject's head."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the top title to frame a trade, then contrast a desirable 'i receive' item with an absurd, worse, or overly specific 'you receive' item.",
+        "good_examples": [
+          {
+            "trade_offer_title": "TRADE OFFER",
+            "i_receive": "free pizza",
+            "you_receive": "my eternal loyalty"
+          },
+          {
+            "trade_offer_title": "TRADE OFFER",
+            "i_receive": "one compliment",
+            "you_receive": "a 47-slide presentation"
+          }
+        ],
+        "bad_examples": [
+          {
+            "i_receive": "something long and sentence-like that wraps too much",
+            "you_receive": "another long sentence that crowds the face"
+          },
+          {
+            "trade_offer_title": "TRADE OFFER",
+            "i_receive": "text placed over the subject's face",
+            "you_receive": "text placed over the subject's hands"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "tuxedo-winnie-the-pooh",
+      "meme_id": "a9e544d4-7c78-4148-bcf4-43736de47a76",
+      "name": "Tuxedo Winnie The Pooh",
+      "aliases": [
+        "Tuxedo Winnie The Pooh"
+      ],
+      "source_image": "/memes/seed-tuxedo-winnie-the-pooh-e064a62a.png",
+      "image_width": 800,
+      "image_height": 582,
+      "image_aspect_ratio": 1.3746,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_reaction",
+          "role": "setup or plain reaction text for the unimpressed top panel",
+          "x": 0,
+          "y": 0,
+          "width": 0.42,
+          "height": 0.48,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Keep text within the left half; avoid Pooh's face and the chair edge."
+        },
+        {
+          "id": "bottom_reaction",
+          "role": "punchline or upgraded reaction text for the smug bottom panel",
+          "x": 0,
+          "y": 0.52,
+          "width": 0.42,
+          "height": 0.46,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Keep text within the left half; avoid the tuxedoed body and face."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the top panel for a neutral, unimpressed, or low-status reaction, then use the bottom panel for the same character looking more confident, refined, or smug after an upgrade or realization.",
+        "good_examples": [
+          {
+            "top_reaction": "ME BEFORE COFFEE"
+          },
+          {
+            "bottom_reaction": "ME AFTER COFFEE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_reaction": "A very long sentence that fills the whole panel and covers Pooh's face"
+          },
+          {
+            "bottom_reaction": "Text placed on the right side over the blank white area, making the joke feel disconnected"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "two-buttons",
+      "meme_id": "e72d3994-fd35-432d-abc2-ade112dcb41a",
+      "name": "Two Buttons",
+      "aliases": [
+        "Two Buttons"
+      ],
+      "source_image": "/memes/seed-two-buttons-f09dbc3e.jpg",
+      "image_width": 600,
+      "image_height": 908,
+      "image_aspect_ratio": 0.6608,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "left_button_label",
+          "role": "label for the left choice/button",
+          "x": 0.06,
+          "y": 0.08,
+          "width": 0.34,
+          "height": 0.28,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text in the blank white panel above/around the left red button; keep clear of the button itself."
+        },
+        {
+          "id": "right_button_label",
+          "role": "label for the right choice/button",
+          "x": 0.41,
+          "y": 0.06,
+          "width": 0.34,
+          "height": 0.28,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place text in the blank white panel above/around the right red button; keep clear of the button itself."
+        },
+        {
+          "id": "reaction_caption",
+          "role": "reaction or dilemma text on the sweating man",
+          "x": 0.08,
+          "y": 0.56,
+          "width": 0.84,
+          "height": 0.34,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 54,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the character's internal conflict, panic, or punchline; avoid covering the face too heavily if possible."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke comes from presenting two undesirable or tempting options on the buttons, then showing the character sweating over which one to choose.",
+        "good_examples": [
+          {
+            "left_button_label": "Do the responsible thing",
+            "right_button_label": "Do the fun thing"
+          },
+          {
+            "reaction_caption": "Why is this suddenly the hardest decision of my life?"
+          },
+          {
+            "left_button_label": "Save money",
+            "right_button_label": "Buy snacks"
+          },
+          {
+            "reaction_caption": "I can only pick one and that feels illegal"
+          }
+        ],
+        "bad_examples": [
+          {
+            "left_button_label": "A very long sentence that won't fit",
+            "right_button_label": "Another overly long sentence that won't fit"
+          },
+          {
+            "reaction_caption": "Text that tries to label every part of the image and covers the face and buttons"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "two-paths",
+      "meme_id": "24792931-05a8-46bb-aff3-f65fc443f941",
+      "name": "Two Paths",
+      "aliases": [
+        "Two Paths"
+      ],
+      "source_image": "/memes/seed-two-paths-4a9d07c2.png",
+      "image_width": 416,
+      "image_height": 416,
+      "image_aspect_ratio": 1,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "left_path_label",
+          "role": "label for the desirable or correct choice on the left side",
+          "x": 0.03,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the sky/upper-left area; avoid the castle silhouette."
+        },
+        {
+          "id": "right_path_label",
+          "role": "label for the tempting, bad, or chaotic choice on the right side",
+          "x": 0.55,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the dark sky/upper-right area; avoid the castle and lightning."
+        },
+        {
+          "id": "decision_caption",
+          "role": "main punchline or narrator text describing the choice being made",
+          "x": 0.18,
+          "y": 0.72,
+          "width": 0.64,
+          "height": 0.22,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 3,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open lower-center path area above the character; keep text clear of the signpost and boy."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the two upper labels to contrast a good/safe option versus a bad/chaotic option, then add a bottom caption that frames the decision or reveals the punchline.",
+        "good_examples": [
+          {
+            "left_path_label": "Stable job"
+          },
+          {
+            "right_path_label": "Crypto at 3 a.m."
+          }
+        ],
+        "bad_examples": [
+          {
+            "left_path_label": "The easy way"
+          },
+          {
+            "decision_caption": "Me choosing the option that will definitely ruin my week"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "uno-draw-25-cards",
+      "meme_id": "16500697-80bb-4196-af68-a8894834679b",
+      "name": "UNO Draw 25 Cards",
+      "aliases": [
+        "UNO Draw 25 Cards"
+      ],
+      "source_image": "/memes/seed-uno-draw-25-cards-d75f95a0.jpg",
+      "image_width": 500,
+      "image_height": 494,
+      "image_aspect_ratio": 1.0121,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_left_card_text",
+          "role": "setup text on the UNO card to present the choice or rule",
+          "x": 0.08,
+          "y": 0.18,
+          "width": 0.34,
+          "height": 0.42,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 44,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place text inside the blank white center of the left card; keep it short and bold."
+        },
+        {
+          "id": "right_player_reaction",
+          "role": "reaction text describing the person on the right or the consequence of the draw",
+          "x": 0.56,
+          "y": 0.08,
+          "width": 0.38,
+          "height": 0.34,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 22,
+          "font": {
+            "family": "Impact",
+            "min_size": 20,
+            "max_size": 40,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use the open wall area above/near the player; avoid covering the face and cards."
+        },
+        {
+          "id": "bottom_table_comment",
+          "role": "punchline or commentary about the game state",
+          "x": 0.52,
+          "y": 0.72,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 24,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 34,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best for a short punchline placed over the empty table area."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the left card as the setup and the right-side player as the reaction, with the joke landing on the absurdity of being forced to draw 25 cards.",
+        "good_examples": [
+          {
+            "top_left_card_text": "OR\nDRAW 25",
+            "right_player_reaction": "me after one bad move"
+          },
+          {
+            "top_left_card_text": "CHOOSE\nYOUR FATE",
+            "bottom_table_comment": "the game immediately ends"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_left_card_text": "a very long paragraph that won't fit",
+            "right_player_reaction": "overlapping the man's face and cards"
+          },
+          {
+            "top_left_card_text": "tiny text in the corner",
+            "bottom_table_comment": "covering the UNO logo or card edges"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "waiting-skeleton",
+      "meme_id": "e146b6a1-fd33-4e48-89e9-290ace61aa4e",
+      "name": "Waiting Skeleton",
+      "aliases": [
+        "Waiting Skeleton"
+      ],
+      "source_image": "/memes/seed-waiting-skeleton-aa1a4889.jpg",
+      "image_width": 298,
+      "image_height": 403,
+      "image_aspect_ratio": 0.7395,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup",
+          "x": 0.08,
+          "y": 0.02,
+          "width": 0.84,
+          "height": 0.16,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the open sky/grass area above the skeleton; keep text away from the head."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline",
+          "x": 0.06,
+          "y": 0.8,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 48,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the bench/empty lower area; avoid the hands and pelvis if possible."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A setup describes waiting, delay, or anticipation, and the punchline reveals the wait has become absurdly long or pointless.",
+        "good_examples": [
+          {
+            "top_caption": "Me waiting for the update:"
+          },
+          {
+            "bottom_caption": "It's been 3 business eternities."
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "Tiny text placed over the skull and face."
+          },
+          {
+            "bottom_caption": "A long paragraph that covers the entire skeleton."
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "where-monkey",
+      "meme_id": "b435528d-5f49-4cc8-8023-f58c472b3e62",
+      "name": "where monkey",
+      "aliases": [
+        "where monkey"
+      ],
+      "source_image": "/memes/seed-where-monkey-06687209.png",
+      "image_width": 1113,
+      "image_height": 629,
+      "image_aspect_ratio": 1.7695,
+      "supports_overlay": false,
+      "quality": "draft",
+      "regions": [],
+      "caption_guidance": {
+        "pattern": "This is mainly a reaction image, so the joke comes from pairing the monkeys' blank, confused stares with a caption about not understanding or searching for something.",
+        "good_examples": [
+          {}
+        ],
+        "bad_examples": []
+      }
+    },
+    {
+      "template_id": "whisper-and-goosebumps",
+      "meme_id": "89c016e5-3d95-40be-b7ab-80132179c2e5",
+      "name": "Whisper and Goosebumps",
+      "aliases": [
+        "Whisper and Goosebumps"
+      ],
+      "source_image": "/memes/seed-whisper-and-goosebumps-83a25349.jpg",
+      "image_width": 600,
+      "image_height": 600,
+      "image_aspect_ratio": 1,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "whisper_text",
+          "role": "setup / whispered line",
+          "x": 0.03,
+          "y": 0.03,
+          "width": 0.94,
+          "height": 0.42,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 3,
+          "max_chars": 90,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the top panel; keep text away from the ear and mouth edges, centered in the open skin area."
+        },
+        {
+          "id": "goosebumps_text",
+          "role": "punchline / reaction line",
+          "x": 0.03,
+          "y": 0.62,
+          "width": 0.94,
+          "height": 0.3,
+          "align": "center",
+          "valign": "middle",
+          "max_lines": 2,
+          "max_chars": 70,
+          "font": {
+            "family": "Impact",
+            "min_size": 26,
+            "max_size": 48,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the bottom panel; use the smooth skin area as a clean backdrop for the reaction text."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The top text is a whispered setup, and the bottom text is the physical reaction or consequence it causes.",
+        "good_examples": [
+          {
+            "whisper_text": "I have a secret..."
+          },
+          {
+            "goosebumps_text": "AND NOW MY SKIN IS PANICKING"
+          }
+        ],
+        "bad_examples": [
+          {
+            "whisper_text": "BIG LOUD ANNOUNCEMENT!!!"
+          },
+          {
+            "goosebumps_text": "A detailed paragraph about taxes and municipal bonds"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "woman-yelling-at-cat",
+      "meme_id": "8a8c69ef-8cd8-4b65-a69a-faa1d235208f",
+      "name": "Woman Yelling At Cat",
+      "aliases": [
+        "Woman Yelling At Cat"
+      ],
+      "source_image": "/memes/seed-woman-yelling-at-cat-4132dfed.jpg",
+      "image_width": 680,
+      "image_height": 438,
+      "image_aspect_ratio": 1.5525,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "woman_yelling",
+          "role": "left-side accusation or emotional reaction text",
+          "x": 0,
+          "y": 0,
+          "width": 0.5,
+          "height": 0.52,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 42,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the left half, keeping clear of faces as much as possible; best for the dramatic complaint or accusation."
+        },
+        {
+          "id": "cat_response",
+          "role": "right-side deadpan response or absurd counterpoint text",
+          "x": 0.5,
+          "y": 0,
+          "width": 0.5,
+          "height": 0.52,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 42,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the right half above the cat and table area; keep text away from the cat's face and the hand."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use the left side for an intense accusation or overreaction and the right side for a calm, clueless, or absurdly literal response.",
+        "good_examples": [
+          {
+            "woman_yelling": "ME EXPLAINING\nWHY THIS IS WRONG"
+          },
+          {
+            "cat_response": "ME, UNMOVED,\nEATING SALAD"
+          }
+        ],
+        "bad_examples": [
+          {
+            "woman_yelling": "tiny label"
+          },
+          {
+            "cat_response": "long paragraph that won't fit in the box"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "y-all-got-any-more-of-that",
+      "meme_id": "34962e7a-4ed4-4211-a6df-54eed4a8ef3b",
+      "name": "Y'all Got Any More Of That",
+      "aliases": [
+        "Y'all Got Any More Of That"
+      ],
+      "source_image": "/memes/seed-y-all-got-any-more-of-that-f7eef98d.jpg",
+      "image_width": 600,
+      "image_height": 471,
+      "image_aspect_ratio": 1.2739,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup or request text",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place over the open sky/background area; keep clear of the face and hat."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline or repeated request text",
+          "x": 0.06,
+          "y": 0.8,
+          "width": 0.88,
+          "height": 0.17,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 24,
+            "max_size": 40,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use the lower empty band; avoid covering the hand and jacket."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "A character urgently asks for more of something, usually after running out, and the joke is the exaggerated desperation or scarcity.",
+        "good_examples": [
+          {
+            "top_caption": "WHEN THE GROUP CHAT DROPS THE LAST MEME"
+          },
+          {
+            "bottom_caption": "Y'ALL GOT ANY MORE OF THAT?"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A DETAILED PARAGRAPH ABOUT OFFICE POLICY"
+          },
+          {
+            "bottom_caption": "THIS IS A SERIOUS HISTORICAL ANALYSIS"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "yo-dawg-heard-you",
+      "meme_id": "fee01255-4f09-4971-acd6-b01cb7a02233",
+      "name": "Yo Dawg Heard You",
+      "aliases": [
+        "Yo Dawg Heard You"
+      ],
+      "source_image": "/memes/seed-yo-dawg-heard-you-6e5fb6ad.jpg",
+      "image_width": 500,
+      "image_height": 323,
+      "image_aspect_ratio": 1.548,
+      "supports_overlay": true,
+      "quality": "draft",
+      "regions": [
+        {
+          "id": "top_hook",
+          "role": "setup / premise",
+          "x": 0.06,
+          "y": 0.03,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place the first 'Yo dawg...' clause here; keep it short and centered above the face."
+        },
+        {
+          "id": "bottom_punchline",
+          "role": "punchline / recursive twist",
+          "x": 0.06,
+          "y": 0.78,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 46,
+          "font": {
+            "family": "Impact",
+            "min_size": 18,
+            "max_size": 30,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use for the second clause that mirrors or escalates the setup; avoid covering the chain and shoulders too much."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "The joke is a recursive 'Yo dawg' setup where the first line introduces a thing and the second line absurdly duplicates or nests it.",
+        "good_examples": [
+          {
+            "top_hook": "YO DAWG, I HEARD YOU LIKE MEMES"
+          },
+          {
+            "bottom_punchline": "SO I PUT A MEME INSIDE YOUR MEME"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_hook": "A RANDOM LONG PARAGRAPH ABOUT TECHNICAL SUPPORT"
+          },
+          {
+            "bottom_punchline": "THIS IS A SERIOUS QUOTE WITH NO RECURSIVE TWIST"
+          }
+        ]
+      }
+    }
+  ]
+}

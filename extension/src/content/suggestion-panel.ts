@@ -27,6 +27,7 @@ interface Suggestion {
 interface MemeTextOverlay {
   enabled: boolean;
   style: "impact";
+  template_id?: string;
   alt_text: string;
   regions: MemeTextRegion[];
 }
@@ -41,6 +42,14 @@ interface MemeTextRegion {
   align?: "left" | "center" | "right";
   valign?: "top" | "middle" | "bottom";
   font_scale?: number;
+  max_lines?: number;
+  max_chars?: number;
+  font?: {
+    family: "Impact";
+    min_size: number;
+    max_size: number;
+    stroke_ratio: number;
+  };
 }
 
 let panelHost: HTMLDivElement | null = null;
@@ -527,14 +536,20 @@ function drawImpactText(
   const y = region.y * canvasHeight;
   const width = region.width * canvasWidth;
   const height = region.height * canvasHeight;
-  const text = region.text.trim().toUpperCase();
+  const text = region.text.trim().slice(0, region.max_chars || 120).toUpperCase();
   if (!text) return;
 
   const fontScale = region.font_scale ?? 1;
-  const maxFont = Math.max(16, Math.min(width / 5.2, height / 1.25) * fontScale);
-  const minFont = Math.max(12, Math.min(canvasWidth, canvasHeight) * 0.035);
+  const manifestMax = region.font?.max_size || 52;
+  const manifestMin = region.font?.min_size || 12;
+  const maxFont = Math.max(
+    manifestMin,
+    Math.min(manifestMax, Math.min(width / 4.8, height / 1.12) * fontScale)
+  );
+  const minFont = Math.max(10, manifestMin);
+  const maxLines = region.max_lines || 4;
   let fontSize = maxFont;
-  let lines = wrapImpactLines(ctx, text, width, fontSize);
+  let lines = wrapImpactLines(ctx, text, width, fontSize, maxLines);
 
   while (
     fontSize > minFont &&
@@ -542,8 +557,10 @@ function drawImpactText(
       lines.some((line) => measureImpactText(ctx, line, fontSize) > width))
   ) {
     fontSize -= 2;
-    lines = wrapImpactLines(ctx, text, width, fontSize);
+    lines = wrapImpactLines(ctx, text, width, fontSize, maxLines);
   }
+
+  if (lines.length * fontSize * 1.08 > height) return;
 
   ctx.textAlign = region.align || "center";
   ctx.textBaseline = "middle";
@@ -568,7 +585,7 @@ function drawImpactText(
   ctx.font = impactFont(fontSize);
   ctx.fillStyle = "#fff";
   ctx.strokeStyle = "#000";
-  ctx.lineWidth = Math.max(3, fontSize * 0.12);
+  ctx.lineWidth = Math.max(2, fontSize * (region.font?.stroke_ratio || 0.12));
 
   for (let i = 0; i < lines.length; i++) {
     const lineY = startY + i * lineHeight;
@@ -581,7 +598,8 @@ function wrapImpactLines(
   ctx: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,
-  fontSize: number
+  fontSize: number,
+  maxLines: number
 ): string[] {
   ctx.font = impactFont(fontSize);
   const words = text.split(/\s+/).filter(Boolean);
@@ -598,7 +616,7 @@ function wrapImpactLines(
     }
   }
   if (current) lines.push(current);
-  return lines.slice(0, 4);
+  return lines.slice(0, maxLines);
 }
 
 function measureImpactText(

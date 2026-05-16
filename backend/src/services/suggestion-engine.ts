@@ -13,7 +13,7 @@ import {
 import { loadUserPreferences, applyPreferences } from "./personalization.js";
 import { rerankCandidates, type RerankInput } from "./reranker.js";
 import { mmrSelect } from "./diversity.js";
-import { buildTailoredOverlay, type MemeTextOverlay } from "./meme-text.js";
+import { buildTailoredOverlays, type MemeTextOverlay } from "./meme-text.js";
 
 const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -229,11 +229,13 @@ export async function getSuggestions(
   }));
   const diversified = mmrSelect(mmrInput, limit, 0.72).map((item) => item._ref);
 
+  const tailoredOverlays = await buildTailoredOverlays(tweetText, context, diversified);
+
   const result: SuggestionResult[] = diversified.map((c) => ({
     meme_id: c.meme_id,
     name: c.name,
     image_url: c.image_url,
-    tailored_overlay: buildTailoredOverlay(tweetText, context, c),
+    tailored_overlay: tailoredOverlays.get(c.meme_id) || null,
     use_case_label:
       c.punch_reason ||
       (c.system_tags.use_cases?.[0] || "reaction").replace(/_/g, " "),

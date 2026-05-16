@@ -12,7 +12,12 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-memes": "tsx src/db/seed-memes.ts",
     "db:init": "tsx src/db/setup.ts && drizzle-kit push && tsx src/db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "manifest:generate": "tsx scripts/generate-template-manifest.ts --out shared/src/data/meme-template-manifest.generated.json",
+    "manifest:batch:create": "tsx scripts/generate-template-manifest.ts --batch-create --out shared/src/data/meme-template-manifest.generated.json",
+    "manifest:batch:status": "tsx scripts/generate-template-manifest.ts --batch-status",
+    "manifest:batch:retrieve": "tsx scripts/generate-template-manifest.ts --out shared/src/data/meme-template-manifest.generated.json --batch-retrieve",
+    "manifest:dry-run": "tsx scripts/generate-template-manifest.ts --dry-run --files-only --out /tmp/memedrop-template-manifest-dry-run.json"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.50",
