@@ -30,6 +30,7 @@ interface MemeTextOverlay {
 interface MemeTextRegion {
   id: string;
   text: string;
+  text_transform?: "uppercase" | "mocking" | "none";
   x: number;
   y: number;
   width: number;
@@ -161,14 +162,15 @@ async function fetchSuggestions(
     onInitial?: (suggestions: Suggestion[]) => void;
   } = {}
 ): Promise<Suggestion[]> {
-  const cacheKey = `${normalizeTweetText(tweetText)}|limit:${options.limit || 10}|source:${options.source || "all"}|mode:${options.mode || "fast"}`;
+  const mode = options.mode || "smart";
+  const cacheKey = `${normalizeTweetText(tweetText)}|limit:${options.limit || 10}|source:${options.source || "all"}|mode:${mode}`;
   if (!options.refresh) {
     const cached = readCachedSuggestions(cacheKey);
     if (cached) return cached;
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5000);
+  const timer = setTimeout(() => controller.abort(), 12000);
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}/api/v1/suggest`, {
@@ -180,7 +182,7 @@ async function fetchSuggestions(
         limit: options.limit,
         source: options.source,
         refresh: options.refresh,
-        mode: options.mode || "fast",
+        mode,
       }),
     });
     if (!res.ok) {

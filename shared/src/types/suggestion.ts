@@ -71,6 +71,7 @@ export interface MemeTextOverlay {
 export interface MemeTextRegion {
   id: string;
   text: string;
+  text_transform?: "uppercase" | "mocking" | "none";
   x: number;
   y: number;
   width: number;

@@ -8,6 +8,7 @@ export interface MemeTemplateManifest {
 
 export interface MemeTemplate {
   template_id: string;
+  meme_id?: string;
   name: string;
   aliases: string[];
   source_image?: string;

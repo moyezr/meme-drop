@@ -17,7 +17,9 @@
     "manifest:batch:create": "tsx scripts/generate-template-manifest.ts --batch-create --out shared/src/data/meme-template-manifest.generated.json",
     "manifest:batch:status": "tsx scripts/generate-template-manifest.ts --batch-status",
     "manifest:batch:retrieve": "tsx scripts/generate-template-manifest.ts --out shared/src/data/meme-template-manifest.generated.json --batch-retrieve",
-    "manifest:dry-run": "tsx scripts/generate-template-manifest.ts --dry-run --files-only --out /tmp/memedrop-template-manifest-dry-run.json"
+    "manifest:dry-run": "tsx scripts/generate-template-manifest.ts --dry-run --files-only --out /tmp/memedrop-template-manifest-dry-run.json",
+    "manifest:qa": "tsx scripts/render-template-qa.ts",
+    "eval:suggestions": "tsx scripts/evaluate-suggestions.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.50",

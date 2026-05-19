@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "id": "prod-fire-calm",
+      "tweet": "Prod is down, the dashboard is red, and leadership just asked if we can still ship the launch today.",
+      "expected_memes": ["This Is Fine", "Hide the Pain Harold", "Disaster Girl"],
+      "keywords": ["prod", "dashboard", "launch"]
+    },
+    {
+      "id": "obvious-consequences",
+      "tweet": "We skipped tests, deployed Friday night, and somehow the payment flow exploded. Who could have predicted this?",
+      "expected_memes": ["Surprised Pikachu", "This Is Fine", "One Does Not Simply"],
+      "keywords": ["tests", "deployed", "payment"]
+    },
+    {
+      "id": "new-framework-fomo",
+      "tweet": "The team finally stabilized the app, so naturally we're debating a full rewrite in the new framework from yesterday.",
+      "expected_memes": ["Distracted Boyfriend", "Expanding Brain", "Gru's Plan"],
+      "keywords": ["rewrite", "framework", "app"]
+    },
+    {
+      "id": "false-choice",
+      "tweet": "Should I fix the bug properly or add one more feature flag and pretend we meant to do that?",
+      "expected_memes": ["Two Buttons", "Gru's Plan", "Drake Hotline Bling"],
+      "keywords": ["bug", "feature", "flag"]
+    },
+    {
+      "id": "bad-label",
+      "tweet": "Calling a spreadsheet with six macros a modern data platform is certainly one way to describe it.",
+      "expected_memes": ["Is This A Pigeon", "Mocking Spongebob", "Change My Mind"],
+      "keywords": ["spreadsheet", "macros", "platform"]
+    },
+    {
+      "id": "hot-take",
+      "tweet": "Half the meetings on the calendar could have been a two sentence Slack message.",
+      "expected_memes": ["Change My Mind", "Boardroom Meeting Suggestion", "One Does Not Simply"],
+      "keywords": ["meetings", "calendar", "Slack"]
+    },
+    {
+      "id": "obvious-truth",
+      "tweet": "Wait, the urgent roadmap was just vibes and a deck the whole time?",
+      "expected_memes": ["Always Has Been", "Change My Mind", "Surprised Pikachu"],
+      "keywords": ["roadmap", "vibes", "deck"]
+    },
+    {
+      "id": "small-ask",
+      "tweet": "Once again asking people to read the error message before pinging the entire channel.",
+      "expected_memes": ["Bernie I Am Once Again Asking For Your Support", "One Does Not Simply", "Mocking Spongebob"],
+      "keywords": ["error", "message", "channel"]
+    }
+  ]
+}

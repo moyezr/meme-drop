@@ -24,7 +24,12 @@ export type {
 } from "./types/template-manifest.js";
 
 export { MEME_TEMPLATE_MANIFEST } from "./data/meme-template-manifest.js";
-export { findMemeTemplate, normalizeTemplateName } from "./data/template-lookup.js";
+export {
+  findMemeTemplate,
+  findMemeTemplateForCandidate,
+  normalizeTemplateName,
+} from "./data/template-lookup.js";
+export type { TemplateLookupOptions } from "./data/template-lookup.js";
 
 export type {
   SuggestRequest,

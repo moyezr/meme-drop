@@ -21,7 +21,7 @@ const SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SUGGESTION_CACHE_MAX = 200;
 const DEFAULT_SUGGESTION_LIMIT = 10;
 const MAX_SUGGESTION_LIMIT = 20;
-const EMBEDDING_TIMEOUT_MS = 1200;
+const EMBEDDING_TIMEOUT_MS = Number(process.env.MEMEDROP_EMBEDDING_TIMEOUT_MS || 3000);
 
 interface CacheEntry {
   result: SuggestionResult[];
@@ -108,7 +108,7 @@ export async function getSuggestions(
 ): Promise<SuggestionResult[]> {
   const limit = normalizeLimit(options.limit);
   const source = options.source || "all";
-  const mode = options.mode || "fast";
+  const mode = options.mode || "smart";
   const cacheKey = `${normalizeCacheKey(tweetText)}|limit:${limit}|source:${source}|mode:${mode}`;
   if (!options.refresh) {
     const cached = readCache(cacheKey);
@@ -142,14 +142,14 @@ export async function getSuggestions(
       ? retrieveCandidates({
           userId: DEV_USER_ID,
           queryEmbedding,
-          userLimit: source === "user" ? 40 : 20,
-          globalLimit: source === "global" ? 40 : 30,
+          userLimit: source === "user" ? 60 : 30,
+          globalLimit: source === "global" ? 60 : 45,
           source,
         })
       : retrieveFallbackCandidates({
           userId: DEV_USER_ID,
-          userLimit: source === "user" ? 40 : 20,
-          globalLimit: source === "global" ? 40 : 30,
+          userLimit: source === "user" ? 60 : 30,
+          globalLimit: source === "global" ? 60 : 45,
           source,
         }),
     prefsPromise,
@@ -166,7 +166,7 @@ export async function getSuggestions(
   }));
 
   personalized.sort((a, b) => b.adjusted_score - a.adjusted_score);
-  const rerankPool = personalized.slice(0, Math.max(20, limit * 2));
+  const rerankPool = personalized.slice(0, Math.max(40, limit * 4));
 
   // LLM re-rank is intentionally opt-in. The extension needs sub-second
   // results; vector + heuristic scoring is the default fast path.
@@ -227,7 +227,7 @@ export async function getSuggestions(
     embedding: c.embedding,
     _ref: c,
   }));
-  const diversified = mmrSelect(mmrInput, limit, 0.72).map((item) => item._ref);
+  const diversified = mmrSelect(mmrInput, limit, 0.82).map((item) => item._ref);
 
   const tailoredOverlays = await buildTailoredOverlays(tweetText, context, diversified);
 
@@ -286,18 +286,147 @@ function scoreCandidate(
 }
 
 function taxonomyFit(candidate: Candidate, context: TweetContext): number {
-  const useCases = new Set(candidate.system_tags.use_cases || []);
+  const useCases = new Set((candidate.system_tags.use_cases || []).map(normalizeTaxonomyLabel));
   const vibes = (candidate.system_tags.vibes || []).join(" ").toLowerCase();
+  const examples = (candidate.system_tags.example_contexts || []).join(" ").toLowerCase();
+  const searchable = `${candidate.name} ${Array.from(useCases).join(" ")} ${vibes} ${examples}`.toLowerCase();
   let boost = 0;
 
-  if (context.intent === "dunking" && useCases.has("dunking")) boost += 0.08;
-  if (context.intent === "venting" && useCases.has("venting")) boost += 0.07;
-  if (context.intent === "agreement" && useCases.has("agreement")) boost += 0.06;
-  if (context.intent === "asking" && useCases.has("asking")) boost += 0.05;
-  if (context.tone === "sarcastic" && vibes.includes("sarcastic")) boost += 0.04;
-  if (context.tone === "wholesome" && vibes.includes("wholesome")) boost += 0.04;
+  const intentAliases = INTENT_USE_CASES[context.intent] || [];
+  for (const alias of intentAliases) {
+    const normalized = normalizeTaxonomyLabel(alias);
+    if (useCases.has(normalized)) boost += 0.045;
+    else if (searchable.includes(normalized.replace(/_/g, " "))) boost += 0.018;
+  }
 
-  return boost;
+  const toneAliases = TONE_SIGNALS[context.tone] || [];
+  for (const alias of toneAliases) {
+    const normalized = normalizeTaxonomyLabel(alias);
+    if (useCases.has(normalized) || searchable.includes(normalized.replace(/_/g, " "))) {
+      boost += 0.025;
+    }
+  }
+
+  const keywords = context.keywords
+    .map((keyword) => keyword.toLowerCase().trim())
+    .filter((keyword) => keyword.length >= 3);
+  let keywordHits = 0;
+  for (const keyword of keywords) {
+    if (searchable.includes(keyword)) keywordHits += 1;
+  }
+  boost += Math.min(0.09, keywordHits * 0.025);
+
+  if (context.intent === "dunking" && candidate.system_tags.emotion === "savage") boost += 0.035;
+  if (context.intent === "celebrating" && candidate.system_tags.emotion === "celebratory") boost += 0.045;
+  if (context.intent === "asking" && searchable.includes("asking")) boost += 0.055;
+  if (context.intent === "venting" && /cope|suffering|pain|frustration|panic|fine/.test(searchable)) boost += 0.04;
+  boost += canonicalFit(candidate.name, context);
+
+  return Math.min(0.42, boost);
+}
+
+function canonicalFit(name: string, context: TweetContext): number {
+  const meme = name.toLowerCase();
+  const text = context.keywords.join(" ").toLowerCase();
+  const vibe = `${context.reply_style} ${context.ideal_meme_vibe}`.toLowerCase();
+  const combined = `${text} ${vibe}`;
+
+  if (/\b(prod|down|dashboard|red|fire|launch)\b/.test(combined) && meme.includes("this is fine")) {
+    return 0.18;
+  }
+  if (/\b(skip|skipped|tests|friday|deploy|consequence|predictable|payment)\b/.test(combined)) {
+    if (meme.includes("surprised pikachu")) return 0.18;
+    if (meme.includes("one does not simply")) return 0.12;
+  }
+  if (/\b(rewrite|framework|shiny|trend|fomo|new stack)\b/.test(combined)) {
+    if (meme.includes("distracted boyfriend")) return 0.18;
+    if (meme.includes("expanding brain")) return 0.12;
+  }
+  if (/\b(choice|choose|button|flag|properly|dilemma)\b/.test(combined) && meme.includes("two buttons")) {
+    return 0.18;
+  }
+  if (/\b(spreadsheet|macros|platform|mislabel|calling)\b/.test(combined)) {
+    if (meme.includes("is this a pigeon")) return 0.18;
+    if (meme.includes("change my mind")) return 0.12;
+  }
+  if (/\b(meeting|calendar|slack|message)\b/.test(combined)) {
+    if (meme.includes("change my mind")) return 0.15;
+    if (meme.includes("boardroom")) return 0.12;
+  }
+  if (/\b(roadmap|vibes|deck|whole time|realization)\b/.test(combined) && meme.includes("always has been")) {
+    return 0.18;
+  }
+  if (/\b(once again|asking|error|channel|ping)\b/.test(combined)) {
+    if (meme.includes("once again asking")) return 0.18;
+    if (meme.includes("one does not simply")) return 0.12;
+  }
+
+  return 0;
+}
+
+const INTENT_USE_CASES: Record<TweetContext["intent"], string[]> = {
+  "counter-argument": [
+    "counter_argument",
+    "calling_out",
+    "difficulty_warning",
+    "equivalence",
+    "uncomfortable_truth",
+    "rejection_of_facts",
+  ],
+  agreement: [
+    "agreement",
+    "common_ground",
+    "unity",
+    "knowing_laughter",
+    "screaming_agreement",
+    "appreciation",
+    "cheers",
+  ],
+  "sharing-opinion": ["hot_take", "opinion", "contrarianism", "no_punchline", "rhetorical_question"],
+  venting: [
+    "frustration",
+    "cope",
+    "coping",
+    "suffering_in_silence",
+    "polite_suffering",
+    "looming_dread",
+    "rollercoaster",
+  ],
+  asking: ["asking", "asking_nicely", "repeated_request", "searching", "rhetorical_question"],
+  celebrating: ["celebration", "excitement", "appreciation", "cheers", "everyone_gets_something"],
+  dunking: [
+    "dunking",
+    "mock_shock",
+    "consequences",
+    "bad_logic",
+    "mocking_quote",
+    "shutting_down",
+    "predictable_take",
+    "say_the_line",
+  ],
+  "self-deprecating": [
+    "self_deprecation",
+    "self_owning",
+    "relatability",
+    "awkward_lookaway",
+    "bad_impulse",
+    "plans_falling_apart",
+  ],
+};
+
+const TONE_SIGNALS: Record<TweetContext["tone"], string[]> = {
+  sarcastic: ["sarcasm", "mocking_quote", "mock_shock", "fake_wisdom", "bad_logic"],
+  earnest: ["agreement", "appreciation", "common_ground"],
+  rant: ["frustration", "screaming_agreement", "shutting_down", "looming_dread"],
+  celebratory: ["celebration", "excitement", "cheers"],
+  "hot-take": ["hot_take", "opinion", "contrarianism", "superiority"],
+  question: ["asking", "confusion", "squinting_doubt", "rhetorical_question"],
+  absurdist: ["absurdist", "rollercoaster", "escalating_regret", "overdoing_it"],
+  wholesome: ["wholesome", "agreement", "appreciation", "unity"],
+};
+
+function normalizeTaxonomyLabel(label: string): string {
+  return label.toLowerCase().trim().replace(/[-\s]+/g, "_");
 }
 
 function roundScore(score: number): number {

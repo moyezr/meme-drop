@@ -8,12 +8,26 @@ const templates = MEME_TEMPLATE_MANIFEST.templates.filter(
 const generatedTemplates = (generatedManifest.templates as MemeTemplate[]).filter(
   (template) => template.supports_overlay && template.quality !== "disabled"
 );
-const runtimeTemplates = [...templates, ...generatedTemplates];
+const generatedTemplateByMemeId = new Map(
+  generatedTemplates
+    .filter((template) => template.meme_id)
+    .map((template) => [template.meme_id as string, template])
+);
 
-export function findMemeTemplate(name: string): MemeTemplate | null {
+export interface TemplateLookupOptions {
+  includeDrafts?: boolean;
+}
+
+export function findMemeTemplate(
+  name: string,
+  options: TemplateLookupOptions = {}
+): MemeTemplate | null {
   const normalizedName = normalizeTemplateName(name);
   if (!normalizedName) return null;
 
+  const runtimeTemplates = options.includeDrafts
+    ? [...templates, ...generatedTemplates]
+    : templates;
   let best: MemeTemplate | null = null;
   let bestScore = 0;
 
@@ -29,6 +43,22 @@ export function findMemeTemplate(name: string): MemeTemplate | null {
   }
 
   return bestScore >= 0.82 ? best : null;
+}
+
+export function findMemeTemplateForCandidate(
+  name: string,
+  memeId?: string,
+  options: TemplateLookupOptions = {}
+): MemeTemplate | null {
+  const verified = findMemeTemplate(name, { includeDrafts: false });
+  if (verified) return verified;
+
+  if (memeId) {
+    const exactGenerated = generatedTemplateByMemeId.get(memeId);
+    if (exactGenerated) return exactGenerated;
+  }
+
+  return options.includeDrafts ? findMemeTemplate(name, { includeDrafts: true }) : null;
 }
 
 export function normalizeTemplateName(name: string): string {

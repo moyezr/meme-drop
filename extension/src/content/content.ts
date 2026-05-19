@@ -96,7 +96,7 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
 
   chrome.runtime.sendMessage({
     type: "GET_SUGGESTIONS",
-    payload: { tweet_text: suggestionText, limit: 10, source: "all", refresh, mode: "fast" },
+    payload: { tweet_text: suggestionText, limit: 10, source: "all", refresh, mode: "smart" },
   });
 }
 
