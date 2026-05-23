@@ -3,9 +3,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getSuggestions, type SuggestionResult } from "../src/services/suggestion-engine.js";
+import {
+  getOpenRouterApiKey,
+  openRouterHeaders,
+  OPENROUTER_BASE_URL,
+  QWEN_PLUS_MODEL,
+} from "../src/services/llm-provider.js";
 
 interface BenchmarkCase {
   id: string;
+  category?: string;
   tweet: string;
   expected_memes: string[];
   keywords: string[];
@@ -26,6 +33,7 @@ interface CaseResult {
   suggestions: Array<{
     rank: number;
     name: string;
+    source: "user" | "global";
     score: number;
     captions: string[];
     issues: string[];
@@ -104,6 +112,7 @@ function scoreCase(testCase: BenchmarkCase, suggestions: SuggestionResult[]): Ca
     return {
       rank: index + 1,
       name: suggestion.name,
+      source: suggestion.source,
       score: suggestion.score,
       captions,
       issues,
@@ -163,6 +172,10 @@ function summarize(results: CaseResult[]) {
     top3: round(results.filter((item) => item.top3Hit).length / total),
     top5: round(results.filter((item) => item.top5Hit).length / total),
     mean_caption_score: round(results.reduce((sum, item) => sum + item.captionScore, 0) / total),
+    user_source_suggestions: results.reduce(
+      (sum, item) => sum + item.suggestions.filter((suggestion) => suggestion.source === "user").length,
+      0
+    ),
     mean_judge_score: round(
       results.reduce((sum, item) => sum + (item.judge?.overall || 0), 0) /
         Math.max(1, results.filter((item) => item.judge).length)
@@ -171,55 +184,44 @@ function summarize(results: CaseResult[]) {
 }
 
 async function judgeCase(testCase: BenchmarkCase, result: CaseResult): Promise<JudgeResult | undefined> {
-  if (!process.env.OPENAI_API_KEY) return undefined;
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) return undefined;
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
+      ...openRouterHeaders(),
     },
     body: JSON.stringify({
-      model: process.env.MEMEDROP_EVAL_MODEL || "gpt-4o-mini",
+      model: QWEN_PLUS_MODEL,
       temperature: 0,
-      max_output_tokens: 500,
-      text: {
-        format: { type: "json_object" },
-      },
-      input: [
+      max_tokens: 500,
+      reasoning: { effort: "none", exclude: true },
+      response_format: { type: "json_object" },
+      messages: [
         {
-          type: "message",
           role: "system",
           content: [
-            {
-              type: "input_text",
-              text: [
-                "You judge meme reply suggestions for X posts.",
-                "Score harshly from 1 to 5. 3 means usable but forgettable. 5 means a human would likely choose it.",
-                "Reward meme-template fit, post-specific captions, brevity, and natural internet voice.",
-                "Penalize generic captions, brand voice, confusing setups, stale filler, and mismatched templates.",
-                "Return JSON only with keys: meme_fit, caption_quality, specificity, brevity, internet_voice, overall, notes.",
-              ].join(" "),
-            },
-          ],
+            "You judge meme reply suggestions for X posts.",
+            "Score harshly from 1 to 5. 3 means usable but forgettable. 5 means a human would likely choose it.",
+            "Reward meme-template fit, post-specific captions, brevity, and natural internet voice.",
+            "Penalize generic captions, brand voice, confusing setups, stale filler, and mismatched templates.",
+            "Return JSON only with keys: meme_fit, caption_quality, specificity, brevity, internet_voice, overall, notes.",
+          ].join(" "),
         },
         {
-          type: "message",
           role: "user",
-          content: [
+          content: JSON.stringify(
             {
-              type: "input_text",
-              text: JSON.stringify(
-                {
-                  tweet: testCase.tweet,
-                  expected_meme_families: testCase.expected_memes,
-                  suggestions: result.suggestions.slice(0, 3),
-                },
-                null,
-                2
-              ),
+              tweet: testCase.tweet,
+              expected_meme_families: testCase.expected_memes,
+              suggestions: result.suggestions.slice(0, 3),
             },
-          ],
+            null,
+            2
+          ),
         },
       ],
     }),
@@ -227,11 +229,13 @@ async function judgeCase(testCase: BenchmarkCase, result: CaseResult): Promise<J
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Evaluation judge failed ${response.status}: ${body.slice(0, 400)}`);
+    throw new Error(`OpenRouter evaluation judge failed ${response.status}: ${body.slice(0, 400)}`);
   }
 
-  const data = (await response.json()) as { output_text?: string; output?: unknown[] };
-  const content = data.output_text || extractResponseText(data.output);
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = data.choices?.[0]?.message?.content;
   if (!content) return undefined;
   const parsed = JSON.parse(stripJsonFence(content)) as JudgeResult;
   return {
@@ -254,7 +258,7 @@ function printHumanReport(report: {
 }) {
   console.log(`MemeDrop suggestion benchmark (${report.mode}, ${report.source}, top ${report.limit})`);
   console.log(
-    `top1=${pct(report.summary.top1)} top3=${pct(report.summary.top3)} top5=${pct(report.summary.top5)} caption=${pct(report.summary.mean_caption_score)} judge=${judgePct(report.summary.mean_judge_score)}`
+    `top1=${pct(report.summary.top1)} top3=${pct(report.summary.top3)} top5=${pct(report.summary.top5)} caption=${pct(report.summary.mean_caption_score)} userSource=${report.summary.user_source_suggestions} judge=${judgePct(report.summary.mean_judge_score)}`
   );
   console.log("");
 
@@ -265,7 +269,7 @@ function printHumanReport(report: {
     for (const suggestion of result.suggestions.slice(0, 3)) {
       const captions = suggestion.captions.length ? ` | "${suggestion.captions.join(" / ")}"` : "";
       const issues = suggestion.issues.length ? ` [${suggestion.issues.join("; ")}]` : "";
-      console.log(`  ${suggestion.rank}. ${suggestion.name} (${suggestion.score})${captions}${issues}`);
+      console.log(`  ${suggestion.rank}. ${suggestion.name} [${suggestion.source}] (${suggestion.score})${captions}${issues}`);
     }
     if (result.judge?.notes) console.log(`  judge: ${result.judge.notes}`);
   }
@@ -311,21 +315,6 @@ function clampJudgeScore(value: number): number {
 
 function stripJsonFence(content: string): string {
   return content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-}
-
-function extractResponseText(output: unknown[] | undefined): string | null {
-  if (!Array.isArray(output)) return null;
-  for (const item of output) {
-    if (!item || typeof item !== "object") continue;
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) continue;
-    for (const part of content) {
-      if (!part || typeof part !== "object") continue;
-      const text = (part as { text?: unknown }).text;
-      if (typeof text === "string") return text;
-    }
-  }
-  return null;
 }
 
 function stringifyNote(note: unknown): string {

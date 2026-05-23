@@ -12,7 +12,7 @@ MemeDrop is a Chrome extension that helps X (Twitter) users reply to posts with 
 
 The extension does two things:
 1. **Suggests the right meme** when you open a reply composer on X
-2. **Lets you save memes** you see while scrolling, building a personal library that powers better suggestions over time
+2. **Lets you save memes** you see while scrolling, building a personal library for browsing and a future saved-memes suggestion tab
 
 ---
 
@@ -150,8 +150,9 @@ When a user clicks "Reply" on any X post, a floating panel appears showing 5 con
 | Context match score | 80% | Cosine similarity between tweet context embedding and meme use-case embedding |
 | Recency penalty | -20% | Penalizes memes this user has used in the last 48 hours |
 
-### Scope
-- 50 curated seed memes + any user-saved memes
+- Main suggestions use curated seed memes only.
+- User-saved memes stay out of the main recommendation feed for now; they will be handled by a separate saved-memes tab later.
+- Images only (no GIFs)
 - Images only (no GIFs)
 
 ---
@@ -174,7 +175,7 @@ A save icon appears when a user hovers over any image in the X feed. One click s
 9. Response includes generated tags
 10. Toast notification appears on the X page showing tags (e.g., "3 tags added: reaction, sarcastic, counter-argument")
 11. Tapping the toast opens a quick-edit inline panel where the user can rename the meme and add custom tags
-12. Meme is now in the personal library and eligible for future reply suggestions
+12. Meme is now in the personal library. It does not enter the main suggestion feed yet.
 
 ### Save Button UX
 - Save icon follows the same visual language as X's bookmark icon

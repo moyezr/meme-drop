@@ -1,7 +1,7 @@
 import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import type { TweetContext } from "./context-analyzer.js";
+import { openrouter, QWEN_PLUS_MODEL } from "./llm-provider.js";
 
 export interface RerankInput {
   meme_id: string;
@@ -70,23 +70,40 @@ export async function rerankCandidates(
       const examples = c.example_contexts.length
         ? ` | eg: ${c.example_contexts[0]}`
         : "";
-      return `#${i + 1} [id=${c.meme_id}] ${c.name} (${c.emotion || "?"})${vibes}${useCases}${examples}`;
+      return `#${i + 1} [id=${c.meme_id}] ${c.name} (${c.emotion || "?"}, prior=${c.prior_score.toFixed(3)})${vibes}${useCases}${examples}`;
     })
     .join("\n");
 
   const { object } = await generateObject({
-    model: openai(process.env.MEMEDROP_RERANK_MODEL || "gpt-4o-mini"),
+    model: openrouter.chat(QWEN_PLUS_MODEL),
     schema,
     temperature: 0.4,
-    system: `You are a meme curator picking the funniest, most on-point meme replies to a tweet.
+    maxOutputTokens: 600,
+    system: `You are a meme curator picking the funniest, most on-point meme replies to a tweet. Return JSON only. Do not include reasoning, markdown, or extra keys.
+
+The JSON must contain exactly this shape:
+{
+  "picks": [
+    {
+      "meme_id": "id from candidate list",
+      "rank": 1,
+      "punch_reason": "2-4 word tag",
+      "confidence": 0.8
+    }
+  ]
+}
 
 Rules:
-- Prefer a meme whose vibe matches the *reply intent*, not just the tweet topic.
-- A meme that's slightly lower in similarity but a perfect comedic fit beats a high-similarity mismatch.
-- Avoid picking multiple memes with the same vibe — one per vibe-family.
+- Optimize for "would a funny human actually post this?", not "is this semantically related?"
+- Prefer memes whose classic joke structure matches the social dynamic and joke target.
+- The best pick often highlights the absurdity, contradiction, predictable consequence, self-own, or cope in the tweet.
+- A meme that's slightly lower in prior score but a perfect comedic fit beats a high-score mismatch.
+- Prefer recognizable meme formats when they fit cleanly; avoid obscure or generic reaction images.
+- Avoid picking multiple memes with the same joke shape — one per vibe-family.
 - punch_reason must sound like something a friend would text — punchy, concrete, no generic words like "reaction" or "relevant".
+- Do not reward a meme just because it shares a keyword with the tweet.
 
-Return the top ${topN} in order, each with a punch_reason and confidence.
+Return exactly ${topN} picks in order, each with a punch_reason and confidence.
 Only use meme_ids from the candidate list.`,
     prompt: `Tweet: "${tweetText}"
 
@@ -95,12 +112,15 @@ Tweet analysis:
 - intent: ${context.intent}, intensity: ${context.intensity.toFixed(2)}
 - ideal reply style: ${context.reply_style}
 - ideal meme vibe: ${context.ideal_meme_vibe}
+- joke target: ${context.joke_target}
+- social dynamic: ${context.social_dynamic}
+- humor angle: ${context.humor_angle}
 - keywords: ${context.keywords.join(", ")}
 
 Candidates:
 ${candidateText}
 
-Pick the top ${topN} candidates as meme replies. Rank them 1..${topN}.`,
+Pick exactly ${topN} candidates as meme replies. Rank them 1..${topN}. Do not include more than ${topN} picks. Return only the required JSON object.`,
   });
 
   // Dedupe ids (LLM sometimes returns same id twice), keep lowest rank.

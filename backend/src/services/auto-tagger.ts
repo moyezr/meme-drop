@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { openrouter, QWEN_PLUS_MODEL } from "./llm-provider.js";
 
 const schema = z.object({
   name: z
@@ -64,10 +64,11 @@ export async function autoTagMeme(imagePath: string): Promise<AutoTagResult> {
 
   try {
     const { object } = await generateObject({
-      model: openai("gpt-4o"),
+      model: openrouter.chat(QWEN_PLUS_MODEL),
       schema,
       temperature: 0.3,
-      system: `You tag meme images for a recommendation engine. Lean into meme culture: 'smug dunk', 'panik arc', 'calm cope' are better vibe phrases than 'happy' or 'angry'. Use canonical template names when you recognize them.`,
+      maxOutputTokens: 900,
+      system: `You tag meme images for a recommendation engine. Return JSON only. Lean into meme culture: 'smug dunk', 'panik arc', 'calm cope' are better vibe phrases than 'happy' or 'angry'. Use canonical template names when you recognize them.`,
       messages: [
         {
           role: "user",

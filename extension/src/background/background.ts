@@ -163,14 +163,15 @@ async function fetchSuggestions(
   } = {}
 ): Promise<Suggestion[]> {
   const mode = options.mode || "smart";
-  const cacheKey = `${normalizeTweetText(tweetText)}|limit:${options.limit || 10}|source:${options.source || "all"}|mode:${mode}`;
+  const source = options.source || "global";
+  const cacheKey = `${normalizeTweetText(tweetText)}|limit:${options.limit || 5}|source:${source}|mode:${mode}`;
   if (!options.refresh) {
     const cached = readCachedSuggestions(cacheKey);
     if (cached) return cached;
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
+  const timer = setTimeout(() => controller.abort(), 45000);
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}/api/v1/suggest`, {
@@ -180,7 +181,7 @@ async function fetchSuggestions(
       body: JSON.stringify({
         tweet_text: tweetText,
         limit: options.limit,
-        source: options.source,
+        source,
         refresh: options.refresh,
         mode,
       }),
@@ -224,9 +225,6 @@ async function saveMeme(imageUrl: string, sourceTweetId?: string) {
   if (!res.ok) {
     throw new Error(`Save request failed with status ${res.status}`);
   }
-  // A fresh save invalidates any prior suggestion responses — the new meme
-  // should be eligible to appear next time.
-  suggestionCache.clear();
   const data = await res.json();
   return data.meme;
 }

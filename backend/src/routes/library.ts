@@ -6,7 +6,6 @@ import { autoTagMeme } from "../services/auto-tagger.js";
 import { generateEmbedding } from "../services/embedding.js";
 import { downloadImage } from "../services/image-downloader.js";
 import { buildMemeDescriptor } from "../services/descriptor.js";
-import { invalidateSuggestionCache } from "../services/suggestion-engine.js";
 
 const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -55,7 +54,6 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
       })
       .returning();
 
-    invalidateSuggestionCache();
     return { meme };
   });
 
@@ -145,7 +143,6 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
         return reply.code(404).send({ error: "Meme not found" });
       }
 
-      invalidateSuggestionCache();
       return { meme: result[0] };
     }
   );
@@ -165,7 +162,6 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
         return reply.code(404).send({ error: "Meme not found" });
       }
 
-      invalidateSuggestionCache();
       return { deleted: true };
     }
   );

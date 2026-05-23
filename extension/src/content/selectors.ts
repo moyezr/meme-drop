@@ -30,9 +30,10 @@ export const SELECTORS = {
 
 /**
  * URL patterns for detecting reply composer modal.
- * The modal appears when navigating to x.com/compose/post.
+ * Suggestions intentionally only fire for the modal compose route to avoid
+ * spending model calls on every inline reply composer.
  */
 export const URL_PATTERNS = {
-  composeModal: /x\.com\/compose\/post/,
-  tweetDetail: /x\.com\/\w+\/status\/\d+/,
+  composeModal: /(x|twitter)\.com\/compose\/post/,
+  tweetDetail: /(x|twitter)\.com\/\w+\/status\/\d+/,
 } as const;

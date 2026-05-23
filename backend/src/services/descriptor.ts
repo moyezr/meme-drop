@@ -48,6 +48,9 @@ interface TweetDescriptorInput {
   intent: string;
   reply_style: string;
   ideal_meme_vibe: string;
+  joke_target?: string;
+  social_dynamic?: string;
+  humor_angle?: string;
 }
 
 export function buildTweetDescriptor(t: TweetDescriptorInput): string {
@@ -56,6 +59,11 @@ export function buildTweetDescriptor(t: TweetDescriptorInput): string {
     `Intent: ${t.intent.replace(/_/g, " ")}.`,
     `Ideal reply style: ${t.reply_style}.`,
     `The perfect meme reply would feel like: ${t.ideal_meme_vibe}.`,
+    t.joke_target ? `The meme should point at: ${t.joke_target}.` : "",
+    t.social_dynamic ? `Social dynamic: ${t.social_dynamic}.` : "",
+    t.humor_angle ? `Humor angle: ${t.humor_angle}.` : "",
     `Original tweet: "${t.tweet_text}"`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

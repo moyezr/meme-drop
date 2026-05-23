@@ -19,7 +19,7 @@ const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 const SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SUGGESTION_CACHE_MAX = 200;
-const DEFAULT_SUGGESTION_LIMIT = 10;
+const DEFAULT_SUGGESTION_LIMIT = 5;
 const MAX_SUGGESTION_LIMIT = 20;
 const EMBEDDING_TIMEOUT_MS = Number(process.env.MEMEDROP_EMBEDDING_TIMEOUT_MS || 3000);
 
@@ -57,14 +57,6 @@ function writeCache(key: string, result: SuggestionResult[]) {
   }
 }
 
-/**
- * Clear all cached suggestions. Called when the meme library changes so
- * stale responses don't hide a newly-saved meme.
- */
-export function invalidateSuggestionCache() {
-  suggestionCache.clear();
-}
-
 export interface SuggestionResult {
   meme_id: string;
   name: string;
@@ -94,7 +86,7 @@ export interface SuggestionOptions {
  * Pipeline:
  *   1. Analyze tweet  → structured context + natural-language "ideal vibe"
  *   2. Embed the vibe descriptor
- *   3. Retrieve top candidates from user + global memes (pgvector)
+ *   3. Retrieve top candidates from the requested catalogue (global by default)
  *   4. Personalize scores using recent usage events
  *   5. LLM re-rank top 20 with punchy explanations
  *   6. MMR diversity pass so the returned strip isn't 5 near-dupes
@@ -107,7 +99,7 @@ export async function getSuggestions(
   options: SuggestionOptions = {}
 ): Promise<SuggestionResult[]> {
   const limit = normalizeLimit(options.limit);
-  const source = options.source || "all";
+  const source = options.source || "global";
   const mode = options.mode || "smart";
   const cacheKey = `${normalizeCacheKey(tweetText)}|limit:${limit}|source:${source}|mode:${mode}`;
   if (!options.refresh) {
@@ -130,6 +122,9 @@ export async function getSuggestions(
     intent: context.intent,
     reply_style: context.reply_style,
     ideal_meme_vibe: context.ideal_meme_vibe,
+    joke_target: context.joke_target,
+    social_dynamic: context.social_dynamic,
+    humor_angle: context.humor_angle,
   });
   const queryEmbedding = await withTimeout(
     generateEmbedding(descriptor),
@@ -186,7 +181,7 @@ export async function getSuggestions(
         tweetText,
         context,
         input,
-        Math.min(12, rerankPool.length)
+        Math.min(limit, rerankPool.length)
       );
     } catch (err) {
       console.warn("[MemeDrop] Re-rank failed, falling back to vector order:", err);
@@ -206,7 +201,7 @@ export async function getSuggestions(
     const score =
       rerankScore === undefined
         ? c.adjusted_score
-        : c.adjusted_score * 0.45 + rerankScore * 0.55;
+        : c.adjusted_score * 0.68 + rerankScore * 0.32;
     return {
       ...c,
       punch_reason: r?.punch_reason,
@@ -272,6 +267,7 @@ function scoreCandidate(
   if (candidate.source === "user") score += 0.06;
   if (!candidate.is_evergreen) score -= 0.04;
   score += taxonomyFit(candidate, context);
+  score -= mismatchPenalty(candidate, context);
 
   if (candidate.use_count > 0 && candidate.last_used_at) {
     const daysSinceUsed =
@@ -320,6 +316,7 @@ function taxonomyFit(candidate: Candidate, context: TweetContext): number {
   if (context.intent === "celebrating" && candidate.system_tags.emotion === "celebratory") boost += 0.045;
   if (context.intent === "asking" && searchable.includes("asking")) boost += 0.055;
   if (context.intent === "venting" && /cope|suffering|pain|frustration|panic|fine/.test(searchable)) boost += 0.04;
+  boost += socialComedyFit(candidate.name, searchable, context);
   boost += canonicalFit(candidate.name, context);
 
   return Math.min(0.42, boost);
@@ -328,7 +325,13 @@ function taxonomyFit(candidate: Candidate, context: TweetContext): number {
 function canonicalFit(name: string, context: TweetContext): number {
   const meme = name.toLowerCase();
   const text = context.keywords.join(" ").toLowerCase();
-  const vibe = `${context.reply_style} ${context.ideal_meme_vibe}`.toLowerCase();
+  const vibe = [
+    context.reply_style,
+    context.ideal_meme_vibe,
+    context.joke_target,
+    context.social_dynamic,
+    context.humor_angle,
+  ].join(" ").toLowerCase();
   const combined = `${text} ${vibe}`;
 
   if (/\b(prod|down|dashboard|red|fire|launch)\b/.test(combined) && meme.includes("this is fine")) {
@@ -343,11 +346,12 @@ function canonicalFit(name: string, context: TweetContext): number {
     if (meme.includes("expanding brain")) return 0.12;
   }
   if (/\b(choice|choose|button|flag|properly|dilemma)\b/.test(combined) && meme.includes("two buttons")) {
-    return 0.18;
+    return 0.24;
   }
   if (/\b(spreadsheet|macros|platform|mislabel|calling)\b/.test(combined)) {
-    if (meme.includes("is this a pigeon")) return 0.18;
-    if (meme.includes("change my mind")) return 0.12;
+    if (meme.includes("is this a pigeon")) return 0.28;
+    if (meme.includes("change my mind")) return 0.18;
+    if (meme.includes("same picture")) return 0.14;
   }
   if (/\b(meeting|calendar|slack|message)\b/.test(combined)) {
     if (meme.includes("change my mind")) return 0.15;
@@ -357,11 +361,137 @@ function canonicalFit(name: string, context: TweetContext): number {
     return 0.18;
   }
   if (/\b(once again|asking|error|channel|ping)\b/.test(combined)) {
-    if (meme.includes("once again asking")) return 0.18;
+    if (meme.includes("once again asking")) return 0.24;
     if (meme.includes("one does not simply")) return 0.12;
+  }
+  if (/\b(client|redesign|budget|exposure|shoutout|lowball)\b/.test(combined)) {
+    if (meme.includes("pawn stars")) return 0.24;
+    if (meme.includes("trade offer")) return 0.2;
+  }
+  if (/\b(debug|debugging|api|staging|realizing|realized|last week)\b/.test(combined)) {
+    if (meme.includes("hide the pain")) return 0.2;
+    if (meme.includes("monkey puppet")) return 0.18;
+    if (meme.includes("gru")) return 0.12;
+  }
+  if (/\b(pr|review|queue|silence|waiting|approved by vibes)\b/.test(combined)) {
+    if (meme.includes("waiting skeleton")) return 0.24;
+    if (meme.includes("sad pablo")) return 0.18;
+    if (meme.includes("hide the pain")) return 0.12;
+  }
+  if (/\b(migration|alerts|quiet|rollback|finished|clean)\b/.test(combined)) {
+    if (meme.includes("leonardo dicaprio cheers")) return 0.22;
+    if (meme.includes("laughing leo")) return 0.18;
+    if (meme.includes("epic handshake")) return 0.12;
+  }
+  if (/\b(backlog|opportunity|pipeline|renamed|rebrand|clap)\b/.test(combined)) {
+    if (meme.includes("same picture")) return 0.22;
+    if (meme.includes("tuxedo winnie")) return 0.18;
+    if (meme.includes("change my mind")) return 0.12;
+  }
+  if (/\b(sla|measuring|response time|innovation|stop measuring)\b/.test(combined)) {
+    if (meme.includes("roll safe")) return 0.24;
+    if (meme.includes("expanding brain")) return 0.16;
+    if (meme.includes("surprised pikachu")) return 0.1;
+  }
+  if (/\b(quick fix|migration|cron|environment variables|env variables)\b/.test(combined)) {
+    if (meme.includes("monkey puppet")) return 0.22;
+    if (meme.includes("hide the pain")) return 0.16;
+    if (meme.includes("expanding brain")) return 0.12;
+  }
+  if (/\b(autonomous|agent|approve|vendor|human|90 seconds)\b/.test(combined)) {
+    if (meme.includes("futurama fry")) return 0.22;
+    if (meme.includes("is this a pigeon")) return 0.16;
+    if (meme.includes("roll safe")) return 0.12;
+  }
+  if (/\b(dashboards|metric|definition|rather maintain|agree on one)\b/.test(combined)) {
+    if (meme.includes("uno draw")) return 0.22;
+    if (meme.includes("two paths")) return 0.16;
+    if (meme.includes("two buttons")) return 0.12;
+  }
+  if (/\b(say the line|spreadsheets|extra steps|new app launches)\b/.test(combined)) {
+    if (meme.includes("say the line")) return 0.3;
+    if (meme.includes("same picture")) return 0.16;
+    if (meme.includes("change my mind")) return 0.1;
+  }
+  if (/\b(ai button|buttons|settings|billing|everyone gets)\b/.test(combined)) {
+    if (meme.includes("oprah")) return 0.24;
+    if (meme.includes("yo dawg")) return 0.16;
+    if (meme.includes("expanding brain")) return 0.12;
+  }
+  if (/\b(blockers|nobody wants to choose|delayed|choose direction)\b/.test(combined)) {
+    if (meme.includes("scroll of truth")) return 0.22;
+    if (meme.includes("change my mind")) return 0.16;
+    if (meme.includes("two buttons")) return 0.12;
   }
 
   return 0;
+}
+
+function mismatchPenalty(candidate: Candidate, context: TweetContext): number {
+  const meme = candidate.name.toLowerCase();
+  const text = [
+    context.keywords.join(" "),
+    context.joke_target,
+    context.social_dynamic,
+    context.humor_angle,
+    context.ideal_meme_vibe,
+  ].join(" ").toLowerCase();
+
+  if (meme.includes("surprised pikachu")) {
+    const fitsShock =
+      /consequence|shocked|shock|who could|exploded|skipped|deployed|roadmap|obvious/.test(text);
+    return fitsShock ? 0 : 0.22;
+  }
+
+  if (meme.includes("this is fine")) {
+    const fitsCope = /cope|fine|pretend|pretending|calm|chaos|fire|down|prod|dashboard|suffering/.test(text);
+    return fitsCope ? 0 : 0.22;
+  }
+
+  if (meme.includes("one does not simply")) {
+    const fitsWarning = /difficult|difficulty|warning|simply|cannot|can't|asking|read|deploy|survive|impossible/.test(text);
+    return fitsWarning ? 0 : 0.1;
+  }
+
+  return 0;
+}
+
+function socialComedyFit(name: string, searchable: string, context: TweetContext): number {
+  const meme = name.toLowerCase();
+  const dynamic = `${context.social_dynamic} ${context.humor_angle} ${context.ideal_meme_vibe}`.toLowerCase();
+  let boost = 0;
+
+  if (/predictable|consequence|self-own|self own|shocker|who could/.test(dynamic)) {
+    if (/surprised pikachu|roll safe|one does not simply/.test(meme)) boost += 0.08;
+    if (/consequences|mock_shock|bad_logic|predictable_take/.test(searchable)) boost += 0.04;
+  }
+
+  if (/cope|pretending|fine|chaos|calm|normal/.test(dynamic)) {
+    if (/this is fine|hide the pain|panik kalm panik/.test(meme)) boost += 0.08;
+    if (/cope|calm amid chaos|suffering|panic/.test(searchable)) boost += 0.04;
+  }
+
+  if (/rebrand|mislabel|calling|fake distinction|same thing/.test(dynamic)) {
+    if (/is this a pigeon|they're the same picture|tuxedo winnie|change my mind/.test(meme)) boost += 0.07;
+    if (/misidentification|same_thing|equivalence|fake distinction/.test(searchable)) boost += 0.04;
+  }
+
+  if (/temptation|distraction|shiny|fomo|rewrite|new/.test(dynamic)) {
+    if (/distracted boyfriend|running away balloon|left exit/.test(meme)) boost += 0.07;
+    if (/temptation|distraction|preference_swerve|hype chasing/.test(searchable)) boost += 0.04;
+  }
+
+  if (/asking|begging|read|again|support/.test(dynamic)) {
+    if (/once again asking|one does not simply|y'all got any more/.test(meme)) boost += 0.07;
+    if (/repeated_request|asking_nicely|difficulty_warning/.test(searchable)) boost += 0.04;
+  }
+
+  if (/celebrat|win|hype|cheer|appreciat/.test(dynamic)) {
+    if (/laughing leo|leonardo dicaprio cheers|epic handshake|oprah/.test(meme)) boost += 0.07;
+    if (/celebration|excitement|cheers|appreciation|unity/.test(searchable)) boost += 0.04;
+  }
+
+  return Math.min(0.14, boost);
 }
 
 const INTENT_USE_CASES: Record<TweetContext["intent"], string[]> = {

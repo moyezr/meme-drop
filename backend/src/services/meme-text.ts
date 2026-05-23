@@ -1,6 +1,12 @@
 import { findMemeTemplateForCandidate, type MemeTemplate } from "@memedrop/shared";
 import type { TweetContext } from "./context-analyzer.js";
 import type { Candidate } from "./retrieval.js";
+import {
+  getOpenRouterApiKey,
+  openRouterHeaders,
+  OPENROUTER_BASE_URL,
+  QWEN_PLUS_MODEL,
+} from "./llm-provider.js";
 
 export interface MemeTextOverlay {
   enabled: boolean;
@@ -49,9 +55,6 @@ const CAPTION_CACHE_TTL_MS = 30 * 60 * 1000;
 const CAPTION_CACHE_MAX = 400;
 const USE_DRAFT_TEMPLATES = process.env.MEMEDROP_USE_DRAFT_TEMPLATES === "true";
 const USE_CONTEXTUAL_FALLBACK = process.env.MEMEDROP_USE_CONTEXTUAL_CAPTION_FALLBACK !== "false";
-const CAPTION_PROVIDER = (process.env.MEMEDROP_CAPTION_PROVIDER || "openai").toLowerCase();
-const OPENAI_CAPTION_MODEL = process.env.MEMEDROP_OPENAI_CAPTION_MODEL || "gpt-5.4-mini";
-const DEEPSEEK_CAPTION_MODEL = process.env.MEMEDROP_DEEPSEEK_CAPTION_MODEL || "deepseek-chat";
 const GENERIC_CAPTION_PATTERNS = [
   /\b(me rn|bad idea|more vibes|new meeting|post through it|plot twist)\b/i,
   /\b(it'?s fine|making it worse|staying normal|trying to stay normal|acting shocked|the real question)\b/i,
@@ -174,76 +177,30 @@ async function requestCaptions(
   context: TweetContext,
   candidates: CaptionCandidate[]
 ): Promise<Map<string, Record<string, string>>> {
-  if (CAPTION_PROVIDER !== "deepseek" && process.env.OPENAI_API_KEY) {
-    return requestOpenAICaptions(tweetText, context, candidates);
-  }
-  return requestDeepSeekCaptions(tweetText, context, candidates);
+  return requestOpenRouterCaptions(tweetText, context, candidates);
 }
 
-async function requestOpenAICaptions(
+async function requestOpenRouterCaptions(
   tweetText: string,
   context: TweetContext,
   candidates: CaptionCandidate[]
 ): Promise<Map<string, Record<string, string>>> {
-  if (!process.env.OPENAI_API_KEY) return new Map();
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) return new Map();
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
+      ...openRouterHeaders(),
     },
     body: JSON.stringify({
-      model: OPENAI_CAPTION_MODEL,
+      model: QWEN_PLUS_MODEL,
       temperature: 0.8,
-      max_output_tokens: 1400,
-      text: {
-        format: { type: "json_object" },
-      },
-      input: [
-        {
-          type: "message",
-          role: "system",
-          content: [{ type: "input_text", text: captionSystemPrompt() }],
-        },
-        {
-          type: "message",
-          role: "user",
-          content: [{ type: "input_text", text: buildCaptionPrompt(tweetText, context, candidates) }],
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`OpenAI caption request failed ${response.status}: ${body.slice(0, 400)}`);
-  }
-
-  const data = (await response.json()) as { output_text?: string; output?: unknown[] };
-  const content = data.output_text || extractResponseText(data.output);
-  if (!content) return new Map();
-  return parseCaptionResponse(content);
-}
-
-async function requestDeepSeekCaptions(
-  tweetText: string,
-  context: TweetContext,
-  candidates: CaptionCandidate[]
-): Promise<Map<string, Record<string, string>>> {
-  if (!process.env.DEEPSEEK_API_KEY) return new Map();
-
-  const response = await fetch("https://api.deepseek.com/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_CAPTION_MODEL,
-      response_format: { type: "json_object" },
-      temperature: 0.75,
       max_tokens: 1400,
+      reasoning: { effort: "none", exclude: true },
+      response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
@@ -259,7 +216,7 @@ async function requestDeepSeekCaptions(
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`DeepSeek caption request failed ${response.status}: ${body.slice(0, 400)}`);
+    throw new Error(`OpenRouter caption request failed ${response.status}: ${body.slice(0, 400)}`);
   }
 
   const data = (await response.json()) as {
@@ -653,8 +610,7 @@ function textTransform(template: MemeTemplate): "uppercase" | "mocking" | "none"
 }
 
 function cacheKey(tweetText: string, template: MemeTemplate): string {
-  const model = CAPTION_PROVIDER === "deepseek" ? DEEPSEEK_CAPTION_MODEL : OPENAI_CAPTION_MODEL;
-  return `${normalizeTweet(tweetText)}|template:${template.template_id}|provider:${CAPTION_PROVIDER}|model:${model}|v2`;
+  return `${normalizeTweet(tweetText)}|template:${template.template_id}|provider:openrouter|model:${QWEN_PLUS_MODEL}|v2`;
 }
 
 function readCache(key: string): Record<string, string> | null {
@@ -691,25 +647,6 @@ function stripJsonFence(content: string): string {
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/\s*```$/i, "");
-}
-
-function extractResponseText(output: unknown[] | undefined): string | undefined {
-  if (!Array.isArray(output)) return undefined;
-
-  for (const item of output) {
-    if (!item || typeof item !== "object") continue;
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) continue;
-    for (const part of content) {
-      if (!part || typeof part !== "object") continue;
-      const typed = part as { type?: string; text?: string };
-      if ((typed.type === "output_text" || typed.type === "text") && typed.text) {
-        return typed.text;
-      }
-    }
-  }
-
-  return undefined;
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {

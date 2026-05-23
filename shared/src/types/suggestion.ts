@@ -31,12 +31,19 @@ export interface TweetContext {
   intensity: number;
   reply_style: string;
   ideal_meme_vibe: string;
+  joke_target: string;
+  social_dynamic: string;
+  humor_angle: string;
   keywords: string[];
 }
 
 export interface SuggestionRequest {
   tweet_text: string;
   limit?: number;
+  /**
+   * Main compose recommendations should use "global". "user" is reserved for
+   * a future saved-memes tab, and "all" is only for explicit experiments.
+   */
   source?: "all" | "user" | "global";
   refresh?: boolean;
   mode?: "fast" | "smart";

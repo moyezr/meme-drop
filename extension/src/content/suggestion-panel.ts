@@ -285,7 +285,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
           <button class="close-btn" title="Close">&times;</button>
         </div>
       </div>
-      <div class="empty">No meme suggestions yet. Save some memes first!</div>
+      <div class="empty">No meme suggestions yet. Try refreshing.</div>
     `;
   } else {
     const header = document.createElement("div");
