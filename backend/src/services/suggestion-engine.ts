@@ -1,6 +1,5 @@
 import {
   analyzeTweet,
-  heuristicTweetContext,
   type TweetContext,
 } from "./context-analyzer.js";
 import { generateEmbedding } from "./embedding.js";
@@ -14,6 +13,9 @@ import { loadUserPreferences, applyPreferences } from "./personalization.js";
 import { rerankCandidates, type RerankInput } from "./reranker.js";
 import { mmrSelect } from "./diversity.js";
 import { buildTailoredOverlays, type MemeTextOverlay } from "./meme-text.js";
+import { db } from "../db/index.js";
+import { memes } from "../db/schema.js";
+import { eq } from "drizzle-orm";
 
 const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -77,16 +79,15 @@ export interface SuggestionResult {
 
 export interface SuggestionOptions {
   limit?: number;
-  source?: "all" | "user" | "global";
   refresh?: boolean;
-  mode?: "fast" | "smart";
+  cacheKey?: string;
 }
 
 /**
  * Pipeline:
  *   1. Analyze tweet  → structured context + natural-language "ideal vibe"
  *   2. Embed the vibe descriptor
- *   3. Retrieve top candidates from the requested catalogue (global by default)
+ *   3. Retrieve top candidates from the curated global catalogue
  *   4. Personalize scores using recent usage events
  *   5. LLM re-rank top 20 with punchy explanations
  *   6. MMR diversity pass so the returned strip isn't 5 near-dupes
@@ -99,9 +100,7 @@ export async function getSuggestions(
   options: SuggestionOptions = {}
 ): Promise<SuggestionResult[]> {
   const limit = normalizeLimit(options.limit);
-  const source = options.source || "global";
-  const mode = options.mode || "smart";
-  const cacheKey = `${normalizeCacheKey(tweetText)}|limit:${limit}|source:${source}|mode:${mode}`;
+  const cacheKey = `${options.cacheKey || `text:${normalizeCacheKey(tweetText)}`}|limit:${limit}`;
   if (!options.refresh) {
     const cached = readCache(cacheKey);
     if (cached) return cached;
@@ -111,8 +110,7 @@ export async function getSuggestions(
   // overlap with the (serial) LLM + embed + retrieve chain.
   const prefsPromise = loadUserPreferences(DEV_USER_ID);
 
-  const context =
-    mode === "smart" ? await analyzeTweet(tweetText) : heuristicTweetContext(tweetText);
+  const context = await analyzeTweet(tweetText);
 
   const descriptor = buildTweetDescriptor({
     tweet_text: tweetText,
@@ -137,15 +135,15 @@ export async function getSuggestions(
       ? retrieveCandidates({
           userId: DEV_USER_ID,
           queryEmbedding,
-          userLimit: source === "user" ? 60 : 30,
-          globalLimit: source === "global" ? 60 : 45,
-          source,
+          userLimit: 0,
+          globalLimit: 60,
+          source: "global",
         })
       : retrieveFallbackCandidates({
           userId: DEV_USER_ID,
-          userLimit: source === "user" ? 60 : 30,
-          globalLimit: source === "global" ? 60 : 45,
-          source,
+          userLimit: 0,
+          globalLimit: 60,
+          source: "global",
         }),
     prefsPromise,
   ]);
@@ -163,29 +161,25 @@ export async function getSuggestions(
   personalized.sort((a, b) => b.adjusted_score - a.adjusted_score);
   const rerankPool = personalized.slice(0, Math.max(40, limit * 4));
 
-  // LLM re-rank is intentionally opt-in. The extension needs sub-second
-  // results; vector + heuristic scoring is the default fast path.
   let rerankResults: Awaited<ReturnType<typeof rerankCandidates>> = [];
-  if (mode === "smart") {
-    try {
-      const input: RerankInput[] = rerankPool.map((c) => ({
-        meme_id: c.meme_id,
-        name: c.name,
-        emotion: c.system_tags.emotion,
-        use_cases: c.system_tags.use_cases || [],
-        vibes: c.system_tags.vibes || [],
-        example_contexts: c.system_tags.example_contexts || [],
-        prior_score: c.adjusted_score,
-      }));
-      rerankResults = await rerankCandidates(
-        tweetText,
-        context,
-        input,
-        Math.min(limit, rerankPool.length)
-      );
-    } catch (err) {
-      console.warn("[MemeDrop] Re-rank failed, falling back to vector order:", err);
-    }
+  try {
+    const input: RerankInput[] = rerankPool.map((c) => ({
+      meme_id: c.meme_id,
+      name: c.name,
+      emotion: c.system_tags.emotion,
+      use_cases: c.system_tags.use_cases || [],
+      vibes: c.system_tags.vibes || [],
+      example_contexts: c.system_tags.example_contexts || [],
+      prior_score: c.adjusted_score,
+    }));
+    rerankResults = await rerankCandidates(
+      tweetText,
+      context,
+      input,
+      Math.min(limit, rerankPool.length)
+    );
+  } catch (err) {
+    console.warn("[MemeDrop] Re-rank failed, falling back to vector order:", err);
   }
 
   // Stitch re-rank results back onto the candidate objects.
@@ -224,13 +218,11 @@ export async function getSuggestions(
   }));
   const diversified = mmrSelect(mmrInput, limit, 0.82).map((item) => item._ref);
 
-  const tailoredOverlays = await buildTailoredOverlays(tweetText, context, diversified);
-
   const result: SuggestionResult[] = diversified.map((c) => ({
     meme_id: c.meme_id,
     name: c.name,
     image_url: c.image_url,
-    tailored_overlay: tailoredOverlays.get(c.meme_id) || null,
+    tailored_overlay: null,
     use_case_label:
       c.punch_reason ||
       (c.system_tags.use_cases?.[0] || "reaction").replace(/_/g, " "),
@@ -243,6 +235,32 @@ export async function getSuggestions(
 
   writeCache(cacheKey, result);
   return result;
+}
+
+export async function getTailoredOverlayForMeme(
+  tweetText: string,
+  memeId: string
+): Promise<MemeTextOverlay | null> {
+  const [meme] = await db.select().from(memes).where(eq(memes.id, memeId)).limit(1);
+  if (!meme) return null;
+
+  const context = await analyzeTweet(tweetText);
+  const candidate: Candidate = {
+    meme_id: meme.id,
+    source: "global",
+    name: meme.name,
+    image_url: meme.filePath,
+    format_type: meme.formatType,
+    system_tags: (meme.systemTags as Candidate["system_tags"]) || {},
+    embedding: [],
+    similarity: 0,
+    use_count: 0,
+    last_used_at: null,
+    is_evergreen: meme.isEvergreen,
+  };
+
+  const overlays = await buildTailoredOverlays(tweetText, context, [candidate]);
+  return overlays.get(memeId) || null;
 }
 
 function normalizeLimit(limit: number | undefined): number {
@@ -553,6 +571,7 @@ const TONE_SIGNALS: Record<TweetContext["tone"], string[]> = {
   question: ["asking", "confusion", "squinting_doubt", "rhetorical_question"],
   absurdist: ["absurdist", "rollercoaster", "escalating_regret", "overdoing_it"],
   wholesome: ["wholesome", "agreement", "appreciation", "unity"],
+  "self-deprecating": ["self_deprecation", "relatability", "suffering_in_silence", "cope"],
 };
 
 function normalizeTaxonomyLabel(label: string): string {

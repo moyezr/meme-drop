@@ -21,6 +21,7 @@ interface Suggestion {
   match_explanation: string;
   score: number;
   source: "user" | "global";
+  tweet_text?: string;
   tweet_context?: Record<string, unknown>;
 }
 
@@ -435,6 +436,13 @@ function requestRefresh(e: Event) {
 }
 
 async function insertMemeIntoComposer(suggestion: Suggestion) {
+  if (!suggestion.tailored_overlay?.enabled && suggestion.tweet_text) {
+    const overlay = await requestTailoredCaption(suggestion).catch(() => null);
+    if (overlay?.enabled) {
+      suggestion.tailored_overlay = overlay;
+    }
+  }
+
   if (suggestion.tailored_overlay?.enabled && !suggestion.tailored_image_data_url) {
     suggestion.tailored_image_data_url = await renderTailoredMemeDataUrl(suggestion).catch(
       () => null
@@ -447,6 +455,22 @@ async function insertMemeIntoComposer(suggestion: Suggestion) {
     memeId: suggestion.meme_id,
     source: suggestion.source,
   });
+}
+
+async function requestTailoredCaption(
+  suggestion: Suggestion
+): Promise<MemeTextOverlay | null> {
+  if (!suggestion.tweet_text) return null;
+
+  const result = await chrome.runtime.sendMessage({
+    type: "GET_CAPTION",
+    payload: {
+      tweet_text: suggestion.tweet_text,
+      meme_id: suggestion.meme_id,
+    },
+  });
+
+  return result?.tailored_overlay ?? null;
 }
 
 type InsertMemeInput = {

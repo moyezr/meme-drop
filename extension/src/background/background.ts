@@ -9,6 +9,7 @@ interface Suggestion {
   match_explanation: string;
   score: number;
   source: "user" | "global";
+  tweet_text?: string;
   tweet_context?: Record<string, unknown>;
   score_breakdown?: {
     similarity: number;
@@ -56,6 +57,7 @@ interface CacheEntry {
 const SUGGESTION_TTL_MS = 5 * 60 * 1000;
 const SUGGESTION_CACHE_MAX = 100;
 const suggestionCache = new Map<string, CacheEntry>();
+const suggestionInflight = new Map<string, Promise<Suggestion[]>>();
 
 function normalizeTweetText(text: string): string {
   return text.trim().replace(/\s+/g, " ").toLowerCase();
@@ -90,8 +92,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     fetchSuggestions(message.payload.tweet_text, {
       refresh: message.payload.refresh,
       limit: message.payload.limit,
-      source: message.payload.source,
-      mode: message.payload.mode,
+      cacheKey: message.payload.cache_key,
       onInitial: (suggestions) => {
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
@@ -133,6 +134,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "GET_CAPTION") {
+    fetchCaption(message.payload.tweet_text, message.payload.meme_id)
+      .then((tailored_overlay) => sendResponse({ tailored_overlay }))
+      .catch((err) => {
+        console.error("[MemeDrop] Caption error:", err);
+        sendResponse({ tailored_overlay: null, error: err?.message });
+      });
+    return true;
+  }
+
   if (message.type === "LOG_USAGE") {
     logUsage(message.payload).catch((err) => {
       console.error("[MemeDrop] Usage log error:", err);
@@ -157,19 +168,40 @@ async function fetchSuggestions(
   options: {
     refresh?: boolean;
     limit?: number;
-    source?: "all" | "user" | "global";
-    mode?: "fast" | "smart";
+    cacheKey?: string;
     onInitial?: (suggestions: Suggestion[]) => void;
   } = {}
 ): Promise<Suggestion[]> {
-  const mode = options.mode || "smart";
-  const source = options.source || "global";
-  const cacheKey = `${normalizeTweetText(tweetText)}|limit:${options.limit || 5}|source:${source}|mode:${mode}`;
+  const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${options.limit || 5}`;
   if (!options.refresh) {
     const cached = readCachedSuggestions(cacheKey);
     if (cached) return cached;
+
+    const inflight = suggestionInflight.get(cacheKey);
+    if (inflight) return inflight;
   }
 
+  const request = fetchFreshSuggestions(tweetText, options, cacheKey);
+  if (!options.refresh) {
+    suggestionInflight.set(cacheKey, request);
+  }
+  try {
+    return await request;
+  } finally {
+    suggestionInflight.delete(cacheKey);
+  }
+}
+
+async function fetchFreshSuggestions(
+  tweetText: string,
+  options: {
+    refresh?: boolean;
+    limit?: number;
+    cacheKey?: string;
+    onInitial?: (suggestions: Suggestion[]) => void;
+  },
+  cacheKey: string
+): Promise<Suggestion[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45000);
   let res: Response;
@@ -181,9 +213,8 @@ async function fetchSuggestions(
       body: JSON.stringify({
         tweet_text: tweetText,
         limit: options.limit,
-        source,
         refresh: options.refresh,
-        mode,
+        cache_key: options.cacheKey,
       }),
     });
     if (!res.ok) {
@@ -199,6 +230,7 @@ async function fetchSuggestions(
     ...suggestion,
     name: (suggestion.name || "").trim(),
     image_url: toAbsoluteMediaUrl(suggestion.image_url),
+    tweet_text: tweetText,
     image_data_url: null,
   }));
 
@@ -227,6 +259,19 @@ async function saveMeme(imageUrl: string, sourceTweetId?: string) {
   }
   const data = await res.json();
   return data.meme;
+}
+
+async function fetchCaption(tweetText: string, memeId: string): Promise<MemeTextOverlay | null> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/suggest/caption`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tweet_text: tweetText, meme_id: memeId }),
+  });
+  if (!res.ok) {
+    throw new Error(`Caption request failed with status ${res.status}`);
+  }
+  const data = await res.json();
+  return data.tailored_overlay ?? null;
 }
 
 async function logUsage(payload: {

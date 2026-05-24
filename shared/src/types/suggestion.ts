@@ -8,7 +8,8 @@ export interface TweetContext {
     | "hot-take"
     | "question"
     | "absurdist"
-    | "wholesome";
+    | "wholesome"
+    | "self-deprecating";
   topic:
     | "tech"
     | "finance"
@@ -40,13 +41,8 @@ export interface TweetContext {
 export interface SuggestionRequest {
   tweet_text: string;
   limit?: number;
-  /**
-   * Main compose recommendations should use "global". "user" is reserved for
-   * a future saved-memes tab, and "all" is only for explicit experiments.
-   */
-  source?: "all" | "user" | "global";
   refresh?: boolean;
-  mode?: "fast" | "smart";
+  cache_key?: string;
 }
 
 export interface SuggestionResult {

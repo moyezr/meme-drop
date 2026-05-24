@@ -43,14 +43,11 @@ interface CaptionCandidate {
   template: MemeTemplate;
 }
 
-interface CaptionBatchResponse {
-  captions?: Array<{
-    meme_id?: string;
-    regions?: Record<string, string>;
-  }>;
+interface CaptionResponse {
+  regions?: Record<string, string>;
 }
 
-const CAPTION_TIMEOUT_MS = Number(process.env.MEMEDROP_CAPTION_TIMEOUT_MS || 3000);
+const CAPTION_TIMEOUT_MS = Number(process.env.MEMEDROP_CAPTION_TIMEOUT_MS || 8000);
 const CAPTION_CACHE_TTL_MS = 30 * 60 * 1000;
 const CAPTION_CACHE_MAX = 400;
 const USE_DRAFT_TEMPLATES = process.env.MEMEDROP_USE_DRAFT_TEMPLATES === "true";
@@ -76,7 +73,7 @@ export async function buildTailoredOverlays(
       return template ? { meme_id: candidate.meme_id, name: candidate.name, template } : null;
     })
     .filter((item): item is CaptionCandidate => Boolean(item))
-    .slice(0, 8);
+    .slice(0, 5);
 
   if (captionCandidates.length === 0) return new Map();
 
@@ -150,43 +147,53 @@ async function generateCaptions(
 
   if (uncached.length === 0) return result;
 
-  try {
-    const generated = await withTimeout(
-      requestCaptions(tweetText, context, uncached),
-      CAPTION_TIMEOUT_MS,
-      null
-    );
+  const generated = await Promise.allSettled(
+    uncached.map(async (candidate) => {
+      const regions = await withTimeout(
+        requestCaption(tweetText, context, candidate),
+        CAPTION_TIMEOUT_MS,
+        null
+      );
+      return { candidate, regions };
+    })
+  );
 
-    for (const candidate of uncached) {
-      const regions = generated?.get(candidate.meme_id);
+  for (const item of generated) {
+    if (item.status === "rejected") {
+      console.warn("[MemeDrop] Tailored caption generation failed:", item.reason);
+      continue;
+    }
+
+    const { candidate, regions } = item.value;
+    try {
       if (!regions) continue;
       const cleaned = cleanGeneratedRegions(regions, candidate.template, tweetText, context);
       if (Object.keys(cleaned).length === 0) continue;
       result.set(candidate.meme_id, cleaned);
       writeCache(cacheKey(tweetText, candidate.template), cleaned);
+    } catch (err) {
+      console.warn("[MemeDrop] Tailored caption cleanup failed:", err);
     }
-  } catch (err) {
-    console.warn("[MemeDrop] Tailored caption generation failed:", err);
   }
 
   return result;
 }
 
-async function requestCaptions(
+async function requestCaption(
   tweetText: string,
   context: TweetContext,
-  candidates: CaptionCandidate[]
-): Promise<Map<string, Record<string, string>>> {
-  return requestOpenRouterCaptions(tweetText, context, candidates);
+  candidate: CaptionCandidate
+): Promise<Record<string, string> | null> {
+  return requestOpenRouterCaption(tweetText, context, candidate);
 }
 
-async function requestOpenRouterCaptions(
+async function requestOpenRouterCaption(
   tweetText: string,
   context: TweetContext,
-  candidates: CaptionCandidate[]
-): Promise<Map<string, Record<string, string>>> {
+  candidate: CaptionCandidate
+): Promise<Record<string, string> | null> {
   const apiKey = getOpenRouterApiKey();
-  if (!apiKey) return new Map();
+  if (!apiKey) return null;
 
   const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -198,7 +205,7 @@ async function requestOpenRouterCaptions(
     body: JSON.stringify({
       model: QWEN_PLUS_MODEL,
       temperature: 0.8,
-      max_tokens: 1400,
+      max_tokens: 450,
       reasoning: { effort: "none", exclude: true },
       response_format: { type: "json_object" },
       messages: [
@@ -208,7 +215,7 @@ async function requestOpenRouterCaptions(
         },
         {
           role: "user",
-          content: buildCaptionPrompt(tweetText, context, candidates),
+          content: buildCaptionPrompt(tweetText, context, candidate),
         },
       ],
     }),
@@ -223,41 +230,33 @@ async function requestOpenRouterCaptions(
     choices?: Array<{ message?: { content?: string } }>;
   };
   const content = data.choices?.[0]?.message?.content;
-  if (!content) return new Map();
+  if (!content) return null;
 
   return parseCaptionResponse(content);
 }
 
-function parseCaptionResponse(content: string): Map<string, Record<string, string>> {
-  const parsed = JSON.parse(stripJsonFence(content)) as CaptionBatchResponse;
-  const map = new Map<string, Record<string, string>>();
-  for (const item of parsed.captions || []) {
-    if (!item.meme_id || !item.regions) continue;
-    map.set(item.meme_id, item.regions);
-  }
-  return map;
+function parseCaptionResponse(content: string): Record<string, string> | null {
+  const parsed = JSON.parse(stripJsonFence(content)) as CaptionResponse;
+  return parsed.regions || null;
 }
 
 function captionSystemPrompt(): string {
   return [
-    "You write meme overlay captions for replies on social media.",
-    "Return JSON only. No markdown.",
-    "Write like a funny, extremely online person, not like a brand account.",
-    "Prefer short, concrete, post-specific wording over generic meme filler.",
-    "Every region has a hard character limit. Count spaces and punctuation.",
-    "If a caption will not fit, make it shorter instead of explaining more.",
-    "The joke should be clear without extra context, but it must clearly react to the post.",
-    "Avoid hashtags, sales language, moralizing, and long setup sentences.",
+    "Write concise meme overlay captions for a reply on X.",
+    "Return JSON only with one key: regions.",
+    "Use the original post's concrete nouns or named things.",
+    "Match the meme template's joke structure.",
+    "Keep each region short and under its hard character limit.",
+    "Do not explain the joke. Do not use hashtags, brand voice, or generic filler.",
   ].join(" ");
 }
 
 function buildCaptionPrompt(
   tweetText: string,
   context: TweetContext,
-  candidates: CaptionCandidate[]
+  candidate: CaptionCandidate
 ): string {
-  const templates = candidates.map((candidate) => ({
-    meme_id: candidate.meme_id,
+  const template = {
     meme_name: candidate.name,
     template_id: candidate.template.template_id,
     pattern: candidate.template.caption_guidance.pattern,
@@ -268,46 +267,35 @@ function buildCaptionPrompt(
       max_lines: region.max_lines,
       hard_limit: `${region.max_chars} characters including spaces`,
     })),
-    good_examples: candidate.template.caption_guidance.good_examples.slice(0, 2),
-    bad_examples: candidate.template.caption_guidance.bad_examples.slice(0, 1),
-  }));
+    examples: candidate.template.caption_guidance.good_examples.slice(0, 2),
+  };
 
   return `Post to reply to:
 "${tweetText}"
 
-Post analysis:
+Useful post context:
 - tone: ${context.tone}
-- sentiment: ${context.sentiment}
-- topic: ${context.topic}
 - intent: ${context.intent}
-- ideal reply style: ${context.reply_style}
+- joke target: ${context.joke_target}
+- social dynamic: ${context.social_dynamic}
+- humor angle: ${context.humor_angle}
+- reply style: ${context.reply_style}
 - keywords: ${context.keywords.join(", ")}
 
-Write meme overlay captions for these templates:
-${JSON.stringify(templates, null, 2)}
+Selected meme:
+${JSON.stringify(template, null, 2)}
 
 Rules:
-- Sound like a sharp meme reply, not an explanation.
-- Use the post's concrete subject, names, or keywords when they make the joke more specific.
-- At least one region should include a concrete term from the post unless the template's canonical punchline requires otherwise.
+- Write only for this one meme.
+- At least one region must include a concrete term from the post when it fits.
 - Default to 2-5 words per region. Use fewer words when the region is small.
-- Never exceed any region's max_chars. These are hard limits, not suggestions.
-- For contrast formats, make region 1 set expectation and the final region twist or reveal it.
-- Avoid corporate phrasing, SEO phrasing, hashtags, and long noun piles.
-- Prefer concrete, simple, conversational words.
-- Prefer recognizable internet phrasing, but do not copy stale examples unless they perfectly fit the post.
-- Use each meme's pattern and examples.
-- If a meme has multiple regions, the regions must work together as one joke.
-- Return JSON only with this exact shape:
+- Never exceed max_chars.
+- If there are multiple regions, make them work as one joke.
+- Return JSON only:
 {
-  "captions": [
-    {
-      "meme_id": "same id from input",
-      "regions": {
-        "region_id": "caption text"
-      }
-    }
-  ]
+  "regions": {
+    "region_id": "caption text"
+  }
 }`;
 }
 

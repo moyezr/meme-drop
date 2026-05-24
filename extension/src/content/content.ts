@@ -62,12 +62,9 @@ function getTweetTextForActiveCompose(): string | null {
   return candidates[0] || null;
 }
 
-// The composer URL we last fired suggestions for. Prevents duplicate fires
-// when the same /compose/post page stays open across DOM churn.
-let lastComposeUrl: string | null = null;
-// The tweet text we last requested suggestions for. Same-URL re-visits that
-// yield the same tweet text are served from whatever the panel already shows.
-let lastRequestedTweetText: string | null = null;
+// The compose cache key we last requested suggestions for. It is normally the
+// source tweet id parsed from the canonical URL, with tweet text as fallback.
+let lastSuggestionCacheKey: string | null = null;
 // Token used to abandon stale waitForTweetText() loops when the URL changes
 // again before tweet text appears.
 let waitToken = 0;
@@ -83,6 +80,27 @@ async function waitForTweetText(token: number): Promise<string | null> {
   return null;
 }
 
+function getCanonicalTweetId(): string | null {
+  const canonicalHref = document
+    .querySelector<HTMLLinkElement>('link[rel="canonical"]')
+    ?.href;
+  if (!canonicalHref) return null;
+
+  try {
+    const url = new URL(canonicalHref);
+    const match = url.pathname.match(/\/[^/]+\/status\/(\d+)/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function buildSuggestionCacheKey(tweetText: string): string {
+  const tweetId = getCanonicalTweetId();
+  if (tweetId) return `tweet:${tweetId}`;
+  return `text:${tweetText.trim().replace(/\s+/g, " ").toLowerCase()}`;
+}
+
 async function requestSuggestionsForCurrentCompose(refresh = false) {
   const token = ++waitToken;
   showSuggestionPanel();
@@ -90,13 +108,14 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
   const text = await waitForTweetText(token);
   if (token !== waitToken) return; // URL changed while waiting
   const suggestionText = text || "A new X post where a funny, broadly useful reaction meme would help.";
+  const cacheKey = buildSuggestionCacheKey(suggestionText);
 
-  if (!refresh && suggestionText === lastRequestedTweetText && isPanelVisible()) return;
-  lastRequestedTweetText = suggestionText;
+  if (!refresh && cacheKey === lastSuggestionCacheKey && isPanelVisible()) return;
+  lastSuggestionCacheKey = cacheKey;
 
   chrome.runtime.sendMessage({
     type: "GET_SUGGESTIONS",
-    payload: { tweet_text: suggestionText, limit: 5, source: "global", refresh, mode: "smart" },
+    payload: { tweet_text: suggestionText, limit: 5, refresh, cache_key: cacheKey },
   });
 }
 
@@ -106,27 +125,26 @@ window.addEventListener("memedrop:refresh-suggestions", () => {
   });
 });
 
-function onUrlChanged() {
-  const url = window.location.href;
+function onUrlChanged(url = window.location.href) {
   const isCompose = URL_PATTERNS.composeModal.test(url);
 
   if (isCompose) {
-    if (url !== lastComposeUrl || !isPanelVisible()) {
-      lastComposeUrl = url;
-      lastRequestedTweetText = null;
-      requestSuggestionsForCurrentCompose();
-    }
+    requestSuggestionsForCurrentCompose();
     return;
   }
 
-  // Navigated away from /compose/post — tear down any panel state so the
-  // next compose starts from a clean slate.
-  if (lastComposeUrl !== null) {
-    lastComposeUrl = null;
-    lastRequestedTweetText = null;
-    waitToken++;
-    hidePanel();
-  }
+  lastSuggestionCacheKey = null;
+  waitToken++;
+  hidePanel();
+}
+
+let lastSeenUrl = window.location.href;
+
+function handlePotentialUrlChange() {
+  const currentUrl = window.location.href;
+  if (currentUrl === lastSeenUrl) return;
+  lastSeenUrl = currentUrl;
+  onUrlChanged(currentUrl);
 }
 
 // Patch history methods so we can react to SPA navigations (X uses
@@ -136,44 +154,21 @@ function onUrlChanged() {
   const origReplace = history.replaceState;
   history.pushState = function (...args: Parameters<typeof origPush>) {
     const result = origPush.apply(this, args);
-    queueMicrotask(onUrlChanged);
+    queueMicrotask(handlePotentialUrlChange);
     return result;
   };
   history.replaceState = function (...args: Parameters<typeof origReplace>) {
     const result = origReplace.apply(this, args);
-    queueMicrotask(onUrlChanged);
+    queueMicrotask(handlePotentialUrlChange);
     return result;
   };
-  window.addEventListener("popstate", onUrlChanged);
+  window.addEventListener("popstate", handlePotentialUrlChange);
 })();
 
-let lastSeenUrl = window.location.href;
-function checkForComposeState() {
-  const currentUrl = window.location.href;
-  if (currentUrl !== lastSeenUrl) {
-    lastSeenUrl = currentUrl;
-    onUrlChanged();
-    return;
-  }
-
-  if (URL_PATTERNS.composeModal.test(currentUrl) && !isPanelVisible()) {
-    onUrlChanged();
-  }
-}
-
-const composeObserver = new MutationObserver(() => {
-  queueMicrotask(checkForComposeState);
-});
-composeObserver.observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-});
-window.addEventListener("focus", checkForComposeState);
-document.addEventListener("visibilitychange", checkForComposeState);
-setInterval(checkForComposeState, 1000);
-
 // Initial URL check — handles direct loads of /compose/post.
-checkForComposeState();
+if (URL_PATTERNS.composeModal.test(window.location.href)) {
+  onUrlChanged(window.location.href);
+}
 
 function parseDraggedMeme(dataTransfer: DataTransfer | null): {
   imageUrl: string;

@@ -13,6 +13,7 @@ const schema = z.object({
     "question",
     "absurdist",
     "wholesome",
+    "self-deprecating",
   ]),
   topic: z.enum([
     "tech",
@@ -83,7 +84,7 @@ export async function analyzeTweet(tweetText: string): Promise<TweetContext> {
 
 The JSON must contain exactly these keys:
 - sentiment: one of positive, negative, neutral
-- tone: one of sarcastic, earnest, rant, celebratory, hot-take, question, absurdist, wholesome
+- tone: one of sarcastic, earnest, rant, celebratory, hot-take, question, absurdist, wholesome, self-deprecating
 - topic: one of tech, finance, politics, sports, entertainment, personal, culture, relationships, other
 - intent: one of counter-argument, agreement, sharing-opinion, venting, asking, celebrating, dunking, self-deprecating
 - intensity: number from 0 to 1
