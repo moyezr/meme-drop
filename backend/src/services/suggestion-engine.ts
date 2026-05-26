@@ -218,11 +218,19 @@ export async function getSuggestions(
   }));
   const diversified = mmrSelect(mmrInput, limit, 0.82).map((item) => item._ref);
 
+  const overlays = await buildTailoredOverlays(tweetText, context, diversified);
+  console.log(`[MemeDrop]
+Suggestion captions prepared
+- suggestions: ${diversified.length}
+- overlays attached: ${overlays.size}
+- tweet preview: ${previewLogText(tweetText)}
+- meme ids: ${diversified.map((c) => c.meme_id).join(", ")}`);
+
   const result: SuggestionResult[] = diversified.map((c) => ({
     meme_id: c.meme_id,
     name: c.name,
     image_url: c.image_url,
-    tailored_overlay: null,
+    tailored_overlay: overlays.get(c.meme_id) || null,
     use_case_label:
       c.punch_reason ||
       (c.system_tags.use_cases?.[0] || "reaction").replace(/_/g, " "),
@@ -261,6 +269,12 @@ export async function getTailoredOverlayForMeme(
 
   const overlays = await buildTailoredOverlays(tweetText, context, [candidate]);
   return overlays.get(memeId) || null;
+}
+
+function previewLogText(text: string, maxLength = 180): string {
+  const normalized = text.trim().replace(/\s+/g, " ");
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
 function normalizeLimit(limit: number | undefined): number {

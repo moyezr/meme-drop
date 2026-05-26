@@ -2,6 +2,7 @@ import { SELECTORS, URL_PATTERNS } from "./selectors";
 import { initSaveButton } from "./save-button";
 import {
   showSuggestionPanel,
+  showSuggestionError,
   updateSuggestions,
   insertMemeByUrl,
   hidePanel,
@@ -9,11 +10,59 @@ import {
 } from "./suggestion-panel";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
+const DEBUG_PREFIX = "[MemeDrop]";
+
+interface ReplyTweetSnapshot {
+  text: string | null;
+  viewportCount: number;
+  visibleViewportCount: number;
+  selectedViewportIndex: number;
+  selectedStrategy: string;
+  hasReplyContextContainer: boolean;
+  hasLikelyTweetContainer: boolean;
+  hasTweetRoot: boolean;
+  tweetTextNodeCount: number;
+}
 
 initSaveButton();
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "SUGGESTIONS_RESULT") {
+    if (!isComposeRoute()) {
+      logDebug(
+        "Ignored suggestions result",
+        `- reason: current URL is not compose
+- url: ${window.location.href}`
+      );
+      return;
+    }
+    if (currentComposeDismissed) {
+      logDebug(
+        "Ignored suggestions result",
+        "- reason: panel was dismissed for this compose"
+      );
+      return;
+    }
+    if (message.cache_key && message.cache_key !== lastSuggestionCacheKey) {
+      logDebug(
+        "Ignored stale suggestions result",
+        `- result cache key: ${message.cache_key}
+- active cache key: ${lastSuggestionCacheKey || "(none)"}`
+      );
+      return;
+    }
+    if (message.cache_key && message.cache_key === dismissedSuggestionCacheKey) {
+      logDebug(
+        "Ignored dismissed suggestions result",
+        `- dismissed cache key: ${dismissedSuggestionCacheKey}`
+      );
+      return;
+    }
+    logDebug(
+      "Rendering suggestions result",
+      `- cache key: ${message.cache_key || "(missing)"}
+- suggestions: ${(message.suggestions || []).length}`
+    );
     updateSuggestions(message.suggestions || []);
   }
 
@@ -32,50 +81,208 @@ function extractTweetText(tweetTextEl: Element): string {
   return tweetTextEl.textContent?.trim() ?? "";
 }
 
-function findVisibleComposeDialog(): HTMLElement | null {
-  const dialogs = Array.from(
-    document.querySelectorAll<HTMLElement>(SELECTORS.composeDialog)
-  ).filter((dialog) => {
-    if (!dialog.querySelector(SELECTORS.tweetTextarea)) return false;
-    const rect = dialog.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  });
-
-  return dialogs.at(-1) || null;
+function logDebug(title: string, details = "") {
+  console.log(`${DEBUG_PREFIX}
+${title}${details ? `\n${details}` : ""}`);
 }
 
-function getTweetTextForActiveCompose(): string | null {
-  const dialog = findVisibleComposeDialog();
-  const scopedTweetEls = dialog
-    ? Array.from(dialog.querySelectorAll(SELECTORS.tweetText))
+function buildTextPreview(text: string | null, maxLength = 180): string {
+  if (!text) return "(none)";
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 3)}...`;
+}
+
+function isComposeRoute(url = window.location.href): boolean {
+  return URL_PATTERNS.composeModal.test(url);
+}
+
+function getReplyViewports(): HTMLElement[] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(SELECTORS.viewportView)
+  );
+}
+
+function getVisibleReplyViewports(viewports: HTMLElement[]): HTMLElement[] {
+  return viewports.filter((viewport) => {
+    const rect = viewport.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  });
+}
+
+function uniqueElements(elements: Array<Element | null | undefined>): Element[] {
+  const seen = new Set<Element>();
+  const result: Element[] = [];
+
+  for (const element of elements) {
+    if (!element || seen.has(element)) continue;
+    seen.add(element);
+    result.push(element);
+  }
+
+  return result;
+}
+
+function findTweetRootInScope(scope: Element | null | undefined): Element | null {
+  if (!scope) return null;
+  const tweetRoots = [
+    ...(scope.matches(SELECTORS.tweet) ? [scope] : []),
+    ...Array.from(scope.querySelectorAll(SELECTORS.tweet)),
+  ];
+
+  return (
+    tweetRoots.find(
+      (tweetRoot) =>
+        tweetRoot.querySelector(SELECTORS.tweetText) &&
+        !tweetRoot.querySelector(SELECTORS.tweetTextarea)
+    ) || null
+  );
+}
+
+function readSnapshotFromViewport(
+  viewport: HTMLElement,
+  viewportCount: number,
+  visibleViewportCount: number,
+  selectedViewportIndex: number,
+  selectedStrategy: string
+): ReplyTweetSnapshot {
+  const lastChildElement =
+    viewport.lastChild instanceof Element ? viewport.lastChild : viewport.lastElementChild;
+  const replyContextContainer = lastChildElement || viewport.lastElementChild;
+  const likelyTweetContainer = replyContextContainer?.firstElementChild || replyContextContainer;
+  const searchScopes = uniqueElements([
+    likelyTweetContainer,
+    replyContextContainer,
+    viewport,
+  ]);
+  const tweetRoot = searchScopes
+    .map(findTweetRootInScope)
+    .find((root): root is Element => Boolean(root)) || null;
+  const tweetTextNodes = tweetRoot
+    ? Array.from(tweetRoot.querySelectorAll(SELECTORS.tweetText))
     : [];
-  const tweetEls =
-    scopedTweetEls.length > 0
-      ? scopedTweetEls
-      : Array.from(document.querySelectorAll(SELECTORS.tweetText));
-
-  const candidates = tweetEls
+  const candidates = tweetTextNodes
     .map(extractTweetText)
-    .filter((text) => text.length > 0)
-    .sort((a, b) => b.length - a.length);
+    .filter((text) => text.length > 0);
 
-  return candidates[0] || null;
+  return {
+    text: candidates[0] || null,
+    viewportCount,
+    visibleViewportCount,
+    selectedViewportIndex,
+    selectedStrategy,
+    hasReplyContextContainer: Boolean(replyContextContainer),
+    hasLikelyTweetContainer: Boolean(likelyTweetContainer),
+    hasTweetRoot: Boolean(tweetRoot),
+    tweetTextNodeCount: tweetTextNodes.length,
+  };
+}
+
+function buildEmptySnapshot(
+  viewportCount: number,
+  visibleViewportCount: number,
+  selectedViewportIndex = -1,
+  selectedStrategy = "none"
+): ReplyTweetSnapshot {
+  return {
+    text: null,
+    viewportCount,
+    visibleViewportCount,
+    selectedViewportIndex,
+    selectedStrategy,
+    hasReplyContextContainer: false,
+    hasLikelyTweetContainer: false,
+    hasTweetRoot: false,
+    tweetTextNodeCount: 0,
+  };
+}
+
+function readReplyTweetSnapshot(): ReplyTweetSnapshot {
+  const viewports = getReplyViewports();
+  const visibleViewports = getVisibleReplyViewports(viewports);
+  const firstViewport = document.querySelector<HTMLElement>(SELECTORS.viewportView);
+  const viewportAttempts = uniqueElements([
+    firstViewport,
+    ...visibleViewports.filter((viewport) => viewport.querySelector(SELECTORS.tweetTextarea)),
+    ...visibleViewports,
+    ...viewports,
+  ]) as HTMLElement[];
+
+  if (viewportAttempts.length === 0) {
+    return buildEmptySnapshot(viewports.length, visibleViewports.length);
+  }
+
+  let fallback = readSnapshotFromViewport(
+    viewportAttempts[0],
+    viewports.length,
+    visibleViewports.length,
+    viewports.indexOf(viewportAttempts[0]),
+    viewportAttempts[0] === firstViewport ? "first viewport" : "first candidate"
+  );
+
+  for (const viewport of viewportAttempts) {
+    const snapshot = readSnapshotFromViewport(
+      viewport,
+      viewports.length,
+      visibleViewports.length,
+      viewports.indexOf(viewport),
+      viewport === firstViewport
+        ? "first viewport"
+        : viewport.querySelector(SELECTORS.tweetTextarea)
+          ? "viewport with composer"
+          : "viewport fallback"
+    );
+
+    if (!fallback.hasTweetRoot || snapshot.hasTweetRoot) {
+      fallback = snapshot;
+    }
+    if (snapshot.text) return snapshot;
+  }
+
+  return fallback;
+}
+
+function logReplyTweetSnapshot(snapshot: ReplyTweetSnapshot, label: string) {
+  logDebug(
+    label,
+    `- viewport count: ${snapshot.viewportCount}
+- visible viewport count: ${snapshot.visibleViewportCount}
+- selected viewport index: ${snapshot.selectedViewportIndex}
+- selected strategy: ${snapshot.selectedStrategy}
+- has reply context container: ${snapshot.hasReplyContextContainer}
+- has likely tweet container: ${snapshot.hasLikelyTweetContainer}
+- has tweet root: ${snapshot.hasTweetRoot}
+- tweet text nodes: ${snapshot.tweetTextNodeCount}
+- extracted text length: ${snapshot.text?.length || 0}
+- extracted text preview: ${buildTextPreview(snapshot.text)}`
+  );
 }
 
 // The compose cache key we last requested suggestions for. It is normally the
 // source tweet id parsed from the canonical URL, with tweet text as fallback.
 let lastSuggestionCacheKey: string | null = null;
+let dismissedSuggestionCacheKey: string | null = null;
+let currentComposeDismissed = false;
 // Token used to abandon stale waitForTweetText() loops when the URL changes
 // again before tweet text appears.
 let waitToken = 0;
 
 async function waitForTweetText(token: number): Promise<string | null> {
   const deadline = Date.now() + 2500;
+  let lastSnapshot: ReplyTweetSnapshot | null = null;
   while (Date.now() < deadline) {
     if (token !== waitToken) return null;
-    const text = getTweetTextForActiveCompose();
-    if (text) return text;
+    if (!isComposeRoute()) return null;
+    const snapshot = readReplyTweetSnapshot();
+    lastSnapshot = snapshot;
+    if (snapshot.text) {
+      logReplyTweetSnapshot(snapshot, "Found reply tweet context");
+      return snapshot.text;
+    }
     await new Promise((r) => setTimeout(r, 100));
+  }
+  if (lastSnapshot) {
+    logReplyTweetSnapshot(lastSnapshot, "Failed to find reply tweet context");
   }
   return null;
 }
@@ -102,16 +309,93 @@ function buildSuggestionCacheKey(tweetText: string): string {
 }
 
 async function requestSuggestionsForCurrentCompose(refresh = false) {
+  if (!isComposeRoute()) {
+    logDebug(
+      "Suggestion request skipped",
+      `- reason: current URL is not compose
+- url: ${window.location.href}`
+    );
+    return;
+  }
+  if (refresh) {
+    currentComposeDismissed = false;
+  }
+  if (!refresh && currentComposeDismissed) {
+    logDebug(
+      "Suggestion request skipped",
+      `- reason: panel was dismissed for this compose before request start
+- url: ${window.location.href}`
+    );
+    return;
+  }
+
   const token = ++waitToken;
   showSuggestionPanel();
+  logDebug(
+    "Suggestion request started",
+    `- token: ${token}
+- refresh: ${refresh}
+- url: ${window.location.href}`
+  );
 
   const text = await waitForTweetText(token);
-  if (token !== waitToken) return; // URL changed while waiting
-  const suggestionText = text || "A new X post where a funny, broadly useful reaction meme would help.";
+  if (token !== waitToken) {
+    logDebug(
+      "Suggestion request abandoned",
+      `- reason: URL changed or a newer request started
+- token: ${token}
+- current token: ${waitToken}`
+    );
+    return;
+  }
+  if (!isComposeRoute()) {
+    logDebug(
+      "Suggestion request abandoned",
+      `- reason: user left compose before suggestions were requested
+- url: ${window.location.href}`
+    );
+    return;
+  }
+  if (!text) {
+    lastSuggestionCacheKey = null;
+    showSuggestionError(
+      "Could not find the tweet you are replying to. Reopen the reply dialog and try again."
+    );
+    return;
+  }
+
+  const suggestionText = text;
   const cacheKey = buildSuggestionCacheKey(suggestionText);
 
-  if (!refresh && cacheKey === lastSuggestionCacheKey && isPanelVisible()) return;
+  if (!refresh && (currentComposeDismissed || cacheKey === dismissedSuggestionCacheKey)) {
+    logDebug(
+      "Suggestion request skipped",
+      `- reason: panel was dismissed for this compose
+- cache key: ${cacheKey}`
+    );
+    return;
+  }
+  if (refresh) {
+    logDebug("Suggestion refresh requested", "- clearing dismissed compose key");
+    dismissedSuggestionCacheKey = null;
+  }
+
+  if (!refresh && cacheKey === lastSuggestionCacheKey && isPanelVisible()) {
+    logDebug(
+      "Suggestion request skipped",
+      `- reason: panel already visible for this compose
+- cache key: ${cacheKey}`
+    );
+    return;
+  }
   lastSuggestionCacheKey = cacheKey;
+
+  logDebug(
+    "Sending suggestions request",
+    `- cache key: ${cacheKey}
+- text length: ${suggestionText.length}
+- text preview: ${buildTextPreview(suggestionText)}`
+  );
 
   chrome.runtime.sendMessage({
     type: "GET_SUGGESTIONS",
@@ -120,30 +404,68 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
 }
 
 window.addEventListener("memedrop:refresh-suggestions", () => {
+  if (!isComposeRoute()) {
+    logDebug(
+      "Refresh ignored",
+      `- reason: current URL is not compose
+- url: ${window.location.href}`
+    );
+    return;
+  }
   requestSuggestionsForCurrentCompose(true).catch((err) => {
     console.error("[MemeDrop] Refresh suggestions failed:", err);
   });
 });
 
+window.addEventListener("memedrop:suggestions-dismissed", () => {
+  currentComposeDismissed = true;
+  dismissedSuggestionCacheKey = lastSuggestionCacheKey;
+  logDebug(
+    "Suggestions panel dismissed",
+    `- dismissed cache key: ${dismissedSuggestionCacheKey || "(none)"}`
+  );
+});
+
 function onUrlChanged(url = window.location.href) {
-  const isCompose = URL_PATTERNS.composeModal.test(url);
+  const isCompose = isComposeRoute(url);
+  logDebug(
+    "URL change detected",
+    `- url: ${url}
+- is compose: ${isCompose}`
+  );
 
   if (isCompose) {
+    currentComposeDismissed = false;
     requestSuggestionsForCurrentCompose();
     return;
   }
 
   lastSuggestionCacheKey = null;
+  dismissedSuggestionCacheKey = null;
+  currentComposeDismissed = false;
   waitToken++;
   hidePanel();
 }
 
 let lastSeenUrl = window.location.href;
+let lastSeenIsCompose = isComposeRoute(lastSeenUrl);
 
-function handlePotentialUrlChange() {
+function handlePotentialUrlChange(reason = "history") {
   const currentUrl = window.location.href;
-  if (currentUrl === lastSeenUrl) return;
+  const currentIsCompose = isComposeRoute(currentUrl);
+  if (currentUrl === lastSeenUrl && currentIsCompose === lastSeenIsCompose) return;
+
+  logDebug(
+    "Route state changed",
+    `- reason: ${reason}
+- previous url: ${lastSeenUrl}
+- current url: ${currentUrl}
+- previous is compose: ${lastSeenIsCompose}
+- current is compose: ${currentIsCompose}`
+  );
+
   lastSeenUrl = currentUrl;
+  lastSeenIsCompose = currentIsCompose;
   onUrlChanged(currentUrl);
 }
 
@@ -154,16 +476,24 @@ function handlePotentialUrlChange() {
   const origReplace = history.replaceState;
   history.pushState = function (...args: Parameters<typeof origPush>) {
     const result = origPush.apply(this, args);
-    queueMicrotask(handlePotentialUrlChange);
+    queueMicrotask(() => handlePotentialUrlChange("pushState"));
     return result;
   };
   history.replaceState = function (...args: Parameters<typeof origReplace>) {
     const result = origReplace.apply(this, args);
-    queueMicrotask(handlePotentialUrlChange);
+    queueMicrotask(() => handlePotentialUrlChange("replaceState"));
     return result;
   };
-  window.addEventListener("popstate", handlePotentialUrlChange);
+  window.addEventListener("popstate", () => {
+    setTimeout(() => handlePotentialUrlChange("popstate"), 0);
+  });
 })();
+
+// X can miss content-script history hooks during modal transitions. This
+// backstop keeps compose/timeline state in sync without firing suggestions
+// unless the URL is actually /compose/post.
+setInterval(() => handlePotentialUrlChange("route poll"), 500);
+window.addEventListener("focus", () => handlePotentialUrlChange("focus"));
 
 // Initial URL check — handles direct loads of /compose/post.
 if (URL_PATTERNS.composeModal.test(window.location.href)) {

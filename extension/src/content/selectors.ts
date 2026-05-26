@@ -7,6 +7,9 @@ export const SELECTORS = {
   /** Contains nested spans/links with the tweet's text content */
   tweetText: 'div[data-testid="tweetText"]',
 
+  /** Root article node for a tweet */
+  tweet: 'article[data-testid="tweet"]',
+
   /** Contains nested spans with display name and @handle */
   userName: 'div[data-testid="User-Name"]',
 
@@ -21,6 +24,9 @@ export const SELECTORS = {
 
   /** X compose/reply modal dialog */
   composeDialog: 'div[role="dialog"]',
+
+  /** X modal viewport wrapper that contains the reply composer and source tweet */
+  viewportView: '[data-viewportview="true"]',
 
   /** X's hidden file input used by the image-attach button on the composer.
    *  Setting .files + dispatching `change` on this is the only reliable way

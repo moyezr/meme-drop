@@ -260,7 +260,7 @@ function renderLoading() {
     <div class="loading">Finding the perfect meme...</div>
   `;
 
-  panel.querySelector(".close-btn")!.addEventListener("click", hidePanel);
+  panel.querySelector(".close-btn")!.addEventListener("click", dismissPanel);
   panel.querySelector(".refresh-btn")!.addEventListener("click", requestRefresh);
   setupDrag(panel);
   shadowRoot.appendChild(panel);
@@ -388,7 +388,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
     }
   }
 
-  panel.querySelector(".close-btn")!.addEventListener("click", hidePanel);
+  panel.querySelector(".close-btn")!.addEventListener("click", dismissPanel);
   panel.querySelector(".refresh-btn")!.addEventListener("click", requestRefresh);
   setupDrag(panel);
   shadowRoot.appendChild(panel);
@@ -433,6 +433,12 @@ function setupDrag(panel: HTMLElement) {
 function requestRefresh(e: Event) {
   e.stopPropagation();
   window.dispatchEvent(new CustomEvent("memedrop:refresh-suggestions"));
+}
+
+function dismissPanel(e: Event) {
+  e.stopPropagation();
+  window.dispatchEvent(new CustomEvent("memedrop:suggestions-dismissed"));
+  hidePanel();
 }
 
 async function insertMemeIntoComposer(suggestion: Suggestion) {
@@ -1033,6 +1039,36 @@ export function showSuggestionPanel() {
   }
 
   renderLoading();
+  panelHost.style.display = "block";
+}
+
+export function showSuggestionError(message: string) {
+  if (!panelHost || !shadowRoot) {
+    const { host, shadow } = createPanel();
+    panelHost = host;
+    shadowRoot = shadow;
+  }
+
+  const existing = shadowRoot.querySelector(".panel");
+  if (existing) existing.remove();
+
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  panel.innerHTML = `
+    <div class="header">
+      <span class="title"><span class="title-icon">&#x1f4a7;</span> MemeDrop</span>
+      <div class="header-actions">
+        <button class="close-btn" title="Close">&times;</button>
+      </div>
+    </div>
+    <div class="empty"></div>
+  `;
+
+  const empty = panel.querySelector<HTMLElement>(".empty");
+  if (empty) empty.textContent = message;
+  panel.querySelector(".close-btn")!.addEventListener("click", dismissPanel);
+  setupDrag(panel);
+  shadowRoot.appendChild(panel);
   panelHost.style.display = "block";
 }
 

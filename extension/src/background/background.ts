@@ -97,6 +97,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
+            cache_key: message.payload.cache_key,
             suggestions,
           });
         }
@@ -106,6 +107,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
+            cache_key: message.payload.cache_key,
             suggestions,
           });
         }
@@ -116,6 +118,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
+            cache_key: message.payload.cache_key,
             suggestions: [],
           });
         }
