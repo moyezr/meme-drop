@@ -3,6 +3,12 @@ import path from "node:path";
 import process from "node:process";
 import dotenv from "dotenv";
 import { eq } from "drizzle-orm";
+import {
+  getOpenRouterApiKey,
+  openRouterHeaders,
+  OPENROUTER_BASE_URL,
+  QWEN_PLUS_MODEL,
+} from "../src/services/llm-provider.js";
 
 type ManifestQuality = "verified" | "draft" | "disabled";
 
@@ -17,7 +23,7 @@ interface TemplateManifest {
   version: number;
   generated_at: string;
   generator: {
-    provider: "openai";
+    provider: "openrouter";
     model: string;
     note: string;
   };
@@ -87,18 +93,13 @@ dotenv.config({ path: path.join(rootDir, ".env") });
 dotenv.config({ path: path.join(backendDir, ".env"), override: true });
 
 const args = parseArgs(process.argv.slice(2));
-const model = args.model || process.env.OPENAI_TEMPLATE_MODEL || "gpt-5.4-mini";
+const model = args.model || process.env.OPENROUTER_TEMPLATE_MODEL || QWEN_PLUS_MODEL;
 const outputPath = path.resolve(rootDir, args.out || defaultOutputPath);
 const storagePath = resolveStoragePath(process.env.MEME_STORAGE_PATH || defaultStoragePath);
 
 async function main() {
-  if (!args.dryRun && !hasUsableApiKey(process.env.OPENAI_API_KEY)) {
-    throw new Error("A real OPENAI_API_KEY is required. Add it to .env or backend/.env.");
-  }
-
-  if (args.batchStatus) {
-    await printBatchStatus(args.batchStatus);
-    return;
+  if (!args.dryRun && !hasUsableApiKey(getOpenRouterApiKey())) {
+    throw new Error("A real OPENROUTER_API_KEY is required. Add it to .env or backend/.env.");
   }
 
   const memes = await loadMemeInputs();
@@ -108,16 +109,6 @@ async function main() {
 
   if (selected.length === 0) {
     throw new Error("No memes matched the requested filters.");
-  }
-
-  if (args.batchCreate) {
-    await createOpenAIBatch(selected);
-    return;
-  }
-
-  if (args.batchRetrieve) {
-    await retrieveOpenAIBatch(args.batchRetrieve, selected);
-    return;
   }
 
   const templates: MemeTemplate[] = [];
@@ -133,7 +124,7 @@ async function main() {
 
     const generated = args.dryRun
       ? buildDryRunResponse(meme)
-      : await generateTemplateWithOpenAI({
+      : await generateTemplateWithOpenRouter({
           meme,
           image,
           mimeType,
@@ -153,10 +144,10 @@ async function main() {
     version: 1,
     generated_at: new Date().toISOString(),
     generator: {
-      provider: "openai",
+      provider: "openrouter",
       model,
       note:
-        "Generated offline from meme images with OpenAI vision. Treat quality=draft as review-required before runtime use.",
+        "Generated offline from meme images with OpenRouter vision. Treat quality=draft as review-required before runtime use.",
     },
     templates,
   };
@@ -219,208 +210,7 @@ async function loadMemeInputsFromDisk(): Promise<MemeInput[]> {
     });
 }
 
-async function createOpenAIBatch(memes: MemeInput[]) {
-  const jsonl = await buildBatchJsonl(memes);
-  const batchDir = path.join(rootDir, ".memedrop", "batches");
-  const fileName = `template-manifest-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`;
-  const localPath = path.join(batchDir, fileName);
-  await fs.mkdir(batchDir, { recursive: true });
-  await fs.writeFile(localPath, jsonl, "utf8");
-
-  console.log(`Prepared ${memes.length} batch requests at ${path.relative(rootDir, localPath)}`);
-  const uploaded = await uploadBatchFile(jsonl, fileName);
-  console.log(`Uploaded batch input file: ${uploaded.id}`);
-
-  const batch = await createBatch(uploaded.id);
-  console.log(`Created OpenAI batch: ${batch.id}`);
-  console.log(`Status: ${batch.status}`);
-  console.log(`Retrieve later with: npm run manifest:generate --workspace=backend -- --batch-retrieve ${batch.id}`);
-}
-
-async function buildBatchJsonl(memes: MemeInput[]): Promise<string> {
-  const lines: string[] = [];
-  for (const [index, meme] of memes.entries()) {
-    const imagePath = toLocalImagePath(meme.filePath);
-    const image = await fs.readFile(imagePath);
-    const dimensions = readImageDimensions(image);
-    const mimeType = guessMimeType(imagePath);
-    console.log(
-      `[batch ${index + 1}/${memes.length}] ${meme.name} (${dimensions.width}x${dimensions.height})`
-    );
-    lines.push(
-      JSON.stringify({
-        custom_id: batchCustomId(meme),
-        method: "POST",
-        url: "/v1/responses",
-        body: buildOpenAIResponseBody({ meme, image, mimeType, dimensions }),
-      })
-    );
-  }
-  return `${lines.join("\n")}\n`;
-}
-
-async function uploadBatchFile(jsonl: string, filename: string): Promise<{ id: string }> {
-  const form = new FormData();
-  form.append("purpose", "batch");
-  form.append(
-    "file",
-    new Blob([jsonl], { type: "application/jsonl" }),
-    filename
-  );
-
-  const response = await fetch("https://api.openai.com/v1/files", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: form,
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`OpenAI file upload failed ${response.status}: ${body.slice(0, 500)}`);
-  }
-
-  return (await response.json()) as { id: string };
-}
-
-async function createBatch(inputFileId: string): Promise<{ id: string; status: string }> {
-  const response = await fetch("https://api.openai.com/v1/batches", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      input_file_id: inputFileId,
-      endpoint: "/v1/responses",
-      completion_window: "24h",
-      metadata: {
-        job: "memedrop-template-manifest",
-        model,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`OpenAI batch create failed ${response.status}: ${body.slice(0, 500)}`);
-  }
-
-  return (await response.json()) as { id: string; status: string };
-}
-
-async function printBatchStatus(batchId: string) {
-  const batch = await getBatch(batchId);
-  console.log(JSON.stringify(batch, null, 2));
-}
-
-async function retrieveOpenAIBatch(batchId: string, memes: MemeInput[]) {
-  const batch = await getBatch(batchId);
-  console.log(`Batch ${batch.id} status: ${batch.status}`);
-  if (batch.status !== "completed") {
-    console.log("Batch is not completed yet. Run this command again later.");
-    return;
-  }
-  if (!batch.output_file_id) {
-    throw new Error("Batch completed without an output_file_id.");
-  }
-
-  const output = await downloadFile(batch.output_file_id);
-  const templates = await parseBatchOutput(output, memes);
-  const manifest: TemplateManifest = {
-    version: 1,
-    generated_at: new Date().toISOString(),
-    generator: {
-      provider: "openai",
-      model,
-      note:
-        "Generated offline from meme images with OpenAI Batch API. Treat quality=draft as review-required before runtime use.",
-    },
-    templates,
-  };
-
-  await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  await fs.writeFile(outputPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-  console.log(`Wrote ${templates.length} templates to ${path.relative(rootDir, outputPath)}`);
-
-  if (batch.error_file_id) {
-    console.log(`Batch has an error file: ${batch.error_file_id}`);
-  }
-}
-
-async function getBatch(batchId: string): Promise<{
-  id: string;
-  status: string;
-  output_file_id?: string | null;
-  error_file_id?: string | null;
-  request_counts?: { total: number; completed: number; failed: number };
-}> {
-  const response = await fetch(`https://api.openai.com/v1/batches/${batchId}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`OpenAI batch retrieve failed ${response.status}: ${body.slice(0, 500)}`);
-  }
-  return (await response.json()) as Awaited<ReturnType<typeof getBatch>>;
-}
-
-async function downloadFile(fileId: string): Promise<string> {
-  const response = await fetch(`https://api.openai.com/v1/files/${fileId}/content`, {
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`OpenAI file download failed ${response.status}: ${body.slice(0, 500)}`);
-  }
-  return response.text();
-}
-
-async function parseBatchOutput(output: string, memes: MemeInput[]): Promise<MemeTemplate[]> {
-  const byCustomId = new Map(memes.map((meme) => [batchCustomId(meme), meme]));
-  const templates: MemeTemplate[] = [];
-
-  for (const line of output.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    const item = JSON.parse(line) as {
-      custom_id: string;
-      response?: { status_code?: number; body?: { output_text?: string; output?: unknown[] } };
-      error?: { message?: string };
-    };
-
-    const meme = byCustomId.get(item.custom_id);
-    if (!meme) continue;
-    if (item.error || item.response?.status_code !== 200) {
-      console.warn(`Skipping failed batch result for ${meme.name}: ${item.error?.message || item.response?.status_code}`);
-      continue;
-    }
-
-    const body = item.response?.body;
-    const content = body?.output_text || extractResponseText(body?.output);
-    if (!content) {
-      console.warn(`Skipping batch result without output text for ${meme.name}`);
-      continue;
-    }
-
-    const imagePath = toLocalImagePath(meme.filePath);
-    const image = await fs.readFile(imagePath);
-    const dimensions = readImageDimensions(image);
-    const generated = JSON.parse(stripJsonFence(content)) as ModelTemplateResponse;
-    templates.push(normalizeTemplate({ meme, dimensions, generated }));
-  }
-
-  templates.sort((a, b) => a.name.localeCompare(b.name));
-  return templates;
-}
-
-async function generateTemplateWithOpenAI({
+async function generateTemplateWithOpenRouter({
   meme,
   image,
   mimeType,
@@ -431,27 +221,30 @@ async function generateTemplateWithOpenAI({
   mimeType: string;
   dimensions: { width: number; height: number };
 }): Promise<ModelTemplateResponse> {
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${getOpenRouterApiKey()}`,
+      ...openRouterHeaders(),
     },
-    body: JSON.stringify(buildOpenAIResponseBody({ meme, image, mimeType, dimensions })),
+    body: JSON.stringify(buildOpenRouterChatBody({ meme, image, mimeType, dimensions })),
   });
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`OpenAI template request failed ${response.status}: ${body.slice(0, 500)}`);
+    throw new Error(`OpenRouter template request failed ${response.status}: ${body.slice(0, 500)}`);
   }
 
-  const data = (await response.json()) as { output_text?: string; output?: unknown[] };
-  const content = data.output_text || extractResponseText(data.output);
-  if (!content) throw new Error("OpenAI response did not include output text");
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("OpenRouter response did not include output text");
   return JSON.parse(stripJsonFence(content)) as ModelTemplateResponse;
 }
 
-function buildOpenAIResponseBody({
+function buildOpenRouterChatBody({
   meme,
   image,
   mimeType,
@@ -465,34 +258,28 @@ function buildOpenAIResponseBody({
   return {
     model,
     temperature: 0.1,
-    max_output_tokens: 1800,
-    text: {
-      format: { type: "json_object" },
-    },
-    input: [
+    max_tokens: 1800,
+    reasoning: { effort: "none", exclude: true },
+    response_format: { type: "json_object" },
+    messages: [
       {
-        type: "message",
         role: "system",
-        content: [
-          {
-            type: "input_text",
-            text:
-              "You are creating meme text placement templates. Return valid JSON only. Do not include markdown.",
-          },
-        ],
+        content:
+          "You are creating meme text placement templates. Return valid JSON only. Do not include markdown.",
       },
       {
-        type: "message",
         role: "user",
         content: [
           {
-            type: "input_text",
+            type: "text",
             text: buildPrompt(meme, dimensions),
           },
           {
-            type: "input_image",
-            image_url: `data:${mimeType};base64,${image.toString("base64")}`,
-            detail: "high",
+            type: "image_url",
+            image_url: {
+              url: `data:${mimeType};base64,${image.toString("base64")}`,
+              detail: "high",
+            },
           },
         ],
       },
@@ -786,34 +573,11 @@ function stripJsonFence(content: string): string {
     .replace(/\s*```$/i, "");
 }
 
-function extractResponseText(output: unknown): string | null {
-  if (!Array.isArray(output)) return null;
-
-  const chunks: string[] = [];
-  for (const item of output) {
-    if (!item || typeof item !== "object") continue;
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) continue;
-
-    for (const part of content) {
-      if (!part || typeof part !== "object") continue;
-      const text = (part as { text?: unknown }).text;
-      if (typeof text === "string") chunks.push(text);
-    }
-  }
-
-  return chunks.length ? chunks.join("\n") : null;
-}
-
 function parseArgs(argv: string[]) {
   const parsed: Record<string, string | boolean> = {};
-  const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (!arg.startsWith("--")) {
-      positional.push(arg);
-      continue;
-    }
+    if (!arg.startsWith("--")) continue;
     const key = arg.slice(2);
     const next = argv[i + 1];
     if (!next || next.startsWith("--")) {
@@ -832,19 +596,6 @@ function parseArgs(argv: string[]) {
     id: typeof parsed.id === "string" ? parsed.id : undefined,
     out: typeof parsed.out === "string" ? parsed.out : undefined,
     model: typeof parsed.model === "string" ? parsed.model : undefined,
-    batchCreate: Boolean(parsed["batch-create"]),
-    batchStatus:
-      typeof parsed["batch-status"] === "string"
-        ? parsed["batch-status"]
-        : parsed["batch-status"]
-          ? positional[0]
-          : undefined,
-    batchRetrieve:
-      typeof parsed["batch-retrieve"] === "string"
-        ? parsed["batch-retrieve"]
-        : parsed["batch-retrieve"]
-          ? positional[0]
-          : undefined,
   };
 }
 
@@ -854,10 +605,6 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
-}
-
-function batchCustomId(meme: MemeInput): string {
-  return `meme:${meme.id}`;
 }
 
 function clampNumber(

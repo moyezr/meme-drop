@@ -20,7 +20,7 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
     // 1. Download image to local filesystem
     const { filePath, fileName } = await downloadImage(image_url);
 
-    // 2. Auto-tag with GPT-4o Vision
+    // 2. Auto-tag through OpenRouter vision
     const tags = await autoTagMeme(filePath);
 
     // 3. Generate embedding from the full descriptor (same shape as the

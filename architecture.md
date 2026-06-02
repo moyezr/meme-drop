@@ -3,7 +3,7 @@
 MemeDrop is a Chrome extension plus local Fastify backend that suggests meme replies for X posts. The repository is an npm workspace with three packages:
 
 - `extension/`: Chrome extension UI, X content scripts, background worker, popup library.
-- `backend/`: Fastify API, Postgres/pgvector access, OpenAI/DeepSeek integration, caption generation, seed scripts.
+- `backend/`: Fastify API, Postgres/pgvector access, OpenRouter integration, caption generation, seed scripts.
 - `shared/`: TypeScript contracts and meme template manifests used by both backend and extension.
 
 ## High-Level Flow
@@ -35,7 +35,7 @@ The pipeline is:
    - `fast` mode uses `heuristicTweetContext()`.
    - The context includes not only tone/topic/intent, but also `joke_target`, `social_dynamic`, and `humor_angle` so ranking can optimize for the comedic move.
 2. Build a natural-language tweet descriptor.
-3. Generate a `text-embedding-3-small` embedding.
+3. Generate an `openai/text-embedding-3-small` embedding through OpenRouter.
 4. Retrieve meme candidates from Postgres using pgvector similarity. The main compose flow uses global memes only.
 5. Apply taxonomy aliases, keyword overlap, social-dynamic matching, canonical meme-family boosts, and mismatch penalties for over-generic templates.
 6. Optionally rerank with an LLM in `smart` mode. The reranker is a helper, not the dominant signal; deterministic humor-shape scoring carries more weight.
@@ -61,7 +61,7 @@ Saved memes are intentionally not part of the main recommendation engine right n
 
 `backend/src/services/meme-text.ts` finds a matching template from `shared/src/data/*template*`. Templates define text regions, roles, character limits, and examples.
 
-Captions are generated in batches with OpenAI by default, or DeepSeek if configured. The backend sanitizes text, enforces region limits, rejects generic or repeated fallback captions, and returns `tailored_overlay` metadata. The extension renders the final meme image client-side from the base image plus overlay regions.
+Captions are generated through OpenRouter. The backend sanitizes text, enforces region limits, rejects generic or repeated fallback captions, and returns `tailored_overlay` metadata. The extension renders the final meme image client-side from the base image plus overlay regions.
 
 ## Saving And Personalization
 
