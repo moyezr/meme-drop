@@ -24,6 +24,10 @@ const SUGGESTION_CACHE_MAX = 200;
 const DEFAULT_SUGGESTION_LIMIT = 5;
 const MAX_SUGGESTION_LIMIT = 20;
 const EMBEDDING_TIMEOUT_MS = Number(process.env.MEMEDROP_EMBEDDING_TIMEOUT_MS || 3000);
+const DEFAULT_CANDIDATE_POOL_MULTIPLIER = 3;
+const DEFAULT_RERANK_POOL_MULTIPLIER = 2;
+const MAX_CANDIDATE_POOL_SIZE = 30;
+const SUGGESTION_LOG_MODE = process.env.MEMEDROP_SUGGESTION_LOGS || "pretty";
 
 interface CacheEntry {
   result: SuggestionResult[];
@@ -81,15 +85,16 @@ export interface SuggestionOptions {
   limit?: number;
   refresh?: boolean;
   cacheKey?: string;
+  mode?: "fast" | "smart";
 }
 
 /**
  * Pipeline:
  *   1. Analyze tweet  → structured context + natural-language "ideal vibe"
  *   2. Embed the vibe descriptor
- *   3. Retrieve top candidates from the curated global catalogue
+ *   3. Retrieve a small top candidate pool from the curated global catalogue
  *   4. Personalize scores using recent usage events
- *   5. LLM re-rank top 20 with punchy explanations
+ *   5. LLM re-rank a limit-relative shortlist with punchy explanations
  *   6. MMR diversity pass so the returned strip isn't 5 near-dupes
  *
  * Every stage has a graceful degradation path so local dev works even if
@@ -100,17 +105,30 @@ export async function getSuggestions(
   options: SuggestionOptions = {}
 ): Promise<SuggestionResult[]> {
   const limit = normalizeLimit(options.limit);
-  const cacheKey = `${options.cacheKey || `text:${normalizeCacheKey(tweetText)}`}|limit:${limit}`;
+  const mode = normalizeSuggestionMode(options.mode);
+  const cacheKey = `${options.cacheKey || `text:${normalizeCacheKey(tweetText)}`}|limit:${limit}|mode:${mode}`;
   if (!options.refresh) {
     const cached = readCache(cacheKey);
     if (cached) return cached;
   }
+
+  const startedAtMs = Date.now();
+  const timings: Array<{ label: string; ms: number }> = [];
+  let stageStartedAtMs = startedAtMs;
+  const markStage = (label: string) => {
+    const nowMs = Date.now();
+    timings.push({ label, ms: Math.max(0, nowMs - stageStartedAtMs) });
+    stageStartedAtMs = nowMs;
+  };
+  const candidatePoolSize = candidatePoolSizeForLimit(limit);
+  const rerankPoolSize = rerankPoolSizeForLimit(limit, candidatePoolSize);
 
   // Prefs don't depend on the tweet, so start them up front and let them
   // overlap with the (serial) LLM + embed + retrieve chain.
   const prefsPromise = loadUserPreferences(DEV_USER_ID);
 
   const context = await analyzeTweet(tweetText);
+  markStage("analyze");
 
   const descriptor = buildTweetDescriptor({
     tweet_text: tweetText,
@@ -124,11 +142,11 @@ export async function getSuggestions(
     social_dynamic: context.social_dynamic,
     humor_angle: context.humor_angle,
   });
-  const queryEmbedding = await withTimeout(
-    generateEmbedding(descriptor),
-    EMBEDDING_TIMEOUT_MS,
-    null
+  const queryEmbedding = await generateEmbedding(
+    descriptor,
+    AbortSignal.timeout(EMBEDDING_TIMEOUT_MS)
   );
+  markStage("embed");
 
   const [candidates, prefs] = await Promise.all([
     queryEmbedding && isUsableEmbedding(queryEmbedding)
@@ -136,17 +154,18 @@ export async function getSuggestions(
           userId: DEV_USER_ID,
           queryEmbedding,
           userLimit: 0,
-          globalLimit: 60,
+          globalLimit: candidatePoolSize,
           source: "global",
         })
       : retrieveFallbackCandidates({
           userId: DEV_USER_ID,
           userLimit: 0,
-          globalLimit: 60,
+          globalLimit: candidatePoolSize,
           source: "global",
         }),
     prefsPromise,
   ]);
+  markStage("retrieve");
 
   if (candidates.length === 0) {
     return [];
@@ -159,28 +178,32 @@ export async function getSuggestions(
   }));
 
   personalized.sort((a, b) => b.adjusted_score - a.adjusted_score);
-  const rerankPool = personalized.slice(0, Math.max(40, limit * 4));
+  const rerankPool = personalized.slice(0, rerankPoolSize);
+  markStage("score");
 
   let rerankResults: Awaited<ReturnType<typeof rerankCandidates>> = [];
-  try {
-    const input: RerankInput[] = rerankPool.map((c) => ({
-      meme_id: c.meme_id,
-      name: c.name,
-      emotion: c.system_tags.emotion,
-      use_cases: c.system_tags.use_cases || [],
-      vibes: c.system_tags.vibes || [],
-      example_contexts: c.system_tags.example_contexts || [],
-      prior_score: c.adjusted_score,
-    }));
-    rerankResults = await rerankCandidates(
-      tweetText,
-      context,
-      input,
-      Math.min(limit, rerankPool.length)
-    );
-  } catch (err) {
-    console.warn("[MemeDrop] Re-rank failed, falling back to vector order:", err);
+  if (mode === "smart") {
+    try {
+      const input: RerankInput[] = rerankPool.map((c) => ({
+        meme_id: c.meme_id,
+        name: c.name,
+        emotion: c.system_tags.emotion,
+        use_cases: c.system_tags.use_cases || [],
+        vibes: c.system_tags.vibes || [],
+        example_contexts: c.system_tags.example_contexts || [],
+        prior_score: c.adjusted_score,
+      }));
+      rerankResults = await rerankCandidates(
+        tweetText,
+        context,
+        input,
+        Math.min(limit, rerankPool.length)
+      );
+    } catch (err) {
+      console.warn("[MemeDrop] Re-rank failed, falling back to vector order:", err);
+    }
   }
+  markStage(mode === "smart" ? "rerank" : "rerank-skip");
 
   // Stitch re-rank results back onto the candidate objects.
   const rerankById = new Map(rerankResults.map((r) => [r.meme_id, r]));
@@ -217,14 +240,12 @@ export async function getSuggestions(
     _ref: c,
   }));
   const diversified = mmrSelect(mmrInput, limit, 0.82).map((item) => item._ref);
+  markStage("diversify");
 
   const overlays = await buildTailoredOverlays(tweetText, context, diversified);
-  console.log(`[MemeDrop]
-Suggestion captions prepared
-- suggestions: ${diversified.length}
-- overlays attached: ${overlays.size}
-- tweet preview: ${previewLogText(tweetText)}
-- meme ids: ${diversified.map((c) => c.meme_id).join(", ")}`);
+  markStage("captions");
+  const stageTotalMs = sumTimings(timings);
+  const wallMs = Math.max(0, Date.now() - startedAtMs);
 
   const result: SuggestionResult[] = diversified.map((c) => ({
     meme_id: c.meme_id,
@@ -242,6 +263,22 @@ Suggestion captions prepared
   }));
 
   writeCache(cacheKey, result);
+  logSuggestionPipeline({
+    cacheKey,
+    tweetText,
+    context,
+    mode,
+    limit,
+    candidatePoolSize,
+    rerankPoolSize: rerankPool.length,
+    retrievedCount: candidates.length,
+    returnedCount: result.length,
+    overlayCount: overlays.size,
+    timings,
+    result,
+    totalMs: stageTotalMs,
+    wallMs,
+  });
   return result;
 }
 
@@ -280,6 +317,112 @@ function previewLogText(text: string, maxLength = 180): string {
 function normalizeLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) return DEFAULT_SUGGESTION_LIMIT;
   return Math.max(1, Math.min(MAX_SUGGESTION_LIMIT, Math.floor(limit!)));
+}
+
+function normalizeSuggestionMode(mode: SuggestionOptions["mode"]): "fast" | "smart" {
+  if (mode === "fast" || mode === "smart") return mode;
+  return process.env.MEMEDROP_SUGGESTION_MODE === "fast" ? "fast" : "smart";
+}
+
+function candidatePoolSizeForLimit(limit: number): number {
+  const configured = parsePositiveInt(process.env.MEMEDROP_CANDIDATE_POOL_SIZE);
+  if (configured) return Math.max(limit, Math.min(MAX_CANDIDATE_POOL_SIZE, configured));
+
+  return Math.max(
+    limit,
+    Math.min(MAX_CANDIDATE_POOL_SIZE, Math.ceil(limit * DEFAULT_CANDIDATE_POOL_MULTIPLIER))
+  );
+}
+
+function rerankPoolSizeForLimit(limit: number, candidatePoolSize: number): number {
+  const configured = parsePositiveInt(process.env.MEMEDROP_RERANK_POOL_SIZE);
+  if (configured) return Math.max(limit, Math.min(candidatePoolSize, configured));
+
+  return Math.max(
+    limit,
+    Math.min(candidatePoolSize, Math.ceil(limit * DEFAULT_RERANK_POOL_MULTIPLIER))
+  );
+}
+
+function parsePositiveInt(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.floor(parsed);
+}
+
+function sumTimings(timings: Array<{ ms: number }>): number {
+  return timings.reduce((sum, item) => sum + item.ms, 0);
+}
+
+function logSuggestionPipeline(input: {
+  cacheKey: string;
+  tweetText: string;
+  context: TweetContext;
+  mode: "fast" | "smart";
+  limit: number;
+  candidatePoolSize: number;
+  rerankPoolSize: number;
+  retrievedCount: number;
+  returnedCount: number;
+  overlayCount: number;
+  timings: Array<{ label: string; ms: number }>;
+  result: SuggestionResult[];
+  totalMs: number;
+  wallMs: number;
+}) {
+  if (SUGGESTION_LOG_MODE === "off") return;
+
+  if (SUGGESTION_LOG_MODE === "compact") {
+    const driftText =
+      Math.abs(input.wallMs - input.totalMs) > 1000 ? ` wall=${input.wallMs}ms` : "";
+    console.log(
+      `[MemeDrop] suggestions cache=${input.cacheKey} total=${input.totalMs}ms ` +
+        `stages=${compactTimingText(input.timings)}${driftText} ` +
+        `mode=${input.mode} ` +
+        `limit=${input.limit} retrieved=${input.retrievedCount}/${input.candidatePoolSize} ` +
+        `rerank=${input.rerankPoolSize} returned=${input.returnedCount} captions=${input.overlayCount}`
+    );
+    return;
+  }
+
+  const timingText = input.timings
+    .map((item) => `${item.label.padEnd(10)} ${String(item.ms).padStart(5)}ms`)
+    .join("\n");
+  const resultText = input.result
+    .map((suggestion, index) => {
+      const caption = suggestion.tailored_overlay?.enabled ? "caption" : "plain";
+      return `${String(index + 1).padStart(2)}. ${suggestion.name} (${suggestion.score}) ${caption}`;
+    })
+    .join("\n");
+
+  console.log(`
+[MemeDrop] Suggestion pipeline
+--------------------------------
+cache      ${input.cacheKey}
+total      ${input.totalMs}ms
+wall       ${input.wallMs}ms
+tweet      ${previewLogText(input.tweetText)}
+context    ${input.context.intent} / ${input.context.tone} / ${input.context.topic}
+mode       ${input.mode}
+
+budgets
+  limit       ${input.limit}
+  retrieve    ${input.retrievedCount}/${input.candidatePoolSize}
+  rerank      ${input.rerankPoolSize}
+  returned    ${input.returnedCount}
+  captions    ${input.overlayCount}
+
+timings
+${timingText}
+
+results
+${resultText}
+`);
+}
+
+function compactTimingText(timings: Array<{ label: string; ms: number }>): string {
+  return timings.map((item) => `${item.label}:${item.ms}`).join(",");
 }
 
 function scoreCandidate(
@@ -598,24 +741,6 @@ function roundScore(score: number): number {
 
 function isUsableEmbedding(embedding: number[]): boolean {
   return embedding.some((value) => Math.abs(value) > 0.000001);
-}
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  fallback: T
-): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((resolve) => {
-        timer = setTimeout(() => resolve(fallback), ms);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }
 
 function buildMatchExplanation(

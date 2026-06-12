@@ -171,7 +171,7 @@ A save icon appears when a user hovers over any image in the X feed. One click s
 5. Service worker calls `POST /api/v1/library/save` with `{ image_url, source_tweet_id? }`
 6. Backend downloads the image and saves to `./data/memes/{uuid}.{ext}` (local filesystem)
 7. Backend calls OpenRouter vision **inline** with structured prompt requesting: `{ name, emotion, format_type, use_cases[], example_tweet_contexts[], is_evergreen }`
-8. Backend generates embedding from concatenated name + use_cases + example_contexts and stores it in Postgres
+8. Backend stores the generated tags in Postgres
 9. Response includes generated tags
 10. Toast notification appears on the X page showing tags (e.g., "3 tags added: reaction, sarcastic, counter-argument")
 11. Tapping the toast opens a quick-edit inline panel where the user can rename the meme and add custom tags

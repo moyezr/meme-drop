@@ -58,10 +58,7 @@ export async function rerankCandidates(
 ): Promise<RerankResult[]> {
   if (candidates.length === 0) return [];
 
-  // Trim candidate list to reasonable size for the re-ranker (cost + latency).
-  const input = candidates.slice(0, 20);
-
-  const candidateText = input
+  const candidateText = candidates
     .map((c, i) => {
       const vibes = c.vibes.length ? ` | vibe: ${c.vibes.join(", ")}` : "";
       const useCases = c.use_cases.length

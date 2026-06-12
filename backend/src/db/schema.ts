@@ -35,7 +35,13 @@ export const memes = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("idx_memes_format_type").on(table.formatType)]
+  (table) => [
+    index("idx_memes_format_type").on(table.formatType),
+    index("idx_memes_embedding_hnsw").using(
+      "hnsw",
+      table.embedding.op("vector_cosine_ops")
+    ),
+  ]
 );
 
 // User's personal meme library
@@ -83,5 +89,12 @@ export const usageEvents = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("idx_usage_events_user_id").on(table.userId)]
+  (table) => [
+    index("idx_usage_events_user_id").on(table.userId),
+    index("idx_usage_events_user_action_created_at").on(
+      table.userId,
+      table.action,
+      table.createdAt
+    ),
+  ]
 );

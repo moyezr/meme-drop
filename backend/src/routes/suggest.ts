@@ -6,11 +6,12 @@ import {
 
 export const suggestRoutes: FastifyPluginAsync = async (app) => {
   app.post("/suggest", async (request, reply) => {
-    const { tweet_text, limit, refresh, cache_key } = request.body as {
+    const { tweet_text, limit, refresh, cache_key, mode } = request.body as {
       tweet_text: string;
       limit?: number;
       refresh?: boolean;
       cache_key?: string;
+      mode?: "fast" | "smart";
     };
 
     if (!tweet_text?.trim()) {
@@ -22,6 +23,7 @@ export const suggestRoutes: FastifyPluginAsync = async (app) => {
         limit,
         refresh,
         cacheKey: cache_key,
+        mode,
       });
       return { suggestions };
     } catch (err) {

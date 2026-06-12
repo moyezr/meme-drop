@@ -50,7 +50,9 @@ CREATE TABLE IF NOT EXISTS usage_events (
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_user_memes_user_id ON user_memes(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_events_user_id ON usage_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_usage_events_user_action_created_at ON usage_events(user_id, action, created_at);
 CREATE INDEX IF NOT EXISTS idx_memes_format_type ON memes(format_type);
+CREATE INDEX IF NOT EXISTS idx_memes_embedding_hnsw ON memes USING hnsw (embedding vector_cosine_ops);
 
 -- Insert a default dev user (no auth, so we need one to work with)
 INSERT INTO users (id, email)

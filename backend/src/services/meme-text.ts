@@ -48,6 +48,9 @@ interface CaptionResponse {
 }
 
 const CAPTION_TIMEOUT_MS = Number(process.env.MEMEDROP_CAPTION_TIMEOUT_MS || 8000);
+const CAPTION_BATCH_TIMEOUT_MS = Number(
+  process.env.MEMEDROP_CAPTION_BATCH_TIMEOUT_MS || CAPTION_TIMEOUT_MS + 1000
+);
 const CAPTION_CACHE_TTL_MS = 30 * 60 * 1000;
 const CAPTION_CACHE_MAX = 400;
 const USE_DRAFT_TEMPLATES = process.env.MEMEDROP_USE_DRAFT_TEMPLATES === "true";
@@ -147,16 +150,41 @@ async function generateCaptions(
 
   if (uncached.length === 0) return result;
 
-  const generated = await Promise.allSettled(
+  const batchController = new AbortController();
+  let batchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const generatedPromise = Promise.allSettled(
     uncached.map(async (candidate) => {
-      const regions = await withTimeout(
-        requestCaption(tweetText, context, candidate),
-        CAPTION_TIMEOUT_MS,
-        null
+      const regions = await requestCaption(
+        tweetText,
+        context,
+        candidate,
+        combineAbortSignals([
+          batchController.signal,
+          AbortSignal.timeout(CAPTION_TIMEOUT_MS),
+        ])
       );
       return { candidate, regions };
     })
   );
+  const timeoutPromise = new Promise<null>((resolve) => {
+    batchTimer = setTimeout(() => {
+      batchController.abort(new Error("caption batch timeout"));
+      console.warn(
+        `[MemeDrop] Tailored caption batch timed out after ${CAPTION_BATCH_TIMEOUT_MS}ms`
+      );
+      resolve(null);
+    }, CAPTION_BATCH_TIMEOUT_MS);
+  });
+
+  const generated = await Promise.race([
+    generatedPromise,
+    timeoutPromise,
+  ]).finally(() => {
+    if (batchTimer) clearTimeout(batchTimer);
+  });
+
+  if (!generated) return result;
 
   for (const item of generated) {
     if (item.status === "rejected") {
@@ -179,24 +207,45 @@ async function generateCaptions(
   return result;
 }
 
+function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      break;
+    }
+    signal.addEventListener(
+      "abort",
+      () => {
+        if (!controller.signal.aborted) controller.abort(signal.reason);
+      },
+      { once: true }
+    );
+  }
+  return controller.signal;
+}
+
 async function requestCaption(
   tweetText: string,
   context: TweetContext,
-  candidate: CaptionCandidate
+  candidate: CaptionCandidate,
+  signal?: AbortSignal
 ): Promise<Record<string, string> | null> {
-  return requestOpenRouterCaption(tweetText, context, candidate);
+  return requestOpenRouterCaption(tweetText, context, candidate, signal);
 }
 
 async function requestOpenRouterCaption(
   tweetText: string,
   context: TweetContext,
-  candidate: CaptionCandidate
+  candidate: CaptionCandidate,
+  signal?: AbortSignal
 ): Promise<Record<string, string> | null> {
   const apiKey = getOpenRouterApiKey();
   if (!apiKey) return null;
 
   const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
+    signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
@@ -204,8 +253,8 @@ async function requestOpenRouterCaption(
     },
     body: JSON.stringify({
       model: QWEN_PLUS_MODEL,
-      temperature: 0.8,
-      max_tokens: 450,
+      temperature: 0.65,
+      max_tokens: 550,
       reasoning: { effort: "none", exclude: true },
       response_format: { type: "json_object" },
       messages: [
@@ -242,12 +291,14 @@ function parseCaptionResponse(content: string): Record<string, string> | null {
 
 function captionSystemPrompt(): string {
   return [
-    "Write concise meme overlay captions for a reply on X.",
-    "Return JSON only with one key: regions.",
-    "Use the original post's concrete nouns or named things.",
-    "Match the meme template's joke structure.",
-    "Keep each region short and under its hard character limit.",
-    "Do not explain the joke. Do not use hashtags, brand voice, or generic filler.",
+    "You write sharp meme overlay text for reply images on X.",
+    "Return JSON only with exactly one key: regions.",
+    "Every caption must be readable on an image: short, concrete, and punchy.",
+    "Follow the template's joke structure and each region's role.",
+    "Use the post's concrete nouns, named things, or distinctive verbs when they fit.",
+    "Prefer one specific joke over broad commentary.",
+    "Avoid generic filler such as 'me rn', 'it's fine', 'plot twist', 'bad idea', or 'the real question'.",
+    "Do not explain the joke, add hashtags, add quotation marks, mention X, or invent brand voice.",
   ].join(" ");
 }
 
@@ -263,11 +314,14 @@ function buildCaptionPrompt(
     regions: candidate.template.regions.map((region) => ({
       id: region.id,
       role: region.role,
+      position: `${region.align}/${region.valign}`,
       max_chars: region.max_chars,
       max_lines: region.max_lines,
       hard_limit: `${region.max_chars} characters including spaces`,
+      notes: region.notes,
     })),
-    examples: candidate.template.caption_guidance.good_examples.slice(0, 2),
+    good_examples: candidate.template.caption_guidance.good_examples.slice(0, 2),
+    avoid_examples: candidate.template.caption_guidance.bad_examples.slice(0, 2),
   };
 
   return `Post to reply to:
@@ -287,10 +341,16 @@ ${JSON.stringify(template, null, 2)}
 
 Rules:
 - Write only for this one meme.
-- At least one region must include a concrete term from the post when it fits.
-- Default to 2-5 words per region. Use fewer words when the region is small.
+- Use only the listed region ids.
+- Write text meant to be placed directly on the image, not a tweet reply sentence.
+- At least one region must include a concrete term from the post unless it would make the joke worse.
+- Default to 2-5 words per region. Use fewer words for small or side-label regions.
+- Preserve the template's contrast or escalation. Do not make every region say the same thing.
+- Make setup regions understandable and make punchline/verdict/reveal regions do the turn.
+- Avoid copying the good examples; use them only for structure.
+- Do not follow the avoid_examples.
 - Never exceed max_chars.
-- If there are multiple regions, make them work as one joke.
+- If a region cannot add to the joke, use the shortest useful label rather than filler.
 - Return JSON only:
 {
   "regions": {
@@ -307,7 +367,7 @@ function fallbackCaptions(
   if (!USE_CONTEXTUAL_FALLBACK) return null;
 
   const subject = pickSubject(tweetText, context);
-  const contrast = pickContrast(context);
+  const contrast = pickContrast(context, subject);
   const result: Record<string, string> = {};
 
   for (const region of template.regions) {
@@ -402,14 +462,15 @@ function pickSubject(tweetText: string, context: TweetContext): string {
   return sanitizeText(words.slice(0, 2).join(" ") || context.topic || "this", 26);
 }
 
-function pickContrast(context: TweetContext): string {
-  if (context.intent === "celebrating") return "somehow still winning";
-  if (context.intent === "dunking") return "predictable consequences";
-  if (context.intent === "counter-argument") return "the part they skipped";
-  if (context.intent === "venting") return "trying to stay normal";
-  if (context.tone === "sarcastic") return "shocking outcome";
-  if (context.tone === "question") return "asking the obvious";
-  return "the reveal";
+function pickContrast(context: TweetContext, subject: string): string {
+  const shortSubject = sanitizeText(subject, 18);
+  if (context.intent === "celebrating") return `${shortSubject} somehow won`;
+  if (context.intent === "dunking") return `${shortSubject} consequences`;
+  if (context.intent === "counter-argument") return `they skipped ${shortSubject}`;
+  if (context.intent === "venting") return `${shortSubject} again`;
+  if (context.tone === "sarcastic") return `${shortSubject} did this`;
+  if (context.tone === "question") return `so... ${shortSubject}?`;
+  return `${shortSubject} reveal`;
 }
 
 function fallbackTextForRegion(
@@ -462,10 +523,17 @@ function fallbackTextForRegion(
     case "mocking-spongebob":
       return subject;
     default:
-      return role.includes("punch") || role.includes("answer") || role.includes("verdict")
-        ? contrast
-        : subject;
+      return shouldUseContrast(regionId, role) ? contrast : subject;
   }
+}
+
+function shouldUseContrast(regionId: string, role: string): boolean {
+  const descriptor = `${regionId} ${role}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ");
+  return /\b(punch|answer|verdict|reveal|result|bad|wrong|weak|timid|inferior|worse|after|right|bottom|cheems)\b/.test(
+    descriptor
+  );
 }
 
 function isWeakKeyword(word: string): boolean {
@@ -635,18 +703,4 @@ function stripJsonFence(content: string): string {
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/\s*```$/i, "");
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((resolve) => {
-        timer = setTimeout(() => resolve(fallback), ms);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }

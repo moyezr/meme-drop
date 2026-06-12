@@ -56,8 +56,10 @@ interface CacheEntry {
 
 const SUGGESTION_TTL_MS = 5 * 60 * 1000;
 const SUGGESTION_CACHE_MAX = 100;
+const MEDIA_CACHE_MAX = 40;
 const suggestionCache = new Map<string, CacheEntry>();
 const suggestionInflight = new Map<string, Promise<Suggestion[]>>();
+const mediaDataUrlCache = new Map<string, string>();
 
 function normalizeTweetText(text: string): string {
   return text.trim().replace(/\s+/g, " ").toLowerCase();
@@ -89,11 +91,14 @@ function writeCachedSuggestions(key: string, suggestions: Suggestion[]) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_SUGGESTIONS") {
+    let sentInitialSuggestions = false;
     fetchSuggestions(message.payload.tweet_text, {
       refresh: message.payload.refresh,
       limit: message.payload.limit,
       cacheKey: message.payload.cache_key,
+      mode: message.payload.mode,
       onInitial: (suggestions) => {
+        sentInitialSuggestions = true;
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
@@ -102,9 +107,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           });
         }
       },
+      onMedia: (suggestion) => {
+        if (sender.tab?.id && suggestion.image_data_url) {
+          chrome.tabs.sendMessage(sender.tab.id, {
+            type: "SUGGESTION_MEDIA_READY",
+            cache_key: message.payload.cache_key,
+            meme_id: suggestion.meme_id,
+            image_data_url: suggestion.image_data_url,
+          });
+        }
+      },
     })
       .then((suggestions) => {
-        if (sender.tab?.id) {
+        if (!sentInitialSuggestions && sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
             cache_key: message.payload.cache_key,
@@ -172,10 +187,13 @@ async function fetchSuggestions(
     refresh?: boolean;
     limit?: number;
     cacheKey?: string;
+    mode?: "fast" | "smart";
     onInitial?: (suggestions: Suggestion[]) => void;
+    onMedia?: (suggestion: Suggestion) => void;
   } = {}
 ): Promise<Suggestion[]> {
-  const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${options.limit || 5}`;
+  const mode = options.mode || "fast";
+  const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${options.limit || 5}|mode:${mode}`;
   if (!options.refresh) {
     const cached = readCachedSuggestions(cacheKey);
     if (cached) return cached;
@@ -201,7 +219,9 @@ async function fetchFreshSuggestions(
     refresh?: boolean;
     limit?: number;
     cacheKey?: string;
+    mode?: "fast" | "smart";
     onInitial?: (suggestions: Suggestion[]) => void;
+    onMedia?: (suggestion: Suggestion) => void;
   },
   cacheKey: string
 ): Promise<Suggestion[]> {
@@ -218,6 +238,7 @@ async function fetchFreshSuggestions(
         limit: options.limit,
         refresh: options.refresh,
         cache_key: options.cacheKey,
+        mode: options.mode,
       }),
     });
     if (!res.ok) {
@@ -244,6 +265,7 @@ async function fetchFreshSuggestions(
   await Promise.allSettled(
     suggestions.map(async (suggestion) => {
       suggestion.image_data_url = await fetchMediaDataUrl(suggestion.image_url);
+      options.onMedia?.(suggestion);
     })
   );
 
@@ -298,6 +320,13 @@ function toAbsoluteMediaUrl(imageUrl: string): string {
 }
 
 async function fetchMediaDataUrl(imageUrl: string): Promise<string> {
+  const cached = mediaDataUrlCache.get(imageUrl);
+  if (cached) {
+    mediaDataUrlCache.delete(imageUrl);
+    mediaDataUrlCache.set(imageUrl, cached);
+    return cached;
+  }
+
   const response = await fetch(imageUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch media (${response.status})`);
@@ -307,7 +336,13 @@ async function fetchMediaDataUrl(imageUrl: string): Promise<string> {
   const buffer = await blob.arrayBuffer();
   const base64 = arrayBufferToBase64(buffer);
   const mimeType = blob.type || guessMimeType(imageUrl);
-  return `data:${mimeType};base64,${base64}`;
+  const dataUrl = `data:${mimeType};base64,${base64}`;
+  mediaDataUrlCache.set(imageUrl, dataUrl);
+  if (mediaDataUrlCache.size > MEDIA_CACHE_MAX) {
+    const oldestKey = mediaDataUrlCache.keys().next().value;
+    if (oldestKey) mediaDataUrlCache.delete(oldestKey);
+  }
+  return dataUrl;
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {

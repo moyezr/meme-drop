@@ -401,10 +401,10 @@
         "pattern": "A four-panel back-and-forth where the first two panels set up a situation and the bottom two panels escalate it into a more serious or awkward reaction.",
         "good_examples": [
           {
-            "top_left_setup": "Me: I can handle one more task"
+            "top_left_setup": "Me: one more task"
           },
           {
-            "bottom_right_conclusion": "Also me, 5 minutes later: completely overwhelmed"
+            "bottom_right_conclusion": "Also me: overwhelmed"
           }
         ],
         "bad_examples": [
@@ -574,10 +574,10 @@
         "pattern": "Use a short setup at the top and a repeated or escalating request at the bottom to mimic Bernie’s earnest plea.",
         "good_examples": [
           {
-            "top_caption": "When the group project starts"
+            "top_caption": "Group project begins"
           },
           {
-            "bottom_caption": "I am once again asking for your support"
+            "bottom_caption": "Once again asking for help"
           }
         ],
         "bad_examples": [
@@ -723,10 +723,10 @@
         "pattern": "The joke escalates from a normal boardroom suggestion to increasingly absurd responses, ending with a dramatic reaction or consequence.",
         "good_examples": [
           {
-            "top_speaker": "We should improve the product by listening to users."
+            "top_speaker": "Listen to users"
           },
           {
-            "middle_right_speaker": "Or we could just delete the bad reviews."
+            "middle_right_speaker": "Delete bad reviews"
           }
         ],
         "bad_examples": [
@@ -796,7 +796,7 @@
         "pattern": "Use the left label for the powerful, overbuilt, or confident version and the right label for the weaker, anxious, or inferior version to contrast the same thing in two states.",
         "good_examples": [
           {
-            "buff_doge_label": "Me after\none workout"
+            "buff_doge_label": "One workout"
           },
           {
             "cheems_label": "Me before\ncoffee"
@@ -964,7 +964,7 @@
             "top_left_claim": "WHEN THE GROUP CHAT GOES SILENT"
           },
           {
-            "bottom_left_reveal": "BECAUSE THEY'RE ALL SECRETLY PLANNING MY SURPRISE PARTY"
+            "bottom_left_reveal": "THEY PLANNED MY PARTY"
           }
         ],
         "bad_examples": [
@@ -1037,7 +1037,7 @@
             "top_caption": "Just a quick touch-up before the meeting"
           },
           {
-            "bottom_caption": "Me 10 minutes later after 'fixing' one tiny thing"
+            "bottom_caption": "Me after one tiny fix"
           }
         ],
         "bad_examples": [
@@ -1107,10 +1107,10 @@
         "pattern": "A dramatic disaster scene is paired with a smug or mischievous reaction, making the joke about the narrator or subject seeming responsible or pleased by the chaos.",
         "good_examples": [
           {
-            "top_caption": "When the group project starts falling apart"
+            "top_caption": "Group project collapses"
           },
           {
-            "bottom_caption": "and I realize I was the one who sent the wrong file"
+            "bottom_caption": "I sent the wrong file"
           }
         ],
         "bad_examples": [
@@ -1202,7 +1202,7 @@
             "girlfriend": "My current project"
           },
           {
-            "other_woman": "A shiny new side quest"
+            "other_woman": "shiny new side quest"
           }
         ],
         "bad_examples": [
@@ -1273,11 +1273,11 @@
         "good_examples": [
           {
             "reject": "Studying all night",
-            "approve": "Cramming 10 minutes before class"
+            "approve": "Cramming 10 min before class"
           },
           {
             "reject": "Long meetings",
-            "approve": "An email that could've been sent instead"
+            "approve": "sending an email"
           }
         ],
         "bad_examples": [
@@ -1368,10 +1368,10 @@
         "pattern": "Use the two sides to represent unlikely allies or opposing groups, then add a short shared agreement that explains what they both want or hate.",
         "good_examples": [
           {
-            "left_side_label": "People who hate meetings"
+            "left_side_label": "Meeting haters"
           },
           {
-            "right_side_label": "People who love meetings"
+            "right_side_label": "Meeting lovers"
           }
         ],
         "bad_examples": [
@@ -1444,7 +1444,7 @@
             "kermit_conscience": "Go to bed early"
           },
           {
-            "evil_kermit": "Stay up and watch one more episode"
+            "evil_kermit": "Watch one more episode"
           }
         ],
         "bad_examples": [
@@ -1555,7 +1555,7 @@
             "level_1": "Use paper planner"
           },
           {
-            "level_4": "Become a sentient spreadsheet"
+            "level_4": "Become sentient spreadsheet"
           }
         ],
         "bad_examples": [
@@ -1644,10 +1644,10 @@
         "pattern": "Use the first two panels for escalating concern or skepticism, then land the joke in the final panel with an unexpectedly tender, dramatic, or absurd payoff.",
         "good_examples": [
           {
-            "top_reaction": "WHEN THE GROUP CHAT GOES SILENT"
+            "top_reaction": "GROUP CHAT GOES SILENT"
           },
           {
-            "bottom_punchline": "AND THEN HE SAID: 'I BROUGHT SNACKS'"
+            "bottom_punchline": "HE BROUGHT SNACKS"
           }
         ],
         "bad_examples": [
@@ -1936,10 +1936,10 @@
         "pattern": "A setup line describes an ordinary or tense situation, and the punchline reveals an unexpectedly grim or over-the-top consequence.",
         "good_examples": [
           {
-            "top_caption": "When the landlord says he just wants to talk"
+            "top_caption": "Landlord wants to talk"
           },
           {
-            "bottom_caption": "Me opening the door after 3 missed rent payments"
+            "bottom_caption": "Me after 3 missed rents"
           }
         ],
         "bad_examples": [
@@ -2047,10 +2047,10 @@
         "pattern": "Use the four panels as a progression from setup to increasingly absurd escalation, with the final panel delivering the punchline.",
         "good_examples": [
           {
-            "top_left": "Me: I'll just check one thing"
+            "top_left": "Check one thing"
           },
           {
-            "bottom_right": "Three hours later, I'm still scrolling"
+            "bottom_right": "Still scrolling"
           }
         ],
         "bad_examples": [
@@ -2120,7 +2120,7 @@
         "pattern": "State a confident claim or self-image on top, then undercut it with a sharper comparison or contradiction below using Gus Fring's stern, superior expression.",
         "good_examples": [
           {
-            "top_statement": "ME WHEN I SAY I'M THE MOST ORGANIZED PERSON I KNOW"
+            "top_statement": "ME: I'M ORGANIZED"
           },
           {
             "bottom_comparison": "MY DESK: LOOKS LIKE A CRIME SCENE"
@@ -2194,11 +2194,11 @@
         "good_examples": [
           {
             "top_caption": "When the meeting is almost over",
-            "bottom_caption": "and they ask if anyone has 'one quick question'"
+            "bottom_caption": "Then comes one quick question"
           },
           {
             "top_caption": "Me pretending everything is fine",
-            "bottom_caption": "after reading the email I definitely should not have opened"
+            "bottom_caption": "After opening that email"
           }
         ],
         "bad_examples": [
@@ -2391,7 +2391,7 @@
           "font": {
             "family": "Impact",
             "min_size": 42,
-            "max_size": 74,
+            "max_size": 68,
             "stroke_ratio": 0.12
           },
           "notes": "Use the open sky/wall area above the character; keep clear of the window frame and butterfly."
@@ -2410,7 +2410,7 @@
           "font": {
             "family": "Impact",
             "min_size": 42,
-            "max_size": 74,
+            "max_size": 68,
             "stroke_ratio": 0.12
           },
           "notes": "Place over the lower margin and darker foreground; avoid covering the hand and book too much."
@@ -2420,7 +2420,7 @@
         "pattern": "A clueless or mistaken interpretation is introduced in the top text, then the bottom text reveals the absurdly wrong label or conclusion.",
         "good_examples": [
           {
-            "top_caption": "When you think you've found a rare butterfly..."
+            "top_caption": "I found a rare butterfly"
           },
           {
             "bottom_caption": "Is this a pigeon?"
@@ -2939,8 +2939,8 @@
         "pattern": "The meme works by pairing a serious, impossible, or overconfident setup with a blunt punchline that frames the speaker as unable or unwilling to do something simple.",
         "good_examples": [
           {
-            "top_statement": "When the assignment says 'just submit it online'",
-            "bottom_statement": "and the website asks me to create an account first"
+            "top_statement": "Assignment says submit online",
+            "bottom_statement": "Website requires account"
           },
           {
             "top_statement": "Me trying to explain my plan",
@@ -3184,7 +3184,7 @@
             "left_speaker": "Can you fix it for free?"
           },
           {
-            "right_reaction": "Best I can do is $5 and a handshake."
+            "right_reaction": "Best I can do is $5"
           }
         ],
         "bad_examples": [
@@ -3254,7 +3254,7 @@
         "pattern": "Use the character's thinking pose to present a clever but flawed realization, with the text stating the 'obvious' logic that is actually the joke.",
         "good_examples": [
           {
-            "thought_caption": "If I don't check my email, I can't get more work"
+            "thought_caption": "No email, no new work"
           },
           {
             "punchline_caption": "So technically I'm already ahead"
@@ -3368,7 +3368,7 @@
             "top_setup": "ME TRYING TO STAY PRODUCTIVE"
           },
           {
-            "bottom_interference": "MY PHONE, MY BED, AND EVERY DISTRACTION POSSIBLE"
+            "bottom_interference": "EVERY DISTRACTION POSSIBLE"
           }
         ],
         "bad_examples": [
@@ -3879,10 +3879,10 @@
         "pattern": "Use the left side for Squidward's reaction or setup, and the right side for the thing he is judging, admiring, or being annoyed by.",
         "good_examples": [
           {
-            "top_reaction_caption": "When you hear the party start"
+            "top_reaction_caption": "Party starts next door"
           },
           {
-            "right_window_caption": "and it's your neighbors being loud again"
+            "right_window_caption": "neighbors being loud"
           }
         ],
         "bad_examples": [
@@ -3922,8 +3922,8 @@
           "max_chars": 90,
           "font": {
             "family": "Impact",
-            "min_size": 54,
-            "max_size": 120,
+            "min_size": 34,
+            "max_size": 68,
             "stroke_ratio": 0.12
           },
           "notes": "Large blank white area is ideal for classic top caption text; keep centered and high contrast."
@@ -4040,7 +4040,7 @@
           "align": "center",
           "valign": "middle",
           "max_lines": 4,
-          "max_chars": 70,
+          "max_chars": 36,
           "font": {
             "family": "Impact",
             "min_size": 34,
@@ -4076,7 +4076,7 @@
             "top_left_reaction": "I FINALLY FOUND THE ANSWER"
           },
           {
-            "scroll_text": "IT WAS JUST\nA REALLY LONG\nERROR MESSAGE"
+            "scroll_text": "JUST A LONG ERROR MESSAGE"
           }
         ],
         "bad_examples": [
@@ -4165,10 +4165,10 @@
         "pattern": "The joke contrasts one person who knows something important with the others who are oblivious to it.",
         "good_examples": [
           {
-            "top_left_observer": "Me knowing the group chat is about to explode"
+            "top_left_observer": "Group chat about to pop"
           },
           {
-            "right_couple": "Everyone else\nstill acting normal\nwhile the drama\nis already happening"
+            "right_couple": "Everyone acting normal"
           }
         ],
         "bad_examples": [
@@ -4205,7 +4205,7 @@
           "align": "center",
           "valign": "middle",
           "max_lines": 2,
-          "max_chars": 70,
+          "max_chars": 36,
           "font": {
             "family": "Impact",
             "min_size": 34,
@@ -4224,7 +4224,7 @@
           "align": "center",
           "valign": "middle",
           "max_lines": 1,
-          "max_chars": 40,
+          "max_chars": 24,
           "font": {
             "family": "Impact",
             "min_size": 36,
@@ -4238,10 +4238,10 @@
         "pattern": "Present two supposedly different things in the top panel, then reveal in the bottom panel that they are actually the same.",
         "good_examples": [
           {
-            "top_comparison_caption": "My boss's 'urgent' request vs. my actual workload"
+            "top_comparison_caption": "Urgent request vs workload"
           },
           {
-            "bottom_reveal_caption": "They're the same picture."
+            "bottom_reveal_caption": "Same picture."
           }
         ],
         "bad_examples": [
@@ -4405,12 +4405,12 @@
           {
             "trade_offer_title": "TRADE OFFER",
             "i_receive": "free pizza",
-            "you_receive": "my eternal loyalty"
+            "you_receive": "loyalty"
           },
           {
             "trade_offer_title": "TRADE OFFER",
             "i_receive": "one compliment",
-            "you_receive": "a 47-slide presentation"
+            "you_receive": "a 47-slide deck"
           }
         ],
         "bad_examples": [
@@ -4575,11 +4575,11 @@
         "pattern": "The joke comes from presenting two undesirable or tempting options on the buttons, then showing the character sweating over which one to choose.",
         "good_examples": [
           {
-            "left_button_label": "Do the responsible thing",
+            "left_button_label": "Do the adult thing",
             "right_button_label": "Do the fun thing"
           },
           {
-            "reaction_caption": "Why is this suddenly the hardest decision of my life?"
+            "reaction_caption": "Hardest decision of my life"
           },
           {
             "left_button_label": "Save money",
@@ -4773,7 +4773,7 @@
           },
           {
             "top_left_card_text": "CHOOSE\nYOUR FATE",
-            "bottom_table_comment": "the game immediately ends"
+            "bottom_table_comment": "the game instantly ends"
           }
         ],
         "bad_examples": [
@@ -5013,7 +5013,7 @@
         "pattern": "Use the left side for an intense accusation or overreaction and the right side for a calm, clueless, or absurdly literal response.",
         "good_examples": [
           {
-            "woman_yelling": "ME EXPLAINING\nWHY THIS IS WRONG"
+            "woman_yelling": "ME EXPLAINING WHY IT'S WRONG"
           },
           {
             "cat_response": "ME, UNMOVED,\nEATING SALAD"

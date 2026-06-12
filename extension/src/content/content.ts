@@ -4,6 +4,7 @@ import {
   showSuggestionPanel,
   showSuggestionError,
   updateSuggestions,
+  updateSuggestionMedia,
   insertMemeByUrl,
   hidePanel,
   isPanelVisible,
@@ -11,6 +12,16 @@ import {
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const DEBUG_PREFIX = "[MemeDrop]";
+
+type DraggedMeme = Pick<
+  Parameters<typeof insertMemeByUrl>[0],
+  | "imageUrl"
+  | "imageDataUrl"
+  | "tailoredImageDataUrl"
+  | "tailoredOverlay"
+  | "memeId"
+  | "source"
+>;
 
 interface ReplyTweetSnapshot {
   text: string | null;
@@ -64,6 +75,15 @@ chrome.runtime.onMessage.addListener((message) => {
 - suggestions: ${(message.suggestions || []).length}`
     );
     updateSuggestions(message.suggestions || []);
+  }
+
+  if (
+    message.type === "SUGGESTION_MEDIA_READY" &&
+    message.cache_key === lastSuggestionCacheKey &&
+    message.meme_id &&
+    message.image_data_url
+  ) {
+    updateSuggestionMedia(message.meme_id, message.image_data_url);
   }
 
   if (message.type === "INSERT_MEME_FROM_POPUP" && message.payload?.image_url) {
@@ -399,7 +419,13 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
 
   chrome.runtime.sendMessage({
     type: "GET_SUGGESTIONS",
-    payload: { tweet_text: suggestionText, limit: 5, refresh, cache_key: cacheKey },
+    payload: {
+      tweet_text: suggestionText,
+      limit: 5,
+      refresh,
+      cache_key: cacheKey,
+      mode: "fast",
+    },
   });
 }
 
@@ -500,12 +526,7 @@ if (URL_PATTERNS.composeModal.test(window.location.href)) {
   onUrlChanged(window.location.href);
 }
 
-function parseDraggedMeme(dataTransfer: DataTransfer | null): {
-  imageUrl: string;
-  memeId?: string;
-  imageDataUrl?: string;
-  source?: "user" | "global";
-} | null {
+function parseDraggedMeme(dataTransfer: DataTransfer | null): DraggedMeme | null {
   if (!dataTransfer) return null;
 
   const customPayload = dataTransfer.getData(MEME_DROP_MIME_TYPE);
@@ -515,6 +536,8 @@ function parseDraggedMeme(dataTransfer: DataTransfer | null): {
         imageUrl?: string;
         memeId?: string;
         imageDataUrl?: string;
+        tailoredImageDataUrl?: string;
+        tailoredOverlay?: DraggedMeme["tailoredOverlay"];
         source?: "user" | "global";
       };
       if (parsed.imageUrl) {
@@ -522,6 +545,8 @@ function parseDraggedMeme(dataTransfer: DataTransfer | null): {
           imageUrl: parsed.imageUrl,
           memeId: parsed.memeId,
           imageDataUrl: parsed.imageDataUrl,
+          tailoredImageDataUrl: parsed.tailoredImageDataUrl,
+          tailoredOverlay: parsed.tailoredOverlay,
           source: parsed.source,
         };
       }
@@ -604,6 +629,8 @@ document.addEventListener(
     insertMemeByUrl({
       imageUrl: draggedMeme.imageUrl,
       imageDataUrl: draggedMeme.imageDataUrl,
+      tailoredImageDataUrl: draggedMeme.tailoredImageDataUrl,
+      tailoredOverlay: draggedMeme.tailoredOverlay,
       memeId: draggedMeme.memeId,
       source: draggedMeme.source,
       composerTarget: event.target instanceof Element ? event.target : null,

@@ -16,7 +16,13 @@
     "manifest:generate": "tsx scripts/generate-template-manifest.ts --out shared/src/data/meme-template-manifest.generated.json",
     "manifest:dry-run": "tsx scripts/generate-template-manifest.ts --dry-run --files-only --out /tmp/memedrop-template-manifest-dry-run.json",
     "manifest:qa": "tsx scripts/render-template-qa.ts",
-    "eval:suggestions": "tsx scripts/evaluate-suggestions.ts"
+    "manifest:audit": "tsx scripts/audit-template-annotations.ts",
+    "manifest:audit:all": "tsx scripts/audit-template-annotations.ts --scope all",
+    "manifest:fix-examples": "tsx scripts/fix-template-example-lengths.ts",
+    "manifest:review-queue": "tsx scripts/template-review-queue.ts",
+    "eval:suggestions": "tsx scripts/evaluate-suggestions.ts",
+    "eval:quality": "tsx scripts/evaluate-suggestions.ts --mode smart --limit 5 --min-top3 0.55 --min-top5 0.75 --min-caption 0.7 --min-layout 0.9 --min-overlay 0.8",
+    "eval:quality:fast": "tsx scripts/evaluate-suggestions.ts --mode fast --limit 5 --min-top3 0.55 --min-top5 0.75 --min-caption 0.7 --min-layout 0.9 --min-overlay 0.8"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.50",

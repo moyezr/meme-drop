@@ -2,6 +2,8 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { openrouter, QWEN_PLUS_MODEL } from "./llm-provider.js";
 
+const CONTEXT_ANALYSIS_TIMEOUT_MS = Number(process.env.MEMEDROP_CONTEXT_TIMEOUT_MS || 5000);
+
 const schema = z.object({
   sentiment: z.enum(["positive", "negative", "neutral"]),
   tone: z.enum([
@@ -80,6 +82,8 @@ export async function analyzeTweet(tweetText: string): Promise<TweetContext> {
       schema,
       temperature: 0.3,
       maxOutputTokens: 700,
+      maxRetries: 0,
+      timeout: { totalMs: CONTEXT_ANALYSIS_TIMEOUT_MS },
       system: `You classify tweets to pick the funniest meme reply a human would actually post. Return JSON only. Do not include reasoning, markdown, or extra keys.
 
 The JSON must contain exactly these keys:

@@ -43,6 +43,7 @@ export interface SuggestionRequest {
   limit?: number;
   refresh?: boolean;
   cache_key?: string;
+  mode?: "fast" | "smart";
 }
 
 export interface SuggestionResult {

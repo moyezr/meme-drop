@@ -305,6 +305,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
     for (const s of suggestions.slice(0, 10)) {
       const card = document.createElement("div");
       card.className = "meme-card";
+      card.dataset.memeId = s.meme_id;
       card.title = getCardTitle(s);
       card.draggable = true;
 
@@ -336,7 +337,13 @@ function renderSuggestions(suggestions: Suggestion[]) {
       card.appendChild(reason);
       if (name.textContent) card.appendChild(name);
 
-      hydrateTailoredPreview(s, img);
+      if (s.image_data_url) {
+        if (s.tailored_overlay?.enabled) {
+          hydrateTailoredPreview(s, img);
+        } else {
+          img.src = s.image_data_url;
+        }
+      }
 
       card.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -356,7 +363,9 @@ function renderSuggestions(suggestions: Suggestion[]) {
           JSON.stringify({
             imageUrl: s.image_url,
             memeId: s.meme_id,
-            imageDataUrl: s.tailored_image_data_url ?? s.image_data_url ?? undefined,
+            imageDataUrl: s.image_data_url ?? undefined,
+            tailoredImageDataUrl: s.tailored_image_data_url ?? undefined,
+            tailoredOverlay: s.tailored_overlay ?? undefined,
             source: s.source,
           })
         );
@@ -457,7 +466,9 @@ async function insertMemeIntoComposer(suggestion: Suggestion) {
 
   await insertMemeByUrl({
     imageUrl: suggestion.image_url,
-    imageDataUrl: suggestion.tailored_image_data_url ?? suggestion.image_data_url ?? null,
+    imageDataUrl: suggestion.image_data_url ?? null,
+    tailoredImageDataUrl: suggestion.tailored_image_data_url ?? null,
+    tailoredOverlay: suggestion.tailored_overlay ?? null,
     memeId: suggestion.meme_id,
     source: suggestion.source,
   });
@@ -482,6 +493,8 @@ async function requestTailoredCaption(
 type InsertMemeInput = {
   imageUrl: string;
   imageDataUrl?: string | null;
+  tailoredImageDataUrl?: string | null;
+  tailoredOverlay?: MemeTextOverlay | null;
   memeId?: string;
   source?: "user" | "global";
   composerTarget?: Element | null;
@@ -539,7 +552,15 @@ async function renderTailoredMemeDataUrl(suggestion: Suggestion): Promise<string
     return suggestion.image_data_url || suggestion.image_url;
   }
 
-  const raw = await resolveMemeBlob(suggestion.image_url, suggestion.image_data_url);
+  return renderMemeWithOverlay(suggestion.image_url, suggestion.image_data_url, overlay);
+}
+
+async function renderMemeWithOverlay(
+  imageUrl: string,
+  imageDataUrl: string | null | undefined,
+  overlay: MemeTextOverlay
+): Promise<string> {
+  const raw = await resolveMemeBlob(imageUrl, imageDataUrl);
   const bitmap = await createImageBitmap(raw);
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
@@ -876,7 +897,22 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
   let file: File | null = null;
 
   try {
-    const raw = await resolveMemeBlob(payload.imageUrl, payload.imageDataUrl);
+    const tailoredImageDataUrl =
+      payload.tailoredImageDataUrl ||
+      (payload.tailoredOverlay?.enabled
+        ? await renderMemeWithOverlay(
+            payload.imageUrl,
+            payload.imageDataUrl,
+            payload.tailoredOverlay
+          ).catch((err) => {
+            console.warn("[MemeDrop] Tailored insert render failed:", err);
+            return null;
+          })
+        : null);
+    const raw = await resolveMemeBlob(
+      payload.imageUrl,
+      tailoredImageDataUrl ?? payload.imageDataUrl
+    );
     file = await toPngFile(raw);
   } catch (err) {
     console.error("[MemeDrop] Could not load meme image:", err);
@@ -1080,6 +1116,23 @@ export function updateSuggestions(suggestions: Suggestion[]) {
   }
   renderSuggestions(suggestions);
   panelHost!.style.display = "block";
+}
+
+export function updateSuggestionMedia(memeId: string, imageDataUrl: string) {
+  const suggestion = currentSuggestions.find((item) => item.meme_id === memeId);
+  if (!suggestion) return;
+  suggestion.image_data_url = imageDataUrl;
+
+  const card = Array.from(shadowRoot?.querySelectorAll<HTMLElement>(".meme-card") || [])
+    .find((item) => item.dataset.memeId === memeId);
+  const img = card?.querySelector<HTMLImageElement>("img");
+  if (!img) return;
+
+  if (suggestion.tailored_overlay?.enabled) {
+    hydrateTailoredPreview(suggestion, img);
+  } else {
+    img.src = imageDataUrl;
+  }
 }
 
 export function hidePanel() {

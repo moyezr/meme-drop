@@ -5,7 +5,7 @@ import {
   OPENROUTER_EMBEDDING_MODEL,
 } from "./llm-provider.js";
 
-export async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(text: string, signal?: AbortSignal): Promise<number[]> {
   if (!text.trim()) {
     return new Array(1536).fill(0);
   }
@@ -18,6 +18,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
     const response = await fetch(`${OPENROUTER_BASE_URL}/embeddings`, {
       method: "POST",
+      signal,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,

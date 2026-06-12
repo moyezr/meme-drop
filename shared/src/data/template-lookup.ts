@@ -22,27 +22,10 @@ export function findMemeTemplate(
   name: string,
   options: TemplateLookupOptions = {}
 ): MemeTemplate | null {
-  const normalizedName = normalizeTemplateName(name);
-  if (!normalizedName) return null;
-
   const runtimeTemplates = options.includeDrafts
     ? [...templates, ...generatedTemplates]
     : templates;
-  let best: MemeTemplate | null = null;
-  let bestScore = 0;
-
-  for (const template of runtimeTemplates) {
-    const candidates = [template.name, ...template.aliases, template.template_id];
-    for (const candidate of candidates) {
-      const score = matchScore(normalizedName, normalizeTemplateName(candidate));
-      if (score > bestScore) {
-        best = template;
-        bestScore = score;
-      }
-    }
-  }
-
-  return bestScore >= 0.82 ? best : null;
+  return findBestTemplateByName(name, runtimeTemplates);
 }
 
 export function findMemeTemplateForCandidate(
@@ -57,6 +40,9 @@ export function findMemeTemplateForCandidate(
     const exactGenerated = generatedTemplateByMemeId.get(memeId);
     if (exactGenerated) return exactGenerated;
   }
+
+  const generated = findBestTemplateByName(name, generatedTemplates);
+  if (generated) return generated;
 
   return options.includeDrafts ? findMemeTemplate(name, { includeDrafts: true }) : null;
 }
@@ -84,4 +70,28 @@ function matchScore(a: string, b: string): number {
     if (bTokens.has(token)) overlap++;
   }
   return overlap / Math.max(aTokens.size, bTokens.size);
+}
+
+function findBestTemplateByName(
+  name: string,
+  candidates: MemeTemplate[]
+): MemeTemplate | null {
+  const normalizedName = normalizeTemplateName(name);
+  if (!normalizedName) return null;
+
+  let best: MemeTemplate | null = null;
+  let bestScore = 0;
+
+  for (const template of candidates) {
+    const names = [template.name, ...template.aliases, template.template_id];
+    for (const candidate of names) {
+      const score = matchScore(normalizedName, normalizeTemplateName(candidate));
+      if (score > bestScore) {
+        best = template;
+        bestScore = score;
+      }
+    }
+  }
+
+  return bestScore >= 0.82 ? best : null;
 }
