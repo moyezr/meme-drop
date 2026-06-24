@@ -13,8 +13,9 @@ export interface SuggestResponse {
 export interface UsageRequest {
   Body: {
     meme_id: string;
-    action: "suggested" | "used" | "dismissed";
+    action: "suggested" | "shown" | "clicked" | "used" | "inserted" | "saved" | "dismissed";
     tweet_context: TweetContext;
+    source?: "user" | "global";
   };
 }
 

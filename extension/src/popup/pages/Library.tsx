@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, type DragEvent } from "react";
 import { apiFetch } from "../../shared/api";
+import { API_BASE_URL, apiUrl } from "../../shared/config";
+import { rotateInstallId } from "../../shared/identity";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 
 interface MemeItem {
@@ -62,6 +62,7 @@ export default function Library() {
   const [editTags, setEditTags] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const loadLibrary = useCallback(() => {
@@ -207,13 +208,43 @@ export default function Library() {
   const handleCopyImage = async () => {
     if (!selectedMeme) return;
     try {
-      const res = await fetch(`${API_BASE_URL}${selectedMeme.filePath}`);
+      const res = await fetch(apiUrl(selectedMeme.filePath));
       const blob = await res.blob();
       await navigator.clipboard.write([
         new ClipboardItem({ [blob.type]: blob }),
       ]);
     } catch {
       // Fallback: just show a message
+    }
+  };
+
+  const handleDeleteAccountData = async () => {
+    if (
+      !window.confirm(
+        "Delete all MemeDrop library items and usage history for this browser install? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    setDeletingAccount(true);
+    setActionError(null);
+    try {
+      await apiFetch("/account", { method: "DELETE" });
+      await rotateInstallId();
+      setMemes([]);
+      setSelectedMeme(null);
+      setSearch("");
+      setEmotionFilter("");
+    } catch (err) {
+      console.error("[MemeDrop] Account data deletion failed:", err);
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : "Could not delete your MemeDrop data. Please try again."
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -389,6 +420,11 @@ export default function Library() {
       <p className="text-[11px] text-gray-500 mb-2">
         Drag a meme onto the X composer to attach it.
       </p>
+      {actionError && (
+        <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded px-2 py-1.5 mb-2">
+          {actionError}
+        </p>
+      )}
 
       {filteredMemes.length === 0 ? (
         <div className="py-8 text-center">
@@ -441,6 +477,19 @@ export default function Library() {
           ))}
         </div>
       )}
+
+      <div className="mt-4 border-t border-gray-200 pt-3">
+        <p className="text-[11px] text-gray-500 mb-2">
+          Privacy: delete this install's saved memes and usage history from the backend.
+        </p>
+        <button
+          onClick={handleDeleteAccountData}
+          disabled={deletingAccount}
+          className="w-full text-xs text-red-600 border border-red-200 rounded py-1.5 hover:bg-red-50 disabled:opacity-50"
+        >
+          {deletingAccount ? "Deleting MemeDrop data..." : "Delete my MemeDrop data"}
+        </button>
+      </div>
     </div>
   );
 }

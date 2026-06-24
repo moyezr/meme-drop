@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-06-13T00:00:00.000Z",
+  "reviewer": "your-name",
+  "decisions": [
+    {
+      "template_id": "absolute-cinema",
+      "status": "approved",
+      "benchmark_case_id": "dramatic-overanalysis",
+      "notes": "Text regions stay clear of the hands and face; this adds a useful dramatic verdict joke shape."
+    },
+    {
+      "template_id": "american-chopper-argument",
+      "status": "needs_work",
+      "issues": [
+        "Example captions are too sparse for a five-panel argument.",
+        "Need a benchmark case that proves escalation is better than a simpler two-panel argument template."
+      ],
+      "notes": "Keep as draft until the panel-specific captions are visually reviewed with real generated text."
+    }
+  ]
+}

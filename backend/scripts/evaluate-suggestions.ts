@@ -15,6 +15,7 @@ interface BenchmarkCase {
   category?: string;
   tweet: string;
   expected_memes?: string[];
+  rejected_memes?: Array<{ name: string; reason?: string }>;
   keywords?: string[];
 }
 
@@ -31,6 +32,8 @@ interface CaseResult {
   captionScore: number;
   layoutFitScore: number;
   overlayCoverage: number;
+  rejectedHit: boolean;
+  rejectedMatches: string[];
   judge?: JudgeResult;
   suggestions: Array<{
     rank: number;
@@ -69,6 +72,7 @@ interface BenchmarkSummary {
   mean_caption_score: number;
   mean_layout_fit_score: number;
   overlay_coverage: number;
+  rejected_avoidance: number;
   user_source_suggestions: number;
   mean_judge_score: number;
 }
@@ -137,18 +141,14 @@ async function main() {
 
 function scoreCase(testCase: BenchmarkCase, suggestions: SuggestionResult[]): CaseResult {
   const expected = (testCase.expected_memes || []).map(normalizeName);
+  const rejected = (testCase.rejected_memes || []).map((item) => normalizeName(item.name));
   const ranked = suggestions.slice(0, limit);
   const bestIndex = ranked.findIndex((suggestion) => {
-    const normalizedName = normalizeName(suggestion.name);
-    const normalizedId = normalizeName(suggestion.meme_id);
-    return expected.some(
-      (name) =>
-        normalizedName.includes(name) ||
-        name.includes(normalizedName) ||
-        normalizedId.includes(name) ||
-        name.includes(normalizedId)
-    );
+    return matchesAnyFamily(suggestion, expected);
   });
+  const rejectedMatches = ranked
+    .filter((suggestion) => matchesAnyFamily(suggestion, rejected))
+    .map((suggestion) => suggestion.name);
   const captionChecks = ranked.map((suggestion, index) => {
     const captions = suggestion.tailored_overlay?.regions.map((region) => region.text) || [];
     const issues = captionIssues(testCase, suggestion);
@@ -195,8 +195,22 @@ function scoreCase(testCase: BenchmarkCase, suggestions: SuggestionResult[]): Ca
     captionScore,
     layoutFitScore,
     overlayCoverage,
+    rejectedHit: rejectedMatches.length > 0,
+    rejectedMatches,
     suggestions: captionChecks,
   };
+}
+
+function matchesAnyFamily(suggestion: SuggestionResult, families: string[]): boolean {
+  const normalizedName = normalizeName(suggestion.name);
+  const normalizedId = normalizeName(suggestion.meme_id);
+  return families.some(
+    (name) =>
+      normalizedName.includes(name) ||
+      name.includes(normalizedName) ||
+      normalizedId.includes(name) ||
+      name.includes(normalizedId)
+  );
 }
 
 function captionIssues(testCase: BenchmarkCase, suggestion: SuggestionResult): string[] {
@@ -380,6 +394,7 @@ function summarize(results: CaseResult[]): BenchmarkSummary {
     mean_caption_score: round(results.reduce((sum, item) => sum + item.captionScore, 0) / total),
     mean_layout_fit_score: round(results.reduce((sum, item) => sum + item.layoutFitScore, 0) / total),
     overlay_coverage: round(results.reduce((sum, item) => sum + item.overlayCoverage, 0) / total),
+    rejected_avoidance: round(results.filter((item) => !item.rejectedHit).length / total),
     user_source_suggestions: results.reduce(
       (sum, item) => sum + item.suggestions.filter((suggestion) => suggestion.source === "user").length,
       0
@@ -399,6 +414,7 @@ function buildQualityGates(rawArgs: Record<string, string | boolean>): Array<Omi
     ["mean_caption_score", "min-caption"],
     ["mean_layout_fit_score", "min-layout"],
     ["overlay_coverage", "min-overlay"],
+    ["rejected_avoidance", "min-rejected-avoid"],
     ["mean_judge_score", "min-judge"],
   ];
 
@@ -503,14 +519,15 @@ function printHumanReport(report: {
 }) {
   console.log(`MemeDrop suggestion benchmark (${report.mode}, ${report.source}, top ${report.limit})`);
   console.log(
-    `top1=${pct(report.summary.top1)} top3=${pct(report.summary.top3)} top5=${pct(report.summary.top5)} caption=${pct(report.summary.mean_caption_score)} layout=${pct(report.summary.mean_layout_fit_score)} overlay=${pct(report.summary.overlay_coverage)} userSource=${report.summary.user_source_suggestions} judge=${judgePct(report.summary.mean_judge_score)}`
+    `top1=${pct(report.summary.top1)} top3=${pct(report.summary.top3)} top5=${pct(report.summary.top5)} caption=${pct(report.summary.mean_caption_score)} layout=${pct(report.summary.mean_layout_fit_score)} overlay=${pct(report.summary.overlay_coverage)} rejectedAvoid=${pct(report.summary.rejected_avoidance)} userSource=${report.summary.user_source_suggestions} judge=${judgePct(report.summary.mean_judge_score)}`
   );
   console.log("");
 
   for (const result of report.results) {
     const hit = result.bestRank ? `hit@${result.bestRank}` : "miss";
     const judge = result.judge ? `, judge=${result.judge.overall}/5` : "";
-    console.log(`${result.id}: ${hit}, caption=${pct(result.captionScore)}, layout=${pct(result.layoutFitScore)}, overlay=${pct(result.overlayCoverage)}${judge}`);
+    const rejected = result.rejectedHit ? `, rejected=${result.rejectedMatches.join(", ")}` : "";
+    console.log(`${result.id}: ${hit}, caption=${pct(result.captionScore)}, layout=${pct(result.layoutFitScore)}, overlay=${pct(result.overlayCoverage)}${rejected}${judge}`);
     for (const suggestion of result.suggestions.slice(0, 3)) {
       const captions = suggestion.captions.length ? ` | "${suggestion.captions.join(" / ")}"` : "";
       const issues = suggestion.issues.length ? ` [${suggestion.issues.join("; ")}]` : "";

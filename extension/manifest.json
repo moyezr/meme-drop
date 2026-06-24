@@ -3,12 +3,12 @@
   "name": "MemeDrop",
   "description": "Instantly reply with the perfect meme on X",
   "version": "0.0.1",
-  "permissions": ["activeTab", "storage"],
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://x.com/*",
-    "https://twitter.com/*",
-    "http://localhost:3001/*",
-    "http://127.0.0.1:3001/*"
+    "https://twitter.com/*"
   ],
   "background": {
     "service_worker": "src/background/background.ts",

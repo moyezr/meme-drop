@@ -1,15 +1,24 @@
 import { MEME_TEMPLATE_MANIFEST } from "./meme-template-manifest.js";
-import generatedManifest from "./meme-template-manifest.generated.json";
+import generatedManifest from "./meme-template-manifest.generated.json" with {
+  type: "json",
+};
+import promotedManifest from "./meme-template-manifest.promoted.json" with {
+  type: "json",
+};
 import type { MemeTemplate } from "../types/template-manifest.js";
 
 const templates = MEME_TEMPLATE_MANIFEST.templates.filter(
   (template) => template.supports_overlay && template.quality !== "disabled"
 );
+const promotedTemplates = (promotedManifest.templates as MemeTemplate[]).filter(
+  (template) => template.supports_overlay && template.quality === "verified"
+);
 const generatedTemplates = (generatedManifest.templates as MemeTemplate[]).filter(
   (template) => template.supports_overlay && template.quality !== "disabled"
 );
-const generatedTemplateByMemeId = new Map(
-  generatedTemplates
+const runtimeTemplates = [...templates, ...promotedTemplates];
+const promotedTemplateByMemeId = new Map(
+  promotedTemplates
     .filter((template) => template.meme_id)
     .map((template) => [template.meme_id as string, template])
 );
@@ -22,10 +31,10 @@ export function findMemeTemplate(
   name: string,
   options: TemplateLookupOptions = {}
 ): MemeTemplate | null {
-  const runtimeTemplates = options.includeDrafts
-    ? [...templates, ...generatedTemplates]
-    : templates;
-  return findBestTemplateByName(name, runtimeTemplates);
+  const candidates = options.includeDrafts
+    ? [...runtimeTemplates, ...generatedTemplates]
+    : runtimeTemplates;
+  return findBestTemplateByName(name, candidates);
 }
 
 export function findMemeTemplateForCandidate(
@@ -37,12 +46,12 @@ export function findMemeTemplateForCandidate(
   if (verified) return verified;
 
   if (memeId) {
-    const exactGenerated = generatedTemplateByMemeId.get(memeId);
-    if (exactGenerated) return exactGenerated;
+    const exactPromoted = promotedTemplateByMemeId.get(memeId);
+    if (exactPromoted) return exactPromoted;
   }
 
-  const generated = findBestTemplateByName(name, generatedTemplates);
-  if (generated) return generated;
+  const promoted = findBestTemplateByName(name, promotedTemplates);
+  if (promoted) return promoted;
 
   return options.includeDrafts ? findMemeTemplate(name, { includeDrafts: true }) : null;
 }

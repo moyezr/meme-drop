@@ -1,0 +1,12 @@
+node_modules
+backend/dist
+shared/dist
+extension/dist
+.memedrop
+.git
+.env
+*.local
+.DS_Store
+backend/data/memes/*
+!backend/data/memes/.gitkeep
+data

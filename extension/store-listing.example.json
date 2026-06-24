@@ -1,0 +1,29 @@
+{
+  "single_purpose": "MemeDrop helps users create and insert meme replies on X/Twitter.",
+  "short_description": "Create context-aware meme replies on X/Twitter.",
+  "detailed_description": "MemeDrop suggests relevant meme replies for X/Twitter posts, generates short readable captions, and lets users insert or save selected memes from the extension UI.",
+  "privacy_policy_url": "https://example.com/memedrop/privacy",
+  "support_email": "support@example.com",
+  "permission_justifications": {
+    "storage": "Stores a random anonymous install ID and local extension preferences.",
+    "https://x.com/*": "Runs the content script on X so users can insert selected meme replies.",
+    "https://twitter.com/*": "Runs the content script on Twitter/X so users can insert selected meme replies.",
+    "api_host": "Sends selected tweet context and meme actions to the MemeDrop backend for suggestions, captions, saved library, feedback quality signals, and deletion/export requests."
+  },
+  "data_disclosures": {
+    "tweet_text_or_compose_context": "Sent to the backend only when generating meme suggestions or captions.",
+    "anonymous_install_id": "Stored in Chrome extension storage and sent to the backend to separate saved library and usage data by browser install.",
+    "usage_events": "Sent to the backend to improve ranking quality and personalization, including shown, clicked, inserted or used, saved, and dismissed meme events.",
+    "saved_meme_images": "Stored when the user saves meme images to their library."
+  },
+  "screenshots": [
+    {
+      "path": "store-assets/suggestion-panel.png",
+      "description": "Suggestion panel showing meme recommendations on X."
+    },
+    {
+      "path": "store-assets/popup-library.png",
+      "description": "Popup library with saved memes and data deletion control."
+    }
+  ]
+}

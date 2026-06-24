@@ -84,7 +84,10 @@ export async function buildTailoredOverlays(
   const overlays = new Map<string, MemeTextOverlay>();
 
   for (const item of captionCandidates) {
-    const regions = captions.get(item.meme_id) || fallbackCaptions(tweetText, context, item.template);
+    const regions =
+      captions.get(item.meme_id) ||
+      fallbackCaptions(tweetText, context, item.template) ||
+      guaranteedFallbackCaptions(tweetText, context, item.template);
     if (!regions) continue;
     const overlay = buildOverlay(item, regions);
     if (overlay) overlays.set(item.meme_id, overlay);
@@ -291,13 +294,15 @@ function parseCaptionResponse(content: string): Record<string, string> | null {
 
 function captionSystemPrompt(): string {
   return [
-    "You write sharp meme overlay text for reply images on X.",
+    "You write meme overlay text for reply images on X that should feel like a human made the meme, not like a bot summarized the post.",
     "Return JSON only with exactly one key: regions.",
     "Every caption must be readable on an image: short, concrete, and punchy.",
+    "Write labels and punchlines, not explanations, summaries, advice, or complete tweet replies.",
     "Follow the template's joke structure and each region's role.",
     "Use the post's concrete nouns, named things, or distinctive verbs when they fit.",
-    "Prefer one specific joke over broad commentary.",
+    "Prefer one specific joke over broad commentary. Make the meme about the social tension, hypocrisy, cope, bad decision, or absurd contrast in the post.",
     "Avoid generic filler such as 'me rn', 'it's fine', 'plot twist', 'bad idea', or 'the real question'.",
+    "Avoid corporate-safe language, therapy-speak, essay phrasing, and neutral descriptions of the image.",
     "Do not explain the joke, add hashtags, add quotation marks, mention X, or invent brand voice.",
   ].join(" ");
 }
@@ -344,11 +349,14 @@ Rules:
 - Use only the listed region ids.
 - Write text meant to be placed directly on the image, not a tweet reply sentence.
 - At least one region must include a concrete term from the post unless it would make the joke worse.
-- Default to 2-5 words per region. Use fewer words for small or side-label regions.
+- Default to 1-5 words per region. Use fewer words for small or side-label regions.
 - Preserve the template's contrast or escalation. Do not make every region say the same thing.
 - Make setup regions understandable and make punchline/verdict/reveal regions do the turn.
+- Punchline regions should contain the funniest turn, not a neutral restatement.
+- If a region is a character/object label, use a compact noun phrase. If it is a reaction/punchline, use a compact human-sounding reaction.
 - Avoid copying the good examples; use them only for structure.
 - Do not follow the avoid_examples.
+- Do not write captions that sound like documentation, analysis, moral judgment, or a content moderation note.
 - Never exceed max_chars.
 - If a region cannot add to the joke, use the shortest useful label rather than filler.
 - Return JSON only:
@@ -376,6 +384,31 @@ function fallbackCaptions(
   }
 
   return isCaptionSetAcceptable(result, template, tweetText, context, true) ? result : null;
+}
+
+function guaranteedFallbackCaptions(
+  tweetText: string,
+  context: TweetContext,
+  template: MemeTemplate
+): Record<string, string> | null {
+  if (!USE_CONTEXTUAL_FALLBACK) return null;
+
+  const subject = pickSubject(tweetText, context);
+  const contrast = pickContrast(context, subject);
+  const result: Record<string, string> = {};
+
+  for (const region of template.regions) {
+    const roleText = shouldUseContrast(region.id, region.role) ? contrast : subject;
+    const text =
+      fallbackTextForRegion(template.template_id, region.id, region.role, subject, contrast) ||
+      roleText ||
+      context.joke_target ||
+      "reaction";
+    const sanitized = sanitizeText(text, region.max_chars);
+    if (sanitized) result[region.id] = sanitized;
+  }
+
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 function cleanGeneratedRegions(
@@ -666,7 +699,7 @@ function textTransform(template: MemeTemplate): "uppercase" | "mocking" | "none"
 }
 
 function cacheKey(tweetText: string, template: MemeTemplate): string {
-  return `${normalizeTweet(tweetText)}|template:${template.template_id}|provider:openrouter|model:${QWEN_PLUS_MODEL}|v2`;
+  return `${normalizeTweet(tweetText)}|template:${template.template_id}|provider:openrouter|model:${QWEN_PLUS_MODEL}|v3`;
 }
 
 function readCache(key: string): Record<string, string> | null {

@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS usage_events (
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   user_meme_id uuid REFERENCES user_memes(id) ON DELETE SET NULL,
   global_meme_id uuid REFERENCES memes(id) ON DELETE SET NULL,
-  action text NOT NULL CHECK (action IN ('suggested', 'used', 'dismissed')),
+  action text NOT NULL CHECK (action IN ('suggested', 'shown', 'clicked', 'used', 'inserted', 'saved', 'dismissed')),
   tweet_context jsonb NOT NULL DEFAULT '{}',
   created_at timestamptz NOT NULL DEFAULT now()
 );

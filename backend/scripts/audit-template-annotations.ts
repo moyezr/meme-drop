@@ -1,4 +1,5 @@
 import generatedManifest from "../../shared/src/data/meme-template-manifest.generated.json";
+import promotedManifest from "../../shared/src/data/meme-template-manifest.promoted.json";
 import {
   MEME_TEMPLATE_MANIFEST,
   type MemeTemplate,
@@ -29,12 +30,17 @@ const scope = args.scope === "all" ? "all" : "verified";
 function main() {
   const allTemplates = [
     ...MEME_TEMPLATE_MANIFEST.templates,
+    ...(promotedManifest.templates as MemeTemplate[]),
     ...(generatedManifest.templates as MemeTemplate[]),
+  ];
+  const runtimeTemplates = [
+    ...MEME_TEMPLATE_MANIFEST.templates,
+    ...(promotedManifest.templates as MemeTemplate[]),
   ];
   const templates =
     scope === "all"
       ? allTemplates
-      : MEME_TEMPLATE_MANIFEST.templates.filter(
+      : runtimeTemplates.filter(
           (template) => template.quality === "verified" && template.supports_overlay
         );
   const findings: Finding[] = [];

@@ -110,6 +110,15 @@ async function handleSaveClick(btn: HTMLDivElement) {
           <polyline points="20 6 9 17 4 12"/>
         </svg>
       `;
+      chrome.runtime.sendMessage({
+        type: "LOG_USAGE",
+        payload: {
+          meme_id: response.meme.id,
+          action: "saved",
+          source: "user",
+          tweet_context: {},
+        },
+      });
     } else {
       showToast("Meme saved!", "success");
     }

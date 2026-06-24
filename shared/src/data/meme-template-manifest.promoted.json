@@ -1,0 +1,355 @@
+{
+  "version": 1,
+  "generated_at": "2026-06-20T08:42:17.710Z",
+  "source_review": {
+    "file": ".memedrop/template-review-decisions.json",
+    "reviewed_at": "2026-06-20T08:38:26.427Z",
+    "reviewer": "meme-taste-review",
+    "approved_count": 4
+  },
+  "templates": [
+    {
+      "template_id": "absolute-cinema",
+      "meme_id": "b2066d32-a91f-4a01-b9d4-0828234e05f7",
+      "name": "Absolute Cinema",
+      "aliases": [
+        "Absolute Cinema"
+      ],
+      "source_image": "/memes/seed-absolute-cinema-50ba416b.png",
+      "image_width": 936,
+      "image_height": 725,
+      "image_aspect_ratio": 1.291,
+      "supports_overlay": true,
+      "quality": "verified",
+      "regions": [
+        {
+          "id": "top_left_caption",
+          "role": "setup or reaction label",
+          "x": 0.02,
+          "y": 0.02,
+          "width": 0.22,
+          "height": 0.16,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use only the empty sky area; keep clear of the raised left hand."
+        },
+        {
+          "id": "top_right_caption",
+          "role": "setup or reaction label",
+          "x": 0.76,
+          "y": 0.02,
+          "width": 0.22,
+          "height": 0.16,
+          "align": "right",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 18,
+          "font": {
+            "family": "Impact",
+            "min_size": 28,
+            "max_size": 44,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use only the empty sky area; keep clear of the raised right hand."
+        },
+        {
+          "id": "bottom_center_punchline",
+          "role": "punchline or verdict",
+          "x": 0.18,
+          "y": 0.8,
+          "width": 0.64,
+          "height": 0.16,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 30,
+            "max_size": 48,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place over the dark lower area; avoid the chair arms and torso edges."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use this for sarcastically over-explaining something obviously low-effort, terrible, or silly as if it has profound artistic depth. The joke is pretentious analysis applied to something that clearly does not deserve it.",
+        "good_examples": [
+          {
+            "top_left_caption": "4 PIXEL JPEG",
+            "top_right_caption": "MODERN ART",
+            "bottom_center_punchline": "ABSOLUTE CINEMA"
+          },
+          {
+            "top_left_caption": "BOILED CHICKEN",
+            "top_right_caption": "MINIMALISM",
+            "bottom_center_punchline": "A MASTERPIECE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_left_caption": "A GENUINELY GOOD FILM",
+            "bottom_center_punchline": "THIS IS BAD ACTUALLY"
+          },
+          {
+            "bottom_center_punchline": "A LONG ESSAY EXPLAINING WHY THE ARTWORK HAS DEEP HISTORICAL VALUE"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "disaster-girl",
+      "meme_id": "0c67e99e-a57c-4b50-8a58-3230ca623d0c",
+      "name": "Disaster Girl",
+      "aliases": [
+        "Disaster Girl"
+      ],
+      "source_image": "/memes/seed-disaster-girl-ac6d1b2e.jpg",
+      "image_width": 500,
+      "image_height": 375,
+      "image_aspect_ratio": 1.3333,
+      "supports_overlay": true,
+      "quality": "verified",
+      "regions": [
+        {
+          "id": "top_caption",
+          "role": "setup",
+          "x": 0.06,
+          "y": 0.02,
+          "width": 0.88,
+          "height": 0.18,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 42,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use for the ironic setup or situation description; keep clear of smoke and the girl's head."
+        },
+        {
+          "id": "bottom_caption",
+          "role": "punchline",
+          "x": 0.04,
+          "y": 0.78,
+          "width": 0.92,
+          "height": 0.2,
+          "align": "center",
+          "valign": "bottom",
+          "max_lines": 2,
+          "max_chars": 48,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use for the punchline or self-satisfied twist; avoid covering the girl's face and the foreground road."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use this when a small mistake, sabotage, or reckless action causes chaos and the subject looks quietly proud or unbothered by the damage. Avoid sincere tragedy or real harm.",
+        "good_examples": [
+          {
+            "top_caption": "GROUP PROJECT COLLAPSES",
+            "bottom_caption": "I SENT THE WRONG FILE"
+          },
+          {
+            "top_caption": "PROD IS ON FIRE",
+            "bottom_caption": "MY ONE LINE CHANGE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_caption": "A REAL EMERGENCY WITH PEOPLE HURT"
+          },
+          {
+            "bottom_caption": "A LONG APOLOGY EXPLAINING EVERY DETAIL"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "spider-man-triple",
+      "meme_id": "b2ade262-af6c-4395-ab41-0796aaaa1575",
+      "name": "Spider Man Triple",
+      "aliases": [
+        "Spider Man Triple"
+      ],
+      "source_image": "/memes/seed-spider-man-triple-10afab8b.jpg",
+      "image_width": 600,
+      "image_height": 551,
+      "image_aspect_ratio": 1.0889,
+      "supports_overlay": true,
+      "quality": "verified",
+      "regions": [
+        {
+          "id": "left_spider_man",
+          "role": "first accusation / initial blame",
+          "x": 0,
+          "y": 0,
+          "width": 0.34,
+          "height": 0.62,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Place in the open left side above and around the left Spider-Man, avoiding the face and body."
+        },
+        {
+          "id": "center_spider_man",
+          "role": "counterpoint / middle accusation",
+          "x": 0.34,
+          "y": 0,
+          "width": 0.34,
+          "height": 0.58,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Use the upper middle area; keep text clear of the central Spider-Man's head and pointing arms."
+        },
+        {
+          "id": "right_spider_man",
+          "role": "final accusation / punchline target",
+          "x": 0.66,
+          "y": 0,
+          "width": 0.34,
+          "height": 0.62,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 3,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 40,
+            "stroke_ratio": 0.12
+          },
+          "notes": "Best placed in the upper-right open space; avoid the right Spider-Man and the crate."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use this for pointless internet arguments, tribal debates, or hypocrisy where multiple sides accuse each other while being nearly the same. Avoid serious moral issues where false equivalence would feel wrong.",
+        "good_examples": [
+          {
+            "left_spider_man": "DARK MODE USERS",
+            "center_spider_man": "LIGHT MODE USERS",
+            "right_spider_man": "AUTO THEME USERS"
+          },
+          {
+            "left_spider_man": "IPHONE PEOPLE",
+            "center_spider_man": "ANDROID PEOPLE",
+            "right_spider_man": "BOTH NEED CHARGERS"
+          }
+        ],
+        "bad_examples": [
+          {
+            "left_spider_man": "A SERIOUS ETHICAL ISSUE"
+          },
+          {
+            "right_spider_man": "A LONG SENTENCE THAT TURNS THE MEME INTO AN ESSAY"
+          }
+        ]
+      }
+    },
+    {
+      "template_id": "squidward-window",
+      "meme_id": "efd1da84-70d5-4580-abcc-a064ee690ece",
+      "name": "Squidward window",
+      "aliases": [
+        "Squidward window"
+      ],
+      "source_image": "/memes/seed-squidward-window-578c7b4a.jpg",
+      "image_width": 598,
+      "image_height": 420,
+      "image_aspect_ratio": 1.4238,
+      "supports_overlay": true,
+      "quality": "verified",
+      "regions": [
+        {
+          "id": "top_reaction_caption",
+          "role": "setup or reaction text describing Squidward's viewpoint",
+          "x": 0.03,
+          "y": 0.03,
+          "width": 0.42,
+          "height": 0.22,
+          "align": "left",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 28,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Use the dark upper-left area; keep text away from Squidward's head silhouette."
+        },
+        {
+          "id": "right_window_caption",
+          "role": "punchline or contrasting text about what Squidward sees",
+          "x": 0.56,
+          "y": 0.06,
+          "width": 0.38,
+          "height": 0.24,
+          "align": "center",
+          "valign": "top",
+          "max_lines": 2,
+          "max_chars": 30,
+          "font": {
+            "family": "Impact",
+            "min_size": 22,
+            "max_size": 34,
+            "stroke_ratio": 0.14
+          },
+          "notes": "Place in the open window area above/around the characters, avoiding faces and the horizontal blinds."
+        }
+      ],
+      "caption_guidance": {
+        "pattern": "Use this when someone is stuck watching other people have fun, make noise, or create chaos nearby. The left side is the annoyed observer; the window side is the loud or fun thing they resent.",
+        "good_examples": [
+          {
+            "top_reaction_caption": "ME AT 1AM",
+            "right_window_caption": "NEIGHBORS DISCOVER BASS"
+          },
+          {
+            "top_reaction_caption": "TRYING TO RELAX",
+            "right_window_caption": "GROUP CHAT GOES LIVE"
+          }
+        ],
+        "bad_examples": [
+          {
+            "top_reaction_caption": "A NORMAL QUIET EVENING"
+          },
+          {
+            "right_window_caption": "A LONG PARAGRAPH ABOUT NOISE RULES AND TENANT POLICY"
+          }
+        ]
+      }
+    }
+  ]
+}

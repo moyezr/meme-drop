@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import generatedManifest from "../../shared/src/data/meme-template-manifest.generated.json";
+import promotedManifest from "../../shared/src/data/meme-template-manifest.promoted.json";
 import {
   MEME_TEMPLATE_MANIFEST,
   normalizeTemplateName,
@@ -33,6 +34,11 @@ function main() {
   };
   const expectedCounts = expectedMemeCounts(benchmark.cases);
   const verifiedIds = new Set(MEME_TEMPLATE_MANIFEST.templates.map((template) => template.template_id));
+  for (const template of promotedManifest.templates as MemeTemplate[]) {
+    if (template.supports_overlay && template.quality === "verified") {
+      verifiedIds.add(template.template_id);
+    }
+  }
   const generated = generatedManifest.templates as MemeTemplate[];
 
   const queue = generated
@@ -51,7 +57,10 @@ function main() {
         promotion_notes: promotionNotes(template, expectedHits, hasVerifiedDuplicate, visualWarnings),
       };
     })
-    .filter((item) => item.expected_hits > 0 || item.visual_warnings.length > 0)
+    .filter((item) => {
+      if (!args["include-duplicates"] && item.has_verified_duplicate) return false;
+      return item.expected_hits > 0 || item.visual_warnings.length > 0;
+    })
     .sort((a, b) => {
       const priorityA = priorityScore(a);
       const priorityB = priorityScore(b);
@@ -60,10 +69,16 @@ function main() {
 
   if (args.json) {
     console.log(JSON.stringify({ generated_at: new Date().toISOString(), queue }, null, 2));
+    if (args["fail-on-items"] && queue.length > 0) {
+      process.exitCode = 1;
+    }
     return;
   }
 
   printQueue(queue, Number(args.limit || 40));
+  if (args["fail-on-items"] && queue.length > 0) {
+    process.exitCode = 1;
+  }
 }
 
 function expectedMemeCounts(cases: BenchmarkCase[]): Map<string, number> {
@@ -211,6 +226,9 @@ function approximateImpactWidth(text: string, fontSize: number): number {
 
 function printQueue(queue: QueueItem[], limit: number) {
   console.log(`MemeDrop template review queue: ${queue.length} templates needing benchmark or visual review`);
+  if (!args["include-duplicates"]) {
+    console.log("Verified duplicates hidden; pass --include-duplicates to compare generated alternatives.");
+  }
   for (const item of queue.slice(0, limit)) {
     const duplicate = item.has_verified_duplicate ? "verified-duplicate" : "new";
     console.log(

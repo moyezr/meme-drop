@@ -1,7 +1,10 @@
 import {
   analyzeTweet,
+  heuristicTweetContext,
   type TweetContext,
 } from "./context-analyzer.js";
+import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { generateEmbedding } from "./embedding.js";
 import { buildTweetDescriptor } from "./descriptor.js";
 import {
@@ -16,8 +19,7 @@ import { buildTailoredOverlays, type MemeTextOverlay } from "./meme-text.js";
 import { db } from "../db/index.js";
 import { memes } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-
-const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
+import { DEV_USER_ID } from "../routes/identity.js";
 
 const SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SUGGESTION_CACHE_MAX = 200;
@@ -27,7 +29,8 @@ const EMBEDDING_TIMEOUT_MS = Number(process.env.MEMEDROP_EMBEDDING_TIMEOUT_MS ||
 const DEFAULT_CANDIDATE_POOL_MULTIPLIER = 3;
 const DEFAULT_RERANK_POOL_MULTIPLIER = 2;
 const MAX_CANDIDATE_POOL_SIZE = 30;
-const SUGGESTION_LOG_MODE = process.env.MEMEDROP_SUGGESTION_LOGS || "pretty";
+const SUGGESTION_LOG_MODE = process.env.MEMEDROP_SUGGESTION_LOGS || (process.env.NODE_ENV === "production" ? "compact" : "pretty");
+const FAST_ANALYSIS_MODE = process.env.MEMEDROP_FAST_ANALYSIS || "heuristic";
 
 interface CacheEntry {
   result: SuggestionResult[];
@@ -86,6 +89,7 @@ export interface SuggestionOptions {
   refresh?: boolean;
   cacheKey?: string;
   mode?: "fast" | "smart";
+  userId?: string;
 }
 
 /**
@@ -106,18 +110,19 @@ export async function getSuggestions(
 ): Promise<SuggestionResult[]> {
   const limit = normalizeLimit(options.limit);
   const mode = normalizeSuggestionMode(options.mode);
-  const cacheKey = `${options.cacheKey || `text:${normalizeCacheKey(tweetText)}`}|limit:${limit}|mode:${mode}`;
+  const userId = options.userId || DEV_USER_ID;
+  const cacheKey = `user:${userId}|${options.cacheKey || `text:${normalizeCacheKey(tweetText)}`}|limit:${limit}|mode:${mode}`;
   if (!options.refresh) {
     const cached = readCache(cacheKey);
     if (cached) return cached;
   }
 
-  const startedAtMs = Date.now();
+  const startedAtMs = performance.now();
   const timings: Array<{ label: string; ms: number }> = [];
   let stageStartedAtMs = startedAtMs;
   const markStage = (label: string) => {
-    const nowMs = Date.now();
-    timings.push({ label, ms: Math.max(0, nowMs - stageStartedAtMs) });
+    const nowMs = performance.now();
+    timings.push({ label, ms: Math.max(0, Math.round(nowMs - stageStartedAtMs)) });
     stageStartedAtMs = nowMs;
   };
   const candidatePoolSize = candidatePoolSizeForLimit(limit);
@@ -125,9 +130,9 @@ export async function getSuggestions(
 
   // Prefs don't depend on the tweet, so start them up front and let them
   // overlap with the (serial) LLM + embed + retrieve chain.
-  const prefsPromise = loadUserPreferences(DEV_USER_ID);
+  const prefsPromise = loadUserPreferences(userId);
 
-  const context = await analyzeTweet(tweetText);
+  const context = await analyzeTweetForMode(tweetText, mode);
   markStage("analyze");
 
   const descriptor = buildTweetDescriptor({
@@ -150,15 +155,15 @@ export async function getSuggestions(
 
   const [candidates, prefs] = await Promise.all([
     queryEmbedding && isUsableEmbedding(queryEmbedding)
-      ? retrieveCandidates({
-          userId: DEV_USER_ID,
+        ? retrieveCandidates({
+          userId,
           queryEmbedding,
           userLimit: 0,
           globalLimit: candidatePoolSize,
           source: "global",
         })
       : retrieveFallbackCandidates({
-          userId: DEV_USER_ID,
+          userId,
           userLimit: 0,
           globalLimit: candidatePoolSize,
           source: "global",
@@ -245,7 +250,7 @@ export async function getSuggestions(
   const overlays = await buildTailoredOverlays(tweetText, context, diversified);
   markStage("captions");
   const stageTotalMs = sumTimings(timings);
-  const wallMs = Math.max(0, Date.now() - startedAtMs);
+  const wallMs = Math.max(0, Math.round(performance.now() - startedAtMs));
 
   const result: SuggestionResult[] = diversified.map((c) => ({
     meme_id: c.meme_id,
@@ -324,6 +329,17 @@ function normalizeSuggestionMode(mode: SuggestionOptions["mode"]): "fast" | "sma
   return process.env.MEMEDROP_SUGGESTION_MODE === "fast" ? "fast" : "smart";
 }
 
+function analyzeTweetForMode(
+  tweetText: string,
+  mode: "fast" | "smart"
+): Promise<TweetContext> | TweetContext {
+  if (mode === "fast" && FAST_ANALYSIS_MODE !== "llm") {
+    return heuristicTweetContext(tweetText);
+  }
+
+  return analyzeTweet(tweetText);
+}
+
 function candidatePoolSizeForLimit(limit: number): number {
   const configured = parsePositiveInt(process.env.MEMEDROP_CANDIDATE_POOL_SIZE);
   if (configured) return Math.max(limit, Math.min(MAX_CANDIDATE_POOL_SIZE, configured));
@@ -377,7 +393,7 @@ function logSuggestionPipeline(input: {
     const driftText =
       Math.abs(input.wallMs - input.totalMs) > 1000 ? ` wall=${input.wallMs}ms` : "";
     console.log(
-      `[MemeDrop] suggestions cache=${input.cacheKey} total=${input.totalMs}ms ` +
+      `[MemeDrop] suggestions cache=${safeLogCacheKey(input.cacheKey)} total=${input.totalMs}ms ` +
         `stages=${compactTimingText(input.timings)}${driftText} ` +
         `mode=${input.mode} ` +
         `limit=${input.limit} retrieved=${input.retrievedCount}/${input.candidatePoolSize} ` +
@@ -399,10 +415,10 @@ function logSuggestionPipeline(input: {
   console.log(`
 [MemeDrop] Suggestion pipeline
 --------------------------------
-cache      ${input.cacheKey}
+cache      ${safeLogCacheKey(input.cacheKey)}
 total      ${input.totalMs}ms
 wall       ${input.wallMs}ms
-tweet      ${previewLogText(input.tweetText)}
+tweet      ${safeLogTweetText(input.tweetText)}
 context    ${input.context.intent} / ${input.context.tone} / ${input.context.topic}
 mode       ${input.mode}
 
@@ -423,6 +439,25 @@ ${resultText}
 
 function compactTimingText(timings: Array<{ label: string; ms: number }>): string {
   return timings.map((item) => `${item.label}:${item.ms}`).join(",");
+}
+
+export function safeLogCacheKey(cacheKey: string): string {
+  return `sha256:${createHash("sha256").update(cacheKey).digest("hex").slice(0, 16)}`;
+}
+
+export function safeLogTweetText(text: string): string {
+  const mode = suggestionLogTextMode();
+  if (mode === "full") return text.trim().replace(/\s+/g, " ");
+  if (mode === "preview") return previewLogText(text);
+  return `[redacted:${createHash("sha256").update(text).digest("hex").slice(0, 12)}]`;
+}
+
+function suggestionLogTextMode(): "full" | "preview" | "redacted" {
+  const configured = process.env.MEMEDROP_SUGGESTION_LOG_TEXT;
+  if (configured === "full" || configured === "preview" || configured === "redacted") {
+    return configured;
+  }
+  return process.env.NODE_ENV === "production" ? "redacted" : "preview";
 }
 
 function scoreCandidate(

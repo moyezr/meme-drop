@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-06-20T08:38:26.427Z",
+  "reviewer": "meme-taste-review",
+  "decisions": [
+    {
+      "template_id": "absolute-cinema",
+      "status": "approved",
+      "benchmark_case_id": "absolute-cinema-fit",
+      "notes": "Taste score: 5/5. Best fit: When you're over-explaining something ridiculously basic or low-effort as if it's profound (e.g., \"This 4-pixel JPEG of a stick figure is actually art because it subverts expectations of traditional form\" or \"This unseasoned boiled chicken is actually art — it's a commentary on minimalism\").\nPerfect for mocking pretentious art snobs, modern art critics, or people who defend terrible movies/games/music with long-winded \"deeper meaning\" essays.\nWorks great in group chats when someone posts a shitpost and another person replies with a 500-word essay about its genius.\nThe exasperated \"teacher explaining to idiots\" energy of the old man makes it hit hard when you're being sarcastic about something that clearly isn't art. Bad fit: When the thing actually is good/high-effort art or has legitimate depth — using it then just makes you look like a cynical edgelord who can't appreciate anything beyond surface level.\nWhen applied to genuinely groundbreaking or technically impressive work (e.g., mocking someone explaining why a Banksy piece or a well-crafted film scene works).\nLoses its punch if overused on things that are obviously jokes or memes themselves — it becomes the \"it's just a prank bro\" defense in reverse.\nThe template implies the explainer is always wrong/delusional, but sometimes people are correctly pointing out artistic merit that others miss."
+    },
+    {
+      "template_id": "american-chopper-argument",
+      "status": "needs_work",
+      "benchmark_case_id": "american-chopper-argument-fit",
+      "notes": "Taste score: 3/5. Best fit: Perfect for workplace/project drama where someone promised something would be \"easy\" or \"quick,\" but it turned into a complete disaster.\nCaptures the exact energy of technical arguments, code reviews, or home renovation projects that spiral out of control.\nThe rapid escalation from calm pointing → yelling → throwing hands → full physical chaos is hilarious, especially when the final \"THEN WHY IS IT STILL BROKEN?\" is delivered like an absolute mic drop.\nGreat for software engineers, contractors, mechanics, or anyone who's ever heard \"It should be a 5-minute fix\" only for it to consume an entire weekend. Bad fit: When the person who said it was \"easy\" was actually right, and the other person is just incompetent or bad at the task (the meme puts all blame on the \"easy\" claimer).\nIf used in situations where the project really was straightforward and the complainer is just making excuses.\nOver-applied to minor issues — not every disagreement needs to escalate to cartoonish violence.\nThe final panel (\"THEN WHY IS IT STILL BROKEN?\") assumes the original claim was false, but sometimes things break for unrelated reasons, or external factors changed the scope.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    },
+    {
+      "template_id": "batman-slapping-robin",
+      "status": "needs_work",
+      "benchmark_case_id": "batman-slapping-robin-fit",
+      "notes": "Taste score: 4/5. Best fit: When someone is overconfident about a plan/idea that has an obvious, glaring flaw (especially something basic like forgetting the exit, backup, or escape route).\nIdeal for roasting friends, coworkers, or yourself when you present something as \"perfect\" only for someone to immediately point out a critical hole.\nWorks amazingly in gaming, D&D sessions, business meetings, heist planning jokes, or software deployment talks (\"This deploy script is flawless\" → \"You forgot to handle the database migration\").\nThe dramatic Batman slap adds perfect physical comedy to the intellectual \"gotcha\" moment. Bad fit: When the correction is actually wrong or pedantic (Robin is mistaken, and the plan really was solid).\nIf used to shut down valid criticism by framing it as an annoying interruption instead of useful feedback.\nLoses power when applied to complex plans where the \"forgotten exit\" isn't actually a flaw, or when the critic is just being a contrarian.\nCan backfire in real team situations by discouraging people from speaking up about legitimate issues.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    },
+    {
+      "template_id": "clown-applying-makeup",
+      "status": "needs_work",
+      "benchmark_case_id": "clown-applying-makeup-fit",
+      "notes": "Taste score: 4/5. Best fit: Perfect for situations where you say \"just one quick fix\" or \"one tiny touch-up\" and it spirals into a complete disaster/overhaul (editing photos, code \"refactoring,\" makeup, home repairs, \"I'll just quickly respond to this email,\" etc.).\nCaptures the \"scope creep\" feeling brilliantly — whether it's design work, DIY projects, cooking (\"just a little seasoning\"), or gaming (\"one more match\").\nThe visual progression from normal → slight makeup → full circus clown is extremely relatable and hilarious. Bad fit: When the single fix actually works perfectly and doesn't lead to further changes (the meme assumes inevitable failure/escalation).\nIf you're the kind of person with strong self-control who really can stop at \"just one touch-up.\"\nLoses impact when applied to things that genuinely need a full transformation or complete rework (sometimes going all-in is the correct move).\nCan feel defeatist if overused — not every small change ruins everything. The captions should be there in all the four stages of clown making and should they should have a samller font size.",
+      "issues": [
+        "The captions should be there in all the four stages of clown making and should they should have a samller font size."
+      ]
+    },
+    {
+      "template_id": "disaster-girl",
+      "status": "approved",
+      "benchmark_case_id": "disaster-girl-fit",
+      "notes": "Taste score: 5/5. Best fit: When a tiny, innocent mistake causes absolute chaos and destruction for everyone else (especially in group projects, work, or shared tasks).\nPerfect for \"I sent the wrong version/file\" moments, \"replied all\" email disasters, or accidentally deleting the shared drive.\nThe smug/slightly proud smile on the girl’s face while everything burns behind her is comedy gold — it captures that \"oops... well, not my problem now\" energy.\nWorks great for school assignments, office presentations, game night plans, or any collaborative effort that implodes spectacularly. Bad fit: When the mistake was genuinely catastrophic and people got seriously hurt (professionally or emotionally) — the meme trivializes real damage.\nIf the person actually owns up and fixes it instead of just smirking while everything burns.\nLoses power when the error was avoidable with basic care (sometimes it's not \"cute chaos,\" it's just negligence).\nCan be tone-deaf in high-stakes environments where one wrong file could have legal/financial consequences."
+    },
+    {
+      "template_id": "finding-neverland",
+      "status": "needs_work",
+      "benchmark_case_id": "finding-neverland-fit",
+      "notes": "Taste score: 4/5. Best fit: Captures the wild emotional swings of group chats perfectly: one message causes drama/tears → instant judgment from the group → everything is forgiven the moment someone brings snacks/food.\nExcellent for office Slack/WhatsApp groups, friend circles, or family chats where arguments escalate quickly but get resolved by something trivial like \"I'll bring pizza.\"\nThe contrast between the boy's devastated face → Leo's cold judgment → sudden wholesome hug is peak comedy.\nWorks especially well when the \"snacks\" person is the one who started or fueled the drama in the first place. Bad fit: When the group chat issue is actually serious (e.g., involving real betrayal, harassment, or important decisions) — reducing it to \"just bring snacks\" is tone-deaf.\nIf the judgment/reaction was completely justified and snacks don't magically fix underlying problems.\nOverusing it can minimize legitimate conflicts in real relationships or teams.\nThe template assumes snacks = instant forgiveness, which doesn't work when people are genuinely hurt or trust is broken.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    },
+    {
+      "template_id": "flex-tape",
+      "status": "needs_work",
+      "benchmark_case_id": "flex-tape-fit",
+      "notes": "Taste score: 4/5. Best fit: Perfect for \"temporary\" fixes that turn into ridiculous, over-engineered hacks (duct tape, zip ties, gum, etc.).\nGreat for DIY disasters, car repairs, home plumbing, software \"band-aid\" solutions, or workplace MacGyver moments.\nThe contrast between the dramatic water explosion (\"temporary leak\") and casually slapping on an absurd amount of tape captures that proud \"I fixed it\" energy perfectly.\nRelatable for engineers, rednecks, college students, and anyone who's ever said \"I'll just patch it real quick.\" Bad fit: When the proper, permanent fix was actually easy and you made things worse by using tape (sometimes \"14 feet of tape\" just delays a bigger problem).\nIn situations where using a proper solution is critical for safety (electrical, gas, structural issues) — glorifying tape can be dangerous.\nLoses humor when the \"fix\" clearly fails or causes more damage long-term.\nCan promote bad habits instead of encouraging people to do things correctly.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    },
+    {
+      "template_id": "grandma-finds-the-internet",
+      "status": "needs_work",
+      "benchmark_case_id": "grandma-finds-the-internet-fit",
+      "notes": "Taste score: 3/5. Best fit: When an older relative (or anyone new to tech) learns the absolute basics and suddenly acts like a world-class expert.\nPerfect for situations where Grandma forwards chain emails, gives terrible tech advice (\"Did you try turning it off and on again?\"), or confidently explains concepts she barely understands.\nCaptures that sweet spot of newfound confidence after discovering Google, Facebook, or ChatGPT — the glasses-adjusting pose sells the \"I've cracked the code\" energy.\nWorks well in family group chats or when older people start \"helping\" with printers, passwords, or \"the Facebooks.\" Bad fit: When the grandma (or older person) is actually quite competent with technology — many older adults are very tech-savvy.\nIt can come off as ageist if overused, painting all older people as clueless when plenty are ahead of the curve.\nLoses its bite when the \"expert\" advice is actually correct or helpful.\nSometimes that enthusiasm is wholesome and should be encouraged rather than mocked.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    },
+    {
+      "template_id": "grim-reaper-knocking-door",
+      "status": "needs_work",
+      "benchmark_case_id": "grim-reaper-knocking-door-fit",
+      "notes": "Taste score: 5/5. Best fit: When you're dodging responsibility (especially rent, bills, or deadlines) and the consequences are finally at your door.\nPeak relatable humor for renters, students, or anyone living that \"I'll pay next week\" lifestyle.\nThe bloody scythe + casual knocking perfectly exaggerates the anxiety of seeing \"Landlord\" pop up on your phone or hearing a knock.\nWorks great with other authority figures too (boss, bank, professor, etc.). Bad fit: When missing rent has real serious consequences (eviction, ruined credit, stress for the landlord) — it trivializes a genuinely bad situation.\nIf you're financially stable and just being irresponsible (the meme makes it look like a silly cartoon instead of poor planning).\nCan be in poor taste if used by people who are actually struggling and using humor to cope, but glorifies the behavior.\nNot every landlord is the Grim Reaper — some are reasonable, and the meme assumes malice. Again, there should captions text on all four doors with smaller font sizes that give more context to the meme.",
+      "issues": [
+        "Again, there should captions text on all four doors with smaller font sizes that give more context to the meme."
+      ]
+    },
+    {
+      "template_id": "gus-fring-we-are-not-the-same",
+      "status": "needs_work",
+      "benchmark_case_id": "gus-fring-we-are-not-the-same-fit",
+      "notes": "Taste score: 3/5. Best fit: When you claim to have your life together (organized, productive, on top of things) but your physical space — especially your desk — is pure chaos (papers everywhere, empty cups, mystery cables, sticky notes from 2023).\nExcellent for creatives, programmers, students, or anyone whose \"organized chaos\" system only makes sense to them.\nGiancarlo Esposito’s intense, dead-serious stare sells the denial perfectly. It’s the visual embodiment of “I know where everything is” while a forensics team would need weeks to process your workspace. Bad fit: When your desk (and life) actually is organized — the meme assumes everyone’s workspace is a disaster.\nIf applied to people who genuinely struggle with organization and are trying to improve (can feel discouraging).\nLoses impact when the mess has crossed into unhygienic or functionally impairing territory (then it’s not funny, it’s a problem).\nSometimes the “crime scene” desk actually reflects high productivity and creativity.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    },
+    {
+      "template_id": "i-m-the-captain-now",
+      "status": "needs_work",
+      "benchmark_case_id": "i-m-the-captain-now-fit",
+      "notes": "Taste score: 4/5. Best fit: When a group project, team effort, or collaborative plan completely falls apart and someone (usually you) dramatically steps up to take control.\nPerfect for the moment everyone is panicking or arguing and one person says “Fine, I’ll do it myself” or seizes leadership.\nThe intense stare + “I’m the captain now” line fits beautifully with that mix of reluctance and power fantasy when you finally snap and take over.\nWorks great in school projects, work teams, friend group vacations, D&D campaigns, or any situation where leadership vacuums appear. Bad fit: When the person taking over is not actually qualified and just makes things worse (the meme implies they’re the savior).\nIf used to justify bossy or controlling behavior instead of genuine leadership.\nIn real crises, declaring yourself “captain” can come across as arrogant rather than helpful.\nDoesn’t fit when the group already has a designated leader or when collaboration is still possible.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    },
+    {
+      "template_id": "left-exit-12-off-ramp",
+      "status": "needs_work",
+      "benchmark_case_id": "left-exit-12-off-ramp-fit",
+      "notes": "Taste score: 4/5. Best fit: When you know exactly what the smart/logical choice is... but your brain (or impulse control) decides to do the complete opposite in spectacular fashion.\nPerfect for ADHD moments, self-sabotage, bad decisions, or “I saw the exit but kept driving anyway” energy.\nThe contrast between the clear, well-marked sign and the car aggressively drifting the wrong way is excellent visual comedy.\nRelatable in many areas: diet (“I’ll eat healthy” → ordering fries), productivity, relationships, shopping, etc. Bad fit: When the “illogical” choice actually turns out better (sometimes taking the scenic route or breaking routine is the right move).\nIn genuinely dangerous situations (the meme glamorizes reckless driving, which can be harmful to promote).\nIf overused, it can normalize bad decision-making instead of encouraging growth or discipline.\nDoesn’t apply well when there are real stakes (safety, finances, relationships) where the logical decision is non-negotiable. This one should also have two caption texts, one at the straight upwards arrow and the other at the right direction arrow on the billboard. Then one at the car.",
+      "issues": [
+        "This one should also have two caption texts, one at the straight upwards arrow and the other at the right direction arrow on the billboard. Then one at the car."
+      ]
+    },
+    {
+      "template_id": "sleeping-shaq",
+      "status": "needs_work",
+      "benchmark_case_id": "sleeping-shaq-fit",
+      "notes": "Taste score: 5/5. Best fit: Perfectly captures the universal employee experience: completely checked out and sleepy during actual work hours, but instantly energized the second money hits the account.\nThe extreme contrast between peaceful sleeping Shaq and glowing-eyes “real shit?” Shaq is comedy gold.\nWorks for anyone living paycheck to paycheck, or even well-paid people who still get that dopamine hit when salary drops.\nGreat for corporate/office humor, remote workers, or anyone pretending to look busy until Friday. Bad fit: When someone actually loves their job and stays motivated regardless of payday (the meme assumes everyone hates working).\nIn high-paying or passion-driven careers where work itself is rewarding.\nCan feel defeatist or discouraging if it normalizes being disengaged at work instead of seeking better alignment or boundaries.\nOversimplifies complex motivations — some people are driven by purpose, growth, or recognition more than just money. The caption texts are misplaced, they should be placed on the left white blank area.",
+      "issues": [
+        "The caption texts are misplaced, they should be placed on the left white blank area."
+      ]
+    },
+    {
+      "template_id": "spider-man-triple",
+      "status": "approved",
+      "benchmark_case_id": "spider-man-triple-fit",
+      "notes": "Taste score: 4/5. Best fit: Ideal for pointless internet arguments or tribal debates where both sides aggressively point fingers at each other (dark mode vs light mode, pineapple on pizza, team Android vs iPhone, etc.).\nThe three-panel escalation works great: two sides fighting → surprise third party (or the same person) delivering the final gotcha/punchline.\nPerfect format for self-deprecating humor or calling out hypocrisy when the accuser is guilty of the same thing.\nVery versatile for fandom wars, tech preferences, or any “my way is superior” nonsense. Bad fit: When the debate actually has objective merit or serious consequences (the meme reduces everything to silly finger-pointing).\nIf used to dismiss valid criticism or moral arguments by framing them as childish “everyone sucks” relativism.\nLoses impact when overused — the template has been run into the ground for years.\nCan promote false equivalence (not all positions are equally ridiculous). captions should be smaller in text size."
+    },
+    {
+      "template_id": "squidward-window",
+      "status": "approved",
+      "benchmark_case_id": "squidward-window-fit",
+      "notes": "Taste score: 5/5. Best fit: Perfect for the ironic/annoying neighbor situation: You're finally hosting or attending a party and your neighbors are the ones being obnoxiously loud.\nCaptures that specific frustration of trying to relax or have your own fun while other people’s noise ruins the vibe (or vice versa).\nSquidward’s signature misery + SpongeBob and Patrick’s chaotic energy is an excellent combo for party/neighbor complaints.\nAlso works for apartment living, dorms, or any thin-walled living situation. Bad fit: When the “loud neighbors” are not actually that bad and you’re just being a grumpy Squidward (hypersensitive or antisocial).\nIf your own party is louder and you’re unfairly complaining.\nLoses humor in situations where noise complaints are justified (e.g., late at night, disturbing sleep, or violating rules).\nCan reinforce the “fun = bad” Squidward stereotype instead of promoting reasonable boundaries."
+    },
+    {
+      "template_id": "whisper-and-goosebumps",
+      "status": "needs_work",
+      "benchmark_case_id": "whisper-and-goosebumps-fit",
+      "notes": "Taste score: 5/5. Best fit: When someone whispers a juicy secret, gossip, or shocking information and your body immediately reacts with goosebumps, chills, or that “oh no” tingle.\nExcellent for dramatic reveals, plot twists, embarrassing stories, or when someone tells you something you wish you didn’t know.\nThe extreme close-up contrast (whispering mouth → skin freaking out) sells the physical reaction perfectly.\nWorks for true crime, celebrity gossip, friend drama, or even secondhand embarrassment. Bad fit: When the “secret” is actually positive or neutral and your skin doesn’t react that way (the meme assumes every secret is intense).\nIf overused for mild information — not every piece of gossip deserves a full-body panic response.\nCan feel exaggerated for people who don’t get strong physical reactions to hearing things.\nSometimes the skin reaction comes from cold temperature or other non-secret reasons.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    },
+    {
+      "template_id": "y-all-got-any-more-of-that",
+      "status": "needs_work",
+      "benchmark_case_id": "y-all-got-any-more-of-that-fit",
+      "notes": "Taste score: 3/5. Best fit: When the group chat has been spamming fire memes and then it suddenly goes quiet after the last good one — and you’re left desperately craving more.\nPerfectly captures that meme addiction feeling: you’ve been laughing for 20 minutes straight and now you’re fiending for the next hit.\nThe intense, slightly unhinged expression + “Y’all got any more of that?” line is comedy gold for anyone deep in meme culture.\nWorks especially well at the end of a great meme chain or when someone says “I’m out of memes.” Bad fit: When the group chat still has plenty of memes left (the meme assumes it’s truly over).\nIf used to pressure people who are tired of spamming or want to talk about something else.\nCan feel needy or annoying in real chats if overdone.\nLoses impact if the “last meme” wasn’t actually that good.",
+      "issues": [
+        "Reviewer did not approve this template."
+      ]
+    }
+  ]
+}

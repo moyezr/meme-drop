@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:3001";
+import { API_BASE_URL, apiUrl } from "../shared/config";
+import { apiErrorFromResponse, withApiRequestHeaders } from "../shared/api";
 
 interface Suggestion {
   meme_id: string;
@@ -229,9 +230,9 @@ async function fetchFreshSuggestions(
   const timer = setTimeout(() => controller.abort(), 45000);
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}/api/v1/suggest`, {
+    res = await fetch(apiUrl("/api/v1/suggest"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await withApiRequestHeaders(),
       signal: controller.signal,
       body: JSON.stringify({
         tweet_text: tweetText,
@@ -242,7 +243,7 @@ async function fetchFreshSuggestions(
       }),
     });
     if (!res.ok) {
-      throw new Error(`Suggest request failed with status ${res.status}`);
+      throw await apiErrorFromResponse(res);
     }
   } finally {
     clearTimeout(timer);
@@ -274,26 +275,26 @@ async function fetchFreshSuggestions(
 }
 
 async function saveMeme(imageUrl: string, sourceTweetId?: string) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/library/save`, {
+  const res = await fetch(apiUrl("/api/v1/library/save"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await withApiRequestHeaders(),
     body: JSON.stringify({ image_url: imageUrl, source_tweet_id: sourceTweetId }),
   });
   if (!res.ok) {
-    throw new Error(`Save request failed with status ${res.status}`);
+    throw await apiErrorFromResponse(res);
   }
   const data = await res.json();
   return data.meme;
 }
 
 async function fetchCaption(tweetText: string, memeId: string): Promise<MemeTextOverlay | null> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/suggest/caption`, {
+  const res = await fetch(apiUrl("/api/v1/suggest/caption"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await withApiRequestHeaders(),
     body: JSON.stringify({ tweet_text: tweetText, meme_id: memeId }),
   });
   if (!res.ok) {
-    throw new Error(`Caption request failed with status ${res.status}`);
+    throw await apiErrorFromResponse(res);
   }
   const data = await res.json();
   return data.tailored_overlay ?? null;
@@ -305,9 +306,9 @@ async function logUsage(payload: {
   tweet_context: Record<string, unknown>;
   source?: "user" | "global";
 }) {
-  await fetch(`${API_BASE_URL}/api/v1/usage`, {
+  await fetch(apiUrl("/api/v1/usage"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await withApiRequestHeaders(),
     body: JSON.stringify(payload),
   });
 }

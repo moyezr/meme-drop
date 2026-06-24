@@ -5,140 +5,192 @@
       "category": "cope under chaos",
       "tweet": "Prod is down, the dashboard is red, and leadership just asked if we can still ship the launch today.",
       "expected_memes": ["This Is Fine", "Hide the Pain Harold", "Panik Kalm Panik"],
-      "keywords": ["prod", "dashboard", "launch"]
+      "keywords": ["prod", "dashboard", "launch"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "giveaway/hype format misses the disaster-cooping shape" }]
     },
     {
       "id": "obvious-consequences",
       "category": "predictable consequence",
       "tweet": "We skipped tests, deployed Friday night, and somehow the payment flow exploded. Who could have predicted this?",
       "expected_memes": ["Surprised Pikachu", "One Does Not Simply", "Roll Safe Think About It"],
-      "keywords": ["tests", "deployed", "payment"]
+      "keywords": ["tests", "deployed", "payment"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "celebration undercuts the predictable failure" }]
     },
     {
       "id": "new-framework-fomo",
       "category": "shiny object temptation",
       "tweet": "The team finally stabilized the app, so naturally we're debating a full rewrite in the new framework from yesterday.",
       "expected_memes": ["Distracted Boyfriend", "Expanding Brain", "Running Away Balloon"],
-      "keywords": ["rewrite", "framework", "app"]
+      "keywords": ["rewrite", "framework", "app"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "waiting reaction misses the temptation/shiny-object conflict" }]
     },
     {
       "id": "false-choice",
       "category": "impossible choice",
       "tweet": "Should I fix the bug properly or add one more feature flag and pretend we meant to do that?",
       "expected_memes": ["Two Buttons", "Evil Kermit", "Gru's Plan"],
-      "keywords": ["bug", "feature", "flag"]
+      "keywords": ["bug", "feature", "flag"],
+      "rejected_memes": [{ "name": "This Is Fine", "reason": "passive disaster acceptance misses the active forced choice" }]
     },
     {
       "id": "bad-label",
       "category": "mislabeling",
       "tweet": "Calling a spreadsheet with six macros a modern data platform is certainly one way to describe it.",
       "expected_memes": ["Is This A Pigeon", "Change My Mind", "They're The Same Picture"],
-      "keywords": ["spreadsheet", "macros", "platform"]
+      "keywords": ["spreadsheet", "macros", "platform"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "agreement format misses the false-labeling joke" }]
     },
     {
       "id": "hot-take",
       "category": "workplace hot take",
       "tweet": "Half the meetings on the calendar could have been a two sentence Slack message.",
       "expected_memes": ["Change My Mind", "Boardroom Meeting Suggestion", "Drake Hotline Bling"],
-      "keywords": ["meetings", "calendar", "Slack"]
+      "keywords": ["meetings", "calendar", "Slack"],
+      "rejected_memes": [{ "name": "Surprised Pikachu", "reason": "consequence shock is weaker than a direct hot-take format" }]
     },
     {
       "id": "obvious-truth",
       "category": "dark realization",
       "tweet": "Wait, the urgent roadmap was just vibes and a deck the whole time?",
       "expected_memes": ["Always Has Been", "Surprised Pikachu", "Change My Mind"],
-      "keywords": ["roadmap", "vibes", "deck"]
+      "keywords": ["roadmap", "vibes", "deck"],
+      "rejected_memes": [{ "name": "Trade Offer", "reason": "lopsided exchange format misses the hidden-truth reveal" }]
     },
     {
       "id": "small-ask",
       "category": "repeated ask",
       "tweet": "Once again asking people to read the error message before pinging the entire channel.",
       "expected_memes": ["Bernie I Am Once Again Asking For Your Support", "One Does Not Simply", "Mocking Spongebob"],
-      "keywords": ["error", "message", "channel"]
+      "keywords": ["error", "message", "channel"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "celebration tone is wrong for a tired repeated ask" }]
     },
     {
       "id": "lowball-client",
       "category": "bad deal",
       "tweet": "Client wants a full redesign by Monday and the budget is exposure plus a shoutout.",
       "expected_memes": ["Pawn Stars Best I Can Do", "Trade Offer", "Woman Yelling At Cat"],
-      "keywords": ["client", "redesign", "exposure"]
+      "keywords": ["client", "redesign", "exposure"],
+      "rejected_memes": [{ "name": "Always Has Been", "reason": "hidden-truth reveal misses the bad-deal negotiation shape" }]
     },
     {
       "id": "self-own-debugging",
       "category": "self-deprecation",
       "tweet": "Spent three hours debugging the API before realizing I was hitting the staging URL from last week.",
       "expected_memes": ["Hide the Pain Harold", "Monkey Puppet", "Gru's Plan"],
-      "keywords": ["debugging", "API", "staging"]
+      "keywords": ["debugging", "API", "staging"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "giveaway format does not fit self-own debugging" }]
     },
     {
       "id": "waiting-review",
       "category": "waiting",
       "tweet": "My PR has been approved by vibes, blocked by silence, and aging like milk in the review queue.",
       "expected_memes": ["Waiting Skeleton", "Sad Pablo Escobar", "Hide the Pain Harold"],
-      "keywords": ["PR", "review", "silence"]
+      "keywords": ["PR", "review", "silence"],
+      "rejected_memes": [{ "name": "Trade Offer", "reason": "exchange format misses the waiting/abandonment emotion" }]
     },
     {
       "id": "celebrate-clean-ship",
       "category": "celebration",
       "tweet": "The migration finished, alerts stayed quiet, and nobody had to say rollback once.",
       "expected_memes": ["Leonardo Dicaprio Cheers", "Laughing Leo", "Epic Handshake"],
-      "keywords": ["migration", "alerts", "rollback"]
+      "keywords": ["migration", "alerts", "rollback"],
+      "rejected_memes": [{ "name": "Panik Kalm Panik", "reason": "panic format contradicts the clean-ship celebration" }]
     },
     {
       "id": "same-thing-rebrand",
       "category": "fake distinction",
       "tweet": "They renamed the backlog to an opportunity pipeline and expected everyone to clap.",
       "expected_memes": ["They're The Same Picture", "Tuxedo Winnie The Pooh", "Change My Mind"],
-      "keywords": ["backlog", "opportunity", "pipeline"]
+      "keywords": ["backlog", "opportunity", "pipeline"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "waiting format misses the fake-distinction joke" }]
     },
     {
       "id": "fake-wisdom",
       "category": "bad logic",
       "tweet": "Can't miss the SLA if we stop measuring response time. This is apparently innovation.",
       "expected_memes": ["Roll Safe Think About It", "Expanding Brain", "Surprised Pikachu"],
-      "keywords": ["SLA", "measuring", "innovation"]
+      "keywords": ["SLA", "measuring", "innovation"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "celebration tone misses the fake-wisdom critique" }]
     },
     {
       "id": "awkward-side-eye",
       "category": "awkward self-own",
       "tweet": "Me explaining why the quick fix has a migration, a cron job, and three new environment variables.",
       "expected_memes": ["Monkey Puppet", "Hide the Pain Harold", "Expanding Brain"],
-      "keywords": ["quick", "migration", "cron"]
+      "keywords": ["quick", "migration", "cron"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "giveaway repetition misses the awkward overbuilt-fix self-own" }]
     },
     {
       "id": "suspicious-claim",
       "category": "suspicion",
       "tweet": "Vendor says the AI agent is fully autonomous but somehow needs a human to click approve every 90 seconds.",
       "expected_memes": ["Futurama Fry", "Is This A Pigeon", "Roll Safe Think About It"],
-      "keywords": ["agent", "autonomous", "approve"]
+      "keywords": ["agent", "autonomous", "approve"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "agreement format misses the suspicion about the claim" }]
     },
     {
       "id": "stubborn-refusal",
       "category": "choosing pain",
       "tweet": "The team would rather maintain four dashboards than agree on one metric definition.",
       "expected_memes": ["UNO Draw 25 Cards", "Two Buttons", "Two Paths"],
-      "keywords": ["dashboards", "metric", "definition"]
+      "keywords": ["dashboards", "metric", "definition"],
+      "rejected_memes": [{ "name": "Laughing Leo", "reason": "amused reaction misses the stubborn refusal tradeoff" }]
     },
     {
       "id": "say-the-line",
       "category": "predictable take",
       "tweet": "Every time a new app launches, someone immediately says it is just spreadsheets with extra steps.",
       "expected_memes": ["Say The Line Bart", "They're The Same Picture", "Change My Mind"],
-      "keywords": ["app", "spreadsheets", "steps"]
+      "keywords": ["app", "spreadsheets", "steps"],
+      "rejected_memes": [{ "name": "Pawn Stars Best I Can Do", "reason": "negotiation format misses the predictable repeated line" }]
     },
     {
       "id": "everyone-gets-ai",
       "category": "hype giveaway",
       "tweet": "New product strategy: you get an AI button, billing gets an AI button, the settings page gets three AI buttons.",
       "expected_memes": ["Oprah You Get A", "Yo Dawg Heard You", "Expanding Brain"],
-      "keywords": ["AI", "button", "settings"]
+      "keywords": ["AI", "button", "settings"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "waiting format misses the excessive-hype giveaway pattern" }]
     },
     {
       "id": "uncomfortable-truth",
       "category": "truth rejection",
       "tweet": "The roadmap is not delayed because of blockers. It is delayed because nobody wants to choose.",
       "expected_memes": ["The Scroll Of Truth", "Change My Mind", "Two Buttons"],
-      "keywords": ["roadmap", "blockers", "choose"]
+      "keywords": ["roadmap", "blockers", "choose"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "celebration tone misses the uncomfortable truth" }]
+    },
+    {
+      "id": "absolute-cinema-fit",
+      "category": "pretentious over-explanation",
+      "tweet": "Someone just called a blurry four pixel stick figure a brave critique of modern visual culture.",
+      "expected_memes": ["Absolute Cinema", "Change My Mind", "Tuxedo Winnie The Pooh"],
+      "keywords": ["blurry", "stick", "figure", "modern", "culture"],
+      "rejected_memes": [{ "name": "This Is Fine", "reason": "disaster coping misses the pretentious art-defense joke" }]
+    },
+    {
+      "id": "disaster-girl-fit",
+      "category": "chaos after tiny mistake",
+      "tweet": "I attached the wrong deck to the client email and now the whole launch plan is on fire.",
+      "expected_memes": ["Disaster Girl", "This Is Fine", "Surprised Pikachu"],
+      "keywords": ["wrong", "deck", "client", "launch", "fire"],
+      "rejected_memes": [{ "name": "Drake Hotline Bling", "reason": "preference comparison misses the smug chaos-after-mistake shape" }]
+    },
+    {
+      "id": "spider-man-triple-fit",
+      "category": "pointless tribal argument",
+      "tweet": "Dark mode users and light mode users arguing like both sides do not immediately complain when auto theme picks wrong.",
+      "expected_memes": ["Spider Man Triple", "They're The Same Picture", "Woman Yelling At Cat"],
+      "keywords": ["dark", "light", "auto", "theme", "arguing"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "waiting reaction misses the mutual finger-pointing debate" }]
+    },
+    {
+      "id": "squidward-window-fit",
+      "category": "annoyed observer",
+      "tweet": "Trying to relax after work while the neighbors discover bass boost for the third night in a row.",
+      "expected_memes": ["Squidward window", "Hide the Pain Harold", "Monkey Puppet"],
+      "keywords": ["relax", "neighbors", "bass", "night"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "giveaway hype misses the annoyed observer dynamic" }]
     }
   ]
 }

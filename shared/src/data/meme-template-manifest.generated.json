@@ -80,21 +80,26 @@
         }
       ],
       "caption_guidance": {
-        "pattern": "Use the two upper corners for a short setup or opposing labels, then place the punchline in the lower center as a dramatic verdict or absurd conclusion.",
+        "pattern": "Use this for sarcastically over-explaining something obviously low-effort, terrible, or silly as if it has profound artistic depth. The joke is pretentious analysis applied to something that clearly does not deserve it.",
         "good_examples": [
           {
-            "top_left_caption": "ME EXPLAINING"
+            "top_left_caption": "4 PIXEL JPEG",
+            "top_right_caption": "MODERN ART",
+            "bottom_center_punchline": "ABSOLUTE CINEMA"
           },
           {
-            "bottom_center_punchline": "WHY THIS IS ACTUALLY ART"
+            "top_left_caption": "BOILED CHICKEN",
+            "top_right_caption": "MINIMALISM",
+            "bottom_center_punchline": "A MASTERPIECE"
           }
         ],
         "bad_examples": [
           {
-            "top_right_caption": "A LONG MULTI-LINE PARAGRAPH THAT COVERS THE HAND"
+            "top_left_caption": "A GENUINELY GOOD FILM",
+            "bottom_center_punchline": "THIS IS BAD ACTUALLY"
           },
           {
-            "bottom_center_punchline": "TEXT PLACED OVER THE FACE OR HANDS"
+            "bottom_center_punchline": "A LONG ESSAY EXPLAINING WHY THE ARTWORK HAS DEEP HISTORICAL VALUE"
           }
         ]
       }
@@ -1104,21 +1109,23 @@
         }
       ],
       "caption_guidance": {
-        "pattern": "A dramatic disaster scene is paired with a smug or mischievous reaction, making the joke about the narrator or subject seeming responsible or pleased by the chaos.",
+        "pattern": "Use this when a small mistake, sabotage, or reckless action causes chaos and the subject looks quietly proud or unbothered by the damage. Avoid sincere tragedy or real harm.",
         "good_examples": [
           {
-            "top_caption": "Group project collapses"
+            "top_caption": "GROUP PROJECT COLLAPSES",
+            "bottom_caption": "I SENT THE WRONG FILE"
           },
           {
-            "bottom_caption": "I sent the wrong file"
+            "top_caption": "PROD IS ON FIRE",
+            "bottom_caption": "MY ONE LINE CHANGE"
           }
         ],
         "bad_examples": [
           {
-            "top_caption": "A detailed paragraph about fire safety procedures and emergency response"
+            "top_caption": "A REAL EMERGENCY WITH PEOPLE HURT"
           },
           {
-            "bottom_caption": "The girl is clearly terrified and wants help immediately"
+            "bottom_caption": "A LONG APOLOGY EXPLAINING EVERY DETAIL"
           }
         ]
       }
@@ -3803,21 +3810,25 @@
         }
       ],
       "caption_guidance": {
-        "pattern": "Three nearly identical characters point at each other to show escalating blame, disagreement, or self-contradiction across three labels.",
+        "pattern": "Use this for pointless internet arguments, tribal debates, or hypocrisy where multiple sides accuse each other while being nearly the same. Avoid serious moral issues where false equivalence would feel wrong.",
         "good_examples": [
           {
-            "left_spider_man": "People who use dark mode"
+            "left_spider_man": "DARK MODE USERS",
+            "center_spider_man": "LIGHT MODE USERS",
+            "right_spider_man": "AUTO THEME USERS"
           },
           {
-            "center_spider_man": "People who use light mode"
+            "left_spider_man": "IPHONE PEOPLE",
+            "center_spider_man": "ANDROID PEOPLE",
+            "right_spider_man": "BOTH NEED CHARGERS"
           }
         ],
         "bad_examples": [
           {
-            "left_spider_man": "A very long sentence that wraps into five lines and covers the character"
+            "left_spider_man": "A SERIOUS ETHICAL ISSUE"
           },
           {
-            "right_spider_man": "Tiny caption placed over the crate and lower body"
+            "right_spider_man": "A LONG SENTENCE THAT TURNS THE MEME INTO AN ESSAY"
           }
         ]
       }
@@ -3876,21 +3887,23 @@
         }
       ],
       "caption_guidance": {
-        "pattern": "Use the left side for Squidward's reaction or setup, and the right side for the thing he is judging, admiring, or being annoyed by.",
+        "pattern": "Use this when someone is stuck watching other people have fun, make noise, or create chaos nearby. The left side is the annoyed observer; the window side is the loud or fun thing they resent.",
         "good_examples": [
           {
-            "top_reaction_caption": "Party starts next door"
+            "top_reaction_caption": "ME AT 1AM",
+            "right_window_caption": "NEIGHBORS DISCOVER BASS"
           },
           {
-            "right_window_caption": "neighbors being loud"
+            "top_reaction_caption": "TRYING TO RELAX",
+            "right_window_caption": "GROUP CHAT GOES LIVE"
           }
         ],
         "bad_examples": [
           {
-            "top_reaction_caption": "A long paragraph that covers Squidward's face and body"
+            "top_reaction_caption": "A NORMAL QUIET EVENING"
           },
           {
-            "right_window_caption": "Text placed directly over SpongeBob and Patrick's faces"
+            "right_window_caption": "A LONG PARAGRAPH ABOUT NOISE RULES AND TENANT POLICY"
           }
         ]
       }
