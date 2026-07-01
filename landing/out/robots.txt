@@ -1,4 +1,0 @@
-User-Agent: *
-Allow: /
-
-Sitemap: https://memedrop.moyezrabani.dev/sitemap.xml
