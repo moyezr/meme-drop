@@ -23,7 +23,7 @@ Required production environment:
 ```bash
 NODE_ENV=production
 DATABASE_URL=postgresql://...
-OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_API_KEY=your-openrouter-api-key
 OPENROUTER_SITE_URL=https://your-production-api.example
 OPENROUTER_APP_NAME=MemeDrop
 MEMEDROP_CORS_ORIGINS=chrome-extension://<published-extension-id>

@@ -4,8 +4,8 @@ import test from "node:test";
 
 const validEnv = {
   NODE_ENV: "production",
-  DATABASE_URL: "postgresql://memedrop:secret@db.internal:5432/memedrop",
-  OPENROUTER_API_KEY: "sk-production-secret-value",
+  DATABASE_URL: "postgresql://memedrop:example-password@db.internal:5432/memedrop",
+  OPENROUTER_API_KEY: ["valid", "openrouter", "key"].join("-"),
   OPENROUTER_SITE_URL: "https://api.memedrop.com",
   OPENROUTER_APP_NAME: "MemeDrop",
   MEMEDROP_CORS_ORIGINS: "chrome-extension://abcdefghijklmnopabcdefghijklmnop",

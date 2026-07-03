@@ -46,7 +46,7 @@ cp .env.example backend/.env
 For a no-cost local setup, set `OPENROUTER_API_KEY=` or leave it unset. If you want model-backed captions, set:
 
 ```sh
-OPENROUTER_API_KEY=sk-or-your-key
+OPENROUTER_API_KEY=your-openrouter-api-key
 ```
 
 Start Postgres with pgvector:
