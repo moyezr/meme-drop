@@ -28,9 +28,31 @@ export default function Home() {
       </section>
 
       <footer className="footer">
-        <a href={chromeStoreUrl}>Add to Chrome</a>
-        <span aria-hidden="true">·</span>
-        <span>MemeDrop</span>
+        <div className="footerLinks">
+          <a
+            href="https://github.com/moyezr/meme-drop"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub
+          </a>
+          <span aria-hidden="true">·</span>
+          <span>MemeDrop</span>
+        </div>
+        <p className="footerNote">
+          Open to work —{" "}
+          <a
+            href="https://x.com/MoyezRabbani"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            DM on X
+          </a>{" "}
+          or{" "}
+          <a href="mailto:moyezrabbani.work@gmail.com">
+            moyezrabbani.work@gmail.com
+          </a>
+        </p>
       </footer>
     </main>
   );
