@@ -299,10 +299,10 @@ export const MEME_TEMPLATE_MANIFEST: MemeTemplateManifest = {
       supports_overlay: true,
       quality: "verified",
       regions: [
-        exactRegion("top_reaction_caption", "setup above the shocked face", 0, 0, 1, 0.33, "center", "middle", 3, 90, 34, 68),
+        exactRegion("top_reaction_caption", "obvious bad choice only; the shocked face supplies the consequence", 0, 0, 1, 0.33, "center", "middle", 3, 90, 34, 68),
       ],
       caption_guidance: guidance(
-        "State the obvious bad choice; the image supplies the shocked consequence.",
+        "State only the obvious bad choice or ignored warning. Do not write the consequence or describe the shock; the image supplies both.",
         [
           { top_reaction_caption: "Skipping tests before Friday deploy" },
           { top_reaction_caption: "Ignoring warnings then seeing warnings" },
@@ -318,11 +318,11 @@ export const MEME_TEMPLATE_MANIFEST: MemeTemplateManifest = {
       supports_overlay: true,
       quality: "verified",
       regions: [
-        exactRegion("top_comparison_caption", "two supposedly different things", 0.12, 0.42, 0.76, 0.09, "center", "middle", 2, 36, 34, 54),
-        exactRegion("bottom_reveal_caption", "reveal that they are identical", 0.3, 0.9, 0.48, 0.07, "center", "middle", 1, 24, 36, 58),
+        exactRegion("top_comparison_caption", "comparison formatted as concise 'X vs Y'", 0.12, 0.42, 0.76, 0.09, "center", "middle", 2, 36, 34, 54),
+        exactRegion("bottom_reveal_caption", "short grammatical reveal that X and Y are identical", 0.3, 0.9, 0.48, 0.07, "center", "middle", 1, 24, 36, 58),
       ],
       caption_guidance: guidance(
-        "Compare two rebranded or supposedly different things, then reveal they are the same.",
+        "Write the two supposedly different labels as 'X vs Y', then reveal they are the same thing.",
         [
           { top_comparison_caption: "Backlog vs pipeline", bottom_reveal_caption: "Same picture" },
           { top_comparison_caption: "Macros vs platform", bottom_reveal_caption: "Same picture" },
@@ -338,11 +338,11 @@ export const MEME_TEMPLATE_MANIFEST: MemeTemplateManifest = {
       supports_overlay: true,
       quality: "verified",
       regions: [
-        exactRegion("top_caption", "mistaken setup", 0.04, 0.02, 0.92, 0.16, "center", "top", 2, 42, 42, 68),
-        exactRegion("bottom_caption", "absurd wrong label", 0.03, 0.82, 0.94, 0.16, "center", "bottom", 2, 44, 42, 68),
+        exactRegion("top_caption", "what the observer sees or does before misidentifying it", 0.04, 0.02, 0.92, 0.16, "center", "top", 2, 42, 42, 68),
+        exactRegion("bottom_caption", "question in the form 'Is this [absurd wrong label]?'", 0.03, 0.82, 0.94, 0.16, "center", "bottom", 2, 44, 42, 68),
       ],
       caption_guidance: guidance(
-        "Set up a confident misread, then label the obvious thing incorrectly.",
+        "Top: state what the observer sees or does. Bottom: ask 'Is this [the inflated or absurd wrong label]?' Never swap those roles.",
         [
           { top_caption: "Calls backlog a strategy", bottom_caption: "Is this a roadmap?" },
           { top_caption: "Sees one AI button", bottom_caption: "Is this innovation?" },
@@ -540,11 +540,11 @@ export const MEME_TEMPLATE_MANIFEST: MemeTemplateManifest = {
       supports_overlay: true,
       quality: "verified",
       regions: [
-        exactRegion("top_caption", "setup or subject label", 0.08, 0.03, 0.84, 0.18, "center", "top", 2, 42, 24, 40),
-        exactRegion("bottom_caption", "smug approval or celebration", 0.08, 0.78, 0.84, 0.18, "center", "bottom", 2, 42, 24, 40),
+        exactRegion("top_caption", "specific win being celebrated", 0.08, 0.03, 0.84, 0.18, "center", "top", 2, 42, 24, 40),
+        exactRegion("bottom_caption", "smug celebratory payoff that heightens the rarity or relief", 0.08, 0.78, 0.84, 0.18, "center", "bottom", 2, 42, 24, 40),
       ],
       caption_guidance: guidance(
-        "Use for smug approval, ironic celebration, or a bad idea somehow working.",
+        "Name the concrete win, then heighten how rare, relieving, or credit-worthy it feels. Do not merely restate the win.",
         [
           { top_caption: "Deploy stayed green", bottom_caption: "Cheers to no rollback" },
           { top_caption: "Bad idea worked", bottom_caption: "I will take credit" },

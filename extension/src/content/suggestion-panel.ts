@@ -387,7 +387,7 @@ function renderLoading() {
     <div class="loading">
       <div class="loading-copy">
         <strong>Finding the right meme...</strong>
-        <span>fast mode</span>
+        <span>analyzing context and punchline fit</span>
       </div>
       <div class="skeleton-row" aria-hidden="true">
         ${Array.from({ length: 4 })

@@ -1,43 +1,392 @@
 import {
-  analyzeTweet,
-  heuristicTweetContext,
-  type TweetContext,
-} from "./context-analyzer.js";
+  findMemeTemplateForCandidate,
+  type MemeTemplate,
+  type SuggestionResult,
+} from "@memedrop/shared";
 import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
-import { generateEmbedding } from "./embedding.js";
-import { buildTweetDescriptor } from "./descriptor.js";
-import {
-  retrieveCandidates,
-  retrieveFallbackCandidates,
-  type Candidate,
-} from "./retrieval.js";
-import { loadUserPreferences, applyPreferences } from "./personalization.js";
-import { rerankCandidates, type RerankInput } from "./reranker.js";
-import { mmrSelect } from "./diversity.js";
-import { buildTailoredOverlays, type MemeTextOverlay } from "./meme-text.js";
+import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { memes } from "../db/schema.js";
-import { eq } from "drizzle-orm";
 import { DEV_USER_ID } from "../routes/identity.js";
+import {
+  getOpenRouterApiKey,
+  MEME_QUALITY_MODEL,
+  openRouterHeaders,
+  OPENROUTER_BASE_URL,
+} from "./llm-provider.js";
+import { buildTailoredOverlays, type MemeTextOverlay } from "./meme-text.js";
+import type { Candidate } from "./candidate.js";
+
+export type { SuggestionResult } from "@memedrop/shared";
 
 const SUGGESTION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SUGGESTION_CACHE_MAX = 200;
 const DEFAULT_SUGGESTION_LIMIT = 5;
-const MAX_SUGGESTION_LIMIT = 20;
-const EMBEDDING_TIMEOUT_MS = Number(process.env.MEMEDROP_EMBEDDING_TIMEOUT_MS || 3000);
-const DEFAULT_CANDIDATE_POOL_MULTIPLIER = 3;
-const DEFAULT_RERANK_POOL_MULTIPLIER = 2;
-const MAX_CANDIDATE_POOL_SIZE = 30;
-const SUGGESTION_LOG_MODE = process.env.MEMEDROP_SUGGESTION_LOGS || (process.env.NODE_ENV === "production" ? "compact" : "pretty");
-const FAST_ANALYSIS_MODE = process.env.MEMEDROP_FAST_ANALYSIS || "heuristic";
+const MAX_SUGGESTION_LIMIT = 5;
+const TEMPLATE_SELECTION_TIMEOUT_MS = Number(
+  process.env.MEMEDROP_TEMPLATE_SELECTION_TIMEOUT_MS || 15000
+);
+const SUGGESTION_LOG_MODE =
+  process.env.MEMEDROP_SUGGESTION_LOGS ||
+  (process.env.NODE_ENV === "production" ? "compact" : "pretty");
 
 interface CacheEntry {
   result: SuggestionResult[];
   expiresAt: number;
 }
 
+interface TemplateCandidate {
+  candidate: Candidate;
+  template: MemeTemplate;
+}
+
+interface TemplateSelection {
+  template_id: string;
+  reason: string;
+  score: number;
+}
+
+interface TemplateSelectionResponse {
+  suggestions?: Array<{
+    template_id?: string;
+    reason?: string;
+    score?: number;
+  }>;
+}
+
 const suggestionCache = new Map<string, CacheEntry>();
+
+export interface SuggestionOptions {
+  limit?: number;
+  refresh?: boolean;
+  cacheKey?: string;
+  userId?: string;
+}
+
+/**
+ * Simple pipeline:
+ *   1. Load valid overlay meme templates that exist in the global meme table.
+ *   2. Ask the model for the five templates that would be the best meme reply.
+ *   3. Generate captions for those five templates in parallel.
+ */
+export async function getSuggestions(
+  tweetText: string,
+  options: SuggestionOptions = {}
+): Promise<SuggestionResult[]> {
+  const limit = normalizeLimit(options.limit);
+  const userId = options.userId || DEV_USER_ID;
+  const cacheKey = `user:${userId}|${options.cacheKey || `text:${normalizeCacheKey(tweetText)}`}|limit:${limit}|simple:v1`;
+  if (!options.refresh) {
+    const cached = readCache(cacheKey);
+    if (cached) return cached;
+  }
+
+  const startedAtMs = performance.now();
+  const timings: Array<{ label: string; ms: number }> = [];
+  let stageStartedAtMs = startedAtMs;
+  const markStage = (label: string) => {
+    const nowMs = performance.now();
+    timings.push({ label, ms: Math.max(0, Math.round(nowMs - stageStartedAtMs)) });
+    stageStartedAtMs = nowMs;
+  };
+
+  const available = await loadValidTemplateCandidates();
+  markStage("load");
+
+  if (available.length === 0) {
+    return [];
+  }
+
+  const selections = await selectReplyTemplates(tweetText, available, limit);
+  const selected = selections
+    .map((selection) => {
+      const item = available.find(
+        (candidate) => candidate.template.template_id === selection.template_id
+      );
+      return item ? { ...item, selection } : null;
+    })
+    .filter((item): item is TemplateCandidate & { selection: TemplateSelection } => Boolean(item));
+  markStage("select");
+
+  const overlays = await buildTailoredOverlays(
+    tweetText,
+    selected.map((item) => item.candidate)
+  );
+  markStage("captions");
+
+  const result: SuggestionResult[] = selected.map((item, index) => ({
+    meme_id: item.candidate.meme_id,
+    name: item.candidate.name,
+    image_url: item.candidate.image_url,
+    tailored_overlay: overlays.get(item.candidate.meme_id) || null,
+    use_case_label: "meme reply",
+    match_explanation: item.selection.reason || item.template.caption_guidance.pattern,
+    score: roundScore(item.selection.score || 1 - index * 0.08),
+    source: item.candidate.source,
+  }));
+
+  writeCache(cacheKey, result);
+  logSuggestionPipeline({
+    cacheKey,
+    tweetText,
+    limit,
+    availableCount: available.length,
+    returnedCount: result.length,
+    overlayCount: overlays.size,
+    timings,
+    result,
+    totalMs: sumTimings(timings),
+    wallMs: Math.max(0, Math.round(performance.now() - startedAtMs)),
+  });
+
+  return result;
+}
+
+export async function getTailoredOverlayForMeme(
+  tweetText: string,
+  memeId: string
+): Promise<MemeTextOverlay | null> {
+  const [meme] = await db.select().from(memes).where(eq(memes.id, memeId)).limit(1);
+  if (!meme) return null;
+
+  const candidate = rowToCandidate({
+    id: meme.id,
+    name: meme.name,
+    filePath: meme.filePath,
+    systemTags: meme.systemTags,
+    isEvergreen: meme.isEvergreen,
+  });
+
+  const overlays = await buildTailoredOverlays(tweetText, [candidate]);
+  return overlays.get(memeId) || null;
+}
+
+async function loadValidTemplateCandidates(): Promise<TemplateCandidate[]> {
+  const rows = await db.select().from(memes);
+  const seenTemplateIds = new Set<string>();
+  const result: TemplateCandidate[] = [];
+
+  for (const row of rows) {
+    const template = findMemeTemplateForCandidate(row.name, row.id);
+    if (!template || !isUsableTemplate(template)) continue;
+    if (seenTemplateIds.has(template.template_id)) continue;
+
+    seenTemplateIds.add(template.template_id);
+    result.push({
+      candidate: rowToCandidate({
+        id: row.id,
+        name: row.name,
+        filePath: row.filePath,
+        systemTags: row.systemTags,
+        isEvergreen: row.isEvergreen,
+      }),
+      template,
+    });
+  }
+
+  return result.sort((a, b) => a.template.name.localeCompare(b.template.name));
+}
+
+function rowToCandidate(row: {
+  id: string;
+  name: string;
+  filePath: string;
+  systemTags: unknown;
+  isEvergreen?: boolean | null;
+}): Candidate {
+  return {
+    meme_id: row.id,
+    source: "global",
+    name: row.name || "Untitled",
+    image_url: row.filePath,
+    system_tags: (row.systemTags as Candidate["system_tags"]) || {},
+    is_evergreen: row.isEvergreen ?? true,
+  };
+}
+
+async function selectReplyTemplates(
+  tweetText: string,
+  available: TemplateCandidate[],
+  limit: number
+): Promise<TemplateSelection[]> {
+  try {
+    const modelSelections = await requestTemplateSelection(tweetText, available, limit);
+    return fillTemplateSelections(modelSelections, fallbackTemplateSelections(tweetText, available, limit), limit);
+  } catch (err) {
+    console.warn("[MemeDrop] Template selection failed, using local fallback:", err);
+    return fallbackTemplateSelections(tweetText, available, limit);
+  }
+}
+
+async function requestTemplateSelection(
+  tweetText: string,
+  available: TemplateCandidate[],
+  limit: number
+): Promise<TemplateSelection[]> {
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) return [];
+
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: "POST",
+    signal: AbortSignal.timeout(TEMPLATE_SELECTION_TIMEOUT_MS),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      ...openRouterHeaders(),
+    },
+    body: JSON.stringify({
+      model: MEME_QUALITY_MODEL,
+      temperature: 0.25,
+      max_tokens: 900,
+      reasoning: { effort: "low", exclude: true },
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "Pick meme templates that would be strong replies to a tweet. Choose templates, not captions. Return JSON only.",
+        },
+        {
+          role: "user",
+          content: buildTemplateSelectionPrompt(tweetText, available, limit),
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`OpenRouter template selection failed ${response.status}: ${body.slice(0, 400)}`);
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) return [];
+
+  const parsed = JSON.parse(stripJsonFence(content)) as TemplateSelectionResponse;
+  const validIds = new Set(available.map((item) => item.template.template_id));
+  const seen = new Set<string>();
+  const selections: TemplateSelection[] = [];
+
+  for (const item of parsed.suggestions || []) {
+    const templateId = String(item.template_id || "").trim();
+    if (!validIds.has(templateId) || seen.has(templateId)) continue;
+    seen.add(templateId);
+    selections.push({
+      template_id: templateId,
+      reason: String(item.reason || "").trim() || "Good meme reply fit.",
+      score: clampUnitInterval(Number(item.score) || 0.8),
+    });
+    if (selections.length >= limit) break;
+  }
+
+  return selections;
+}
+
+function buildTemplateSelectionPrompt(
+  tweetText: string,
+  available: TemplateCandidate[],
+  limit: number
+): string {
+  const catalog = available.map((item) => ({
+    template_id: item.template.template_id,
+    name: item.template.name,
+    pattern: item.template.caption_guidance.pattern,
+    slots: item.template.regions.map((region) => region.role),
+  }));
+
+  return `TWEET
+${JSON.stringify(tweetText)}
+
+VALID MEME TEMPLATES
+${JSON.stringify(catalog)}
+
+TASK
+Pick exactly ${limit} templates that would make the best visual meme reply to this tweet.
+- Prefer templates whose established joke grammar fits the tweet.
+- Do not pick a template just because one keyword overlaps.
+- Pick different joke shapes when possible.
+- Only use template_id values from the catalog.
+- Return JSON only: {"suggestions":[{"template_id":"...","reason":"short reason","score":0.0}]}`;
+}
+
+function fallbackTemplateSelections(
+  tweetText: string,
+  available: TemplateCandidate[],
+  limit: number
+): TemplateSelection[] {
+  const tweetTokens = tokenize(tweetText);
+  const scored = available.map((item, index) => {
+    const searchable = [
+      item.template.name,
+      item.template.aliases.join(" "),
+      item.template.caption_guidance.pattern,
+      ...item.template.caption_guidance.good_examples.flatMap((example) => Object.values(example)),
+      item.candidate.system_tags.emotion || "",
+      ...(item.candidate.system_tags.use_cases || []),
+      ...(item.candidate.system_tags.vibes || []),
+      ...(item.candidate.system_tags.example_contexts || []),
+    ].join(" ");
+    const templateTokens = new Set(tokenize(searchable));
+    let hits = 0;
+    for (const token of tweetTokens) {
+      if (templateTokens.has(token)) hits += 1;
+    }
+    const evergreenBoost = item.candidate.is_evergreen ? 0.05 : 0;
+    const classicBoost = Math.max(0, 0.08 - index * 0.002);
+    const score = Math.min(1, 0.45 + hits * 0.08 + evergreenBoost + classicBoost);
+    return { item, score };
+  });
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ item, score }) => ({
+      template_id: item.template.template_id,
+      reason: item.template.caption_guidance.pattern,
+      score,
+    }));
+}
+
+function fillTemplateSelections(
+  primary: TemplateSelection[],
+  fallback: TemplateSelection[],
+  limit: number
+): TemplateSelection[] {
+  const seen = new Set<string>();
+  const result: TemplateSelection[] = [];
+
+  for (const item of [...primary, ...fallback]) {
+    if (seen.has(item.template_id)) continue;
+    seen.add(item.template_id);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+
+  return result;
+}
+
+function isUsableTemplate(template: MemeTemplate): boolean {
+  return (
+    template.supports_overlay &&
+    template.quality !== "disabled" &&
+    template.regions.length > 0
+  );
+}
+
+function tokenize(text: string): string[] {
+  return Array.from(
+    new Set(
+      text
+        .toLowerCase()
+        .match(/[a-z0-9][a-z0-9_'’-]*/g)
+        ?.filter((token) => token.length > 2) || []
+    )
+  );
+}
 
 function normalizeCacheKey(tweetText: string): string {
   return tweetText.trim().replace(/\s+/g, " ").toLowerCase();
@@ -66,305 +415,22 @@ function writeCache(key: string, result: SuggestionResult[]) {
   }
 }
 
-export interface SuggestionResult {
-  meme_id: string;
-  name: string;
-  image_url: string;
-  tailored_overlay?: MemeTextOverlay | null;
-  use_case_label: string; // the "punch reason" from the re-ranker
-  match_explanation: string;
-  score: number;
-  source: "user" | "global";
-  tweet_context?: TweetContext;
-  score_breakdown?: {
-    similarity: number;
-    personalized: number;
-    rerank?: number;
-    diversity: number;
-  };
-}
-
-export interface SuggestionOptions {
-  limit?: number;
-  refresh?: boolean;
-  cacheKey?: string;
-  mode?: "fast" | "smart";
-  userId?: string;
-}
-
-/**
- * Pipeline:
- *   1. Analyze tweet  → structured context + natural-language "ideal vibe"
- *   2. Embed the vibe descriptor
- *   3. Retrieve a small top candidate pool from the curated global catalogue
- *   4. Personalize scores using recent usage events
- *   5. LLM re-rank a limit-relative shortlist with punchy explanations
- *   6. MMR diversity pass so the returned strip isn't 5 near-dupes
- *
- * Every stage has a graceful degradation path so local dev works even if
- * one service hiccups (e.g. re-ranker times out → fall back to vector score).
- */
-export async function getSuggestions(
-  tweetText: string,
-  options: SuggestionOptions = {}
-): Promise<SuggestionResult[]> {
-  const limit = normalizeLimit(options.limit);
-  const mode = normalizeSuggestionMode(options.mode);
-  const userId = options.userId || DEV_USER_ID;
-  const cacheKey = `user:${userId}|${options.cacheKey || `text:${normalizeCacheKey(tweetText)}`}|limit:${limit}|mode:${mode}`;
-  if (!options.refresh) {
-    const cached = readCache(cacheKey);
-    if (cached) return cached;
-  }
-
-  const startedAtMs = performance.now();
-  const timings: Array<{ label: string; ms: number }> = [];
-  let stageStartedAtMs = startedAtMs;
-  const markStage = (label: string) => {
-    const nowMs = performance.now();
-    timings.push({ label, ms: Math.max(0, Math.round(nowMs - stageStartedAtMs)) });
-    stageStartedAtMs = nowMs;
-  };
-  const candidatePoolSize = candidatePoolSizeForLimit(limit);
-  const rerankPoolSize = rerankPoolSizeForLimit(limit, candidatePoolSize);
-
-  // Prefs don't depend on the tweet, so start them up front and let them
-  // overlap with the (serial) LLM + embed + retrieve chain.
-  const prefsPromise = loadUserPreferences(userId);
-
-  const context = await analyzeTweetForMode(tweetText, mode);
-  markStage("analyze");
-
-  const descriptor = buildTweetDescriptor({
-    tweet_text: tweetText,
-    sentiment: context.sentiment,
-    tone: context.tone,
-    topic: context.topic,
-    intent: context.intent,
-    reply_style: context.reply_style,
-    ideal_meme_vibe: context.ideal_meme_vibe,
-    joke_target: context.joke_target,
-    social_dynamic: context.social_dynamic,
-    humor_angle: context.humor_angle,
-  });
-  const queryEmbedding = await generateEmbedding(
-    descriptor,
-    AbortSignal.timeout(EMBEDDING_TIMEOUT_MS)
-  );
-  markStage("embed");
-
-  const [candidates, prefs] = await Promise.all([
-    queryEmbedding && isUsableEmbedding(queryEmbedding)
-        ? retrieveCandidates({
-          userId,
-          queryEmbedding,
-          userLimit: 0,
-          globalLimit: candidatePoolSize,
-          source: "global",
-        })
-      : retrieveFallbackCandidates({
-          userId,
-          userLimit: 0,
-          globalLimit: candidatePoolSize,
-          source: "global",
-        }),
-    prefsPromise,
-  ]);
-  markStage("retrieve");
-
-  if (candidates.length === 0) {
-    return [];
-  }
-
-  // Personalized score (similarity + emotion/use_case nudges + recency penalty).
-  const personalized = candidates.map((c) => ({
-    ...c,
-    adjusted_score: scoreCandidate(c, context, prefs),
-  }));
-
-  personalized.sort((a, b) => b.adjusted_score - a.adjusted_score);
-  const rerankPool = personalized.slice(0, rerankPoolSize);
-  markStage("score");
-
-  let rerankResults: Awaited<ReturnType<typeof rerankCandidates>> = [];
-  if (mode === "smart") {
-    try {
-      const input: RerankInput[] = rerankPool.map((c) => ({
-        meme_id: c.meme_id,
-        name: c.name,
-        emotion: c.system_tags.emotion,
-        use_cases: c.system_tags.use_cases || [],
-        vibes: c.system_tags.vibes || [],
-        example_contexts: c.system_tags.example_contexts || [],
-        prior_score: c.adjusted_score,
-      }));
-      rerankResults = await rerankCandidates(
-        tweetText,
-        context,
-        input,
-        Math.min(limit, rerankPool.length)
-      );
-    } catch (err) {
-      console.warn("[MemeDrop] Re-rank failed, falling back to vector order:", err);
-    }
-  }
-  markStage(mode === "smart" ? "rerank" : "rerank-skip");
-
-  // Stitch re-rank results back onto the candidate objects.
-  const rerankById = new Map(rerankResults.map((r) => [r.meme_id, r]));
-
-  const finalScored = rerankPool.map((c) => {
-    const r = rerankById.get(c.meme_id);
-    const rerankScore = r
-      ? Math.max(0, 1 - (r.rank - 1) / Math.max(1, rerankResults.length)) *
-          0.85 +
-        r.confidence * 0.15
-      : undefined;
-    const score =
-      rerankScore === undefined
-        ? c.adjusted_score
-        : c.adjusted_score * 0.68 + rerankScore * 0.32;
-    return {
-      ...c,
-      punch_reason: r?.punch_reason,
-      score,
-      score_breakdown: {
-        similarity: roundScore(c.similarity),
-        personalized: roundScore(c.adjusted_score),
-        rerank: rerankScore === undefined ? undefined : roundScore(rerankScore),
-        diversity: roundScore(score),
-      },
-    };
-  });
-
-  // MMR to spread the top results across vibes.
-  const mmrInput = finalScored.map((c) => ({
-    id: c.meme_id,
-    score: c.score,
-    embedding: c.embedding,
-    _ref: c,
-  }));
-  const diversified = mmrSelect(mmrInput, limit, 0.82).map((item) => item._ref);
-  markStage("diversify");
-
-  const overlays = await buildTailoredOverlays(tweetText, context, diversified);
-  markStage("captions");
-  const stageTotalMs = sumTimings(timings);
-  const wallMs = Math.max(0, Math.round(performance.now() - startedAtMs));
-
-  const result: SuggestionResult[] = diversified.map((c) => ({
-    meme_id: c.meme_id,
-    name: c.name,
-    image_url: c.image_url,
-    tailored_overlay: overlays.get(c.meme_id) || null,
-    use_case_label:
-      c.punch_reason ||
-      (c.system_tags.use_cases?.[0] || "reaction").replace(/_/g, " "),
-    match_explanation: buildMatchExplanation(c, context),
-    score: roundScore(c.score),
-    source: c.source,
-    tweet_context: context,
-    score_breakdown: c.score_breakdown,
-  }));
-
-  writeCache(cacheKey, result);
-  logSuggestionPipeline({
-    cacheKey,
-    tweetText,
-    context,
-    mode,
-    limit,
-    candidatePoolSize,
-    rerankPoolSize: rerankPool.length,
-    retrievedCount: candidates.length,
-    returnedCount: result.length,
-    overlayCount: overlays.size,
-    timings,
-    result,
-    totalMs: stageTotalMs,
-    wallMs,
-  });
-  return result;
-}
-
-export async function getTailoredOverlayForMeme(
-  tweetText: string,
-  memeId: string
-): Promise<MemeTextOverlay | null> {
-  const [meme] = await db.select().from(memes).where(eq(memes.id, memeId)).limit(1);
-  if (!meme) return null;
-
-  const context = await analyzeTweet(tweetText);
-  const candidate: Candidate = {
-    meme_id: meme.id,
-    source: "global",
-    name: meme.name,
-    image_url: meme.filePath,
-    format_type: meme.formatType,
-    system_tags: (meme.systemTags as Candidate["system_tags"]) || {},
-    embedding: [],
-    similarity: 0,
-    use_count: 0,
-    last_used_at: null,
-    is_evergreen: meme.isEvergreen,
-  };
-
-  const overlays = await buildTailoredOverlays(tweetText, context, [candidate]);
-  return overlays.get(memeId) || null;
-}
-
-function previewLogText(text: string, maxLength = 180): string {
-  const normalized = text.trim().replace(/\s+/g, " ");
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 3)}...`;
-}
-
 function normalizeLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) return DEFAULT_SUGGESTION_LIMIT;
   return Math.max(1, Math.min(MAX_SUGGESTION_LIMIT, Math.floor(limit!)));
 }
 
-function normalizeSuggestionMode(mode: SuggestionOptions["mode"]): "fast" | "smart" {
-  if (mode === "fast" || mode === "smart") return mode;
-  return process.env.MEMEDROP_SUGGESTION_MODE === "fast" ? "fast" : "smart";
+function clampUnitInterval(value: number): number {
+  if (!Number.isFinite(value)) return 0.8;
+  return Math.max(0, Math.min(1, value));
 }
 
-function analyzeTweetForMode(
-  tweetText: string,
-  mode: "fast" | "smart"
-): Promise<TweetContext> | TweetContext {
-  if (mode === "fast" && FAST_ANALYSIS_MODE !== "llm") {
-    return heuristicTweetContext(tweetText);
-  }
-
-  return analyzeTweet(tweetText);
+function roundScore(n: number): number {
+  return Math.round(Math.max(0, Math.min(1, n)) * 1000) / 1000;
 }
 
-function candidatePoolSizeForLimit(limit: number): number {
-  const configured = parsePositiveInt(process.env.MEMEDROP_CANDIDATE_POOL_SIZE);
-  if (configured) return Math.max(limit, Math.min(MAX_CANDIDATE_POOL_SIZE, configured));
-
-  return Math.max(
-    limit,
-    Math.min(MAX_CANDIDATE_POOL_SIZE, Math.ceil(limit * DEFAULT_CANDIDATE_POOL_MULTIPLIER))
-  );
-}
-
-function rerankPoolSizeForLimit(limit: number, candidatePoolSize: number): number {
-  const configured = parsePositiveInt(process.env.MEMEDROP_RERANK_POOL_SIZE);
-  if (configured) return Math.max(limit, Math.min(candidatePoolSize, configured));
-
-  return Math.max(
-    limit,
-    Math.min(candidatePoolSize, Math.ceil(limit * DEFAULT_RERANK_POOL_MULTIPLIER))
-  );
-}
-
-function parsePositiveInt(value: string | undefined): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return Math.floor(parsed);
+function stripJsonFence(content: string): string {
+  return content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
 }
 
 function sumTimings(timings: Array<{ ms: number }>): number {
@@ -374,12 +440,8 @@ function sumTimings(timings: Array<{ ms: number }>): number {
 function logSuggestionPipeline(input: {
   cacheKey: string;
   tweetText: string;
-  context: TweetContext;
-  mode: "fast" | "smart";
   limit: number;
-  candidatePoolSize: number;
-  rerankPoolSize: number;
-  retrievedCount: number;
+  availableCount: number;
   returnedCount: number;
   overlayCount: number;
   timings: Array<{ label: string; ms: number }>;
@@ -395,9 +457,7 @@ function logSuggestionPipeline(input: {
     console.log(
       `[MemeDrop] suggestions cache=${safeLogCacheKey(input.cacheKey)} total=${input.totalMs}ms ` +
         `stages=${compactTimingText(input.timings)}${driftText} ` +
-        `mode=${input.mode} ` +
-        `limit=${input.limit} retrieved=${input.retrievedCount}/${input.candidatePoolSize} ` +
-        `rerank=${input.rerankPoolSize} returned=${input.returnedCount} captions=${input.overlayCount}`
+        `limit=${input.limit} templates=${input.availableCount} returned=${input.returnedCount} captions=${input.overlayCount}`
     );
     return;
   }
@@ -419,13 +479,10 @@ cache      ${safeLogCacheKey(input.cacheKey)}
 total      ${input.totalMs}ms
 wall       ${input.wallMs}ms
 tweet      ${safeLogTweetText(input.tweetText)}
-context    ${input.context.intent} / ${input.context.tone} / ${input.context.topic}
-mode       ${input.mode}
 
 budgets
   limit       ${input.limit}
-  retrieve    ${input.retrievedCount}/${input.candidatePoolSize}
-  rerank      ${input.rerankPoolSize}
+  templates   ${input.availableCount}
   returned    ${input.returnedCount}
   captions    ${input.overlayCount}
 
@@ -439,6 +496,12 @@ ${resultText}
 
 function compactTimingText(timings: Array<{ label: string; ms: number }>): string {
   return timings.map((item) => `${item.label}:${item.ms}`).join(",");
+}
+
+function previewLogText(text: string, maxLength = 180): string {
+  const normalized = text.trim().replace(/\s+/g, " ");
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
 export function safeLogCacheKey(cacheKey: string): string {
@@ -458,336 +521,4 @@ function suggestionLogTextMode(): "full" | "preview" | "redacted" {
     return configured;
   }
   return process.env.NODE_ENV === "production" ? "redacted" : "preview";
-}
-
-function scoreCandidate(
-  candidate: Candidate,
-  context: TweetContext,
-  prefs: Awaited<ReturnType<typeof loadUserPreferences>>
-): number {
-  let score = applyPreferences(
-    {
-      meme_id: candidate.meme_id,
-      similarity: candidate.similarity,
-      system_tags: candidate.system_tags,
-    },
-    prefs
-  );
-
-  if (candidate.source === "user") score += 0.06;
-  if (!candidate.is_evergreen) score -= 0.04;
-  score += taxonomyFit(candidate, context);
-  score -= mismatchPenalty(candidate, context);
-
-  if (candidate.use_count > 0 && candidate.last_used_at) {
-    const daysSinceUsed =
-      (Date.now() - new Date(candidate.last_used_at).getTime()) /
-      (24 * 60 * 60 * 1000);
-    if (Number.isFinite(daysSinceUsed) && daysSinceUsed < 7) {
-      score -= (7 - daysSinceUsed) * 0.015;
-    }
-  }
-
-  return Math.max(0, Math.min(1.25, score));
-}
-
-function taxonomyFit(candidate: Candidate, context: TweetContext): number {
-  const useCases = new Set((candidate.system_tags.use_cases || []).map(normalizeTaxonomyLabel));
-  const vibes = (candidate.system_tags.vibes || []).join(" ").toLowerCase();
-  const examples = (candidate.system_tags.example_contexts || []).join(" ").toLowerCase();
-  const searchable = `${candidate.name} ${Array.from(useCases).join(" ")} ${vibes} ${examples}`.toLowerCase();
-  let boost = 0;
-
-  const intentAliases = INTENT_USE_CASES[context.intent] || [];
-  for (const alias of intentAliases) {
-    const normalized = normalizeTaxonomyLabel(alias);
-    if (useCases.has(normalized)) boost += 0.045;
-    else if (searchable.includes(normalized.replace(/_/g, " "))) boost += 0.018;
-  }
-
-  const toneAliases = TONE_SIGNALS[context.tone] || [];
-  for (const alias of toneAliases) {
-    const normalized = normalizeTaxonomyLabel(alias);
-    if (useCases.has(normalized) || searchable.includes(normalized.replace(/_/g, " "))) {
-      boost += 0.025;
-    }
-  }
-
-  const keywords = context.keywords
-    .map((keyword) => keyword.toLowerCase().trim())
-    .filter((keyword) => keyword.length >= 3);
-  let keywordHits = 0;
-  for (const keyword of keywords) {
-    if (searchable.includes(keyword)) keywordHits += 1;
-  }
-  boost += Math.min(0.09, keywordHits * 0.025);
-
-  if (context.intent === "dunking" && candidate.system_tags.emotion === "savage") boost += 0.035;
-  if (context.intent === "celebrating" && candidate.system_tags.emotion === "celebratory") boost += 0.045;
-  if (context.intent === "asking" && searchable.includes("asking")) boost += 0.055;
-  if (context.intent === "venting" && /cope|suffering|pain|frustration|panic|fine/.test(searchable)) boost += 0.04;
-  boost += socialComedyFit(candidate.name, searchable, context);
-  boost += canonicalFit(candidate.name, context);
-
-  return Math.min(0.42, boost);
-}
-
-function canonicalFit(name: string, context: TweetContext): number {
-  const meme = name.toLowerCase();
-  const text = context.keywords.join(" ").toLowerCase();
-  const vibe = [
-    context.reply_style,
-    context.ideal_meme_vibe,
-    context.joke_target,
-    context.social_dynamic,
-    context.humor_angle,
-  ].join(" ").toLowerCase();
-  const combined = `${text} ${vibe}`;
-
-  if (/\b(prod|down|dashboard|red|fire|launch)\b/.test(combined) && meme.includes("this is fine")) {
-    return 0.18;
-  }
-  if (/\b(skip|skipped|tests|friday|deploy|consequence|predictable|payment)\b/.test(combined)) {
-    if (meme.includes("surprised pikachu")) return 0.18;
-    if (meme.includes("one does not simply")) return 0.12;
-  }
-  if (/\b(rewrite|framework|shiny|trend|fomo|new stack)\b/.test(combined)) {
-    if (meme.includes("distracted boyfriend")) return 0.18;
-    if (meme.includes("expanding brain")) return 0.12;
-  }
-  if (/\b(choice|choose|button|flag|properly|dilemma)\b/.test(combined) && meme.includes("two buttons")) {
-    return 0.24;
-  }
-  if (/\b(spreadsheet|macros|platform|mislabel|calling)\b/.test(combined)) {
-    if (meme.includes("is this a pigeon")) return 0.28;
-    if (meme.includes("change my mind")) return 0.18;
-    if (meme.includes("same picture")) return 0.14;
-  }
-  if (/\b(meeting|calendar|slack|message)\b/.test(combined)) {
-    if (meme.includes("change my mind")) return 0.15;
-    if (meme.includes("boardroom")) return 0.12;
-  }
-  if (/\b(roadmap|vibes|deck|whole time|realization)\b/.test(combined) && meme.includes("always has been")) {
-    return 0.18;
-  }
-  if (/\b(once again|asking|error|channel|ping)\b/.test(combined)) {
-    if (meme.includes("once again asking")) return 0.24;
-    if (meme.includes("one does not simply")) return 0.12;
-  }
-  if (/\b(client|redesign|budget|exposure|shoutout|lowball)\b/.test(combined)) {
-    if (meme.includes("pawn stars")) return 0.24;
-    if (meme.includes("trade offer")) return 0.2;
-  }
-  if (/\b(debug|debugging|api|staging|realizing|realized|last week)\b/.test(combined)) {
-    if (meme.includes("hide the pain")) return 0.2;
-    if (meme.includes("monkey puppet")) return 0.18;
-    if (meme.includes("gru")) return 0.12;
-  }
-  if (/\b(pr|review|queue|silence|waiting|approved by vibes)\b/.test(combined)) {
-    if (meme.includes("waiting skeleton")) return 0.24;
-    if (meme.includes("sad pablo")) return 0.18;
-    if (meme.includes("hide the pain")) return 0.12;
-  }
-  if (/\b(migration|alerts|quiet|rollback|finished|clean)\b/.test(combined)) {
-    if (meme.includes("leonardo dicaprio cheers")) return 0.22;
-    if (meme.includes("laughing leo")) return 0.18;
-    if (meme.includes("epic handshake")) return 0.12;
-  }
-  if (/\b(backlog|opportunity|pipeline|renamed|rebrand|clap)\b/.test(combined)) {
-    if (meme.includes("same picture")) return 0.22;
-    if (meme.includes("tuxedo winnie")) return 0.18;
-    if (meme.includes("change my mind")) return 0.12;
-  }
-  if (/\b(sla|measuring|response time|innovation|stop measuring)\b/.test(combined)) {
-    if (meme.includes("roll safe")) return 0.24;
-    if (meme.includes("expanding brain")) return 0.16;
-    if (meme.includes("surprised pikachu")) return 0.1;
-  }
-  if (/\b(quick fix|migration|cron|environment variables|env variables)\b/.test(combined)) {
-    if (meme.includes("monkey puppet")) return 0.22;
-    if (meme.includes("hide the pain")) return 0.16;
-    if (meme.includes("expanding brain")) return 0.12;
-  }
-  if (/\b(autonomous|agent|approve|vendor|human|90 seconds)\b/.test(combined)) {
-    if (meme.includes("futurama fry")) return 0.22;
-    if (meme.includes("is this a pigeon")) return 0.16;
-    if (meme.includes("roll safe")) return 0.12;
-  }
-  if (/\b(dashboards|metric|definition|rather maintain|agree on one)\b/.test(combined)) {
-    if (meme.includes("uno draw")) return 0.22;
-    if (meme.includes("two paths")) return 0.16;
-    if (meme.includes("two buttons")) return 0.12;
-  }
-  if (/\b(say the line|spreadsheets|extra steps|new app launches)\b/.test(combined)) {
-    if (meme.includes("say the line")) return 0.3;
-    if (meme.includes("same picture")) return 0.16;
-    if (meme.includes("change my mind")) return 0.1;
-  }
-  if (/\b(ai button|buttons|settings|billing|everyone gets)\b/.test(combined)) {
-    if (meme.includes("oprah")) return 0.24;
-    if (meme.includes("yo dawg")) return 0.16;
-    if (meme.includes("expanding brain")) return 0.12;
-  }
-  if (/\b(blockers|nobody wants to choose|delayed|choose direction)\b/.test(combined)) {
-    if (meme.includes("scroll of truth")) return 0.22;
-    if (meme.includes("change my mind")) return 0.16;
-    if (meme.includes("two buttons")) return 0.12;
-  }
-
-  return 0;
-}
-
-function mismatchPenalty(candidate: Candidate, context: TweetContext): number {
-  const meme = candidate.name.toLowerCase();
-  const text = [
-    context.keywords.join(" "),
-    context.joke_target,
-    context.social_dynamic,
-    context.humor_angle,
-    context.ideal_meme_vibe,
-  ].join(" ").toLowerCase();
-
-  if (meme.includes("surprised pikachu")) {
-    const fitsShock =
-      /consequence|shocked|shock|who could|exploded|skipped|deployed|roadmap|obvious/.test(text);
-    return fitsShock ? 0 : 0.22;
-  }
-
-  if (meme.includes("this is fine")) {
-    const fitsCope = /cope|fine|pretend|pretending|calm|chaos|fire|down|prod|dashboard|suffering/.test(text);
-    return fitsCope ? 0 : 0.22;
-  }
-
-  if (meme.includes("one does not simply")) {
-    const fitsWarning = /difficult|difficulty|warning|simply|cannot|can't|asking|read|deploy|survive|impossible/.test(text);
-    return fitsWarning ? 0 : 0.1;
-  }
-
-  return 0;
-}
-
-function socialComedyFit(name: string, searchable: string, context: TweetContext): number {
-  const meme = name.toLowerCase();
-  const dynamic = `${context.social_dynamic} ${context.humor_angle} ${context.ideal_meme_vibe}`.toLowerCase();
-  let boost = 0;
-
-  if (/predictable|consequence|self-own|self own|shocker|who could/.test(dynamic)) {
-    if (/surprised pikachu|roll safe|one does not simply/.test(meme)) boost += 0.08;
-    if (/consequences|mock_shock|bad_logic|predictable_take/.test(searchable)) boost += 0.04;
-  }
-
-  if (/cope|pretending|fine|chaos|calm|normal/.test(dynamic)) {
-    if (/this is fine|hide the pain|panik kalm panik/.test(meme)) boost += 0.08;
-    if (/cope|calm amid chaos|suffering|panic/.test(searchable)) boost += 0.04;
-  }
-
-  if (/rebrand|mislabel|calling|fake distinction|same thing/.test(dynamic)) {
-    if (/is this a pigeon|they're the same picture|tuxedo winnie|change my mind/.test(meme)) boost += 0.07;
-    if (/misidentification|same_thing|equivalence|fake distinction/.test(searchable)) boost += 0.04;
-  }
-
-  if (/temptation|distraction|shiny|fomo|rewrite|new/.test(dynamic)) {
-    if (/distracted boyfriend|running away balloon|left exit/.test(meme)) boost += 0.07;
-    if (/temptation|distraction|preference_swerve|hype chasing/.test(searchable)) boost += 0.04;
-  }
-
-  if (/asking|begging|read|again|support/.test(dynamic)) {
-    if (/once again asking|one does not simply|y'all got any more/.test(meme)) boost += 0.07;
-    if (/repeated_request|asking_nicely|difficulty_warning/.test(searchable)) boost += 0.04;
-  }
-
-  if (/celebrat|win|hype|cheer|appreciat/.test(dynamic)) {
-    if (/laughing leo|leonardo dicaprio cheers|epic handshake|oprah/.test(meme)) boost += 0.07;
-    if (/celebration|excitement|cheers|appreciation|unity/.test(searchable)) boost += 0.04;
-  }
-
-  return Math.min(0.14, boost);
-}
-
-const INTENT_USE_CASES: Record<TweetContext["intent"], string[]> = {
-  "counter-argument": [
-    "counter_argument",
-    "calling_out",
-    "difficulty_warning",
-    "equivalence",
-    "uncomfortable_truth",
-    "rejection_of_facts",
-  ],
-  agreement: [
-    "agreement",
-    "common_ground",
-    "unity",
-    "knowing_laughter",
-    "screaming_agreement",
-    "appreciation",
-    "cheers",
-  ],
-  "sharing-opinion": ["hot_take", "opinion", "contrarianism", "no_punchline", "rhetorical_question"],
-  venting: [
-    "frustration",
-    "cope",
-    "coping",
-    "suffering_in_silence",
-    "polite_suffering",
-    "looming_dread",
-    "rollercoaster",
-  ],
-  asking: ["asking", "asking_nicely", "repeated_request", "searching", "rhetorical_question"],
-  celebrating: ["celebration", "excitement", "appreciation", "cheers", "everyone_gets_something"],
-  dunking: [
-    "dunking",
-    "mock_shock",
-    "consequences",
-    "bad_logic",
-    "mocking_quote",
-    "shutting_down",
-    "predictable_take",
-    "say_the_line",
-  ],
-  "self-deprecating": [
-    "self_deprecation",
-    "self_owning",
-    "relatability",
-    "awkward_lookaway",
-    "bad_impulse",
-    "plans_falling_apart",
-  ],
-};
-
-const TONE_SIGNALS: Record<TweetContext["tone"], string[]> = {
-  sarcastic: ["sarcasm", "mocking_quote", "mock_shock", "fake_wisdom", "bad_logic"],
-  earnest: ["agreement", "appreciation", "common_ground"],
-  rant: ["frustration", "screaming_agreement", "shutting_down", "looming_dread"],
-  celebratory: ["celebration", "excitement", "cheers"],
-  "hot-take": ["hot_take", "opinion", "contrarianism", "superiority"],
-  question: ["asking", "confusion", "squinting_doubt", "rhetorical_question"],
-  absurdist: ["absurdist", "rollercoaster", "escalating_regret", "overdoing_it"],
-  wholesome: ["wholesome", "agreement", "appreciation", "unity"],
-  "self-deprecating": ["self_deprecation", "relatability", "suffering_in_silence", "cope"],
-};
-
-function normalizeTaxonomyLabel(label: string): string {
-  return label.toLowerCase().trim().replace(/[-\s]+/g, "_");
-}
-
-function roundScore(score: number): number {
-  return Math.round(score * 1000) / 1000;
-}
-
-function isUsableEmbedding(embedding: number[]): boolean {
-  return embedding.some((value) => Math.abs(value) > 0.000001);
-}
-
-function buildMatchExplanation(
-  c: { similarity: number; system_tags: { emotion?: string; vibes?: string[] } },
-  ctx: TweetContext
-): string {
-  const pct = Math.round(Math.max(0, Math.min(1, c.similarity)) * 100);
-  const vibe = (c.system_tags.vibes || [])[0];
-  const emo = c.system_tags.emotion;
-  const parts: string[] = [`${pct}% vibe match`];
-  if (vibe) parts.push(vibe);
-  else if (emo) parts.push(emo);
-  parts.push(`for ${ctx.tone} ${ctx.intent.replace(/_/g, " ")}`);
-  return parts.join(" • ");
 }

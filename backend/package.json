@@ -40,10 +40,10 @@
     "eval:benchmark-audit": "tsx scripts/validate-suggestion-benchmark.ts",
     "eval:usage-feedback": "tsx scripts/usage-feedback-report.ts",
     "eval:suggestions": "tsx scripts/evaluate-suggestions.ts",
-    "eval:quality": "tsx scripts/evaluate-suggestions.ts --mode smart --limit 5 --min-top3 0.55 --min-top5 0.75 --min-caption 0.7 --min-layout 0.9 --min-overlay 0.8 --min-rejected-avoid 0.9",
-    "eval:quality:fast": "tsx scripts/evaluate-suggestions.ts --mode fast --limit 5 --min-top3 0.55 --min-top5 0.75 --min-caption 0.7 --min-layout 0.9 --min-overlay 0.8 --min-rejected-avoid 0.9"
+    "eval:quality": "tsx scripts/evaluate-suggestions.ts --limit 5 --min-top3 0.55 --min-top5 0.75 --min-caption 0.7 --min-layout 0.9 --min-overlay 0.8 --min-rejected-avoid 0.9"
   },
   "dependencies": {
+    "@memedrop/shared": "0.0.1",
     "@ai-sdk/openai": "^3.0.50",
     "@fastify/cors": "^11.0.0",
     "@fastify/static": "^9.1.3",

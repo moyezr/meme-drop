@@ -69,7 +69,7 @@ export const userMemes = pgTable(
   (table) => [index("idx_user_memes_user_id").on(table.userId)]
 );
 
-// Usage events for future personalization
+// Usage events for analytics and recommendation feedback.
 export const usageEvents = pgTable(
   "usage_events",
   {

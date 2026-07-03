@@ -16,7 +16,6 @@ const suggestRequestSchema = z.object({
   limit: z.number().int().min(1).max(10).optional(),
   refresh: z.boolean().optional(),
   cache_key: z.string().trim().min(1).max(240).optional(),
-  mode: z.enum(["fast", "smart"]).optional(),
 });
 
 const captionRequestSchema = z.object({
@@ -30,7 +29,7 @@ export const suggestRoutes: FastifyPluginAsync = async (app) => {
     if (!parsed.success) {
       return sendValidationError(reply, parsed.error);
     }
-    const { tweet_text, limit, refresh, cache_key, mode } = parsed.data;
+    const { tweet_text, limit, refresh, cache_key } = parsed.data;
     const userId = await resolveRequestUserId(request, reply);
     if (!userId) return;
 
@@ -39,7 +38,6 @@ export const suggestRoutes: FastifyPluginAsync = async (app) => {
         limit,
         refresh,
         cacheKey: cache_key,
-        mode,
         userId,
       });
       return { suggestions };

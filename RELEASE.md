@@ -147,7 +147,7 @@ npm run quality:promotion
 npm run quality:security
 npm run quality:benchmark
 npm run quality:dataset-plan
-MEMEDROP_SUGGESTION_LOGS=compact npm run quality:fast
+MEMEDROP_SUGGESTION_LOGS=compact npm run quality:suggestions
 ```
 
 CI-safe release dry run:
@@ -188,7 +188,7 @@ npm run dataset:review-decisions:promotion
 npm run quality:dataset-plan
 npm run dataset:promote-reviewed
 npm run quality:promotion
-MEMEDROP_SUGGESTION_LOGS=compact npm run quality:fast
+MEMEDROP_SUGGESTION_LOGS=compact npm run quality:suggestions
 ```
 
 Only promote reviewed templates in small batches. The promotion planner writes `.memedrop/template-promotion-plan.json` and identifies ready approvals, blocked approvals, unreviewed clean drafts, and benchmark-case stubs. The promotion compiler writes `shared/src/data/meme-template-manifest.promoted.json`; runtime lookup includes those templates only after they are marked `verified` by the compiler.

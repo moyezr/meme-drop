@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 
 const args = parseArgs(process.argv.slice(2));
 const strict = Boolean(args.strict);
-const withFastEval = Boolean(args["with-fast-eval"]);
+const withSuggestionEval = Boolean(args["with-suggestion-eval"]);
 const skipProductionEnv = Boolean(args["skip-production-env"]);
 const apiBaseUrl = String(
   args["api-base-url"] ||
@@ -44,8 +44,8 @@ try {
     ], env);
   }
 
-  if (withFastEval) {
-    run("Fast suggestion quality gate", ["npm", "run", "quality:fast"], {
+  if (withSuggestionEval) {
+    run("Suggestion quality gate", ["npm", "run", "quality:suggestions"], {
       ...env,
       MEMEDROP_SUGGESTION_LOGS: env.MEMEDROP_SUGGESTION_LOGS || "compact",
     });

@@ -13,6 +13,8 @@ export type {
   TweetContext,
   SuggestionRequest,
   SuggestionResult,
+  MemeTextOverlay,
+  MemeTextRegion,
 } from "./types/suggestion.js";
 
 export type {

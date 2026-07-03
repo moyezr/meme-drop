@@ -263,7 +263,7 @@ function planTemplate(
     warnings: visualWarnings,
     suggested_next_step:
       status === "approved_ready"
-        ? "include in the next small promotion batch, then run quality:promotion and quality:fast"
+        ? "include in the next small promotion batch, then run quality:promotion and quality:suggestions"
         : "fix blockers before promotion; use the benchmark stub as the starting point if coverage is missing",
     benchmark_case_id: decision.benchmark_case_id,
     benchmark_stub: decision.benchmark_case_id && !context.benchmarkById.has(decision.benchmark_case_id)

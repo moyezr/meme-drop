@@ -1,118 +1,6 @@
-import { generateObject } from "ai";
-import { z } from "zod";
-import { openrouter, QWEN_PLUS_MODEL } from "./llm-provider.js";
+import type { TweetContext } from "@memedrop/shared";
 
-const CONTEXT_ANALYSIS_TIMEOUT_MS = Number(process.env.MEMEDROP_CONTEXT_TIMEOUT_MS || 5000);
-
-const schema = z.object({
-  sentiment: z.enum(["positive", "negative", "neutral"]),
-  tone: z.enum([
-    "sarcastic",
-    "earnest",
-    "rant",
-    "celebratory",
-    "hot-take",
-    "question",
-    "absurdist",
-    "wholesome",
-    "self-deprecating",
-  ]),
-  topic: z.enum([
-    "tech",
-    "finance",
-    "politics",
-    "sports",
-    "entertainment",
-    "personal",
-    "culture",
-    "relationships",
-    "other",
-  ]),
-  intent: z.enum([
-    "counter-argument",
-    "agreement",
-    "sharing-opinion",
-    "venting",
-    "asking",
-    "celebrating",
-    "dunking",
-    "self-deprecating",
-  ]),
-  intensity: z.number().min(0).max(1),
-  reply_style: z
-    .string()
-    .describe(
-      "Two to four words describing the ideal reply style, e.g. 'sarcastic agreement', 'exaggerated disappointment', 'calm dunk'"
-    ),
-  ideal_meme_vibe: z
-    .string()
-    .describe(
-      "One sentence describing the vibe of the ideal meme reply. Should read like meme taxonomy: e.g. 'calm-above-the-chaos energy — This Is Fine territory', or 'loud mocking repetition with deranged face'. 12-20 words."
-    ),
-  joke_target: z
-    .string()
-    .describe(
-      "Who or what the meme reply should make fun of, sympathize with, or spotlight. Use a concrete noun phrase from the tweet when possible."
-    ),
-  social_dynamic: z
-    .string()
-    .describe(
-      "The social move the reply should make, e.g. 'mocking a predictable self-own', 'joining the complaint', 'calling out rebrand nonsense', 'celebrating a clean win'."
-    ),
-  humor_angle: z
-    .string()
-    .describe(
-      "A short description of the funniest angle for a meme reply. Name the tension, reversal, or absurdity; do not write the caption."
-    ),
-  keywords: z
-    .array(z.string())
-    .min(2)
-    .max(6)
-    .describe(
-      "2-6 salient keywords from the tweet itself (nouns, named entities, distinctive verbs) that would help match a meme about those specific things."
-    ),
-});
-
-export type TweetContext = z.infer<typeof schema>;
-
-export async function analyzeTweet(tweetText: string): Promise<TweetContext> {
-  try {
-    const { object } = await generateObject({
-      model: openrouter.chat(QWEN_PLUS_MODEL),
-      schema,
-      temperature: 0.3,
-      maxOutputTokens: 700,
-      maxRetries: 0,
-      timeout: { totalMs: CONTEXT_ANALYSIS_TIMEOUT_MS },
-      system: `You classify tweets to pick the funniest meme reply a human would actually post. Return JSON only. Do not include reasoning, markdown, or extra keys.
-
-The JSON must contain exactly these keys:
-- sentiment: one of positive, negative, neutral
-- tone: one of sarcastic, earnest, rant, celebratory, hot-take, question, absurdist, wholesome, self-deprecating
-- topic: one of tech, finance, politics, sports, entertainment, personal, culture, relationships, other
-- intent: one of counter-argument, agreement, sharing-opinion, venting, asking, celebrating, dunking, self-deprecating
-- intensity: number from 0 to 1
-- reply_style: string
-- ideal_meme_vibe: string
-- joke_target: string
-- social_dynamic: string
-- humor_angle: string
-- keywords: array of 2 to 6 strings
-
-Focus on the social move, not just topic or emotion:
-- Who or what is the joke aimed at?
-- Is the reply joining the complaint, dunking on someone, self-owning, celebrating, or pointing out absurdity?
-- What meme energy would make the reply land without explaining the joke?
-
-Lean toward bold, specific reply_style descriptions — 'perfect dunk', 'sincere cheers', 'exhausted agreement' — not generic ones like 'neutral response'. The ideal_meme_vibe should sound like something a meme connoisseur would say out loud.`,
-      prompt: `Analyze this tweet and return only the required JSON object:\n\n"${tweetText}"`,
-    });
-    return object;
-  } catch (err) {
-    console.warn("[MemeDrop] Tweet analysis failed, using heuristic context:", err);
-    return heuristicTweetContext(tweetText);
-  }
-}
+export type { TweetContext } from "@memedrop/shared";
 
 export function heuristicTweetContext(tweetText: string): TweetContext {
   const text = tweetText.toLowerCase();
@@ -127,14 +15,24 @@ export function heuristicTweetContext(tweetText: string): TweetContext {
   );
 
   const negative = /\b(bad|broken|hate|awful|terrible|worst|angry|mad|fail|failed|annoying)\b/.test(text);
-  const positive = /\b(good|great|love|best|win|won|happy|nice|amazing|finally|lol|lmao)\b/.test(text);
+  const positive =
+    /\b(good|great|love|best|win|won|happy|nice|amazing|lol|lmao)\b/.test(text) ||
+    /\b(finished|succeeded|successful|shipped|launched)\b/.test(text) &&
+      /\b(quiet|clean|green|without|nobody had to|no rollback)\b/.test(text);
   const sarcastic = /\b(sure|totally|obviously|of course|yeah right|lol|lmao)\b/.test(text);
   const question = tweetText.includes("?");
+  const rhetoricalQuestion =
+    question &&
+    /\b(who could have predicted|what could (?:possibly )?go wrong|how could this happen|who saw that coming|somehow)\b/.test(
+      text
+    );
   const rant = /!{2,}|\b(always|never|again|ridiculous|insane)\b/.test(text);
 
-  const tone: TweetContext["tone"] = question
-    ? "question"
-    : sarcastic
+  const tone: TweetContext["tone"] = rhetoricalQuestion
+    ? "sarcastic"
+    : question
+      ? "question"
+      : sarcastic
       ? "sarcastic"
       : rant
         ? "rant"
@@ -142,9 +40,11 @@ export function heuristicTweetContext(tweetText: string): TweetContext {
           ? "celebratory"
           : "hot-take";
 
-  const intent: TweetContext["intent"] = question
-    ? "asking"
-    : negative && (sarcastic || rant)
+  const intent: TweetContext["intent"] = rhetoricalQuestion
+    ? "dunking"
+    : question
+      ? "asking"
+      : negative && (sarcastic || rant)
       ? "dunking"
       : negative
         ? "venting"
@@ -180,8 +80,155 @@ export function heuristicTweetContext(tweetText: string): TweetContext {
         : intent === "venting"
           ? "everyone is pretending the bad situation is normal"
           : "the funniest part is the obvious tension in the post",
+    core_claim: tweetText.trim().replace(/\s+/g, " "),
+    implied_context:
+      intent === "dunking"
+        ? "the speaker's claim or behavior creates an obvious self-own"
+        : intent === "venting"
+          ? "the audience recognizes this as a recurring shared frustration"
+          : "the audience is expected to recognize the unstated contrast",
+    comedic_tension:
+      intent === "dunking"
+        ? "what they expected vs the predictable consequence"
+        : intent === "venting"
+          ? "what should be normal vs the recurring mess"
+          : "the stated point vs the obvious subtext",
+    caption_anchors: buildHeuristicCaptionAnchors(tweetText, keywords),
     keywords: keywords.length >= 2 ? keywords.slice(0, 6) : ["tweet", "reaction"],
   };
+}
+
+function buildHeuristicCaptionAnchors(tweetText: string, keywords: string[]): string[] {
+  const lowerTweet = tweetText.toLowerCase();
+  const words = Array.from(lowerTweet.matchAll(/[a-z0-9][a-z0-9_'’-]*/g)).map(
+    (match, index) => ({
+      word: match[0],
+      index,
+      start: match.index,
+      end: match.index + match[0].length,
+    })
+  );
+  const candidates: Array<{ phrase: string; score: number; index: number }> = [];
+
+  for (const { word, index } of words) {
+    if (word.length < 3 || isWeakAnchorWord(word)) continue;
+    candidates.push({ phrase: word, score: termSpecificity(word), index });
+  }
+
+  for (let i = 0; i < words.length - 1; i += 1) {
+    const first = words[i];
+    const second = words[i + 1];
+    const separator = lowerTweet.slice(first.end, second.start);
+    if (
+      !/^\s+$/.test(separator) ||
+      first.word.length < 3 ||
+      second.word.length < 3 ||
+      isWeakAnchorWord(first.word) ||
+      isWeakAnchorWord(second.word)
+    ) {
+      continue;
+    }
+    const actionBonus = /(ed|ing)$/.test(first.word) ? 2 : 0;
+    candidates.push({
+      phrase: `${first.word} ${second.word}`,
+      score: termSpecificity(first.word) + termSpecificity(second.word) + actionBonus,
+      index: first.index,
+    });
+  }
+
+  for (let i = 0; i < words.length - 2; i += 1) {
+    const first = words[i];
+    const second = words[i + 1];
+    const third = words[i + 2];
+    const firstSeparator = lowerTweet.slice(first.end, second.start);
+    const secondSeparator = lowerTweet.slice(second.end, third.start);
+    if (
+      !/^\s+$/.test(firstSeparator) ||
+      !/^\s+$/.test(secondSeparator) ||
+      [first.word, second.word, third.word].some(
+        (word) => word.length < 3 || isWeakAnchorWord(word)
+      )
+    ) {
+      continue;
+    }
+    const outcomeBonus = /(explode|exploded|broken|broke|failed|failing|down)$/.test(third.word)
+      ? 6
+      : 0;
+    candidates.push({
+      phrase: `${first.word} ${second.word} ${third.word}`,
+      score:
+        termSpecificity(first.word) +
+        termSpecificity(second.word) +
+        termSpecificity(third.word) +
+        outcomeBonus,
+      index: first.index,
+    });
+  }
+
+  for (const keyword of keywords) {
+    const index = words.find((item) => item.word === keyword.toLowerCase())?.index ?? words.length;
+    candidates.push({
+      phrase: keyword.toLowerCase(),
+      score: termSpecificity(keyword) + 1,
+      index,
+    });
+  }
+
+  const anchors = Array.from(
+    new Map(
+      candidates
+        .sort((a, b) => b.score - a.score || a.index - b.index)
+        .map((candidate) => [candidate.phrase, candidate])
+    ).values()
+  )
+    .slice(0, 6)
+    .map((candidate) => candidate.phrase);
+
+  return anchors.length >= 2 ? anchors : ["tweet", "reaction"];
+}
+
+function termSpecificity(term: string): number {
+  let score = term.length >= 7 ? 2 : 1;
+  if (
+    /prod|dashboard|launch|test|deploy|payment|rewrite|framework|bug|flag|spreadsheet|macro|platform|meeting|calendar|slack|message|roadmap|deck|error|review|migration|agent/.test(
+      term
+    )
+  ) {
+    score += 4;
+  }
+  return score;
+}
+
+function isWeakAnchorWord(word: string): boolean {
+  return COMMON_WORDS.has(word) || new Set([
+    "a",
+    "after",
+    "an",
+    "and",
+    "before",
+    "but",
+    "could",
+    "every",
+    "everyone",
+    "how",
+    "into",
+    "not",
+    "only",
+    "or",
+    "someone",
+    "somehow",
+    "the",
+    "predicted",
+    "really",
+    "than",
+    "then",
+    "while",
+    "who",
+    "why",
+    "thing",
+    "things",
+    "would",
+  ]).has(word);
 }
 
 function pickJokeTarget(tweetText: string, keywords: string[]): string {

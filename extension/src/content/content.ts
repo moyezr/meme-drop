@@ -424,7 +424,6 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
       limit: 5,
       refresh,
       cache_key: cacheKey,
-      mode: "fast",
     },
   });
 }

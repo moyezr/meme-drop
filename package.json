@@ -34,7 +34,7 @@
     "launch:status": "node scripts/launch-status.mjs",
     "store-listing:init": "npm run init:store-listing --workspace=extension --",
     "release:dry-run": "node scripts/release-candidate.mjs",
-    "release:candidate": "node scripts/release-candidate.mjs --strict --with-fast-eval",
+    "release:candidate": "node scripts/release-candidate.mjs --strict --with-suggestion-eval",
     "dataset:expansion-report": "npm run manifest:expansion-report --workspace=backend -- --out .memedrop/template-expansion-report.json",
     "dataset:qa-expansion": "npm run dataset:expansion-report && npm run manifest:qa:expansion --workspace=backend",
     "dataset:taste-review": "npm run manifest:taste-review --workspace=backend",
@@ -46,13 +46,10 @@
     "dataset:review-decisions:promotion": "npm run manifest:review-decisions:promotion --workspace=backend",
     "dataset:promote-reviewed": "npm run manifest:promote-reviewed --workspace=backend",
     "dataset:usage-feedback": "npm run eval:usage-feedback --workspace=backend --",
-    "quality:fast": "npm run eval:quality:fast --workspace=backend",
+    "quality:suggestions": "npm run eval:quality --workspace=backend",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:init": "npm run db:init --workspace=backend",
     "db:studio": "npm run db:studio --workspace=backend"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.29.7"
   }
 }

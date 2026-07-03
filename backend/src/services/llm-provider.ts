@@ -2,6 +2,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const QWEN_PLUS_MODEL = "qwen/qwen3.6-plus";
+export const MEME_QUALITY_MODEL =
+  process.env.OPENROUTER_MEME_MODEL || "z-ai/glm-5.2";
 export const OPENROUTER_EMBEDDING_MODEL = "openai/text-embedding-3-small";
 
 export function getOpenRouterApiKey(): string | undefined {
@@ -15,27 +17,9 @@ export function openRouterHeaders(): Record<string, string> {
   };
 }
 
-async function openRouterFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  if (init?.body && typeof init.body === "string") {
-    try {
-      const body = JSON.parse(init.body) as Record<string, unknown>;
-      body.reasoning = { effort: "none", exclude: true };
-      return fetch(input, {
-        ...init,
-        body: JSON.stringify(body),
-      });
-    } catch {
-      // Fall through to the original request body.
-    }
-  }
-
-  return fetch(input, init);
-}
-
 export const openrouter = createOpenAI({
   name: "openrouter",
   baseURL: OPENROUTER_BASE_URL,
   apiKey: getOpenRouterApiKey(),
   headers: openRouterHeaders(),
-  fetch: openRouterFetch,
 });

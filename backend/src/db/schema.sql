@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS user_memes (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Usage events for future personalization
+-- Usage events for analytics and recommendation feedback.
 CREATE TABLE IF NOT EXISTS usage_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,

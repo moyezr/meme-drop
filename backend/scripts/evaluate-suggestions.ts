@@ -93,7 +93,6 @@ const GENERIC_CAPTION_PATTERNS = [
 ];
 
 const args = parseArgs(process.argv.slice(2));
-const mode = args.mode === "smart" ? "smart" : "fast";
 const source = args.source === "all" || args.source === "user" ? args.source : "global";
 const limit = Number(args.limit || 5);
 const benchmarkPath = path.resolve(args.file || DEFAULT_BENCHMARK_PATH);
@@ -102,11 +101,11 @@ const qualityGates = buildQualityGates(args);
 async function main() {
   const benchmark = JSON.parse(fs.readFileSync(benchmarkPath, "utf8")) as BenchmarkFile;
   const results: CaseResult[] = [];
+  const selectedCases = selectBenchmarkCases(benchmark.cases, args);
 
-  for (const testCase of benchmark.cases) {
+  for (const testCase of selectedCases) {
     const suggestions = await getSuggestions(testCase.tweet, {
       limit,
-      mode,
       source,
       refresh: true,
     });
@@ -121,7 +120,6 @@ async function main() {
   const gates = evaluateQualityGates(summary, qualityGates);
   const report = {
     generated_at: new Date().toISOString(),
-    mode,
     source,
     limit,
     summary,
@@ -137,6 +135,40 @@ async function main() {
 
   printHumanReport(report);
   if (gates.some((gate) => !gate.passed)) process.exitCode = 1;
+}
+
+function selectBenchmarkCases(
+  cases: BenchmarkCase[],
+  rawArgs: Record<string, string | boolean>
+): BenchmarkCase[] {
+  const requestedIds =
+    typeof rawArgs["case-ids"] === "string"
+      ? new Set(
+          rawArgs["case-ids"]
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean)
+        )
+      : null;
+  const filtered = requestedIds
+    ? cases.filter((testCase) => testCase.id && requestedIds.has(testCase.id))
+    : cases;
+
+  if (requestedIds) {
+    const foundIds = new Set(filtered.map((testCase) => testCase.id));
+    const missingIds = Array.from(requestedIds).filter((id) => !foundIds.has(id));
+    if (missingIds.length > 0) {
+      throw new Error(`Unknown --case-ids: ${missingIds.join(", ")}`);
+    }
+  }
+
+  const rawLimit = rawArgs["case-limit"];
+  if (typeof rawLimit !== "string") return filtered;
+  const caseLimit = Number(rawLimit);
+  if (!Number.isInteger(caseLimit) || caseLimit < 1) {
+    throw new Error(`Invalid --case-limit value: ${rawLimit}`);
+  }
+  return filtered.slice(0, caseLimit);
 }
 
 function scoreCase(testCase: BenchmarkCase, suggestions: SuggestionResult[]): CaseResult {
@@ -510,14 +542,13 @@ async function judgeCase(testCase: BenchmarkCase, result: CaseResult): Promise<J
 }
 
 function printHumanReport(report: {
-  mode: string;
   source: string;
   limit: number;
   summary: BenchmarkSummary;
   gates: QualityGate[];
   results: CaseResult[];
 }) {
-  console.log(`MemeDrop suggestion benchmark (${report.mode}, ${report.source}, top ${report.limit})`);
+  console.log(`MemeDrop suggestion benchmark (${report.source}, top ${report.limit})`);
   console.log(
     `top1=${pct(report.summary.top1)} top3=${pct(report.summary.top3)} top5=${pct(report.summary.top5)} caption=${pct(report.summary.mean_caption_score)} layout=${pct(report.summary.mean_layout_fit_score)} overlay=${pct(report.summary.overlay_coverage)} rejectedAvoid=${pct(report.summary.rejected_avoidance)} userSource=${report.summary.user_source_suggestions} judge=${judgePct(report.summary.mean_judge_score)}`
   );

@@ -6,7 +6,7 @@ process.env.DATABASE_URL ||= "postgresql://test";
 const { safeLogCacheKey, safeLogTweetText } = await import("../src/services/suggestion-engine.js");
 
 test("safeLogCacheKey hashes cache keys instead of exposing tweet text", () => {
-  const cacheKey = "user:abc|text:prod is down and leadership wants launch|limit:5|mode:fast";
+  const cacheKey = "user:abc|text:prod is down and leadership wants launch|limit:5|quality:v1";
   const logged = safeLogCacheKey(cacheKey);
 
   assert.match(logged, /^sha256:[a-f0-9]{16}$/);

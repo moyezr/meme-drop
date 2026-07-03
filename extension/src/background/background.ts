@@ -12,12 +12,6 @@ interface Suggestion {
   source: "user" | "global";
   tweet_text?: string;
   tweet_context?: Record<string, unknown>;
-  score_breakdown?: {
-    similarity: number;
-    personalized: number;
-    rerank?: number;
-    diversity: number;
-  };
   image_data_url?: string | null;
 }
 
@@ -97,7 +91,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       refresh: message.payload.refresh,
       limit: message.payload.limit,
       cacheKey: message.payload.cache_key,
-      mode: message.payload.mode,
       onInitial: (suggestions) => {
         sentInitialSuggestions = true;
         if (sender.tab?.id) {
@@ -188,13 +181,11 @@ async function fetchSuggestions(
     refresh?: boolean;
     limit?: number;
     cacheKey?: string;
-    mode?: "fast" | "smart";
     onInitial?: (suggestions: Suggestion[]) => void;
     onMedia?: (suggestion: Suggestion) => void;
   } = {}
 ): Promise<Suggestion[]> {
-  const mode = options.mode || "fast";
-  const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${options.limit || 5}|mode:${mode}`;
+  const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${options.limit || 5}|quality:v1`;
   if (!options.refresh) {
     const cached = readCachedSuggestions(cacheKey);
     if (cached) return cached;
@@ -220,14 +211,13 @@ async function fetchFreshSuggestions(
     refresh?: boolean;
     limit?: number;
     cacheKey?: string;
-    mode?: "fast" | "smart";
     onInitial?: (suggestions: Suggestion[]) => void;
     onMedia?: (suggestion: Suggestion) => void;
   },
   cacheKey: string
 ): Promise<Suggestion[]> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45000);
+  const timer = setTimeout(() => controller.abort(), 75000);
   let res: Response;
   try {
     res = await fetch(apiUrl("/api/v1/suggest"), {
@@ -239,7 +229,6 @@ async function fetchFreshSuggestions(
         limit: options.limit,
         refresh: options.refresh,
         cache_key: options.cacheKey,
-        mode: options.mode,
       }),
     });
     if (!res.ok) {

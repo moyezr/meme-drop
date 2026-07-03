@@ -35,6 +35,10 @@ export interface TweetContext {
   joke_target: string;
   social_dynamic: string;
   humor_angle: string;
+  core_claim: string;
+  implied_context: string;
+  comedic_tension: string;
+  caption_anchors: string[];
   keywords: string[];
 }
 
@@ -43,7 +47,6 @@ export interface SuggestionRequest {
   limit?: number;
   refresh?: boolean;
   cache_key?: string;
-  mode?: "fast" | "smart";
 }
 
 export interface SuggestionResult {
@@ -56,12 +59,6 @@ export interface SuggestionResult {
   score: number;
   source: "user" | "global";
   tweet_context?: TweetContext;
-  score_breakdown?: {
-    similarity: number;
-    personalized: number;
-    rerank?: number;
-    diversity: number;
-  };
 }
 
 export interface MemeTextOverlay {

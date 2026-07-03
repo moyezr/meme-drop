@@ -53,7 +53,7 @@ Use a promotion funnel, not a bulk import:
 18. Import the clean edited cases with `npm run dataset:benchmark-import -- --file .memedrop/suggestion-benchmark-stubs.json --write`, then run `npm run dataset:review-decisions:promotion`.
 19. Run `npm run quality:dataset-plan` before promotion so approved-but-blocked templates do not silently accumulate.
 20. Run `npm run dataset:promote-reviewed` to compile approved decisions into `shared/src/data/meme-template-manifest.promoted.json`.
-21. Promote only a small batch at a time, then run `npm run quality:promotion` and `npm run quality:fast`.
+21. Promote only a small batch at a time, then run `npm run quality:promotion` and `npm run quality:suggestions`.
 
 Keep verified templates conservative. Draft volume can grow quickly; verified runtime volume should grow only when the template has passed mechanical audit, rendered QA, and suggestion evals.
 
@@ -73,10 +73,10 @@ The expansion report is intentionally different from the promotion queue:
 
 ## Evaluation Workflow
 
-Run the benchmark for fast iteration:
+Run the suggestion benchmark:
 
 ```bash
-npm run eval:suggestions --workspace=backend -- --mode fast --limit 5
+npm run eval:suggestions --workspace=backend -- --limit 5
 ```
 
 Run the quality gate before trusting ranking or caption changes:
@@ -93,12 +93,6 @@ npm run quality:benchmark
 
 The benchmark audit checks case count, category diversity, expected/rejected family diversity, no expected/rejected overlap inside a case, verified overlay-template coverage, and caps any single meme family from dominating the benchmark.
 
-Run the user-facing fast path gate when optimizing interactive latency:
-
-```bash
-npm run eval:quality:fast --workspace=backend
-```
-
 The quality gate checks:
 
 - `top3`: expected meme family appears near the top.
@@ -111,7 +105,7 @@ The quality gate checks:
 Use `--judge` for slower LLM-as-judge checks when comparing larger ranking or captioning changes:
 
 ```bash
-npm run eval:suggestions --workspace=backend -- --mode smart --limit 5 --judge --min-judge 3.5
+npm run eval:suggestions --workspace=backend -- --limit 5 --judge --min-judge 3.5
 ```
 
 ## Automated Tests
@@ -184,15 +178,15 @@ Consider a dedicated vector store only if:
 - The catalogue grows into hundreds of thousands of embeddings.
 - You need advanced hybrid retrieval features that are painful in Postgres.
 
-## Speed Priorities
+## Pipeline Priorities
 
 The slow path is LLM work, not vector search.
 
 Recommended order:
 
-1. Use `mode: "fast"` for the interactive extension path; it skips LLM reranking while keeping captions.
+1. Keep LLM context analysis and meme reranking enabled for every user-facing request.
 2. Cache tweet analysis and embeddings by normalized tweet text.
-3. Retrieve more candidates with pgvector, then use cheaper deterministic scoring before optional LLM rerank.
+3. Retrieve candidates with pgvector, then rerank a bounded shortlist with the quality model.
 4. Caption only the top few verified templates.
 5. Precompute richer meme descriptors, example contexts, and humor tags offline.
 6. Stream partial suggestions without captions, then hydrate captioned previews as they finish.
