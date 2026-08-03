@@ -12,22 +12,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.13
+
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          uv sync --project apps/api --frozen
 
       - name: Run release dry run
         run: npm run release:dry-run
 
       - name: Upload extension package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: memedrop-extension-release
           path: .memedrop/memedrop-extension-v*.zip
@@ -38,10 +48,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and smoke backend image
         run: npm run quality:backend-image
@@ -75,19 +85,29 @@ jobs:
       MEMEDROP_USE_CONTEXTUAL_CAPTION_FALLBACK: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.13
+
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          uv sync --project apps/api --frozen
 
       - name: Initialize database
         run: npm run db:init
 
-      - name: Run fast suggestion eval
-        run: npm run quality:fast
+      - name: Run suggestion eval
+        run: npm run quality:suggestions
