@@ -33,6 +33,7 @@ class Candidate:
     system_tags: dict[str, Any]
     is_evergreen: bool
     template: MemeTemplate
+    feedback_boost: float = 0.0
 
 
 class SuggestionService:
@@ -65,7 +66,7 @@ class SuggestionService:
             return cached
         started = time.perf_counter()
         context = heuristic_tweet_context(tweet_text)
-        candidates = await self._load_candidates()
+        candidates = await self._load_candidates(user_id)
         if not candidates:
             return []
         fallback = fallback_template_selections(tweet_text, candidates, normalized_limit)
@@ -144,9 +145,10 @@ class SuggestionService:
             regions = build_fallback_caption_set(tweet_text, context, template) or {}
         return build_overlay(template, str(row["name"]), regions)
 
-    async def _load_candidates(self) -> list[Candidate]:
+    async def _load_candidates(self, user_id: UUID) -> list[Candidate]:
         result = []
         seen: set[str] = set()
+        feedback = await self.store.global_meme_feedback_scores(user_id)
         for row in await self.store.list_global_memes():
             template = self.catalog.find_template(
                 str(row["name"]),
@@ -164,6 +166,7 @@ class SuggestionService:
                     system_tags=dict(row.get("systemTags") or {}),
                     is_evergreen=bool(row.get("isEvergreen", True)),
                     template=template,
+                    feedback_boost=feedback.get(str(row["id"]), 0.0),
                 )
             )
         return sorted(result, key=lambda candidate: candidate.template.name)
@@ -216,6 +219,7 @@ def fallback_template_selections(
             0.45
             + hits * 0.06
             + signal_boost
+            + candidate.feedback_boost
             + (0.04 if candidate.is_evergreen else 0)
             + max(0, 0.05 - index * 0.001),
         )

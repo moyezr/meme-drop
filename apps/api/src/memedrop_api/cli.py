@@ -1,18 +1,26 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
+import json
 import os
 import re
+from collections.abc import Sequence
 from pathlib import Path
+from typing import TypedDict, cast
 from urllib.parse import urlparse
 from uuid import UUID
 
+import httpx
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from memedrop_api.config import Settings
-from memedrop_api.db import Database, User
+from memedrop_api.db import Database, Meme, User
+from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
+from memedrop_api.services.usage_feedback import load_usage_feedback
 
 DEV_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 PLACEHOLDER_HOSTS = {
@@ -24,6 +32,11 @@ PLACEHOLDER_HOSTS = {
     "memedrop.example",
     "api.memedrop.example",
 }
+
+
+class RemoteTemplate(TypedDict):
+    name: str
+    url: str
 
 
 def db_init() -> None:
@@ -39,6 +52,76 @@ def db_seed() -> None:
     settings = Settings()  # type: ignore[call-arg]
     asyncio.run(seed_development_user(settings))
     print("[MemeDrop] Development identity seeded.")
+
+
+def db_seed_memes() -> None:
+    settings = Settings()  # type: ignore[call-arg]
+    inserted, skipped = asyncio.run(seed_meme_catalog(settings))
+    print(f"[MemeDrop] Meme catalog seeded: inserted={inserted} skipped={skipped}")
+
+
+async def seed_meme_catalog(settings: Settings) -> tuple[int, int]:
+    catalog = MemeCatalog.load()
+    async with httpx.AsyncClient(timeout=settings.image_download_timeout_ms / 1000) as client:
+        response = await client.get("https://api.imgflip.com/get_memes")
+        response.raise_for_status()
+        remote = cast(list[RemoteTemplate], response.json()["data"]["memes"])
+        by_name = {normalize_template_name(item["name"]): item for item in remote}
+        database = Database(settings.database_url)
+        inserted = 0
+        skipped = 0
+        try:
+            await asyncio.to_thread(
+                Path(settings.meme_storage_path).mkdir, parents=True, exist_ok=True
+            )
+            async with database.session() as session, session.begin():
+                for template in catalog.verified_templates:
+                    item = match_remote_template(template.name, template.aliases, by_name)
+                    existing = await session.scalar(
+                        select(Meme.id).where(func.lower(Meme.name) == template.name.lower())
+                    )
+                    if item is None or existing is not None:
+                        skipped += 1
+                        continue
+                    image = await client.get(item["url"])
+                    image.raise_for_status()
+                    extension = Path(httpx.URL(item["url"]).path).suffix.lower()
+                    if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+                        skipped += 1
+                        continue
+                    filename = f"seed-{template.template_id}{extension}"
+                    await asyncio.to_thread(
+                        (Path(settings.meme_storage_path) / filename).write_bytes, image.content
+                    )
+                    session.add(
+                        Meme(
+                            name=template.name,
+                            file_path=f"/memes/{filename}",
+                            format_type="text_overlay"
+                            if template.supports_overlay
+                            else "reaction_image",
+                            is_evergreen=True,
+                            system_tags={"caption_pattern": template.caption_guidance.pattern},
+                            source_url=item["url"],
+                        )
+                    )
+                    inserted += 1
+        finally:
+            await database.close()
+    return inserted, skipped
+
+
+def match_remote_template(
+    name: str, aliases: Sequence[str], remote_by_name: dict[str, RemoteTemplate]
+) -> RemoteTemplate | None:
+    return next(
+        (
+            remote_by_name.get(normalize_template_name(candidate))
+            for candidate in (name, *aliases)
+            if remote_by_name.get(normalize_template_name(candidate))
+        ),
+        None,
+    )
 
 
 async def seed_development_user(settings: Settings) -> None:
@@ -63,6 +146,42 @@ def validate_production_env() -> None:
             f"warnings={len(warnings)}"
         )
     print(f"[MemeDrop] production env validated (warnings={len(warnings)})")
+
+
+def usage_feedback() -> None:
+    parser = argparse.ArgumentParser(description="Summarize recommendation outcome signals")
+    parser.add_argument("--days", type=int, default=30)
+    parser.add_argument("--min-shown", type=int, default=20)
+    parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--out")
+    arguments = parser.parse_args()
+    if arguments.days < 1 or arguments.min_shown < 1 or arguments.limit < 0:
+        parser.error("days and min-shown must be positive; limit must be non-negative")
+    settings = Settings()  # type: ignore[call-arg]
+    report = asyncio.run(
+        build_usage_feedback_report(
+            settings,
+            days=arguments.days,
+            minimum_shown=arguments.min_shown,
+            limit=arguments.limit,
+        )
+    )
+    output = f"{json.dumps(report, indent=2)}\n"
+    if arguments.out:
+        Path(arguments.out).write_text(output, encoding="utf-8")
+    print(output, end="")
+
+
+async def build_usage_feedback_report(
+    settings: Settings, *, days: int, minimum_shown: int, limit: int
+) -> dict[str, object]:
+    database = Database(settings.database_url)
+    try:
+        return await load_usage_feedback(
+            database, lookback_days=days, minimum_shown=minimum_shown, limit=limit
+        )
+    finally:
+        await database.close()
 
 
 def production_env_findings(

@@ -173,7 +173,7 @@ CI also runs `npm run quality:backend-image` as a separate job so the production
 
 Expected current template gate:
 
-- `npm run manifest:audit --workspace=backend` should report zero errors.
+- `npm run manifest:audit --workspace=@memedrop/template-tools` should report zero errors.
 - The review queue should be empty or contain only intentionally deferred drafts.
 - Fast suggestion eval should pass the configured top-k, caption, layout, and overlay thresholds.
 - `npm run quality:api-process` should build the Python package and prove Uvicorn can start the FastAPI application.

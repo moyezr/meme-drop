@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from memedrop_api.cli import production_env_findings, repository_root
+from memedrop_api.cli import (
+    RemoteTemplate,
+    match_remote_template,
+    production_env_findings,
+    repository_root,
+)
 
 
 def valid_environment() -> dict[str, str]:
@@ -57,3 +62,12 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
 
 def test_repository_root_contains_workspace_config() -> None:
     assert (repository_root() / "pyproject.toml").is_file()
+
+
+def test_seed_catalog_matches_remote_names_and_aliases() -> None:
+    remote: dict[str, RemoteTemplate] = {
+        "drake": {"name": "Drake", "url": "https://example.test/drake.jpg"}
+    }
+
+    assert match_remote_template("Drake Hotline Bling", ("Drake",), remote) == remote["drake"]
+    assert match_remote_template("Missing", (), remote) is None

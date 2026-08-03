@@ -1,7 +1,7 @@
 # MemeDrop FastAPI
 
-This workspace is the production backend replacement for the legacy Fastify service. During the
-migration it preserves the existing HTTP paths, response field casing, PostgreSQL tables, pgvector
+This workspace is the production MemeDrop backend. It preserves the established HTTP paths,
+response field casing, PostgreSQL tables, pgvector
 columns, install identity semantics, and extension-facing error contract.
 
 ## Implemented
@@ -32,6 +32,7 @@ npm run test:api
 uv run --package memedrop-api mypy apps/api/src apps/api/tests
 npm run catalog:export
 npm run db:init
+npm run db:seed-memes
 npm run quality:api-process
 ```
 
@@ -47,5 +48,5 @@ MEMEDROP_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedro
 Integration records use generated IDs and are removed after each run.
 
 The suggestion tests also run the offline benchmark at
-`backend/evals/suggestion-benchmark.json`. They enforce a minimum relevance floor for the local
+`tools/template-tools/evals/suggestion-benchmark.json`. They enforce a minimum relevance floor for the local
 ranker, which remains available when OpenRouter is not configured or temporarily fails.

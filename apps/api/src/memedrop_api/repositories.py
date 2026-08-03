@@ -23,6 +23,8 @@ class BackendStore(Protocol):
 
     async def get_global_meme(self, meme_id: UUID) -> JsonRecord | None: ...
 
+    async def global_meme_feedback_scores(self, user_id: UUID) -> dict[str, float]: ...
+
     async def create_user_meme(
         self,
         *,
@@ -110,6 +112,23 @@ class SqlAlchemyStore:
         async with self.database.session() as session:
             row = await session.get(Meme, meme_id)
         return meme_record(row) if row else None
+
+    async def global_meme_feedback_scores(self, user_id: UUID) -> dict[str, float]:
+        statement = (
+            select(UsageEvent.global_meme_id, UsageEvent.action, func.count(UsageEvent.id))
+            .where(and_(UsageEvent.user_id == user_id, UsageEvent.global_meme_id.is_not(None)))
+            .group_by(UsageEvent.global_meme_id, UsageEvent.action)
+        )
+        async with self.database.session() as session:
+            rows = (await session.execute(statement)).all()
+        grouped: dict[str, dict[str, int]] = {}
+        for meme_id, action, count in rows:
+            grouped.setdefault(str(meme_id), {})[str(action)] = int(count)
+        return {
+            meme_id: feedback_ranking_boost(actions)
+            for meme_id, actions in grouped.items()
+            if actions.get("shown", 0) + actions.get("suggested", 0) >= 5
+        }
 
     async def create_user_meme(
         self,
@@ -321,3 +340,11 @@ def usage_event_record(row: UsageEvent) -> JsonRecord:
         "tweetContext": row.tweet_context,
         "createdAt": row.created_at.isoformat(),
     }
+
+
+def feedback_ranking_boost(actions: Mapping[str, int]) -> float:
+    shown = max(1, actions.get("shown", 0) + actions.get("suggested", 0))
+    used = actions.get("used", 0) + actions.get("inserted", 0)
+    positive = used + actions.get("saved", 0) * 0.8 + actions.get("clicked", 0) * 0.25
+    negative = actions.get("dismissed", 0) * 0.2
+    return max(-0.12, min(0.12, (positive - negative) / shown * 0.3))

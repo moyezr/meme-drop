@@ -22,11 +22,11 @@ The extension does two things:
 | Layer | Technology |
 |---|---|
 | Extension framework | Manifest V3 (service worker, not background page) |
-| Language | TypeScript throughout |
+| Languages | Python backend; TypeScript extension and tooling |
 | Extension UI | React 19, TailwindCSS, Zustand |
 | Extension build | Vite + CRXJS (MV3 HMR, content script bundling, manifest injection) |
 | Extension storage | `chrome.storage` for persistence |
-| Backend | Node.js + Fastify (TypeScript) |
+| Backend | FastAPI + SQLAlchemy + Alembic (Python) |
 | Database | PostgreSQL with pgvector (local Docker container) |
 | AI — tweet analysis | Qwen through OpenRouter |
 | AI — meme tagging | Qwen Vision through OpenRouter |
@@ -35,7 +35,7 @@ The extension does two things:
 ### Local Replacements
 | Production | Local Equivalent |
 |---|---|
-| Cloudflare R2 | Local filesystem (`./data/memes/`) served by Fastify static |
+| Cloudflare R2 | Local filesystem (`./apps/api/data/memes/`) served by FastAPI |
 | BullMQ + Redis | Inline async calls (no queue) |
 | Supabase Auth | No auth — all endpoints open |
 | Supabase managed Postgres | Docker `pgvector/pgvector:pg16` |
@@ -341,25 +341,9 @@ memedrop/
 │   ├── manifest.json
 │   ├── vite.config.ts
 │   └── package.json
-├── backend/
-│   ├── src/
-│   │   ├── server.ts
-│   │   ├── routes/
-│   │   │   ├── suggest.ts
-│   │   │   └── library.ts
-│   │   ├── services/
-│   │   │   ├── suggestion-engine.ts
-│   │   │   ├── auto-tagger.ts
-│   │   │   └── embedding.ts
-│   │   └── db/
-│   │       └── schema.sql
-│   ├── scripts/
-│   │   └── seed-memes.ts
-│   ├── seed-data/
-│   │   └── memes.json
-│   ├── data/
-│   │   └── memes/             # Local image storage
-│   └── package.json
+├── apps/api/                  # FastAPI, SQLAlchemy, Alembic, pytest
+├── tools/template-tools/      # Offline catalog QA and benchmark tools
+├── packages/meme-catalog/     # Language-neutral runtime catalog
 ├── shared/
 │   └── types/
 │       ├── meme.ts
@@ -388,8 +372,8 @@ memedrop/
 
 ## Build Order
 
-1. **Local infrastructure** — `docker-compose.yml` with `pgvector/pgvector:pg16`, apply `schema.sql`
-2. **Backend skeleton** — Fastify server, health check, CORS config, static file serving for memes
+1. **Local infrastructure** — `docker-compose.yml` with pgvector, apply Alembic migrations
+2. **Backend skeleton** — FastAPI server, health/readiness checks, CORS, static meme serving
 3. **Extension scaffold** — Vite + CRXJS setup, manifest.json, content script that logs to console on x.com
 4. **Content script DOM detection** — implement `selectors.ts`, detect reply composer opening, extract parent tweet text
 5. **Suggestion engine** — OpenRouter analysis → embedding → pgvector nearest-neighbor → scoring → return results

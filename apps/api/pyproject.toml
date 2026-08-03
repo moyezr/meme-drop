@@ -17,7 +17,9 @@ dependencies = [
 [project.scripts]
 memedrop-db-init = "memedrop_api.cli:db_init"
 memedrop-db-seed = "memedrop_api.cli:db_seed"
+memedrop-db-seed-memes = "memedrop_api.cli:db_seed_memes"
 memedrop-validate-production-env = "memedrop_api.cli:validate_production_env"
+memedrop-usage-feedback = "memedrop_api.cli:usage_feedback"
 
 [dependency-groups]
 dev = [

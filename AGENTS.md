@@ -2,31 +2,33 @@
 
 ## Project Structure & Module Organization
 
-This is an npm workspace TypeScript project with three packages:
+This is a Python and npm monorepo:
 
-- `backend/`: Fastify API, Drizzle database setup, service logic, routes, and scripts. Key paths include `backend/src/routes`, `backend/src/services`, `backend/src/db`, and `backend/scripts`.
+- `apps/api/`: FastAPI runtime, SQLAlchemy persistence, Alembic migrations, services, and pytest suite.
 - `extension/`: Chrome extension built with React, Vite, Tailwind, and CRXJS. Popup code lives in `extension/src/popup`, content scripts in `extension/src/content`, and background logic in `extension/src/background`.
 - `shared/`: Shared types, API contracts, template manifest data, and lookup helpers used by both backend and extension.
+- `tools/template-tools/`: Offline TypeScript catalog QA, benchmark, and promotion tooling.
+- `packages/meme-catalog/`: Language-neutral catalog consumed by FastAPI.
 
 Root files include `docker-compose.yml` for local infrastructure, `tsconfig.base.json` for shared TypeScript settings, and `.env.example` for configuration reference.
 
 ## Build, Test, and Development Commands
 
-- `npm run dev:backend`: run the backend with `tsx watch` on port `3001` by default.
+- `npm run dev:backend`: run FastAPI with Uvicorn on port `3001` by default.
 - `npm run dev:extension`: build the extension continuously with Vite watch mode.
 - `npm run build:extension`: typecheck and build the extension.
 - `npm run db:up` / `npm run db:down`: start or stop local Docker services.
-- `npm run db:init`: initialize backend database setup, push Drizzle schema, and seed data.
-- `npm run db:studio`: open Drizzle Studio.
+- `npm run db:init`: apply Alembic migrations and seed the development identity.
+- `npm run db:seed-memes`: download and insert missing verified catalog memes.
 - `npm run typecheck --workspace=backend|extension|shared`: run package TypeScript checks.
 
 ## Coding Style & Naming Conventions
 
-Use strict TypeScript and ES modules. Keep imports explicit, including `.js` extensions for local TypeScript imports that compile to ESM. Follow existing two-space indentation, double quotes, and semicolon style. Use `camelCase` for variables/functions, `PascalCase` for React components and exported types, and kebab-case for route-like filenames such as `meme-text.ts`.
+Use typed Python with Ruff and mypy in `apps/api`. Use strict TypeScript and ES modules elsewhere. Follow existing two-space TypeScript indentation, double quotes, and semicolon style.
 
 ## Testing Guidelines
 
-No formal unit test framework is currently configured. Before submitting changes, run relevant typechecks and builds. For backend API work, run the backend locally and verify affected endpoints manually. Add future tests near the code they cover using `*.test.ts` or `*.spec.ts`, and document any new test command in the relevant `package.json`.
+FastAPI uses pytest with unit, HTTP, benchmark, and PostgreSQL integration coverage. Run `npm run test:api`, mypy, and Ruff for API changes; use `MEMEDROP_TEST_DATABASE_URL` for the integration suite. TypeScript tools and clients retain Node test suites.
 
 ## Commit & Pull Request Guidelines
 
@@ -34,4 +36,4 @@ Recent commits use short, informal summaries such as `working: text overlay` and
 
 ## Security & Configuration Tips
 
-Keep secrets in `.env` files and never hard-code API keys in scripts or source. Treat `backend/.env`, root `.env`, generated meme assets, and local database state as environment-specific. Update `.env.example` when adding required configuration.
+Keep secrets in `.env` files and never hard-code API keys. Treat root/app `.env` files, `apps/api/data/memes`, generated assets, and local database state as environment-specific. Update `.env.example` when adding required configuration.

@@ -119,6 +119,17 @@ async def test_service_falls_back_when_selection_model_fails() -> None:
     assert result[0]["name"] == "This Is Fine"
 
 
+async def test_local_ranking_uses_bounded_personal_feedback() -> None:
+    service, store, gateway = service_with_templates("change-my-mind", "disaster-girl")
+    gateway.fail_selection = True
+    preferred = next(row for row in store.memes if row["name"] == "Disaster Girl")
+    store.feedback_scores[preferred["id"]] = 0.12
+
+    result = await service.get_suggestions("A generic reaction", user_id=INSTALL_ID, limit=1)
+
+    assert result[0]["name"] == "Disaster Girl"
+
+
 async def test_caption_for_one_meme_and_missing_meme() -> None:
     service, store, gateway = service_with_templates("drake-hotline-bling")
     meme_id = UUID(store.memes[0]["id"])
@@ -181,7 +192,11 @@ def test_safe_suggestion_logs_hash_sensitive_text() -> None:
 
 def test_local_ranker_meets_benchmark_retrieval_gates() -> None:
     benchmark_path = (
-        Path(__file__).resolve().parents[3] / "backend" / "evals" / "suggestion-benchmark.json"
+        Path(__file__).resolve().parents[3]
+        / "tools"
+        / "template-tools"
+        / "evals"
+        / "suggestion-benchmark.json"
     )
     cases = json.loads(benchmark_path.read_text(encoding="utf-8"))["cases"]
     catalog = MemeCatalog.load()

@@ -15,6 +15,7 @@ class FakeStore:
         self.last_browse_filters: dict[str, Any] | None = None
         self.last_library_filters: dict[str, Any] | None = None
         self.deleted_account = False
+        self.feedback_scores: dict[str, float] = {}
 
     async def ensure_install_user(self, user_id: UUID) -> None:
         self.ensured_users.append(user_id)
@@ -34,6 +35,9 @@ class FakeStore:
 
     async def get_global_meme(self, meme_id: UUID) -> dict[str, Any] | None:
         return next((row for row in self.memes if row["id"] == str(meme_id)), None)
+
+    async def global_meme_feedback_scores(self, user_id: UUID) -> dict[str, float]:
+        return self.feedback_scores
 
     async def create_user_meme(
         self,

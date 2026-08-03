@@ -1,0 +1,44 @@
+{
+  "name": "@memedrop/template-tools",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run build --workspace=@memedrop/shared && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "manifest:generate": "tsx scripts/generate-template-manifest.ts --out shared/src/data/meme-template-manifest.generated.json",
+    "manifest:dry-run": "tsx scripts/generate-template-manifest.ts --dry-run --files-only --out /tmp/memedrop-template-manifest-dry-run.json",
+    "manifest:qa": "tsx scripts/render-template-qa.ts",
+    "manifest:taste-review": "tsx scripts/render-taste-review.ts",
+    "manifest:audit": "tsx scripts/audit-template-annotations.ts",
+    "manifest:audit:all": "tsx scripts/audit-template-annotations.ts --scope all",
+    "manifest:fix-examples": "tsx scripts/fix-template-example-lengths.ts",
+    "manifest:review-queue": "tsx scripts/template-review-queue.ts",
+    "manifest:review-gate": "tsx scripts/template-review-queue.ts --limit 20 --fail-on-items",
+    "manifest:expansion-report": "tsx scripts/template-expansion-report.ts",
+    "manifest:coverage-gate": "tsx scripts/template-expansion-report.ts --fail-on-gaps --limit 0",
+    "manifest:review-decisions": "tsx scripts/validate-template-review-decisions.ts",
+    "manifest:review-decisions:init": "tsx scripts/init-template-review-decisions.ts",
+    "manifest:promotion-plan": "tsx scripts/plan-template-promotion.ts",
+    "manifest:benchmark-stubs": "tsx scripts/export-benchmark-stubs.ts",
+    "eval:benchmark-import": "tsx scripts/import-benchmark-cases.ts",
+    "manifest:review-decisions:promotion": "tsx scripts/validate-template-review-decisions.ts --require-benchmark-present --fail-on-missing",
+    "manifest:promote-reviewed": "tsx scripts/promote-template-decisions.ts",
+    "manifest:qa:queue": "tsx scripts/render-template-qa.ts --scope queue --limit 12",
+    "manifest:qa:expansion": "tsx scripts/render-template-qa.ts --scope expansion",
+    "manifest:qa:all": "tsx scripts/render-template-qa.ts --scope all",
+    "eval:benchmark-audit": "tsx scripts/validate-suggestion-benchmark.ts"
+  },
+  "dependencies": {
+    "@memedrop/shared": "0.0.1",
+    "dotenv": "^16.4.0",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

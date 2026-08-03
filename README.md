@@ -24,7 +24,7 @@ MemeDrop still works without an OpenRouter key, but suggestions and captions wil
 
 ```text
 apps/api/   FastAPI application, PostgreSQL models, and Python tests
-backend/    Temporary TypeScript catalog/evaluation tools and retired Fastify source
+tools/template-tools/  Offline TypeScript catalog QA and promotion tools
 extension/  Chrome extension source, popup, content scripts, background worker
 shared/     Shared types, API contracts, template manifest, lookup helpers
 landing/    Next.js landing page
@@ -77,10 +77,10 @@ npm run db:init
 Seed the meme catalog and local meme image files:
 
 ```sh
-npm run db:seed-memes --workspace=backend
+npm run db:seed-memes
 ```
 
-This downloads seed meme images into `backend/data/memes/` and inserts catalog rows into the local database. The generated image files are intentionally ignored by git.
+This downloads verified Imgflip templates into `apps/api/data/memes/` and inserts missing catalog rows. The idempotent command preserves existing rows, and generated image files are ignored by git.
 
 ## Run The App Locally
 
@@ -159,8 +159,8 @@ npm run quality:api-process
 Catalog tooling:
 
 ```sh
-npm run manifest:audit --workspace=backend
-npm run eval:quality --workspace=backend
+npm run manifest:audit --workspace=@memedrop/template-tools
+npm run eval:quality --workspace=@memedrop/template-tools
 ```
 
 Extension-only:
@@ -202,7 +202,7 @@ npm run db:init
 If suggestions return no memes, seed the catalog:
 
 ```sh
-npm run db:seed-memes --workspace=backend
+npm run db:seed-memes
 ```
 
 If Chrome does not show extension changes, rebuild or keep watch mode running, then click reload on the extension card in `chrome://extensions`.

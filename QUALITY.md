@@ -19,10 +19,10 @@ Use template annotations as the source of truth for caption quality. For every m
 3. Set `max_chars` from visual capacity, not from what would be nice to say.
 4. Add good examples that obey the same `max_chars` and region layout constraints users will get at runtime.
 5. Add bad examples for generic, wordy, or structurally wrong captions.
-6. Run `npm run manifest:audit --workspace=backend` before promoting any draft template.
-7. Run `npm run manifest:audit:all --workspace=backend` when working through the full draft/generated backlog.
-8. Run `npm run manifest:review-queue --workspace=backend` to prioritize draft templates by benchmark relevance and visual-fit risk.
-9. Run `npm run manifest:qa:queue --workspace=backend` to generate `.memedrop/template-qa-queue.html` for the highest-priority draft templates.
+6. Run `npm run manifest:audit --workspace=@memedrop/template-tools` before promoting any draft template.
+7. Run `npm run manifest:audit:all --workspace=@memedrop/template-tools` when working through the full draft/generated backlog.
+8. Run `npm run manifest:review-queue --workspace=@memedrop/template-tools` to prioritize draft templates by benchmark relevance and visual-fit risk.
+9. Run `npm run manifest:qa:queue --workspace=@memedrop/template-tools` to generate `.memedrop/template-qa-queue.html` for the highest-priority draft templates.
 10. Open the QA sheet against a running backend and promote only templates whose rendered text is readable, correctly placed, and not covering the meme's key face/gesture/punchline.
 
 The verified-template audit must reach zero errors before a template is treated as production-quality. Warnings are review prompts; they are acceptable only when visually checked with the QA contact sheet. The all-template audit is intentionally stricter and may fail while draft templates are still being curated.
@@ -34,17 +34,17 @@ The review queue should drive promotion work. Templates with high expected-hit c
 Use a promotion funnel, not a bulk import:
 
 1. Add or generate candidate templates as `draft` with source images and overlay regions.
-2. Run `npm run manifest:fix-examples --workspace=backend` after model-generated batches to shorten examples mechanically.
-3. Run `npm run manifest:audit:all --workspace=backend` and fix any errors before visual review.
+2. Run `npm run manifest:fix-examples --workspace=@memedrop/template-tools` after model-generated batches to shorten examples mechanically.
+3. Run `npm run manifest:audit:all --workspace=@memedrop/template-tools` and fix any errors before visual review.
 4. Run `npm run dataset:expansion-report` to write `.memedrop/template-expansion-report.json`.
 5. Use the expansion report to pick novel draft templates with zero mechanical warnings; these are candidates for rendered QA, not automatic promotion.
-6. Run `npm run manifest:review-queue --workspace=backend -- --limit 20` to choose high-impact drafts that overlap existing benchmark expectations.
+6. Run `npm run manifest:review-queue --workspace=@memedrop/template-tools -- --limit 20` to choose high-impact drafts that overlap existing benchmark expectations.
 7. Run `npm run dataset:qa-expansion` and inspect `.memedrop/template-qa-expansion.html` for novel clean drafts.
-8. Run `npm run manifest:qa:queue --workspace=backend` and inspect `.memedrop/template-qa-queue.html` for benchmark-overlap or warning-driven drafts.
+8. Run `npm run manifest:qa:queue --workspace=@memedrop/template-tools` and inspect `.memedrop/template-qa-queue.html` for benchmark-overlap or warning-driven drafts.
 9. Run `npm run dataset:taste-review` to generate `.memedrop/taste-review.html`. This is the default human review page for deciding whether a draft template has product taste.
 10. Open `.memedrop/taste-review.html` with the backend running, review each template, and export review decisions plus benchmark-case drafts from the page.
 11. Save exported decisions as `.memedrop/template-review-decisions.json`. For later batches, use `npm run dataset:review-decisions:init -- --append` only if you need a plain JSON scaffold instead of the taste-review page.
-12. Record visual QA decisions in `.memedrop/template-review-decisions.json` using `backend/evals/template-review-decisions.example.json` as the schema. Change a template to `approved` only after rendered QA is clean, culturally recognizable, and backed by a realistic benchmark case.
+12. Record visual QA decisions in `.memedrop/template-review-decisions.json` using `tools/template-tools/evals/template-review-decisions.example.json` as the schema. Change a template to `approved` only after rendered QA is clean, culturally recognizable, and backed by a realistic benchmark case.
 13. Run `npm run dataset:review-decisions` to validate the review file before editing the runtime manifest.
 14. Run `npm run dataset:promotion-plan` to write `.memedrop/template-promotion-plan.json`. Use it to separate `approved_ready` templates from approvals still blocked by missing benchmark coverage or stale visual warnings.
 15. Run `npm run dataset:benchmark-stubs` to write `.memedrop/suggestion-benchmark-stubs.json` with copy-ready benchmark case drafts for ready or blocked candidates, or use the benchmark draft exported by `.memedrop/taste-review.html`.
@@ -67,22 +67,22 @@ The expansion report is intentionally different from the promotion queue:
 - `dataset:review-decisions:init` creates a conservative review file from mechanically clean expansion candidates so reviewers edit decisions instead of writing JSON from scratch. It refuses to overwrite an existing review file unless `--force` is passed, and `--append` preserves existing decisions while adding new unreviewed candidates.
 - `dataset:promotion-plan` writes a deterministic promotion plan that shows ready approvals, blocked approvals, unreviewed mechanically clean candidates, and benchmark-case stubs for missing coverage. The default batch policy selects at most five ready approvals and avoids overloading a release with one joke category.
 - `dataset:benchmark-stubs` extracts benchmark-case drafts from the current promotion plan into `.memedrop/suggestion-benchmark-stubs.json`. These stubs are scaffolding only: replace placeholder tweets, add enough expected/rejected meme families, and run `npm run quality:benchmark` before treating them as real eval coverage.
-- `dataset:benchmark-import` validates an edited benchmark case pack before appending it to `backend/evals/suggestion-benchmark.json`. It rejects placeholders, duplicate case IDs, missing signal, unknown meme families, and imports that would make one meme family dominate the merged benchmark. Draft templates listed in the case pack's `source_templates` are allowed as pending expected families; all other expected and rejected families must already resolve to verified runtime templates.
-- `dataset:review-decisions:promotion` is stricter: the local review file must exist and every approved `benchmark_case_id` must already exist in `backend/evals/suggestion-benchmark.json`.
+- `dataset:benchmark-import` validates an edited benchmark case pack before appending it to `tools/template-tools/evals/suggestion-benchmark.json`. It rejects placeholders, duplicate case IDs, missing signal, unknown meme families, and imports that would make one meme family dominate the merged benchmark. Draft templates listed in the case pack's `source_templates` are allowed as pending expected families; all other expected and rejected families must already resolve to verified runtime templates.
+- `dataset:review-decisions:promotion` is stricter: the local review file must exist and every approved `benchmark_case_id` must already exist in `tools/template-tools/evals/suggestion-benchmark.json`.
 - `dataset:promote-reviewed` is the only supported bulk-promotion path. It re-runs strict review validation, copies only approved generated drafts, marks them `verified`, and writes the promoted runtime manifest.
 
 ## Evaluation Workflow
 
-Run the suggestion benchmark:
+Run the deterministic FastAPI suggestion quality suite:
 
 ```bash
-npm run eval:suggestions --workspace=backend -- --limit 5
+npm run quality:suggestions
 ```
 
-Run the quality gate before trusting ranking or caption changes:
+Inspect real usage outcomes before changing personalization weights:
 
 ```bash
-npm run eval:quality --workspace=backend
+DATABASE_URL=postgresql://... npm run dataset:usage-feedback -- --min-shown 20
 ```
 
 Audit the benchmark corpus itself before adding or promoting templates:
@@ -102,15 +102,12 @@ The quality gate checks:
 - `overlay`: suggested memes actually have overlay templates.
 - `rejected_avoidance`: explicitly rejected meme families stay out of the top results.
 
-Use `--judge` for slower LLM-as-judge checks when comparing larger ranking or captioning changes:
-
-```bash
-npm run eval:suggestions --workspace=backend -- --limit 5 --judge --min-judge 3.5
-```
+Model-backed selection and captions are separately covered with deterministic gateway tests; the
+local ranker remains the release floor so provider downtime cannot erase relevance.
 
 ## Automated Tests
 
-Run dependency-free backend tests with:
+Run the full monorepo tests with:
 
 ```bash
 npm test
@@ -120,9 +117,9 @@ These tests currently cover:
 
 - Shared template lookup behavior, especially excluding generated drafts from default runtime suggestions.
 - Suggestion benchmark corpus quality, including expected meme families resolving to verified runtime templates.
-- Backend HTTP fail-fast behavior for public validation and identity errors.
-- Suggestion logging privacy redaction for cache keys and production tweet text.
-- Security-sensitive backend utility behavior, starting with image-download SSRF IP classification.
+- FastAPI route contracts, identity, failures, downloads, rate limits, persistence, and account data.
+- Suggestion context, ranking, personalization feedback, captions, caching, and privacy-safe logs.
+- Real PostgreSQL/pgvector repository behavior when `MEMEDROP_TEST_DATABASE_URL` is set.
 
 Add tests for new production guardrails as they are introduced.
 

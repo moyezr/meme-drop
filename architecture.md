@@ -31,7 +31,7 @@ The monorepo is organized by deployable app and reusable package:
 | `landing/` | Public Next.js landing page |
 | `shared/` | TypeScript API contracts and source template data |
 | `packages/meme-catalog/` | Language-neutral exported runtime meme catalog |
-| `backend/` | Temporary TypeScript catalog/evaluation tools and retired Fastify source |
+| `tools/template-tools/` | Offline TypeScript catalog QA, benchmark, and promotion tools |
 
 ## HTTP surface
 
