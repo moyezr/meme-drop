@@ -7,7 +7,7 @@ columns, install identity semantics, and extension-facing error contract.
 ## Implemented
 
 - process liveness and PostgreSQL readiness
-- request IDs, safe errors, CORS, static meme media, and rate limiting
+- request IDs, safe errors, CORS, object-backed meme media, and rate limiting
 - install identity creation and enforcement
 - global meme browsing
 - saved-meme download, SSRF protection, vision tagging, listing, editing, and deletion
@@ -35,6 +35,18 @@ npm run db:init
 npm run db:seed-memes
 npm run quality:api-process
 ```
+
+Meme files use Supabase's S3-compatible API. Development is pinned to `meme-drop-dev` and
+production to `meme-drop-prod`; configuration rejects a bucket from the wrong environment. Keep
+S3 credentials server-side. Validate access without writing, or measure the full object round trip:
+
+```sh
+uv run --package memedrop-api memedrop-storage-check
+uv run --package memedrop-api memedrop-storage-check --latency
+```
+
+The latency probe writes a small `_health/` object and removes it before returning JSON timings.
+Set `MEMEDROP_STORAGE_BACKEND=local` only for offline development or tests.
 
 The default test suite uses in-memory collaborators for deterministic HTTP tests. The repository
 integration suite runs against PostgreSQL and pgvector:

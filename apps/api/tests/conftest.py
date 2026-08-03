@@ -10,6 +10,7 @@ import pytest
 from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 from memedrop_api.schemas import AutoTagResult
+from memedrop_api.services.storage import LocalMemeStorage
 
 from tests.fakes import FakeStore
 
@@ -28,6 +29,7 @@ def settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url="postgresql://test:test@127.0.0.1:5432/test",
         meme_storage_path=tmp_path / "memes",
+        image_download_path=tmp_path / "downloads",
         cors_origins_value="http://localhost:5173",
     )
 
@@ -45,9 +47,17 @@ async def api_harness(settings: Settings, tmp_path: Path) -> AsyncIterator[ApiHa
     store = FakeStore()
     deleted_paths: list[str] = []
 
+    class RecordingStorage(LocalMemeStorage):
+        async def delete(self, public_path: str) -> bool:
+            deleted_paths.append(public_path)
+            return True
+
+    storage = RecordingStorage(tmp_path / "memes")
+
     async def fake_download(image_url: str, configured: Settings) -> tuple[Path, str]:
         assert image_url.startswith("https://")
-        path = configured.meme_storage_path / "downloaded.png"
+        path = configured.image_download_path / "downloaded.png"
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"image")
         return path, path.name
 
@@ -68,13 +78,8 @@ async def api_harness(settings: Settings, tmp_path: Path) -> AsyncIterator[ApiHa
         store=store,
         download_image_service=fake_download,
         auto_tag_service=fake_tag,
+        storage=storage,
     )
-
-    async def fake_delete(public_path: str, _: Path) -> bool:
-        deleted_paths.append(public_path)
-        return True
-
-    app.state.delete_stored_image = fake_delete
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
         yield ApiHarness(test_client, store, deleted_paths)

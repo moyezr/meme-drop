@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,11 +14,14 @@ DEFAULT_ALLOWED_ORIGINS = (
     "https://twitter.com",
 )
 DEFAULT_STORAGE_PATH = Path(__file__).resolve().parents[3] / "data" / "memes"
+DEFAULT_DOWNLOAD_PATH = Path("/tmp/memedrop-downloads")
+DEVELOPMENT_BUCKET = "meme-drop-dev"
+PRODUCTION_BUCKET = "meme-drop-prod"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env", "backend/.env", "apps/api/.env"),
+        env_file=(".env", "apps/api/.env"),
         env_file_encoding="utf-8",
         extra="ignore",
         populate_by_name=True,
@@ -62,6 +66,21 @@ class Settings(BaseSettings):
     meme_storage_path: Path = Field(
         default=DEFAULT_STORAGE_PATH, validation_alias="MEME_STORAGE_PATH"
     )
+    image_download_path: Path = Field(
+        default=DEFAULT_DOWNLOAD_PATH, validation_alias="MEMEDROP_IMAGE_DOWNLOAD_PATH"
+    )
+    storage_backend: Literal["local", "s3"] = Field(
+        default="local", validation_alias="MEMEDROP_STORAGE_BACKEND"
+    )
+    s3_endpoint: str | None = Field(default=None, validation_alias="S3_ENDPOINT")
+    s3_region: str | None = Field(default=None, validation_alias="S3_REGION")
+    s3_access_key_id: str | None = Field(default=None, validation_alias="S3_ACCESS_KEY_ID")
+    s3_secret_access_key: str | None = Field(
+        default=None, validation_alias="S3_SECRET_ACCESS_KEY"
+    )
+    storage_bucket_override: str | None = Field(
+        default=None, validation_alias="MEMEDROP_STORAGE_BUCKET"
+    )
     require_install_id: bool = Field(default=False, validation_alias="MEMEDROP_REQUIRE_INSTALL_ID")
     suggestion_log_mode: Literal["off", "compact", "pretty"] = Field(
         default="pretty", validation_alias="MEMEDROP_SUGGESTION_LOGS"
@@ -94,14 +113,43 @@ class Settings(BaseSettings):
         configured = [item.strip() for item in self.cors_origins_value.split(",") if item.strip()]
         return configured or list(DEFAULT_ALLOWED_ORIGINS)
 
+    @property
+    def storage_bucket(self) -> str:
+        return self.storage_bucket_override or (
+            PRODUCTION_BUCKET if self.is_production else DEVELOPMENT_BUCKET
+        )
+
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:
-        if not self.is_production:
-            return self
-        if not self.openrouter_api_key:
-            raise ValueError("OPENROUTER_API_KEY is required in production")
-        if not self.cors_origins_value.strip():
-            raise ValueError("MEMEDROP_CORS_ORIGINS is required in production")
-        if "*" in self.cors_origins:
-            raise ValueError("MEMEDROP_CORS_ORIGINS must not include * in production")
+        expected_bucket = PRODUCTION_BUCKET if self.is_production else DEVELOPMENT_BUCKET
+        if self.storage_bucket != expected_bucket:
+            raise ValueError(
+                f"MEMEDROP_STORAGE_BUCKET must be {expected_bucket} in {self.node_env}"
+            )
+        if self.storage_backend == "s3":
+            missing = [
+                name
+                for name, value in (
+                    ("S3_ENDPOINT", self.s3_endpoint),
+                    ("S3_REGION", self.s3_region),
+                    ("S3_ACCESS_KEY_ID", self.s3_access_key_id),
+                    ("S3_SECRET_ACCESS_KEY", self.s3_secret_access_key),
+                )
+                if not value
+            ]
+            if missing:
+                raise ValueError(f"S3 storage requires {', '.join(missing)}")
+            endpoint = urlparse(self.s3_endpoint or "")
+            allowed_schemes = {"https"} if self.is_production else {"http", "https"}
+            if endpoint.scheme not in allowed_schemes or not endpoint.hostname:
+                raise ValueError("S3_ENDPOINT must be a valid storage endpoint URL")
+        if self.is_production:
+            if not self.openrouter_api_key:
+                raise ValueError("OPENROUTER_API_KEY is required in production")
+            if not self.cors_origins_value.strip():
+                raise ValueError("MEMEDROP_CORS_ORIGINS is required in production")
+            if "*" in self.cors_origins:
+                raise ValueError("MEMEDROP_CORS_ORIGINS must not include * in production")
+            if self.storage_backend != "s3":
+                raise ValueError("MEMEDROP_STORAGE_BACKEND must be s3 in production")
         return self

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import pytest
+
 from tests.conftest import INSTALL_ID, ApiHarness
 from tests.fakes import make_user_meme
 
@@ -41,7 +43,7 @@ async def test_save_meme_downloads_tags_and_persists(api_harness: ApiHarness) ->
 
     assert response.status_code == 200
     meme = response.json()["meme"]
-    assert meme["filePath"] == "/memes/downloaded.png"
+    assert meme["filePath"] == f"/memes/users/{INSTALL_ID}/downloaded.png"
     assert meme["userName"] == "Saved Reaction"
     assert meme["systemTags"]["emotion"] == "sarcastic"
 
@@ -53,6 +55,26 @@ async def test_save_meme_validates_url_before_identity(api_harness: ApiHarness) 
 
     assert response.status_code == 400
     assert response.json()["error"] == "Invalid request"
+
+
+async def test_save_meme_removes_uploaded_object_when_database_write_fails(
+    api_harness: ApiHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fail_create(**_: object) -> dict[str, object]:
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(api_harness.store, "create_user_meme", fail_create)
+
+    response = await api_harness.client.post(
+        "/api/v1/library/save",
+        headers=HEADERS,
+        json={"image_url": "https://cdn.example.com/reaction.png"},
+    )
+
+    expected_path = f"/memes/users/{INSTALL_ID}/downloaded.png"
+    assert response.status_code == 400
+    assert response.json() == {"error": "Failed to save meme"}
+    assert api_harness.deleted_paths == [expected_path]
 
 
 async def test_list_library_returns_contract_and_filters(api_harness: ApiHarness) -> None:

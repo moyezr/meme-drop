@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import insert
 from memedrop_api.config import Settings
 from memedrop_api.db import Database, Meme, User
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
+from memedrop_api.services.storage import create_meme_storage
 from memedrop_api.services.usage_feedback import load_usage_feedback
 
 DEV_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -62,6 +63,7 @@ def db_seed_memes() -> None:
 
 async def seed_meme_catalog(settings: Settings) -> tuple[int, int]:
     catalog = MemeCatalog.load()
+    storage = create_meme_storage(settings)
     async with httpx.AsyncClient(timeout=settings.image_download_timeout_ms / 1000) as client:
         response = await client.get("https://api.imgflip.com/get_memes")
         response.raise_for_status()
@@ -71,9 +73,6 @@ async def seed_meme_catalog(settings: Settings) -> tuple[int, int]:
         inserted = 0
         skipped = 0
         try:
-            await asyncio.to_thread(
-                Path(settings.meme_storage_path).mkdir, parents=True, exist_ok=True
-            )
             async with database.session() as session, session.begin():
                 for template in catalog.verified_templates:
                     item = match_remote_template(template.name, template.aliases, by_name)
@@ -90,13 +89,17 @@ async def seed_meme_catalog(settings: Settings) -> tuple[int, int]:
                         skipped += 1
                         continue
                     filename = f"seed-{template.template_id}{extension}"
-                    await asyncio.to_thread(
-                        (Path(settings.meme_storage_path) / filename).write_bytes, image.content
+                    file_path = await storage.put_bytes(
+                        f"catalog/{filename}",
+                        image.content,
+                        content_type=image.headers.get("content-type", "image/jpeg").split(
+                            ";", 1
+                        )[0],
                     )
                     session.add(
                         Meme(
                             name=template.name,
-                            file_path=f"/memes/{filename}",
+                            file_path=file_path,
                             format_type="text_overlay"
                             if template.supports_overlay
                             else "reaction_image",
@@ -172,6 +175,20 @@ def usage_feedback() -> None:
     print(output, end="")
 
 
+def storage_check() -> None:
+    parser = argparse.ArgumentParser(description="Validate object storage and report latency")
+    parser.add_argument(
+        "--latency",
+        action="store_true",
+        help="also upload, download, and delete a temporary probe object",
+    )
+    arguments = parser.parse_args()
+    settings = Settings()  # type: ignore[call-arg]
+    storage = create_meme_storage(settings)
+    result = asyncio.run(storage.check(include_write=arguments.latency))
+    print(json.dumps(result, sort_keys=True))
+
+
 async def build_usage_feedback_report(
     settings: Settings, *, days: int, minimum_shown: int, limit: int
 ) -> dict[str, object]:
@@ -240,6 +257,15 @@ def production_env_findings(
         errors.append("MEMEDROP_SUGGESTION_LOG_TEXT must not be full in production.")
     if environment.get("MEMEDROP_USE_DRAFT_TEMPLATES", "").strip().lower() == "true":
         errors.append("MEMEDROP_USE_DRAFT_TEMPLATES must not be true in production.")
+    if value("MEMEDROP_STORAGE_BACKEND") != "s3":
+        errors.append("MEMEDROP_STORAGE_BACKEND must be s3.")
+    storage_endpoint = value("S3_ENDPOINT")
+    validate_url("S3_ENDPOINT", storage_endpoint, {"https"}, errors)
+    value("S3_REGION")
+    value("S3_ACCESS_KEY_ID")
+    value("S3_SECRET_ACCESS_KEY")
+    if value("MEMEDROP_STORAGE_BUCKET") != "meme-drop-prod":
+        errors.append("MEMEDROP_STORAGE_BUCKET must be meme-drop-prod.")
     for name in (
         "MEMEDROP_RATE_LIMIT_WINDOW_MS",
         "MEMEDROP_RATE_LIMIT_MAX",
@@ -249,9 +275,6 @@ def production_env_findings(
         "MEMEDROP_MAX_IMAGE_BYTES",
     ):
         positive_int(name)
-    storage = value("MEME_STORAGE_PATH")
-    if storage and not Path(storage).is_absolute():
-        errors.append("MEME_STORAGE_PATH must be an absolute path.")
     return errors, warnings
 
 

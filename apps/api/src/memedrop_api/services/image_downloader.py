@@ -65,7 +65,7 @@ async def download_image(
             else mimetypes.guess_extension(content_type) or ".jpg"
         )
     file_name = f"{uuid4()}{extension}"
-    file_path = settings.meme_storage_path / file_name
+    file_path = settings.image_download_path / file_name
     await asyncio.to_thread(file_path.parent.mkdir, parents=True, exist_ok=True)
     await asyncio.to_thread(file_path.write_bytes, response.content)
     return file_path, file_name
@@ -101,24 +101,3 @@ def is_private_or_reserved_ip(address: str) -> bool:
         return not parsed.is_global or parsed.is_multicast
     except ValueError:
         return True
-
-
-def stored_image_path(public_path: str, storage_path: Path) -> Path | None:
-    prefix = "/memes/"
-    if not public_path.startswith(prefix):
-        return None
-    file_name = public_path.removeprefix(prefix)
-    if not file_name or Path(file_name).name != file_name:
-        return None
-    return storage_path / file_name
-
-
-async def delete_stored_image(public_path: str, storage_path: Path) -> bool:
-    file_path = stored_image_path(public_path, storage_path)
-    if file_path is None:
-        return False
-    try:
-        await asyncio.to_thread(file_path.unlink)
-        return True
-    except FileNotFoundError:
-        return False

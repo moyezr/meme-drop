@@ -5,6 +5,7 @@ description = "FastAPI backend for MemeDrop"
 requires-python = ">=3.12,<3.15"
 dependencies = [
   "alembic>=1.14.0",
+  "boto3>=1.43.62",
   "fastapi>=0.115.0",
   "httpx>=0.28.0",
   "pgvector>=0.3.6",
@@ -20,6 +21,7 @@ memedrop-db-seed = "memedrop_api.cli:db_seed"
 memedrop-db-seed-memes = "memedrop_api.cli:db_seed_memes"
 memedrop-validate-production-env = "memedrop_api.cli:validate_production_env"
 memedrop-usage-feedback = "memedrop_api.cli:usage_feedback"
+memedrop-storage-check = "memedrop_api.cli:storage_check"
 
 [dependency-groups]
 dev = [

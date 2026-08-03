@@ -4,15 +4,14 @@ import logging
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
+from starlette.responses import Response
 
 from memedrop_api.api.account import router as account_router
 from memedrop_api.api.health import ReadinessCheck
@@ -33,11 +32,9 @@ from memedrop_api.rate_limit import (
 from memedrop_api.repositories import BackendStore, SqlAlchemyStore
 from memedrop_api.services.auto_tagger import auto_tag_meme
 from memedrop_api.services.catalog import MemeCatalog
-from memedrop_api.services.image_downloader import (
-    delete_stored_image,
-    download_image,
-)
+from memedrop_api.services.image_downloader import download_image
 from memedrop_api.services.openrouter import OpenRouterSuggestionGateway
+from memedrop_api.services.storage import MemeStorage, create_meme_storage
 from memedrop_api.services.suggestion_engine import SuggestionService
 
 LOGGER = logging.getLogger("memedrop.api")
@@ -54,9 +51,10 @@ def create_app(
     download_image_service=None,  # type: ignore[no-untyped-def]
     auto_tag_service=None,  # type: ignore[no-untyped-def]
     suggestion_service: SuggestionService | None = None,
+    storage: MemeStorage | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings()  # type: ignore[call-arg]
-    Path(app_settings.meme_storage_path).mkdir(parents=True, exist_ok=True)
+    meme_storage = storage or create_meme_storage(app_settings)
     database = Database(app_settings.database_url)
     backend_store = store or SqlAlchemyStore(database)
     suggestions = suggestion_service or SuggestionService(
@@ -91,7 +89,7 @@ def create_app(
     app.state.readiness_check = readiness_check or database.is_ready
     app.state.download_image = download_image_service or download_image
     app.state.auto_tag_meme = auto_tag_service or auto_tag_meme
-    app.state.delete_stored_image = delete_stored_image
+    app.state.meme_storage = meme_storage
     app.state.suggestion_service = suggestions
 
     app.add_middleware(
@@ -171,9 +169,9 @@ def create_app(
     app.include_router(memes_router)
     app.include_router(suggest_router)
     app.include_router(usage_router)
-    app.mount(
-        "/memes",
-        StaticFiles(directory=str(app_settings.meme_storage_path), check_dir=False),
-        name="memes",
-    )
+
+    @app.get("/memes/{object_key:path}", include_in_schema=False)
+    async def serve_meme(object_key: str) -> Response:
+        return await meme_storage.serve(f"/memes/{object_key}")
+
     return app

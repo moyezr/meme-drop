@@ -73,8 +73,8 @@ async def test_cors_preflight_allows_extension_headers(client: httpx.AsyncClient
 
 async def test_static_meme_serving(settings: Settings, tmp_path: Path) -> None:
     storage = tmp_path / "static-memes"
-    storage.mkdir()
-    (storage / "test.txt").write_text("meme-bytes", encoding="utf-8")
+    (storage / "catalog").mkdir(parents=True)
+    (storage / "catalog" / "test.txt").write_text("meme-bytes", encoding="utf-8")
     configured = settings.model_copy(update={"meme_storage_path": storage})
 
     async def ready() -> bool:
@@ -83,7 +83,7 @@ async def test_static_meme_serving(settings: Settings, tmp_path: Path) -> None:
     app = create_app(configured, readiness_check=ready)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/memes/test.txt")
+        response = await client.get("/memes/catalog/test.txt")
 
     assert response.status_code == 200
     assert response.text == "meme-bytes"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Annotated, Literal
@@ -11,12 +12,14 @@ from memedrop_api.config import Settings
 from memedrop_api.identity import InstallHeader, resolve_request_user_id
 from memedrop_api.repositories import BackendStore
 from memedrop_api.schemas import AutoTagResult, SaveMemeRequest, UpdateMemeRequest
+from memedrop_api.services.storage import MemeStorage
 
 DownloadService = Callable[[str, Settings], Awaitable[tuple[Path, str]]]
 AutoTagService = Callable[[Path, Settings], Awaitable[AutoTagResult]]
 LiteralSort = Literal["recent", "most_used", "alphabetical"]
 
 router = APIRouter(prefix="/api/v1", tags=["library"])
+LOGGER = logging.getLogger("memedrop.library")
 
 
 @router.post("/library/save")
@@ -29,13 +32,19 @@ async def save_meme(
     settings: Settings = request.app.state.settings
     download: DownloadService = request.app.state.download_image
     tag_image: AutoTagService = request.app.state.auto_tag_meme
+    storage: MemeStorage = request.app.state.meme_storage
     store: BackendStore = request.app.state.store
+    downloaded_path: Path | None = None
+    uploaded_path: str | None = None
     try:
-        file_path, file_name = await download(str(body.image_url), settings)
-        tags = await tag_image(file_path, settings)
+        downloaded_path, file_name = await download(str(body.image_url), settings)
+        tags = await tag_image(downloaded_path, settings)
+        uploaded_path = await storage.put_file(
+            downloaded_path, f"users/{user_id}/{file_name}"
+        )
         meme = await store.create_user_meme(
             user_id=user_id,
-            file_path=f"/memes/{file_name}",
+            file_path=uploaded_path,
             user_name=tags.name,
             system_tags={
                 "emotion": tags.emotion,
@@ -46,7 +55,18 @@ async def save_meme(
         )
         return {"meme": meme}
     except Exception as error:
+        if uploaded_path:
+            try:
+                await storage.delete(uploaded_path)
+            except Exception:
+                LOGGER.warning("Failed to roll back uploaded meme", exc_info=True)
         raise HTTPException(status_code=400, detail="Failed to save meme") from error
+    finally:
+        if downloaded_path:
+            try:
+                downloaded_path.unlink(missing_ok=True)
+            except OSError:
+                LOGGER.warning("Failed to remove temporary meme download", exc_info=True)
 
 
 @router.get("/library")
@@ -101,7 +121,9 @@ async def delete_library_meme(
     meme = await store.delete_user_meme(user_id, meme_id)
     if meme is None:
         raise HTTPException(status_code=404, detail="Meme not found")
-    await request.app.state.delete_stored_image(
-        meme["filePath"], request.app.state.settings.meme_storage_path
-    )
+    storage: MemeStorage = request.app.state.meme_storage
+    try:
+        await storage.delete(meme["filePath"])
+    except Exception:
+        LOGGER.warning("Failed to delete stored meme", extra={"meme_id": str(meme_id)})
     return {"deleted": True}

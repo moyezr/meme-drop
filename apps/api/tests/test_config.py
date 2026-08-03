@@ -50,7 +50,47 @@ def test_production_configuration_is_accepted() -> None:
         require_install_id=True,
         rate_limit_store="database",
         suggestion_log_text="redacted",
+        storage_backend="s3",
+        s3_endpoint="https://project.storage.supabase.co/storage/v1/s3",
+        s3_region="ap-south-1",
+        s3_access_key_id="access-key",
+        s3_secret_access_key="secret-key",
     )
 
     assert settings.is_production is True
     assert settings.cors_origins == ["chrome-extension://abcdefghijklmnopabcdefghijklmnop"]
+    assert settings.storage_bucket == "meme-drop-prod"
+
+
+def test_s3_configuration_requires_credentials_and_environment_bucket() -> None:
+    with pytest.raises(ValidationError, match="S3 storage requires"):
+        Settings(
+            database_url="postgresql://localhost/memedrop",
+            storage_backend="s3",
+        )
+
+    with pytest.raises(ValidationError, match="must be meme-drop-dev"):
+        Settings(
+            database_url="postgresql://localhost/memedrop",
+            storage_bucket_override="meme-drop-prod",
+        )
+
+    with pytest.raises(ValidationError, match="valid storage endpoint URL"):
+        Settings(
+            database_url="postgresql://localhost/memedrop",
+            storage_backend="s3",
+            s3_endpoint="not-a-url",
+            s3_region="ap-south-1",
+            s3_access_key_id="access-key",
+            s3_secret_access_key="secret-key",
+        )
+
+
+def test_production_requires_s3_storage() -> None:
+    with pytest.raises(ValidationError, match="MEMEDROP_STORAGE_BACKEND must be s3"):
+        Settings(
+            node_env="production",
+            database_url="postgresql://localhost/memedrop",
+            openrouter_api_key="secret",
+            cors_origins_value="chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+        )

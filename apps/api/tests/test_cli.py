@@ -26,7 +26,12 @@ def valid_environment() -> dict[str, str]:
         "MEMEDROP_EXPENSIVE_RATE_LIMIT_MAX": "180",
         "MEMEDROP_IMAGE_DOWNLOAD_TIMEOUT_MS": "10000",
         "MEMEDROP_MAX_IMAGE_BYTES": "8388608",
-        "MEME_STORAGE_PATH": "/var/lib/memedrop/memes",
+        "MEMEDROP_STORAGE_BACKEND": "s3",
+        "MEMEDROP_STORAGE_BUCKET": "meme-drop-prod",
+        "S3_ENDPOINT": "https://project.storage.supabase.co/storage/v1/s3",
+        "S3_REGION": "ap-south-1",
+        "S3_ACCESS_KEY_ID": "access-key",
+        "S3_SECRET_ACCESS_KEY": "secret-key",
     }
 
 
@@ -48,7 +53,9 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
             "MEMEDROP_SUGGESTION_LOG_TEXT": "full",
             "MEMEDROP_USE_DRAFT_TEMPLATES": "true",
             "MEMEDROP_RATE_LIMIT_MAX": "zero",
-            "MEME_STORAGE_PATH": "./memes",
+            "MEMEDROP_STORAGE_BACKEND": "local",
+            "MEMEDROP_STORAGE_BUCKET": "meme-drop-dev",
+            "S3_ENDPOINT": "http://localhost:9000",
         }
     )
 
@@ -57,7 +64,7 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
     assert len(errors) >= 10
     assert any("must be production" in error for error in errors)
     assert any("placeholder" in error for error in errors)
-    assert any("must be an absolute path" in error for error in errors)
+    assert any("MEMEDROP_STORAGE_BUCKET must be meme-drop-prod" in error for error in errors)
 
 
 def test_repository_root_contains_workspace_config() -> None:

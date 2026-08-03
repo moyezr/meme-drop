@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 
 from memedrop_api.identity import RequiredUserId
 from memedrop_api.repositories import BackendStore
+from memedrop_api.services.storage import MemeStorage
 
 LOGGER = logging.getLogger("memedrop.account")
 router = APIRouter(prefix="/api/v1", tags=["account"])
@@ -34,14 +35,13 @@ async def delete_account(
 ) -> dict[str, object]:
     store: BackendStore = request.app.state.store
     saved_memes, deleted_memes, deleted_usage, deleted_user = await store.delete_account(user_id)
+    storage: MemeStorage = request.app.state.meme_storage
     deleted_files = 0
     for meme in saved_memes:
         try:
-            deleted = await request.app.state.delete_stored_image(
-                meme["filePath"], request.app.state.settings.meme_storage_path
-            )
+            deleted = await storage.delete(meme["filePath"])
             deleted_files += int(deleted)
-        except OSError:
+        except Exception:
             LOGGER.warning("Failed to delete stored meme", extra={"meme_id": meme["id"]})
     return {
         "deleted": True,

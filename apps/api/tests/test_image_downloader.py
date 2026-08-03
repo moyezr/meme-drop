@@ -7,10 +7,8 @@ import pytest
 from memedrop_api.config import Settings
 from memedrop_api.services.image_downloader import (
     assert_hostname_resolves_publicly,
-    delete_stored_image,
     download_image,
     is_private_or_reserved_ip,
-    stored_image_path,
 )
 
 
@@ -56,7 +54,7 @@ async def test_hostname_resolver_rejects_any_private_result() -> None:
 async def test_download_image_validates_content_and_writes_file(tmp_path: Path) -> None:
     settings = Settings(
         database_url="postgresql://localhost/test",
-        meme_storage_path=tmp_path,
+        image_download_path=tmp_path,
         max_image_bytes=100,
     )
 
@@ -80,7 +78,7 @@ async def test_download_image_validates_content_and_writes_file(tmp_path: Path) 
 async def test_download_rejects_non_image_and_oversized_body(tmp_path: Path) -> None:
     settings = Settings(
         database_url="postgresql://localhost/test",
-        meme_storage_path=tmp_path,
+        image_download_path=tmp_path,
         max_image_bytes=4,
     )
 
@@ -105,14 +103,3 @@ async def test_download_rejects_non_image_and_oversized_body(tmp_path: Path) -> 
             await download_image(
                 "https://example.com/a.png", settings, client=client, resolver=public
             )
-
-
-async def test_stored_path_and_delete_are_traversal_safe(tmp_path: Path) -> None:
-    stored = tmp_path / "safe.png"
-    stored.write_bytes(b"image")
-
-    assert stored_image_path("/memes/../secret", tmp_path) is None
-    assert stored_image_path("/other/safe.png", tmp_path) is None
-    assert await delete_stored_image("/memes/safe.png", tmp_path) is True
-    assert stored.exists() is False
-    assert await delete_stored_image("/memes/safe.png", tmp_path) is False

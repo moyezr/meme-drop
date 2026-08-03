@@ -61,6 +61,8 @@
     "dataset:review-decisions:promotion": "npm run manifest:review-decisions:promotion --workspace=@memedrop/template-tools",
     "dataset:promote-reviewed": "npm run manifest:promote-reviewed --workspace=@memedrop/template-tools",
     "dataset:usage-feedback": "uv run --package memedrop-api memedrop-usage-feedback",
+    "storage:check": "uv run --package memedrop-api memedrop-storage-check",
+    "storage:latency": "uv run --package memedrop-api memedrop-storage-check --latency",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:init": "uv run --package memedrop-api memedrop-db-init",

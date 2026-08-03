@@ -13,7 +13,6 @@ FROM python:3.13-slim-bookworm AS runtime
 
 ENV MEMEDROP_ENV=production
 ENV PORT=3001
-ENV MEME_STORAGE_PATH=/var/lib/memedrop/memes
 ENV PATH=/app/.venv/bin:$PATH
 ENV PYTHONPATH=/app/apps/api/src
 ENV PYTHONUNBUFFERED=1
@@ -21,8 +20,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 RUN groupadd --system memedrop && useradd --system --gid memedrop --home-dir /app memedrop \
-  && mkdir -p /var/lib/memedrop/memes \
-  && chown -R memedrop:memedrop /var/lib/memedrop /app
+  && chown -R memedrop:memedrop /app
 
 COPY --from=build --chown=memedrop:memedrop /app/.venv /app/.venv
 COPY --chown=memedrop:memedrop alembic.ini ./alembic.ini
