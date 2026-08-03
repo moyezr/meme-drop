@@ -1,0 +1,12 @@
+{
+  "name": "@memedrop/meme-catalog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./manifest.json": "./manifest.json"
+  },
+  "files": [
+    "manifest.json"
+  ]
+}

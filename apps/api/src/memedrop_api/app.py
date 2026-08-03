@@ -19,6 +19,7 @@ from memedrop_api.api.health import ReadinessCheck
 from memedrop_api.api.health import router as health_router
 from memedrop_api.api.library import router as library_router
 from memedrop_api.api.memes import router as memes_router
+from memedrop_api.api.suggest import router as suggest_router
 from memedrop_api.api.usage import router as usage_router
 from memedrop_api.config import Settings
 from memedrop_api.db import Database
@@ -31,10 +32,13 @@ from memedrop_api.rate_limit import (
 )
 from memedrop_api.repositories import BackendStore, SqlAlchemyStore
 from memedrop_api.services.auto_tagger import auto_tag_meme
+from memedrop_api.services.catalog import MemeCatalog
 from memedrop_api.services.image_downloader import (
     delete_stored_image,
     download_image,
 )
+from memedrop_api.services.openrouter import OpenRouterSuggestionGateway
+from memedrop_api.services.suggestion_engine import SuggestionService
 
 LOGGER = logging.getLogger("memedrop.api")
 REQUEST_ID_HEADER = "x-request-id"
@@ -49,11 +53,18 @@ def create_app(
     rate_limiter: RateLimitStore | None = None,
     download_image_service=None,  # type: ignore[no-untyped-def]
     auto_tag_service=None,  # type: ignore[no-untyped-def]
+    suggestion_service: SuggestionService | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings()  # type: ignore[call-arg]
     Path(app_settings.meme_storage_path).mkdir(parents=True, exist_ok=True)
     database = Database(app_settings.database_url)
     backend_store = store or SqlAlchemyStore(database)
+    suggestions = suggestion_service or SuggestionService(
+        backend_store,
+        MemeCatalog.load(),
+        OpenRouterSuggestionGateway(app_settings),
+        app_settings,
+    )
     limiter = rate_limiter or (
         PostgresRateLimitStore(database)
         if app_settings.rate_limit_store == "database"
@@ -81,6 +92,7 @@ def create_app(
     app.state.download_image = download_image_service or download_image
     app.state.auto_tag_meme = auto_tag_service or auto_tag_meme
     app.state.delete_stored_image = delete_stored_image
+    app.state.suggestion_service = suggestions
 
     app.add_middleware(
         CORSMiddleware,
@@ -157,6 +169,7 @@ def create_app(
     app.include_router(account_router)
     app.include_router(library_router)
     app.include_router(memes_router)
+    app.include_router(suggest_router)
     app.include_router(usage_router)
     app.mount(
         "/memes",

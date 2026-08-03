@@ -13,9 +13,12 @@ columns, install identity semantics, and extension-facing error contract.
 - saved-meme download, SSRF protection, vision tagging, listing, editing, and deletion
 - usage feedback validation and persistence
 - account data export and deletion
+- catalog-backed template ranking with benchmarked local fallback
+- optional OpenRouter template selection and batched caption generation
+- deterministic contextual overlays for model outages
 
-The suggestion and caption pipeline remains on the compatibility backend until its benchmark and
-fallback behavior has been ported.
+FastAPI now has route parity with the compatibility backend. Deployment and release tooling still
+target Fastify until the next migration milestone is validated.
 
 ## Development
 
@@ -27,6 +30,7 @@ npm run dev:api
 npm run lint:api
 npm run test:api
 uv run --package memedrop-api mypy apps/api/src apps/api/tests
+npm run catalog:export
 ```
 
 The default test suite uses in-memory collaborators for deterministic HTTP tests. The repository
@@ -39,3 +43,7 @@ MEMEDROP_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedro
 ```
 
 Integration records use generated IDs and are removed after each run.
+
+The suggestion tests also run the offline benchmark at
+`backend/evals/suggestion-benchmark.json`. They enforce a minimum relevance floor for the local
+ranker, which remains available when OpenRouter is not configured or temporarily fails.

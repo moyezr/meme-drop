@@ -137,3 +137,72 @@ class AutoTagResult(StrictModel):
     example_contexts: list[str] = Field(min_length=2, max_length=4)
     vibes: list[str] = Field(min_length=1, max_length=4)
     is_evergreen: bool
+
+
+class TweetContext(StrictModel):
+    sentiment: Literal["positive", "negative", "neutral"]
+    tone: Literal[
+        "sarcastic",
+        "earnest",
+        "rant",
+        "celebratory",
+        "hot-take",
+        "question",
+        "absurdist",
+        "wholesome",
+        "self-deprecating",
+    ]
+    topic: Literal[
+        "tech",
+        "finance",
+        "politics",
+        "sports",
+        "entertainment",
+        "personal",
+        "culture",
+        "relationships",
+        "other",
+    ]
+    intent: Literal[
+        "counter-argument",
+        "agreement",
+        "sharing-opinion",
+        "venting",
+        "asking",
+        "celebrating",
+        "dunking",
+        "self-deprecating",
+    ]
+    intensity: float = Field(ge=0, le=1)
+    reply_style: str
+    ideal_meme_vibe: str
+    joke_target: str
+    social_dynamic: str
+    humor_angle: str
+    core_claim: str
+    implied_context: str
+    comedic_tension: str
+    caption_anchors: list[str]
+    keywords: list[str]
+
+
+TweetText = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=280,
+    ),
+]
+
+
+class SuggestRequest(StrictModel):
+    tweet_text: TweetText
+    limit: int | None = Field(default=None, ge=1, le=10)
+    refresh: bool = False
+    cache_key: str | None = Field(default=None, min_length=1, max_length=240)
+
+
+class CaptionRequest(StrictModel):
+    tweet_text: TweetText
+    meme_id: UUID

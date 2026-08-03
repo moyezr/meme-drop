@@ -69,6 +69,12 @@ async def test_sqlalchemy_store_exercises_every_data_feature(database: Database)
             format_type="text_overlay", emotion="sarcastic", search="This Is Fine"
         )
         assert [row["id"] for row in browsed if row["id"] == str(global_id)] == [str(global_id)]
+        global_memes = await store.list_global_memes()
+        assert str(global_id) in {row["id"] for row in global_memes}
+        global_meme = await store.get_global_meme(global_id)
+        assert global_meme is not None
+        assert global_meme["name"] == "Integration This Is Fine"
+        assert await store.get_global_meme(uuid4()) is None
 
         searched = await store.list_user_memes(
             user_id,

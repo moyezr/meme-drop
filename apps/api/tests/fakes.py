@@ -29,6 +29,12 @@ class FakeStore:
         }
         return self.memes
 
+    async def list_global_memes(self) -> list[dict[str, Any]]:
+        return self.memes
+
+    async def get_global_meme(self, meme_id: UUID) -> dict[str, Any] | None:
+        return next((row for row in self.memes if row["id"] == str(meme_id)), None)
+
     async def create_user_meme(
         self,
         *,

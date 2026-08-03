@@ -1,179 +1,135 @@
-• Migration Status
+# MemeDrop architecture
 
-  The production API is being migrated from Fastify to FastAPI under `apps/api/`.
-  During the migration, Fastify remains the compatibility runtime and both implementations
-  preserve the existing `/api/v1` contract. Fastify will be removed only after route, database,
-  recommendation, deployment, and extension integration parity are verified.
+## Migration status
 
-  The FastAPI foundation owns configuration, request IDs, safe errors, CORS, static meme media,
-  PostgreSQL/pgvector models, readiness, and liveness. Identity, rate limiting, account export and
-  deletion, usage feedback, meme browsing, saved-meme CRUD, safe image download, and vision tagging
-  now also run in FastAPI with API and PostgreSQL integration tests. The suggestion/caption pipeline
-  is the remaining runtime feature on Fastify. New backend features must target FastAPI.
+The production API is moving from Fastify to FastAPI under `apps/api/`. FastAPI now implements the
+complete extension-facing HTTP surface, including suggestions and tailored captions. The legacy
+Fastify server remains temporarily as a compatibility runtime while deployment, database tooling,
+release checks, and end-to-end extension validation are switched over.
 
-• Mental Model
-  MemeDrop is a Chrome extension backed by a local recommendation API.
+New backend runtime work belongs in FastAPI. The legacy server must not gain new features.
 
-  X page
-    -> Chrome extension content script
-    -> Extension background service worker
-    -> Fastify backend on localhost:3001
-    -> Postgres + pgvector
-    -> OpenRouter APIs
+## System map
 
-  Popup library
-    -> Fastify backend
-    -> Local meme image storage + Postgres
+```text
+X reply composer                         Extension popup
+       |                                       |
+       +---- Chrome extension service worker --+
+                              |
+                         FastAPI :3001
+                         /       |       \
+                   PostgreSQL  OpenRouter  local meme files
+                    + pgvector
+```
 
-  The repository has three npm workspaces:
+The monorepo is organized by deployable app and reusable package:
 
-  ┌────────────┬──────────────────────────────────────────────────────────────────────┐
-  │ Package    │ Responsibility                                                       │
-  ├────────────┼──────────────────────────────────────────────────────────────────────┤
-  │ extension/ │ X integration, injected suggestion panel, save button, popup library │
-  │ backend/   │ API, recommendation pipeline, OpenRouter calls, database access      │
-  │ shared/    │ Shared contracts and meme text-overlay template data                 │
-  └────────────┴──────────────────────────────────────────────────────────────────────┘
+| Path | Responsibility |
+| --- | --- |
+| `apps/api/` | FastAPI HTTP API, services, persistence, and Python tests |
+| `extension/` | X integration, background worker, injected panel, and popup |
+| `landing/` | Public Next.js landing page |
+| `shared/` | TypeScript API contracts and source template data |
+| `packages/meme-catalog/` | Language-neutral exported runtime meme catalog |
+| `backend/` | Temporary Fastify compatibility runtime and catalog tooling |
 
-  Backend Surface
-  The Fastify server starts in backend/src/server.ts:15.
+## HTTP surface
 
-  ┌──────────────────────────────┬──────────────────────────────────────┐
-  │ Endpoint                     │ Purpose                              │
-  ├──────────────────────────────┼──────────────────────────────────────┤
-  │ GET /health                  │ Verify database connectivity         │
-  │ POST /api/v1/suggest         │ Generate meme recommendations        │
-  │ POST /api/v1/suggest/caption │ Generate a caption for one meme      │
-  │ POST /api/v1/library/save    │ Save and AI-tag an image             │
-  │ GET /api/v1/library          │ List saved memes                     │
-  │ PUT /api/v1/library/:id      │ Rename or tag a saved meme           │
-  │ DELETE /api/v1/library/:id   │ Delete a saved meme                  │
-  │ POST /api/v1/usage           │ Record used or dismissed suggestions │
-  │ GET /memes/:file             │ Serve locally stored image files     │
-  └──────────────────────────────┴──────────────────────────────────────┘
+FastAPI preserves the extension's existing `/api/v1` JSON contract and camelCase response fields.
 
-  Suggestion Flow
-  When a user opens an X reply composer:
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health/live` | Process liveness |
+| `GET /health` and `GET /health/ready` | PostgreSQL readiness |
+| `GET /api/v1/memes` | Browse the global meme catalog |
+| `POST /api/v1/suggest` | Rank templates and generate contextual overlays |
+| `POST /api/v1/suggest/caption` | Generate an overlay for one meme |
+| `POST /api/v1/library/save` | Download, validate, store, and AI-tag an image |
+| `GET /api/v1/library` | Search and sort saved memes |
+| `PUT /api/v1/library/{id}` | Rename or tag a saved meme |
+| `DELETE /api/v1/library/{id}` | Delete a saved meme and local image |
+| `POST /api/v1/usage` | Record shown, used, and dismissed feedback |
+| `GET /api/v1/account/export` | Export saved memes and usage history |
+| `DELETE /api/v1/account` | Delete an install's data |
+| `GET /memes/{file}` | Serve stored meme media |
 
-  Reply composer opens
-    -> content script extracts original tweet text
-    -> GET_SUGGESTIONS Chrome message
-    -> background worker calls POST /api/v1/suggest
-    -> backend returns ranked memes and optional text overlays
-    -> panel displays previews
-    -> user clicks or drags a meme
-    -> extension attaches a PNG through X's hidden file input
-    -> usage event is recorded
+Install identity is carried in `x-memedrop-install-id`. Development can use the configured default
+identity; production can require the header. Rate limiting supports in-memory local operation and a
+PostgreSQL-backed mode for multiple API replicas.
 
-  The content script detects X SPA route changes and extracts the tweet being replied to in extension/src/content/
-  content.ts:311. It sends the request to the background worker at extension/src/content/content.ts:400.
+## Suggestion path
 
-  The background worker is the HTTP bridge. It calls POST /api/v1/suggest, caches results for five minutes, and converts
-  backend images into data URLs because X page CSP can block injected localhost images: extension/src/background/
-  background.ts:169.
+```text
+tweet text
+  -> deterministic context analysis
+  -> match database memes to verified catalog templates
+  -> local semantic ranking (always available)
+  -> optional OpenRouter structured template selection
+  -> one batched OpenRouter caption request
+  -> contextual deterministic caption fallback
+  -> overlay regions + structured tweet context
+```
 
-  Recommendation Pipeline
-  The core ranking logic is in backend/src/services/suggestion-engine.ts:98.
+The language-neutral catalog is generated at `packages/meme-catalog/manifest.json`. It records each
+template's aliases, use cases, anti-use cases, semantic tags, caption grammar, and layout regions.
+FastAPI loads verified curated and promoted templates by default; generated drafts remain opt-in.
 
-  Tweet text
-    -> OpenRouter tweet analysis
-    -> structured TweetContext
-    -> natural-language tweet descriptor
-    -> OpenRouter embedding
-    -> pgvector nearest-neighbor search
-    -> deterministic scoring + preference adjustments
-    -> OpenRouter LLM reranking
-    -> MMR diversity pass
-    -> tailored caption generation
-    -> suggestion response
+The local ranker is the availability fallback and the quality baseline. Its benchmark test enforces
+minimum expected-family retrieval rates at top 3 and top 5. A model can reorder candidates, but an
+unavailable or malformed model response cannot make the endpoint fail. Caption generation is batched
+to keep latency bounded and every supported template has a deterministic contextual fallback.
 
-  The structured context includes tone, intent, topic, joke target, social dynamic, keywords, and humor angle. If
-  OpenRouter analysis fails, a heuristic analyzer is used: backend/src/services/context-analyzer.ts:72.
+Suggestions return `tweet_context` with the recommendation. The extension sends that context back in
+usage events so future ranking changes can learn from shown, dismissed, and used outcomes without
+storing raw tweet text in logs. Recommendation cache keys and application logs hash or redact tweet
+content.
 
-  The descriptor becomes a 1536-dimensional embedding using OpenRouter: backend/src/services/embedding.ts:8.
+## Library path
 
-  Postgres uses pgvector cosine distance to retrieve relevant memes: backend/src/services/retrieval.ts:36. If embeddings
-  fail or exceed the timeout, the backend uses a cheaper database-order fallback.
+Saving a meme follows this sequence:
 
-  After retrieval:
+```text
+source image URL
+  -> reject private/loopback hosts and unsafe redirects
+  -> stream with byte and timeout limits
+  -> verify image content type and decoded dimensions
+  -> persist under configured meme storage
+  -> optional OpenRouter vision tags
+  -> insert user_memes row
+```
 
-  1. Taxonomy rules add boosts and mismatch penalties.
-  2. Usage history adds small preference boosts and recent-repeat penalties.
-  3. OpenRouter reranks likely candidates for comedic fit.
-  4. MMR removes near-duplicate recommendations.
-  5. The top candidates receive tailored overlay captions.
+Saved memes are available in the popup library but are not yet mixed into automatic suggestions.
+This separation avoids surfacing a private or low-quality saved image before personalized retrieval
+has explicit quality controls.
 
-  Caption Rendering
-  The backend does not generate final image files for recommendations. It returns text plus normalized layout regions:
+## Persistence
 
-  {
-    text: "THE DEPLOYMENT IS FINE",
-    x: 0.05,
-    y: 0.05,
-    width: 0.9,
-    height: 0.2
-  }
+SQLAlchemy models preserve the existing PostgreSQL tables so the runtime can change without a data
+migration: `users`, `memes`, `user_memes`, `usage_events`, and `rate_limits`. pgvector columns remain
+available for learned/embedding retrieval work.
 
-  Caption generation lives in backend/src/services/meme-text.ts:63. Template geometry comes from the shared manifest.
+Repository methods form the boundary between API/service tests and PostgreSQL. The default suite uses
+deterministic in-memory collaborators; the integration marker runs the same repository against a real
+PostgreSQL instance with pgvector.
 
-  The extension draws Impact-style text onto a canvas and converts the result into a PNG data URL: extension/src/
-  content/suggestion-panel.ts:535. It then attaches the PNG through X's upload input.
+## Recommendation evolution
 
-  Save And Library Flow
-  Hovering over an image on X displays a save button: extension/src/content/save-button.ts:75.
+Recommendation changes should improve measured relevance without sacrificing latency or fallback
+behavior. The intended progression is:
 
-  User saves X image
-    -> SAVE_MEME message
-    -> POST /api/v1/library/save
-    -> backend downloads image to backend/data/memes
-    -> OpenRouter vision auto-tags image
-    -> backend builds meme descriptor
-    -> row inserted into user_memes
-    -> saved meme appears in popup library
+1. Preserve reliable structured usage events and request context.
+2. Establish offline benchmark gates for retrieval, diversity, captions, and latency.
+3. Derive per-template and per-context outcome features from shown/used/dismissed events.
+4. Introduce a versioned learned reranker behind the existing local candidate generator.
+5. Compare model versions offline, then in an observable rollout with an immediate fallback.
 
-  The backend implementation is in backend/src/routes/library.ts:14. The popup loads and manages saved memes in
-  extension/src/popup/pages/Library.tsx:53.
+This keeps the HTTP API stable while allowing the ranking implementation to evolve independently.
 
-  Saved memes can be dragged from the popup into an X composer.
+## Testing boundaries
 
-  Database Model
-  The Drizzle schema is in backend/src/db/schema.ts:13.
-
-  ┌──────────────┬────────────────────────────────────────────────────────┐
-  │ Table        │ Purpose                                                │
-  ├──────────────┼────────────────────────────────────────────────────────┤
-  │ users        │ Minimal user record                                    │
-  │ memes        │ Curated global meme catalogue with tags and embeddings │
-  │ user_memes   │ Images saved by the user                               │
-  │ usage_events │ Used and dismissed meme events for personalization     │
-  └──────────────┴────────────────────────────────────────────────────────┘
-
-  The app currently uses one hard-coded development user ID. Authentication and real multi-user support are not
-  implemented.
-
-  Important Current Boundary
-  The recommendation feed currently searches only the curated global memes table:
-
-  userLimit: 0,
-  globalLimit: 60,
-  source: "global"
-
-  See backend/src/services/suggestion-engine.ts:133.
-
-  Saved memes live in user_memes and are usable from the popup, but they are intentionally excluded from automatic
-  suggestions for now.
-
-  OpenRouter Usage
-  All live AI requests now use OpenRouter:
-
-  ┌─────────────────────┬──────────────────────────────────────────────────┐
-  │ Task                │ Model path                                       │
-  ├─────────────────────┼──────────────────────────────────────────────────┤
-  │ Tweet analysis      │ qwen/qwen3.6-plus                                │
-  │ Meme reranking      │ qwen/qwen3.6-plus                                │
-  │ Caption generation  │ qwen/qwen3.6-plus                                │
-  │ Vision auto-tagging │ qwen/qwen3.6-plus                                │
-  │ Embeddings          │ openai/text-embedding-3-small through OpenRouter │
-  └─────────────────────┴──────────────────────────────────────────────────┘
-
-  Provider configuration is centralized in backend/src/services/llm-provider.ts:3.
+- Unit tests cover configuration, identity, context analysis, catalog lookup, captions, ranking,
+  downloads, vision responses, rate limiting, and repository-independent services.
+- HTTP tests cover every route, validation contract, failure response, and ownership boundary.
+- PostgreSQL integration tests exercise every repository data feature and pgvector-compatible schema.
+- The extension retains TypeScript contract and UI tests; release smoke tests will target the FastAPI
+  process and container once deployment migration is complete.

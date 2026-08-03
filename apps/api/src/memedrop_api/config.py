@@ -72,6 +72,18 @@ class Settings(BaseSettings):
     use_draft_templates: bool = Field(
         default=False, validation_alias="MEMEDROP_USE_DRAFT_TEMPLATES"
     )
+    template_selection_timeout_ms: int = Field(
+        default=15_000,
+        validation_alias="MEMEDROP_TEMPLATE_SELECTION_TIMEOUT_MS",
+        gt=0,
+    )
+    caption_timeout_ms: int = Field(
+        default=20_000, validation_alias="MEMEDROP_CAPTION_TIMEOUT_MS", gt=0
+    )
+    contextual_caption_fallback: bool = Field(
+        default=True,
+        validation_alias="MEMEDROP_USE_CONTEXTUAL_CAPTION_FALLBACK",
+    )
 
     @property
     def is_production(self) -> bool:

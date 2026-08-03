@@ -19,6 +19,10 @@ class BackendStore(Protocol):
         self, *, format_type: str | None, emotion: str | None, search: str | None
     ) -> list[JsonRecord]: ...
 
+    async def list_global_memes(self) -> list[JsonRecord]: ...
+
+    async def get_global_meme(self, meme_id: UUID) -> JsonRecord | None: ...
+
     async def create_user_meme(
         self,
         *,
@@ -96,6 +100,16 @@ class SqlAlchemyStore:
         async with self.database.session() as session:
             rows = (await session.scalars(statement)).all()
         return [meme_record(row) for row in rows]
+
+    async def list_global_memes(self) -> list[JsonRecord]:
+        async with self.database.session() as session:
+            rows = (await session.scalars(select(Meme).order_by(asc(Meme.name)))).all()
+        return [meme_record(row) for row in rows]
+
+    async def get_global_meme(self, meme_id: UUID) -> JsonRecord | None:
+        async with self.database.session() as session:
+            row = await session.get(Meme, meme_id)
+        return meme_record(row) if row else None
 
     async def create_user_meme(
         self,
