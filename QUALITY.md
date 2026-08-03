@@ -189,6 +189,15 @@ Recommended order:
 6. Stream partial suggestions without captions, then hydrate captioned previews as they finish.
 7. Measure stage timings from the existing suggestion pipeline before replacing infrastructure.
 
+## Dependency Security
+
+Run `npm run quality:security` after lockfile or deployment changes. It audits the complete npm
+workspace and the locked FastAPI production environment. The script fails on every new advisory.
+Two narrowly version-pinned exceptions expire on 2026-09-01: Next.js build dependencies used only
+to export the static landing site, and the Vite 5 copy embedded by the current CRXJS build plugin.
+Neither dependency set is shipped in the extension runtime or a landing server. Any package change,
+new advisory, or review-date expiry makes the gate fail until the exception is reviewed again.
+
 ## Chrome Extension Release Gate
 
 Use the normal extension build for local development:
