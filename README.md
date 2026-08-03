@@ -2,7 +2,8 @@
 
 MemeDrop is a local-first Chrome extension for replying on X/Twitter with meme suggestions. The repo includes:
 
-- a Fastify API that serves suggestions, meme images, library routes, and usage feedback
+- a FastAPI migration under `apps/api/` that is replacing the legacy Fastify API
+- the legacy Fastify API, retained temporarily until route and recommendation parity is verified
 - a Chrome extension built with React, Vite, Tailwind, and CRXJS
 - shared TypeScript types and meme template data
 - a small Next.js landing page that can be hosted separately on Vercel
@@ -22,11 +23,22 @@ MemeDrop still works without an OpenRouter key, but suggestions and captions wil
 ## Project Layout
 
 ```text
+apps/api/   FastAPI application, PostgreSQL models, and Python tests
 backend/    Fastify API, Drizzle schema, database scripts, services, tests
 extension/  Chrome extension source, popup, content scripts, background worker
 shared/     Shared types, API contracts, template manifest, lookup helpers
 landing/    Next.js landing page
 scripts/    Root release, launch, and smoke-check scripts
+```
+
+The migration is intentionally incremental. `npm run dev:backend` remains the compatibility
+runtime until every production route has moved and passed parity tests. The new foundation can
+be validated independently with:
+
+```sh
+uv sync --all-packages
+npm run lint:api
+npm run test:api
 ```
 
 ## Local Setup

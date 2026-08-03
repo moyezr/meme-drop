@@ -1,3 +1,13 @@
+• Migration Status
+
+  The production API is being migrated from Fastify to FastAPI under `apps/api/`.
+  During the migration, Fastify remains the compatibility runtime and both implementations
+  preserve the existing `/api/v1` contract. Fastify will be removed only after route, database,
+  recommendation, deployment, and extension integration parity are verified.
+
+  The FastAPI foundation owns configuration, request IDs, safe errors, CORS, static meme media,
+  PostgreSQL/pgvector models, readiness, and liveness. New backend features must target FastAPI.
+
 • Mental Model
   MemeDrop is a Chrome extension backed by a local recommendation API.
 

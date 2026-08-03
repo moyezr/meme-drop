@@ -3,6 +3,15 @@ dist/
 .next/
 out/
 *.tsbuildinfo
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.py[cod]
 .env
 .env.*
 !.env.example
@@ -12,4 +21,6 @@ out/
 .memedrop/
 backend/data/memes/*
 !backend/data/memes/.gitkeep
+apps/api/data/memes/*
+!apps/api/data/memes/.gitkeep
 .DS_Store
