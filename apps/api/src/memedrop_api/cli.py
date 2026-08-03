@@ -33,6 +33,15 @@ PLACEHOLDER_HOSTS = {
     "memedrop.example",
     "api.memedrop.example",
 }
+PLACEHOLDER_MARKERS = (
+    "change-me",
+    "placeholder",
+    "dummy",
+    "test-key",
+    "your-domain",
+    "your-project-ref",
+    "your-s3-region",
+)
 
 
 class RemoteTemplate(TypedDict):
@@ -218,15 +227,20 @@ def production_env_findings(
         if raw and (not raw.isdigit() or int(raw) <= 0):
             errors.append(f"{name} must be a positive integer.")
 
+    def reject_placeholder(name: str, raw: str) -> None:
+        if raw and is_placeholder_value(raw):
+            errors.append(f"{name} must not use a placeholder value.")
+
     if value("MEMEDROP_ENV") != "production":
         errors.append("MEMEDROP_ENV must be production.")
     database_url = value("DATABASE_URL")
     validate_url("DATABASE_URL", database_url, {"postgres", "postgresql"}, errors)
+    reject_placeholder("DATABASE_URL", database_url)
     site_url = value("OPENROUTER_SITE_URL")
     validate_url("OPENROUTER_SITE_URL", site_url, {"https"}, errors)
 
     api_key = value("OPENROUTER_API_KEY")
-    if re.search(r"example|placeholder|change-me|dummy|test-key", api_key, re.I):
+    if is_placeholder_value(api_key):
         errors.append("OPENROUTER_API_KEY must not use a placeholder value.")
     elif api_key and len(api_key) < 16:
         warnings.append("OPENROUTER_API_KEY looks unusually short.")
@@ -261,9 +275,12 @@ def production_env_findings(
         errors.append("MEMEDROP_STORAGE_BACKEND must be s3.")
     storage_endpoint = value("S3_ENDPOINT")
     validate_url("S3_ENDPOINT", storage_endpoint, {"https"}, errors)
-    value("S3_REGION")
-    value("S3_ACCESS_KEY_ID")
-    value("S3_SECRET_ACCESS_KEY")
+    storage_region = value("S3_REGION")
+    storage_access_key = value("S3_ACCESS_KEY_ID")
+    storage_secret_key = value("S3_SECRET_ACCESS_KEY")
+    reject_placeholder("S3_REGION", storage_region)
+    reject_placeholder("S3_ACCESS_KEY_ID", storage_access_key)
+    reject_placeholder("S3_SECRET_ACCESS_KEY", storage_secret_key)
     if value("MEMEDROP_STORAGE_BUCKET") != "meme-drop-prod":
         errors.append("MEMEDROP_STORAGE_BUCKET must be meme-drop-prod.")
     for name in (
@@ -284,8 +301,13 @@ def validate_url(name: str, raw: str, schemes: set[str], errors: list[str]) -> N
     parsed = urlparse(raw)
     if parsed.scheme not in schemes or not parsed.hostname:
         errors.append(f"{name} must be a valid {', '.join(sorted(schemes))} URL.")
-    elif parsed.hostname.lower() in PLACEHOLDER_HOSTS:
+    elif parsed.hostname.lower() in PLACEHOLDER_HOSTS or is_placeholder_value(parsed.hostname):
         errors.append(f"{name} must not use a local or placeholder host: {parsed.hostname}.")
+
+
+def is_placeholder_value(raw: str) -> bool:
+    normalized = raw.strip().lower()
+    return any(marker in normalized for marker in PLACEHOLDER_MARKERS)
 
 
 def repository_root() -> Path:

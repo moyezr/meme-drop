@@ -67,6 +67,32 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
     assert any("MEMEDROP_STORAGE_BUCKET must be meme-drop-prod" in error for error in errors)
 
 
+def test_production_environment_rejects_example_credentials() -> None:
+    environment = valid_environment()
+    environment.update(
+        {
+            "DATABASE_URL": "postgresql://memedrop:change-me@db:5432/memedrop",
+            "OPENROUTER_SITE_URL": "https://api.your-domain.com",
+            "S3_ENDPOINT": "https://your-project-ref.storage.supabase.co/storage/v1/s3",
+            "S3_REGION": "your-s3-region",
+            "S3_ACCESS_KEY_ID": "change-me-s3-access-key",
+            "S3_SECRET_ACCESS_KEY": "change-me-s3-secret-key",
+        }
+    )
+
+    errors, _ = production_env_findings(environment)
+
+    for name in (
+        "DATABASE_URL",
+        "OPENROUTER_SITE_URL",
+        "S3_ENDPOINT",
+        "S3_REGION",
+        "S3_ACCESS_KEY_ID",
+        "S3_SECRET_ACCESS_KEY",
+    ):
+        assert any(error.startswith(name) and "placeholder" in error for error in errors)
+
+
 def test_repository_root_contains_workspace_config() -> None:
     assert (repository_root() / "pyproject.toml").is_file()
 
