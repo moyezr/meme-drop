@@ -2,10 +2,10 @@
 
 ## Migration status
 
-The production API is moving from Fastify to FastAPI under `apps/api/`. FastAPI now implements the
-complete extension-facing HTTP surface, including suggestions and tailored captions. The legacy
-Fastify server remains temporarily as a compatibility runtime while deployment, database tooling,
-release checks, and end-to-end extension validation are switched over.
+FastAPI under `apps/api/` is the production backend. It implements the complete extension-facing
+HTTP surface, including suggestions and tailored captions. Root development, database, build,
+container, and release commands all target FastAPI. The retired Fastify source remains temporarily
+only while its TypeScript catalog and evaluation tools are reorganized.
 
 New backend runtime work belongs in FastAPI. The legacy server must not gain new features.
 
@@ -31,7 +31,7 @@ The monorepo is organized by deployable app and reusable package:
 | `landing/` | Public Next.js landing page |
 | `shared/` | TypeScript API contracts and source template data |
 | `packages/meme-catalog/` | Language-neutral exported runtime meme catalog |
-| `backend/` | Temporary Fastify compatibility runtime and catalog tooling |
+| `backend/` | Temporary TypeScript catalog/evaluation tools and retired Fastify source |
 
 ## HTTP surface
 

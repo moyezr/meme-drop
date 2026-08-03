@@ -17,8 +17,8 @@ columns, install identity semantics, and extension-facing error contract.
 - optional OpenRouter template selection and batched caption generation
 - deterministic contextual overlays for model outages
 
-FastAPI now has route parity with the compatibility backend. Deployment and release tooling still
-target Fastify until the next migration milestone is validated.
+FastAPI has route parity and is the runtime used by root development, build, database, container,
+and deployment commands.
 
 ## Development
 
@@ -31,6 +31,8 @@ npm run lint:api
 npm run test:api
 uv run --package memedrop-api mypy apps/api/src apps/api/tests
 npm run catalog:export
+npm run db:init
+npm run quality:api-process
 ```
 
 The default test suite uses in-memory collaborators for deterministic HTTP tests. The repository

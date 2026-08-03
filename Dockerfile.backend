@@ -1,39 +1,39 @@
-FROM node:22-slim AS build
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS build
 
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.base.json ./
-COPY backend/package.json backend/package.json
-COPY shared/package.json shared/package.json
-RUN npm ci
+COPY pyproject.toml uv.lock ./
+COPY apps/api/pyproject.toml apps/api/pyproject.toml
+COPY apps/api/src apps/api/src
+RUN uv sync --frozen --package memedrop-api --no-dev
 
-COPY backend backend
-COPY shared shared
-RUN npm run build:backend
-RUN npm prune --omit=dev
+FROM python:3.13-slim-bookworm AS runtime
 
-FROM node:22-slim AS runtime
-
-ENV NODE_ENV=production
+ENV MEMEDROP_ENV=production
 ENV PORT=3001
 ENV MEME_STORAGE_PATH=/var/lib/memedrop/memes
+ENV PATH=/app/.venv/bin:$PATH
+ENV PYTHONPATH=/app/apps/api/src
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
-COPY --from=build --chown=node:node /app/node_modules ./node_modules
-COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
-COPY --from=build --chown=node:node /app/backend/dist ./backend/dist
-COPY --from=build --chown=node:node /app/shared/package.json ./shared/package.json
-COPY --from=build --chown=node:node /app/shared/dist ./shared/dist
+RUN groupadd --system memedrop && useradd --system --gid memedrop --home-dir /app memedrop \
+  && mkdir -p /var/lib/memedrop/memes \
+  && chown -R memedrop:memedrop /var/lib/memedrop /app
 
-RUN mkdir -p /var/lib/memedrop/memes && chown -R node:node /var/lib/memedrop
+COPY --from=build --chown=memedrop:memedrop /app/.venv /app/.venv
+COPY --chown=memedrop:memedrop alembic.ini ./alembic.ini
+COPY --chown=memedrop:memedrop apps/api/migrations apps/api/migrations
+COPY --chown=memedrop:memedrop apps/api/src apps/api/src
+COPY --chown=memedrop:memedrop packages/meme-catalog packages/meme-catalog
 
-USER node
-
+USER memedrop
 EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3001) + '/live').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/live', timeout=3)"
 
-CMD ["node", "backend/dist/server.js"]
+CMD ["sh", "-c", "uvicorn memedrop_api.main:app --app-dir apps/api/src --host 0.0.0.0 --port ${PORT:-3001}"]

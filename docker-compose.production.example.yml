@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 10
 
-  backend:
+  api:
     build:
       context: .
       dockerfile: Dockerfile.backend
@@ -23,7 +23,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      NODE_ENV: production
+      MEMEDROP_ENV: production
       PORT: 3001
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY}
@@ -45,7 +45,7 @@ services:
     volumes:
       - meme-assets:/var/lib/memedrop/memes
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/live').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/live', timeout=3)\""]
       interval: 30s
       timeout: 5s
       start_period: 15s

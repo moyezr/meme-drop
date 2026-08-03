@@ -3,7 +3,7 @@
 MemeDrop is a local-first Chrome extension for replying on X/Twitter with meme suggestions. The repo includes:
 
 - a FastAPI API under `apps/api/` with complete extension-facing route parity
-- the legacy Fastify API, retained temporarily while deployment and release tooling are switched
+- legacy TypeScript catalog/evaluation tooling, retained temporarily while it is reorganized
 - a Chrome extension built with React, Vite, Tailwind, and CRXJS
 - shared TypeScript types and meme template data
 - a small Next.js landing page that can be hosted separately on Vercel
@@ -24,7 +24,7 @@ MemeDrop still works without an OpenRouter key, but suggestions and captions wil
 
 ```text
 apps/api/   FastAPI application, PostgreSQL models, and Python tests
-backend/    Fastify API, Drizzle schema, database scripts, services, tests
+backend/    Temporary TypeScript catalog/evaluation tools and retired Fastify source
 extension/  Chrome extension source, popup, content scripts, background worker
 shared/     Shared types, API contracts, template manifest, lookup helpers
 landing/    Next.js landing page
@@ -32,9 +32,8 @@ packages/meme-catalog/  Language-neutral runtime template catalog
 scripts/    Root release, launch, and smoke-check scripts
 ```
 
-The migration is intentionally incremental. `npm run dev:backend` remains the compatibility
-runtime until deployment and release checks target FastAPI. The complete FastAPI API can
-be validated independently with:
+FastAPI is the only backend started by root development, database, build, and deployment commands.
+The complete API can be validated with:
 
 ```sh
 uv sync --all-packages
@@ -51,10 +50,10 @@ Install dependencies:
 npm install
 ```
 
-Create the backend env file:
+Create the local environment file:
 
 ```sh
-cp .env.example backend/.env
+cp .env.example .env
 ```
 
 For a no-cost local setup, set `OPENROUTER_API_KEY=` or leave it unset. If you want model-backed captions, set:
@@ -144,15 +143,22 @@ npm run typecheck
 npm test
 npm run build:backend
 npm run build:extension
-npm run db:studio
+npm run db:migrate
 npm run db:down
 ```
 
-Backend-only:
+API-only:
 
 ```sh
-npm run typecheck --workspace=backend
-npm run test --workspace=backend
+uv run --package memedrop-api mypy apps/api/src apps/api/tests
+npm run test:api
+npm run test:api:integration
+npm run quality:api-process
+```
+
+Catalog tooling:
+
+```sh
 npm run manifest:audit --workspace=backend
 npm run eval:quality --workspace=backend
 ```
@@ -167,11 +173,11 @@ npm run build --workspace=extension
 
 ## Environment Notes
 
-Important backend env vars live in `backend/.env`:
+Important API env vars live in the root `.env` or `apps/api/.env`:
 
 ```text
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedrop
-MEME_STORAGE_PATH=./data/memes
+MEME_STORAGE_PATH=./apps/api/data/memes
 MEMEDROP_REQUIRE_INSTALL_ID=false
 MEMEDROP_RATE_LIMIT_STORE=memory
 ```
@@ -201,11 +207,11 @@ npm run db:seed-memes --workspace=backend
 
 If Chrome does not show extension changes, rebuild or keep watch mode running, then click reload on the extension card in `chrome://extensions`.
 
-If meme images are broken, check that `backend/data/memes/` contains seeded files and that the backend is running on `http://localhost:3001`.
+If meme images are broken, check the configured `MEME_STORAGE_PATH` and confirm FastAPI is running on `http://localhost:3001`.
 
 ## Notes For Contributors
 
-- Keep local generated files out of git: `.memedrop/`, `dist/`, `backend/data/memes/*`, `.env`, and `*.tsbuildinfo` are ignored.
+- Keep local generated files out of git: `.memedrop/`, `dist/`, `apps/api/data/memes/*`, `.env`, and `*.tsbuildinfo` are ignored.
 - Use strict TypeScript and ES modules.
 - Keep local imports explicit with `.js` extensions where TypeScript emits ESM.
 - Prefer simple, readable code over broad abstractions.

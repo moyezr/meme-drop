@@ -21,7 +21,7 @@ Do not treat this as production-ready for a broad public launch until account/se
 Required production environment:
 
 ```bash
-NODE_ENV=production
+MEMEDROP_ENV=production
 DATABASE_URL=postgresql://...
 OPENROUTER_API_KEY=your-openrouter-api-key
 OPENROUTER_SITE_URL=https://your-production-api.example
@@ -46,7 +46,7 @@ MEME_STORAGE_PATH=/var/lib/memedrop/memes
 Backend deployment checklist:
 
 1. Run Postgres with pgvector enabled.
-2. Run `npm run db:init` against the production database only after verifying `DATABASE_URL`. This enables pgvector, pushes Drizzle schema, applies compatibility migrations such as the expanded `usage_events.action` constraint, and seeds baseline data.
+2. Run `npm run db:init` against the production database only after verifying `DATABASE_URL`. Alembic enables pgvector, applies the versioned SQLAlchemy schema baseline, preserves compatible existing tables, and seeds the development identity idempotently.
 3. Serve `/memes/*` from persistent storage, not an ephemeral container filesystem.
 4. Set `MEMEDROP_CORS_ORIGINS` to the final Chrome extension origin after the Web Store item ID exists.
 5. Put the API behind HTTPS.
@@ -57,7 +57,7 @@ Backend deployment checklist:
 10. Keep image downloads restricted to public `http(s)` image URLs with DNS/private-IP checks enabled.
 11. Use `/live` for container liveness probes and `/health` for readiness probes that require database connectivity.
 12. Preserve `x-request-id` from upstream gateways when present; the API echoes a safe request ID on every response for support/debugging.
-13. Install production deployments with dev dependencies omitted after build/migration steps, for example `npm ci --omit=dev`, so Drizzle/Vite/esbuild tooling is not shipped in the runtime image.
+13. Keep Python test and lint dependencies out of the runtime image. The tracked multi-stage image installs only the locked FastAPI production dependency set.
 
 Production env preflight:
 
@@ -74,17 +74,20 @@ docker build -f Dockerfile.backend -t memedrop-backend:local .
 npm run quality:backend-image
 ```
 
-The backend image is multi-stage: it installs dev tooling only in the build stage, compiles `shared` and `backend`, prunes dev dependencies, and runs `node backend/dist/server.js` as the non-root `node` user. Mount persistent storage at `/var/lib/memedrop/memes` or override `MEME_STORAGE_PATH` with another absolute path.
+The backend image is multi-stage: it builds the locked Python environment with uv, copies only the
+FastAPI runtime, migration files, and language-neutral catalog, and runs Uvicorn as the non-root
+`memedrop` user. Mount persistent storage at `/var/lib/memedrop/memes` or override
+`MEME_STORAGE_PATH` with another absolute path.
 
 Single-host Docker Compose example:
 
 ```bash
 cp .env.production.example .env.production
-docker compose --env-file .env.production -f docker-compose.production.example.yml build backend
+docker compose --env-file .env.production -f docker-compose.production.example.yml build api
 docker compose --env-file .env.production -f docker-compose.production.example.yml up -d
 ```
 
-`docker-compose.production.example.yml` is an operations template, not a substitute for a managed production platform. Put a real TLS reverse proxy or load balancer in front of `backend`, keep the backend port bound to localhost/private networking, use managed Postgres if available, and back up both the database volume and meme asset volume. Run `npm run quality:production-env` with the same environment values before deploying.
+`docker-compose.production.example.yml` is an operations template, not a substitute for a managed production platform. Put a real TLS reverse proxy or load balancer in front of `api`, keep the API port bound to localhost/private networking, use managed Postgres if available, and back up both the database volume and meme asset volume. Run `npm run quality:production-env` with the same environment values before deploying.
 
 ## Extension
 
@@ -173,7 +176,7 @@ Expected current template gate:
 - `npm run manifest:audit --workspace=backend` should report zero errors.
 - The review queue should be empty or contain only intentionally deferred drafts.
 - Fast suggestion eval should pass the configured top-k, caption, layout, and overlay thresholds.
-- `npm run quality:compiled-backend` should build shared/backend and prove `node backend/dist/server.js` can start from compiled JavaScript.
+- `npm run quality:api-process` should build the Python package and prove Uvicorn can start the FastAPI application.
 
 Dataset promotion flow:
 

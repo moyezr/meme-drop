@@ -13,7 +13,7 @@ run("docker", [
   "-p",
   `${hostPort}:3001`,
   "-e",
-  "NODE_ENV=development",
+  "MEMEDROP_ENV=development",
   "-e",
   "DATABASE_URL=postgresql://test",
   "-e",

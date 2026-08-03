@@ -9,4 +9,6 @@ extension/dist
 .DS_Store
 backend/data/memes/*
 !backend/data/memes/.gitkeep
+apps/api/data/memes/*
+!apps/api/data/memes/.gitkeep
 data
