@@ -7,18 +7,18 @@ const hasDistManifest = fs.existsSync(distManifestPath);
 const distManifest = hasDistManifest ? readJson("../dist/manifest.json") : null;
 
 if (!isChromeVersion(sourceManifest.version)) {
-  fail(`extension/manifest.json version is not a valid Chrome extension version: ${sourceManifest.version}`);
+  fail(`apps/extension/manifest.json version is not a valid Chrome extension version: ${sourceManifest.version}`);
 }
 
 if (extensionPackage.version !== sourceManifest.version) {
   fail(
-    `extension/package.json version (${extensionPackage.version}) must match extension/manifest.json version (${sourceManifest.version}).`
+    `apps/extension/package.json version (${extensionPackage.version}) must match apps/extension/manifest.json version (${sourceManifest.version}).`
   );
 }
 
 if (distManifest && distManifest.version !== sourceManifest.version) {
   fail(
-    `dist/manifest.json version (${distManifest.version}) must match extension/manifest.json version (${sourceManifest.version}).`
+    `dist/manifest.json version (${distManifest.version}) must match apps/extension/manifest.json version (${sourceManifest.version}).`
   );
 }
 

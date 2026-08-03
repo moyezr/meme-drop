@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import generatedManifest from "../../../shared/src/data/meme-template-manifest.generated.json";
+import generatedManifest from "../../../packages/shared/src/data/meme-template-manifest.generated.json";
 import { MEME_TEMPLATE_MANIFEST, type MemeTemplate } from "@memedrop/shared";
 
 type ReviewStatus = "approved" | "needs_work" | "rejected";
@@ -34,7 +34,9 @@ const benchmarkPath = path.resolve(
 );
 const outPath = path.resolve(
   rootDir,
-  String(args.out || path.join("shared", "src", "data", "meme-template-manifest.promoted.json"))
+  String(
+    args.out || path.join("packages", "shared", "src", "data", "meme-template-manifest.promoted.json")
+  )
 );
 
 main();

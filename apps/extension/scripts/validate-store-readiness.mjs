@@ -3,11 +3,11 @@ import path from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
 const strict = Boolean(args.strict);
-const rootDir = path.resolve(new URL("../..", import.meta.url).pathname);
-const extensionDir = path.join(rootDir, "extension");
+const rootDir = path.resolve(new URL("../../..", import.meta.url).pathname);
+const extensionDir = path.join(rootDir, "apps/extension");
 const listingPath = path.resolve(
   rootDir,
-  String(args.file || "extension/store-listing.json")
+  String(args.file || "apps/extension/store-listing.json")
 );
 const manifestPath = path.join(extensionDir, "manifest.json");
 const privacyPath = path.join(rootDir, "PRIVACY.md");

@@ -2,7 +2,7 @@
 
 `manifest.json` is the language-neutral runtime catalog consumed by FastAPI and, after the backend
 migration, the TypeScript clients. Its source data remains the curated, promoted, and generated
-manifests under `shared/src/data` until the final repository cleanup.
+manifests under `packages/shared/src/data` until the final repository cleanup.
 
 Regenerate it from the repository root:
 

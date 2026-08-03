@@ -1,9 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MEME_TEMPLATE_MANIFEST } from "../../../shared/src/data/meme-template-manifest.js";
-import generatedManifest from "../../../shared/src/data/meme-template-manifest.generated.json" with { type: "json" };
-import type { MemeTemplate } from "../../../shared/src/types/template-manifest.js";
+import { MEME_TEMPLATE_MANIFEST } from "../../../packages/shared/src/data/meme-template-manifest.js";
+import generatedManifest from "../../../packages/shared/src/data/meme-template-manifest.generated.json" with { type: "json" };
+import type { MemeTemplate } from "../../../packages/shared/src/types/template-manifest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..", "..", "..");

@@ -79,6 +79,7 @@ const rootDir = path.resolve(import.meta.dirname, "..", "..", "..");
 const toolDir = path.join(rootDir, "tools", "template-tools");
 const defaultOutputPath = path.join(
   rootDir,
+  "packages",
   "shared",
   "src",
   "data",

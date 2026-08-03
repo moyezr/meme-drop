@@ -9,7 +9,7 @@ const apiBaseUrl = String(
     process.env.VITE_API_BASE_URL ||
     (strict ? "" : "https://api.memedrop.example")
 );
-const storeListingFile = String(args["store-listing"] || "extension/store-listing.json");
+const storeListingFile = String(args["store-listing"] || "apps/extension/store-listing.json");
 const env = {
   ...process.env,
   VITE_API_BASE_URL: apiBaseUrl,
@@ -37,7 +37,7 @@ try {
     }
     run("Strict store readiness", [
       "node",
-      "extension/scripts/validate-store-readiness.mjs",
+      "apps/extension/scripts/validate-store-readiness.mjs",
       "--strict",
       "--file",
       storeListingFile,

@@ -2,12 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
-const rootDir = path.resolve(new URL("../..", import.meta.url).pathname);
-const extensionDir = path.join(rootDir, "extension");
+const rootDir = path.resolve(new URL("../../..", import.meta.url).pathname);
+const extensionDir = path.join(rootDir, "apps/extension");
 const templatePath = path.join(extensionDir, "store-listing.example.json");
 const outPath = path.resolve(
   rootDir,
-  String(args.out || "extension/store-listing.json")
+  String(args.out || "apps/extension/store-listing.json")
 );
 const allowPlaceholders = Boolean(args["allow-placeholders"]);
 
@@ -43,7 +43,7 @@ fs.writeFileSync(outPath, `${JSON.stringify(listing, null, 2)}\n`);
 fs.mkdirSync(path.join(extensionDir, "store-assets"), { recursive: true });
 
 console.log(`[MemeDrop] wrote ${path.relative(rootDir, outPath)}`);
-console.log("[MemeDrop] capture store screenshots into extension/store-assets/ using the listed paths.");
+console.log("[MemeDrop] capture store screenshots into apps/extension/store-assets/ using the listed paths.");
 
 function validatePrivacyPolicyUrl(value) {
   let url;

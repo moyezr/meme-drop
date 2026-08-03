@@ -3,8 +3,8 @@ import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import extensionPackage from "../package.json" with { type: "json" };
 
-const repoRoot = resolve(import.meta.dirname, "../..");
-const extensionDir = resolve(repoRoot, "extension");
+const repoRoot = resolve(import.meta.dirname, "../../..");
+const extensionDir = resolve(repoRoot, "apps/extension");
 const distDir = resolve(extensionDir, "dist");
 const outputPath = resolve(
   repoRoot,

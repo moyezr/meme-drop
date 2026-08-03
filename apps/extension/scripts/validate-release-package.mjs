@@ -4,7 +4,7 @@ import path from "node:path";
 import extensionPackage from "../package.json" with { type: "json" };
 
 const args = parseArgs(process.argv.slice(2));
-const repoRoot = path.resolve(import.meta.dirname, "../..");
+const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const zipPath = path.resolve(
   repoRoot,
   String(args.zip || `.memedrop/memedrop-extension-v${extensionPackage.version}.zip`)

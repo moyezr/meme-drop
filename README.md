@@ -25,9 +25,9 @@ MemeDrop still works without an OpenRouter key, but suggestions and captions wil
 ```text
 apps/api/   FastAPI application, PostgreSQL models, and Python tests
 tools/template-tools/  Offline TypeScript catalog QA and promotion tools
-extension/  Chrome extension source, popup, content scripts, background worker
+apps/extension/  Chrome extension source, popup, content scripts, background worker
 shared/     Shared types, API contracts, template manifest, lookup helpers
-landing/    Next.js landing page
+apps/landing/    Next.js landing page
 packages/meme-catalog/  Language-neutral runtime template catalog
 scripts/    Root release, launch, and smoke-check scripts
 ```
@@ -107,12 +107,12 @@ Load the extension in Chrome:
 1. Open `chrome://extensions`.
 2. Enable Developer mode.
 3. Click "Load unpacked".
-4. Select `extension/dist`.
+4. Select `apps/extension/dist`.
 5. Open `https://x.com` or `https://twitter.com`.
 
 The extension defaults to `http://localhost:3001` for API calls. If you need a different API origin, run the extension build with `VITE_API_BASE_URL` set.
 
-For example, create `extension/.env.local`:
+For example, create `apps/extension/.env.local`:
 
 ```sh
 VITE_API_BASE_URL=http://localhost:3001
@@ -120,7 +120,7 @@ VITE_API_BASE_URL=http://localhost:3001
 
 ## Landing Page
 
-The landing page is separate from the local extension/backend workflow.
+The landing page is separate from the local apps/extension/backend workflow.
 
 Run it locally:
 
@@ -182,7 +182,7 @@ MEMEDROP_REQUIRE_INSTALL_ID=false
 MEMEDROP_RATE_LIMIT_STORE=memory
 ```
 
-Extension env vars live in `extension/.env.local` if you need to override defaults:
+Extension env vars live in `apps/extension/.env.local` if you need to override defaults:
 
 ```text
 VITE_API_BASE_URL=http://localhost:3001

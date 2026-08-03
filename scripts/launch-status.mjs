@@ -1,14 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import extensionPackage from "../extension/package.json" with { type: "json" };
+import extensionPackage from "../apps/extension/package.json" with { type: "json" };
 
 const args = parseArgs(process.argv.slice(2));
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const extensionDir = path.join(repoRoot, "extension");
+const extensionDir = path.join(repoRoot, "apps/extension");
 const apiBaseUrl = String(args["api-base-url"] || process.env.VITE_API_BASE_URL || "");
 const listingPath = path.resolve(
   repoRoot,
-  String(args.file || "extension/store-listing.json")
+  String(args.file || "apps/extension/store-listing.json")
 );
 const zipPath = path.resolve(
   repoRoot,
@@ -139,7 +139,7 @@ function checkStoreListing() {
 
   if (!fs.existsSync(listingPath)) {
     blockers.push(
-      `Create ${path.relative(repoRoot, listingPath)} from extension/store-listing.example.json with real URL, email, and screenshots.`
+      `Create ${path.relative(repoRoot, listingPath)} from apps/extension/store-listing.example.json with real URL, email, and screenshots.`
     );
     return;
   }
@@ -223,7 +223,7 @@ function checkDatasetExpansion() {
 
   const promotedPath = path.join(
     repoRoot,
-    "shared/src/data/meme-template-manifest.promoted.json"
+    "packages/shared/src/data/meme-template-manifest.promoted.json"
   );
   if (fs.existsSync(promotedPath)) {
     const promoted = JSON.parse(fs.readFileSync(promotedPath, "utf8"));

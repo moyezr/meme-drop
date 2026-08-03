@@ -23,7 +23,7 @@ Build the landing page from the static workspace:
 npm run build:landing
 ```
 
-Deploy `landing/dist` to the static host for:
+Deploy `apps/landing/dist` to the static host for:
 
 ```text
 https://memedrop.moyezrabani.dev
@@ -65,11 +65,11 @@ npm run store-listing:init -- \
   --support-email support@moyezrabani.dev
 ```
 
-Then edit `extension/store-listing.json` with final copy and screenshot paths.
+Then edit `apps/extension/store-listing.json` with final copy and screenshot paths.
 
 6. Store screenshots
 
-Save real screenshots under `extension/store-assets/`. The validator requires PNG/JPEG screenshots, at least two images, and at least one `1280x800` image.
+Save real screenshots under `apps/extension/store-assets/`. The validator requires PNG/JPEG screenshots, at least two images, and at least one `1280x800` image.
 
 7. Production secrets and storage
 
@@ -81,7 +81,7 @@ With production values loaded:
 
 ```bash
 npm run quality:production-env
-node extension/scripts/validate-store-readiness.mjs --strict --file extension/store-listing.json
+node apps/extension/scripts/validate-store-readiness.mjs --strict --file apps/extension/store-listing.json
 VITE_API_BASE_URL=https://api.your-domain.example npm run package:extension:release
 MEMEDROP_CORS_ORIGINS=chrome-extension://<32-character-web-store-extension-id> \
   VITE_API_BASE_URL=https://api.your-domain.example \

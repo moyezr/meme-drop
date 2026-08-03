@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import generatedManifest from "../../../shared/src/data/meme-template-manifest.generated.json";
+import generatedManifest from "../../../packages/shared/src/data/meme-template-manifest.generated.json";
 import { MEME_TEMPLATE_MANIFEST, type MemeTemplate } from "@memedrop/shared";
 
 type ReviewStatus = "approved" | "needs_work" | "rejected";

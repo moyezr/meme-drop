@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import generatedManifest from "../../../shared/src/data/meme-template-manifest.generated.json" with { type: "json" };
-import { MEME_TEMPLATE_MANIFEST } from "../../../shared/src/data/meme-template-manifest.js";
-import type { MemeTemplate } from "../../../shared/src/types/template-manifest.js";
+import generatedManifest from "../../../packages/shared/src/data/meme-template-manifest.generated.json" with { type: "json" };
+import { MEME_TEMPLATE_MANIFEST } from "../../../packages/shared/src/data/meme-template-manifest.js";
+import type { MemeTemplate } from "../../../packages/shared/src/types/template-manifest.js";
 
 interface ReviewTemplate extends MemeTemplate {
   qa_visual_warnings: string[];

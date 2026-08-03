@@ -27,8 +27,8 @@ The monorepo is organized by deployable app and reusable package:
 | Path | Responsibility |
 | --- | --- |
 | `apps/api/` | FastAPI HTTP API, services, persistence, and Python tests |
-| `extension/` | X integration, background worker, injected panel, and popup |
-| `landing/` | Public Next.js landing page |
+| `apps/extension/` | X integration, background worker, injected panel, and popup |
+| `apps/landing/` | Public Next.js landing page |
 | `shared/` | TypeScript API contracts and source template data |
 | `packages/meme-catalog/` | Language-neutral exported runtime meme catalog |
 | `tools/template-tools/` | Offline TypeScript catalog QA, benchmark, and promotion tools |

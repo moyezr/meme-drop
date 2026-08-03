@@ -120,26 +120,26 @@ npm run store-listing:init -- \
   --privacy-policy-url https://your-production-site.example/privacy \
   --support-email support@your-production-site.example
 npm run quality:store-readiness
-node extension/scripts/validate-store-readiness.mjs --strict --file extension/store-listing.json
+node apps/extension/scripts/validate-store-readiness.mjs --strict --file apps/extension/store-listing.json
 MEMEDROP_CORS_ORIGINS=chrome-extension://<published-extension-id> \
   VITE_API_BASE_URL=https://your-production-api.example \
   npm run launch:status
 ```
 
-The initializer creates `extension/store-listing.json` from the tracked example and refuses placeholder privacy URLs or support emails by default. The non-strict command validates the tracked listing template and current manifest shape. The strict command is for public submission and requires a real hosted privacy policy URL, support email, screenshots, and no privacy placeholders.
+The initializer creates `apps/extension/store-listing.json` from the tracked example and refuses placeholder privacy URLs or support emails by default. The non-strict command validates the tracked listing template and current manifest shape. The strict command is for public submission and requires a real hosted privacy policy URL, support email, screenshots, and no privacy placeholders.
 Listed screenshots must be PNG or JPEG files sized `1280x800` or `640x400`, and at least one screenshot must be `1280x800`.
 
 `npm run launch:status` is intentionally stricter than CI promotion checks. It fails until the real production API origin, hosted privacy policy/listing metadata, screenshot files, and other public-launch inputs are present.
 
 Before upload:
 
-1. Confirm `extension/manifest.json` uses only required permissions.
+1. Confirm `apps/extension/manifest.json` uses only required permissions.
 2. Confirm `storage` is disclosed as storing the anonymous install ID used to isolate library and usage data.
 3. Confirm `dist/manifest.json` includes the production API host permission and no localhost permissions.
-4. Test the packaged extension by loading `extension/dist` in Chrome.
+4. Test the packaged extension by loading `apps/extension/dist` in Chrome.
 5. Verify suggestion, caption, insert, save-to-library, and usage logging flows on `https://x.com`.
-6. Bump `extension/package.json` and `extension/manifest.json` versions together; `npm run quality:promotion` enforces this.
-7. Capture store screenshots from the real extension flow and save them under `extension/store-assets/` using the paths listed in `extension/store-listing.json`.
+6. Bump `apps/extension/package.json` and `apps/extension/manifest.json` versions together; `npm run quality:promotion` enforces this.
+7. Capture store screenshots from the real extension flow and save them under `apps/extension/store-assets/` using the paths listed in `apps/extension/store-listing.json`.
 
 ## Quality Gates
 
@@ -165,7 +165,7 @@ Strict public release candidate:
 VITE_API_BASE_URL=https://your-production-api.example npm run release:candidate
 ```
 
-The dry run uses the placeholder HTTPS API origin and verifies build/package mechanics. The strict candidate additionally requires the real backend production environment, strict Chrome Web Store metadata, fast suggestion quality, and public launch status. Both commands rebuild `extension/dist` back to the local development API configuration after packaging.
+The dry run uses the placeholder HTTPS API origin and verifies build/package mechanics. The strict candidate additionally requires the real backend production environment, strict Chrome Web Store metadata, fast suggestion quality, and public launch status. Both commands rebuild `apps/extension/dist` back to the local development API configuration after packaging.
 
 `quality:security` requires the production dependency audit to be clean. It allows only documented development-install advisories for build/migration tooling that is excluded from runtime deployments with `npm ci --omit=dev`.
 
@@ -194,7 +194,7 @@ npm run quality:promotion
 MEMEDROP_SUGGESTION_LOGS=compact npm run quality:suggestions
 ```
 
-Only promote reviewed templates in small batches. The promotion planner writes `.memedrop/template-promotion-plan.json` and identifies ready approvals, blocked approvals, unreviewed clean drafts, and benchmark-case stubs. The promotion compiler writes `shared/src/data/meme-template-manifest.promoted.json`; runtime lookup includes those templates only after they are marked `verified` by the compiler.
+Only promote reviewed templates in small batches. The promotion planner writes `.memedrop/template-promotion-plan.json` and identifies ready approvals, blocked approvals, unreviewed clean drafts, and benchmark-case stubs. The promotion compiler writes `packages/shared/src/data/meme-template-manifest.promoted.json`; runtime lookup includes those templates only after they are marked `verified` by the compiler.
 
 ## Chrome Web Store
 

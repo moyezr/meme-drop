@@ -52,7 +52,7 @@ Use a promotion funnel, not a bulk import:
 17. Dry-run the edited case pack with `npm run dataset:benchmark-import -- --file .memedrop/suggestion-benchmark-stubs.json`.
 18. Import the clean edited cases with `npm run dataset:benchmark-import -- --file .memedrop/suggestion-benchmark-stubs.json --write`, then run `npm run dataset:review-decisions:promotion`.
 19. Run `npm run quality:dataset-plan` before promotion so approved-but-blocked templates do not silently accumulate.
-20. Run `npm run dataset:promote-reviewed` to compile approved decisions into `shared/src/data/meme-template-manifest.promoted.json`.
+20. Run `npm run dataset:promote-reviewed` to compile approved decisions into `packages/shared/src/data/meme-template-manifest.promoted.json`.
 21. Promote only a small batch at a time, then run `npm run quality:promotion` and `npm run quality:suggestions`.
 
 Keep verified templates conservative. Draft volume can grow quickly; verified runtime volume should grow only when the template has passed mechanical audit, rendered QA, and suggestion evals.
@@ -211,11 +211,11 @@ Run the store-readiness metadata audit before preparing screenshots or Web Store
 npm run quality:store-readiness
 ```
 
-Before public submission, create `extension/store-listing.json` from `extension/store-listing.example.json` and run:
+Before public submission, create `apps/extension/store-listing.json` from `apps/extension/store-listing.example.json` and run:
 
 ```bash
 npm run store-listing:init -- \
   --privacy-policy-url https://your-production-site.example/privacy \
   --support-email support@your-production-site.example
-node extension/scripts/validate-store-readiness.mjs --strict --file extension/store-listing.json
+node apps/extension/scripts/validate-store-readiness.mjs --strict --file apps/extension/store-listing.json
 ```

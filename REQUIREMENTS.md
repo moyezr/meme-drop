@@ -322,7 +322,7 @@ No authentication required for local testing.
 
 ```
 memedrop/
-├── extension/                 # Chrome extension (Vite + CRXJS)
+├── apps/extension/                 # Chrome extension (Vite + CRXJS)
 │   ├── src/
 │   │   ├── content/
 │   │   │   ├── content.ts     # Main content script

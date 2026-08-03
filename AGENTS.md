@@ -5,7 +5,7 @@
 This is a Python and npm monorepo:
 
 - `apps/api/`: FastAPI runtime, SQLAlchemy persistence, Alembic migrations, services, and pytest suite.
-- `extension/`: Chrome extension built with React, Vite, Tailwind, and CRXJS. Popup code lives in `extension/src/popup`, content scripts in `extension/src/content`, and background logic in `extension/src/background`.
+- `apps/extension/`: Chrome extension built with React, Vite, Tailwind, and CRXJS. Popup code lives in `apps/extension/src/popup`, content scripts in `apps/extension/src/content`, and background logic in `apps/extension/src/background`.
 - `shared/`: Shared types, API contracts, template manifest data, and lookup helpers used by both backend and extension.
 - `tools/template-tools/`: Offline TypeScript catalog QA, benchmark, and promotion tooling.
 - `packages/meme-catalog/`: Language-neutral catalog consumed by FastAPI.

@@ -16,7 +16,7 @@ test("launch status reports a valid Chrome extension CORS origin as ready", () =
 
   assert.equal(result.status, 1);
   assert.match(result.stdout, /Backend CORS includes a final Chrome extension origin/);
-  assert.doesNotMatch(result.stdout, /MEMEDROP_CORS_ORIGINS must include the final chrome-extension/);
+  assert.doesNotMatch(result.stdout, /MEMEDROP_CORS_ORIGINS must include the final chrome-extension:\/\//);
   assert.doesNotMatch(result.stdout, /Chrome extension origin must use the final 32-character/);
 });
 
@@ -37,7 +37,7 @@ test("launch status requires a Chrome extension CORS origin", () => {
   });
 
   assert.equal(result.status, 1);
-  assert.match(result.stdout, /must include the final chrome-extension/);
+  assert.match(result.stdout, /must include the final chrome-extension:\/\//);
 });
 
 test("launch status warns when dataset promotion plan is missing", () => {

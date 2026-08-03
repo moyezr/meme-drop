@@ -1,5 +1,5 @@
-import generatedManifest from "../../../shared/src/data/meme-template-manifest.generated.json";
-import promotedManifest from "../../../shared/src/data/meme-template-manifest.promoted.json";
+import generatedManifest from "../../../packages/shared/src/data/meme-template-manifest.generated.json";
+import promotedManifest from "../../../packages/shared/src/data/meme-template-manifest.promoted.json";
 import {
   MEME_TEMPLATE_MANIFEST,
   type MemeTemplate,

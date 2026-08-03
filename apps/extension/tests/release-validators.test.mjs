@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 
 const execFileAsync = promisify(execFile);
-const rootDir = path.resolve(import.meta.dirname, "..", "..");
+const rootDir = path.resolve(import.meta.dirname, "..", "..", "..");
 
 test("store listing initializer writes a launch listing with real contact fields", async () => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-store-listing-"));
@@ -24,14 +24,14 @@ test("store listing initializer writes a launch listing with real contact fields
       "--support-email",
       "support@memedrop.app",
     ],
-    { cwd: path.join(rootDir, "extension") }
+    { cwd: path.join(rootDir, "apps/extension") }
   );
 
   const listing = JSON.parse(await fs.readFile(outPath, "utf8"));
   assert.equal(listing.privacy_policy_url, "https://memedrop.app/privacy");
   assert.equal(listing.support_email, "support@memedrop.app");
   assert.match(stdout, /wrote/);
-  await fs.access(path.join(rootDir, "extension", "store-assets"));
+  await fs.access(path.join(rootDir, "apps/extension", "store-assets"));
 });
 
 test("store listing initializer refuses to overwrite without force", async () => {
@@ -51,7 +51,7 @@ test("store listing initializer refuses to overwrite without force", async () =>
         "--support-email",
         "support@memedrop.app",
       ],
-      { cwd: path.join(rootDir, "extension") }
+      { cwd: path.join(rootDir, "apps/extension") }
     ),
     (error) => {
       assert.match(error.stderr || "", /already exists/);
@@ -76,7 +76,7 @@ test("store listing initializer rejects placeholder launch contacts", async () =
         "--support-email",
         "support@example.com",
       ],
-      { cwd: path.join(rootDir, "extension") }
+      { cwd: path.join(rootDir, "apps/extension") }
     ),
     (error) => {
       assert.match(error.stderr || "", /privacy policy URL must not use a placeholder/);
@@ -88,8 +88,8 @@ test("store listing initializer rejects placeholder launch contacts", async () =
 test("store readiness validator passes template metadata in non-strict mode", async () => {
   const { stdout } = await execFileAsync(
     "node",
-    ["scripts/validate-store-readiness.mjs", "--file", "extension/store-listing.example.json"],
-    { cwd: path.join(rootDir, "extension") }
+    ["scripts/validate-store-readiness.mjs", "--file", "apps/extension/store-listing.example.json"],
+    { cwd: path.join(rootDir, "apps/extension") }
   );
 
   assert.match(stdout, /store readiness validated/);
@@ -104,9 +104,9 @@ test("store readiness validator fails strict mode on launch placeholders", async
         "scripts/validate-store-readiness.mjs",
         "--strict",
         "--file",
-        "extension/store-listing.example.json",
+        "apps/extension/store-listing.example.json",
       ],
-      { cwd: path.join(rootDir, "extension") }
+      { cwd: path.join(rootDir, "apps/extension") }
     ),
     (error) => {
       assert.match(error.stdout || "", /ERROR privacy policy still contains launch placeholders/);
@@ -121,7 +121,7 @@ test("store readiness validator requires detailed usage event disclosure", async
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-listing-"));
   const listingPath = path.join(tmpDir, "listing.json");
   const listing = JSON.parse(
-    await fs.readFile(path.join(rootDir, "extension", "store-listing.example.json"), "utf8")
+    await fs.readFile(path.join(rootDir, "apps/extension", "store-listing.example.json"), "utf8")
   );
   listing.data_disclosures.usage_events = "Sent to the backend to improve ranking quality.";
   await fs.writeFile(listingPath, JSON.stringify(listing, null, 2));
@@ -130,7 +130,7 @@ test("store readiness validator requires detailed usage event disclosure", async
     execFileAsync(
       "node",
       ["scripts/validate-store-readiness.mjs", "--file", listingPath],
-      { cwd: path.join(rootDir, "extension") }
+      { cwd: path.join(rootDir, "apps/extension") }
     ),
     (error) => {
       assert.match(error.stdout || "", /usage_events disclosure must disclose shown meme feedback events/);
@@ -142,7 +142,7 @@ test("store readiness validator requires detailed usage event disclosure", async
 });
 
 test("store readiness validator rejects invalid screenshot dimensions", async () => {
-  const assetDir = path.join(rootDir, "extension", "store-assets");
+  const assetDir = path.join(rootDir, "apps/extension", "store-assets");
   const screenshotPath = path.join(assetDir, "test-invalid-dimensions.png");
   await fs.mkdir(assetDir, { recursive: true });
   await fs.writeFile(screenshotPath, pngWithDimensions(1, 1));
@@ -151,7 +151,7 @@ test("store readiness validator rejects invalid screenshot dimensions", async ()
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-listing-"));
     const listingPath = path.join(tmpDir, "listing.json");
     const listing = JSON.parse(
-      await fs.readFile(path.join(rootDir, "extension", "store-listing.example.json"), "utf8")
+      await fs.readFile(path.join(rootDir, "apps/extension", "store-listing.example.json"), "utf8")
     );
     listing.screenshots = [
       {
@@ -169,7 +169,7 @@ test("store readiness validator rejects invalid screenshot dimensions", async ()
       execFileAsync(
         "node",
         ["scripts/validate-store-readiness.mjs", "--file", listingPath],
-        { cwd: path.join(rootDir, "extension") }
+        { cwd: path.join(rootDir, "apps/extension") }
       ),
       (error) => {
         assert.match(error.stdout || "", /must be 1280x800 or 640x400; found 1x1/);
@@ -183,7 +183,7 @@ test("store readiness validator rejects invalid screenshot dimensions", async ()
 });
 
 test("store readiness validator accepts correctly sized screenshot files", async () => {
-  const assetDir = path.join(rootDir, "extension", "store-assets");
+  const assetDir = path.join(rootDir, "apps/extension", "store-assets");
   const screenshotOne = path.join(assetDir, "test-valid-suggestion.png");
   const screenshotTwo = path.join(assetDir, "test-valid-library.png");
   await fs.mkdir(assetDir, { recursive: true });
@@ -194,7 +194,7 @@ test("store readiness validator accepts correctly sized screenshot files", async
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-listing-"));
     const listingPath = path.join(tmpDir, "listing.json");
     const listing = JSON.parse(
-      await fs.readFile(path.join(rootDir, "extension", "store-listing.example.json"), "utf8")
+      await fs.readFile(path.join(rootDir, "apps/extension", "store-listing.example.json"), "utf8")
     );
     listing.screenshots = [
       {
@@ -211,7 +211,7 @@ test("store readiness validator accepts correctly sized screenshot files", async
     const { stdout } = await execFileAsync(
       "node",
       ["scripts/validate-store-readiness.mjs", "--file", listingPath],
-      { cwd: path.join(rootDir, "extension") }
+      { cwd: path.join(rootDir, "apps/extension") }
     );
 
     assert.match(stdout, /store readiness validated/);
@@ -222,7 +222,7 @@ test("store readiness validator accepts correctly sized screenshot files", async
 });
 
 test("store readiness validator requires at least one 1280x800 screenshot", async () => {
-  const assetDir = path.join(rootDir, "extension", "store-assets");
+  const assetDir = path.join(rootDir, "apps/extension", "store-assets");
   const screenshotOne = path.join(assetDir, "test-small-one.png");
   const screenshotTwo = path.join(assetDir, "test-small-two.png");
   await fs.mkdir(assetDir, { recursive: true });
@@ -233,7 +233,7 @@ test("store readiness validator requires at least one 1280x800 screenshot", asyn
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-listing-"));
     const listingPath = path.join(tmpDir, "listing.json");
     const listing = JSON.parse(
-      await fs.readFile(path.join(rootDir, "extension", "store-listing.example.json"), "utf8")
+      await fs.readFile(path.join(rootDir, "apps/extension", "store-listing.example.json"), "utf8")
     );
     listing.screenshots = [
       {
@@ -251,7 +251,7 @@ test("store readiness validator requires at least one 1280x800 screenshot", asyn
       execFileAsync(
         "node",
         ["scripts/validate-store-readiness.mjs", "--file", listingPath],
-        { cwd: path.join(rootDir, "extension") }
+        { cwd: path.join(rootDir, "apps/extension") }
       ),
       (error) => {
         assert.match(error.stdout || "", /must include at least one 1280x800 image/);
@@ -267,7 +267,7 @@ test("store readiness validator requires at least one 1280x800 screenshot", asyn
 test("release build validator rejects localhost API origins", async () => {
   await assert.rejects(
     execFileAsync("node", ["scripts/validate-release-build.mjs", "--pre"], {
-      cwd: path.join(rootDir, "extension"),
+      cwd: path.join(rootDir, "apps/extension"),
       env: {
         ...process.env,
         VITE_API_BASE_URL: "http://localhost:3001",
@@ -282,7 +282,7 @@ test("release build validator rejects localhost API origins", async () => {
 
 test("release build validator accepts HTTPS API origins in preflight mode", async () => {
   const { stdout } = await execFileAsync("node", ["scripts/validate-release-build.mjs", "--pre"], {
-    cwd: path.join(rootDir, "extension"),
+    cwd: path.join(rootDir, "apps/extension"),
     env: {
       ...process.env,
       VITE_API_BASE_URL: "https://api.memedrop.example",
@@ -301,7 +301,7 @@ test("release package validator accepts a minimal valid package", async () => {
     "node",
     ["scripts/validate-release-package.mjs", "--zip", zipPath],
     {
-      cwd: path.join(rootDir, "extension"),
+      cwd: path.join(rootDir, "apps/extension"),
       env: {
         ...process.env,
         VITE_API_BASE_URL: "https://api.memedrop.example",
@@ -319,7 +319,7 @@ test("release package validator rejects local host permissions", async () => {
 
   await assert.rejects(
     execFileAsync("node", ["scripts/validate-release-package.mjs", "--zip", zipPath], {
-      cwd: path.join(rootDir, "extension"),
+      cwd: path.join(rootDir, "apps/extension"),
       env: {
         ...process.env,
         VITE_API_BASE_URL: "https://api.memedrop.example",
