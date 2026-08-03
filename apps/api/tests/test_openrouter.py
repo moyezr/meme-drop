@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import httpx
+
 from memedrop_api.config import Settings
 from memedrop_api.services.catalog import MemeCatalog
 from memedrop_api.services.openrouter import (

@@ -10,7 +10,15 @@ import promotedManifest from "../packages/shared/src/data/meme-template-manifest
 };
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const outputPath = path.join(root, "packages", "meme-catalog", "manifest.json");
+const outputPath = path.join(
+  root,
+  "apps",
+  "api",
+  "src",
+  "memedrop_api",
+  "data",
+  "meme_catalog.json"
+);
 const templates = [
   ...MEME_TEMPLATE_MANIFEST.templates,
   ...promotedManifest.templates,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import httpx
+
 from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 

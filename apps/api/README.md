@@ -25,11 +25,11 @@ and deployment commands.
 From the repository root:
 
 ```sh
-uv sync --all-packages
+npm install
 npm run dev:api
 npm run lint:api
 npm run test:api
-uv run --package memedrop-api mypy apps/api/src apps/api/tests
+npm run typecheck --workspace=@memedrop/api
 npm run catalog:export
 npm run db:init
 npm run db:seed-memes
@@ -41,8 +41,8 @@ production to `meme-drop-prod`; configuration rejects a bucket from the wrong en
 S3 credentials server-side. Validate access without writing, or measure the full object round trip:
 
 ```sh
-uv run --package memedrop-api memedrop-storage-check
-uv run --package memedrop-api memedrop-storage-check --latency
+npm run storage:check
+npm run storage:latency
 ```
 
 The latency probe writes a small `_health/` object and removes it before returning JSON timings.
@@ -62,3 +62,11 @@ Integration records use generated IDs and are removed after each run.
 The suggestion tests also run the offline benchmark at
 `tools/template-tools/evals/suggestion-benchmark.json`. They enforce a minimum relevance floor for the local
 ranker, which remains available when OpenRouter is not configured or temporarily fails.
+
+## Vercel
+
+Create a dedicated Vercel project with Root Directory set to `apps/api`. The app has its own
+`pyproject.toml`, `uv.lock`, Python version, catalog data, migrations, and recognized `app.py`
+entrypoint. Configure production environment variables from `.env.production.example` in the
+project dashboard, then run `npm run db:migrate` and `npm run db:seed-memes` as controlled release
+steps rather than during a serverless build.

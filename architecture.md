@@ -18,7 +18,7 @@ X reply composer                         Extension popup
                               |
                          FastAPI :3001
                          /       |       \
-                   PostgreSQL  OpenRouter  local meme files
+                   PostgreSQL  OpenRouter  Supabase Storage
                     + pgvector
 ```
 
@@ -29,8 +29,7 @@ The monorepo is organized by deployable app and reusable package:
 | `apps/api/` | FastAPI HTTP API, services, persistence, and Python tests |
 | `apps/extension/` | X integration, background worker, injected panel, and popup |
 | `apps/landing/` | Public Next.js landing page |
-| `shared/` | TypeScript API contracts and source template data |
-| `packages/meme-catalog/` | Language-neutral exported runtime meme catalog |
+| `packages/shared/` | TypeScript API contracts and source template data |
 | `tools/template-tools/` | Offline TypeScript catalog QA, benchmark, and promotion tools |
 
 ## HTTP surface
@@ -70,7 +69,8 @@ tweet text
   -> overlay regions + structured tweet context
 ```
 
-The language-neutral catalog is generated at `packages/meme-catalog/manifest.json`. It records each
+The language-neutral catalog is generated at
+`apps/api/src/memedrop_api/data/meme_catalog.json`. It records each
 template's aliases, use cases, anti-use cases, semantic tags, caption grammar, and layout regions.
 FastAPI loads verified curated and promoted templates by default; generated drafts remain opt-in.
 

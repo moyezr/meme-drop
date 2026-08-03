@@ -6,9 +6,9 @@ This is a Python and npm monorepo:
 
 - `apps/api/`: FastAPI runtime, SQLAlchemy persistence, Alembic migrations, services, and pytest suite.
 - `apps/extension/`: Chrome extension built with React, Vite, Tailwind, and CRXJS. Popup code lives in `apps/extension/src/popup`, content scripts in `apps/extension/src/content`, and background logic in `apps/extension/src/background`.
-- `shared/`: Shared types, API contracts, template manifest data, and lookup helpers used by both backend and extension.
+- `packages/shared/`: Shared types, API contracts, source template data, and lookup helpers.
 - `tools/template-tools/`: Offline TypeScript catalog QA, benchmark, and promotion tooling.
-- `packages/meme-catalog/`: Language-neutral catalog consumed by FastAPI.
+- `apps/api/src/memedrop_api/data/`: Generated language-neutral catalog consumed by FastAPI.
 
 Root files include `docker-compose.yml` for local infrastructure, `tsconfig.base.json` for shared TypeScript settings, and `.env.example` for configuration reference.
 
@@ -20,7 +20,7 @@ Root files include `docker-compose.yml` for local infrastructure, `tsconfig.base
 - `npm run db:up` / `npm run db:down`: start or stop local Docker services.
 - `npm run db:init`: apply Alembic migrations and seed the development identity.
 - `npm run db:seed-memes`: download and insert missing verified catalog memes.
-- `npm run typecheck --workspace=backend|extension|shared`: run package TypeScript checks.
+- `npm run typecheck`: run Turbo-orchestrated Python and TypeScript checks.
 
 ## Coding Style & Naming Conventions
 

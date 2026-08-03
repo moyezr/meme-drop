@@ -289,4 +289,4 @@ def validate_url(name: str, raw: str, schemes: set[str], errors: list[str]) -> N
 
 
 def repository_root() -> Path:
-    return Path(__file__).resolve().parents[4]
+    return Path(__file__).resolve().parents[2]

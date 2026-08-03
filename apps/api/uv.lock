@@ -2,12 +2,6 @@ version = 1
 revision = 3
 requires-python = ">=3.12, <3.15"
 
-[manifest]
-members = [
-    "memedrop-api",
-    "memedrop-workspace",
-]
-
 [[package]]
 name = "alembic"
 version = "1.18.5"
@@ -524,7 +518,7 @@ wheels = [
 [[package]]
 name = "memedrop-api"
 version = "0.1.0"
-source = { editable = "apps/api" }
+source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "boto3" },
@@ -569,11 +563,6 @@ dev = [
     { name = "respx", specifier = ">=0.22.0" },
     { name = "ruff", specifier = ">=0.9.0" },
 ]
-
-[[package]]
-name = "memedrop-workspace"
-version = "0.0.1"
-source = { virtual = "." }
 
 [[package]]
 name = "mypy"

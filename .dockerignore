@@ -1,6 +1,8 @@
 node_modules
-shared/dist
-extension/dist
+packages/shared/dist
+apps/extension/dist
+apps/landing/out
+.turbo
 .memedrop
 .git
 .env

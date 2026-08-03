@@ -5,6 +5,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import Request
+
 from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 

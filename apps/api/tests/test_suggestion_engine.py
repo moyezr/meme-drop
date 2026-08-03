@@ -15,7 +15,6 @@ from memedrop_api.services.suggestion_engine import (
     safe_log_cache_key,
     safe_log_tweet_text,
 )
-
 from tests.conftest import INSTALL_ID, ApiHarness
 from tests.fakes import FakeStore
 

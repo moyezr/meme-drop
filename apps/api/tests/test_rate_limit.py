@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import httpx
+
 from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 from memedrop_api.rate_limit import MemoryRateLimitStore, rate_limit_client_key
-
 from tests.fakes import FakeStore
 
 

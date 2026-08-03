@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from memedrop_api.config import DEFAULT_ALLOWED_ORIGINS, Settings
 from pydantic import ValidationError
+
+from memedrop_api.config import DEFAULT_ALLOWED_ORIGINS, Settings
 
 
 def test_development_defaults_are_safe_and_usable() -> None:

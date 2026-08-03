@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from memedrop_api.config import Settings
 from memedrop_api.services.storage import (
     LocalMemeStorage,

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import httpx
+
 from memedrop_api.config import Settings
 from memedrop_api.services.auto_tagger import auto_tag_meme, strip_json_fence
 

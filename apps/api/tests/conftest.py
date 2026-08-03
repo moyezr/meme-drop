@@ -7,11 +7,11 @@ from uuid import UUID
 
 import httpx
 import pytest
+
 from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 from memedrop_api.schemas import AutoTagResult
 from memedrop_api.services.storage import LocalMemeStorage
-
 from tests.fakes import FakeStore
 
 INSTALL_ID = UUID("11111111-1111-4111-8111-111111111111")

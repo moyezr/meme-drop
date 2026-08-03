@@ -8,9 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-DEFAULT_CATALOG_PATH = (
-    Path(__file__).resolve().parents[5] / "packages" / "meme-catalog" / "manifest.json"
-)
+DEFAULT_CATALOG_PATH = Path(__file__).resolve().parents[1] / "data" / "meme_catalog.json"
 
 
 class FontSpec(BaseModel):

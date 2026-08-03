@@ -5,19 +5,17 @@ const child = spawn(
   "uv",
   [
     "run",
-    "--package",
-    "memedrop-api",
     "uvicorn",
     "memedrop_api.main:app",
     "--app-dir",
-    "apps/api/src",
+    "src",
     "--host",
     "127.0.0.1",
     "--port",
     port,
   ],
   {
-    cwd: process.cwd(),
+    cwd: new URL("../apps/api/", import.meta.url),
     env: {
       ...process.env,
       MEMEDROP_ENV: "development",

@@ -4,10 +4,11 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from memedrop_api.config import Settings
-from memedrop_api.db import Base, normalize_database_url
 from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
+from memedrop_api.config import Settings
+from memedrop_api.db import Base, normalize_database_url
 
 config = context.config
 if config.config_file_name is not None:

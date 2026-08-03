@@ -6,9 +6,10 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import delete, text
+
 from memedrop_api.db import Base, Database, Meme
 from memedrop_api.repositories import SqlAlchemyStore
-from sqlalchemy import delete, text
 
 pytestmark = pytest.mark.integration
 TEST_DATABASE_URL = os.environ.get("MEMEDROP_TEST_DATABASE_URL")

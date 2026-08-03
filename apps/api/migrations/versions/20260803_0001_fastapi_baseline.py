@@ -6,6 +6,7 @@ Create Date: 2026-08-03
 """
 
 from alembic import op
+
 from memedrop_api.db import Base
 
 revision = "20260803_0001"

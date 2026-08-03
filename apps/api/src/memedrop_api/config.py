@@ -13,7 +13,7 @@ DEFAULT_ALLOWED_ORIGINS = (
     "https://x.com",
     "https://twitter.com",
 )
-DEFAULT_STORAGE_PATH = Path(__file__).resolve().parents[3] / "data" / "memes"
+DEFAULT_STORAGE_PATH = Path("/tmp/memedrop-storage")
 DEFAULT_DOWNLOAD_PATH = Path("/tmp/memedrop-downloads")
 DEVELOPMENT_BUCKET = "meme-drop-dev"
 PRODUCTION_BUCKET = "meme-drop-prod"

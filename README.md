@@ -26,9 +26,8 @@ MemeDrop still works without an OpenRouter key, but suggestions and captions wil
 apps/api/   FastAPI application, PostgreSQL models, and Python tests
 tools/template-tools/  Offline TypeScript catalog QA and promotion tools
 apps/extension/  Chrome extension source, popup, content scripts, background worker
-shared/     Shared types, API contracts, template manifest, lookup helpers
+packages/shared/  Shared types, API contracts, template manifest, lookup helpers
 apps/landing/    Next.js landing page
-packages/meme-catalog/  Language-neutral runtime template catalog
 scripts/    Root release, launch, and smoke-check scripts
 ```
 
@@ -36,7 +35,7 @@ FastAPI is the only backend started by root development, database, build, and de
 The complete API can be validated with:
 
 ```sh
-uv sync --all-packages
+npm install
 npm run lint:api
 npm run test:api
 npm run catalog:export
@@ -134,7 +133,7 @@ Build it:
 npm run build:landing
 ```
 
-For Vercel, deploy the `landing` workspace as the app. The extension and backend do not need to be hosted for the open-source local workflow.
+For Vercel, use separate project roots: `apps/landing` for the website and `apps/api` for FastAPI.
 
 ## Useful Commands
 
@@ -150,7 +149,7 @@ npm run db:down
 API-only:
 
 ```sh
-uv run --package memedrop-api mypy apps/api/src apps/api/tests
+npm run typecheck --workspace=@memedrop/api
 npm run test:api
 npm run test:api:integration
 npm run quality:api-process

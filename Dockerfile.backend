@@ -4,17 +4,16 @@ ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-COPY apps/api/pyproject.toml apps/api/pyproject.toml
-COPY apps/api/src apps/api/src
-RUN uv sync --frozen --package memedrop-api --no-dev
+COPY apps/api/pyproject.toml apps/api/uv.lock ./
+COPY apps/api/src src
+RUN uv sync --frozen --no-dev
 
 FROM python:3.13-slim-bookworm AS runtime
 
 ENV MEMEDROP_ENV=production
 ENV PORT=3001
 ENV PATH=/app/.venv/bin:$PATH
-ENV PYTHONPATH=/app/apps/api/src
+ENV PYTHONPATH=/app/src
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
@@ -23,10 +22,9 @@ RUN groupadd --system memedrop && useradd --system --gid memedrop --home-dir /ap
   && chown -R memedrop:memedrop /app
 
 COPY --from=build --chown=memedrop:memedrop /app/.venv /app/.venv
-COPY --chown=memedrop:memedrop alembic.ini ./alembic.ini
-COPY --chown=memedrop:memedrop apps/api/migrations apps/api/migrations
-COPY --chown=memedrop:memedrop apps/api/src apps/api/src
-COPY --chown=memedrop:memedrop packages/meme-catalog packages/meme-catalog
+COPY --chown=memedrop:memedrop apps/api/alembic.ini ./alembic.ini
+COPY --chown=memedrop:memedrop apps/api/migrations migrations
+COPY --chown=memedrop:memedrop apps/api/src src
 
 USER memedrop
 EXPOSE 3001
@@ -34,4 +32,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/live', timeout=3)"
 
-CMD ["sh", "-c", "uvicorn memedrop_api.main:app --app-dir apps/api/src --host 0.0.0.0 --port ${PORT:-3001}"]
+CMD ["sh", "-c", "uvicorn memedrop_api.main:app --app-dir src --host 0.0.0.0 --port ${PORT:-3001}"]

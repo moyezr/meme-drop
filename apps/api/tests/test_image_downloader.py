@@ -4,6 +4,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+
 from memedrop_api.config import Settings
 from memedrop_api.services.image_downloader import (
     assert_hostname_resolves_publicly,
