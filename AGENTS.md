@@ -1,39 +1,93 @@
-# Repository Guidelines
+# MemeDrop repository guide
 
-## Project Structure & Module Organization
+## Product and architecture
 
-This is a Python and npm monorepo:
+MemeDrop is a Chrome extension that suggests and captions meme replies for X. This repository is a
+Turborepo monorepo with three independently deployable applications:
 
-- `apps/api/`: FastAPI runtime, SQLAlchemy persistence, Alembic migrations, services, and pytest suite.
-- `apps/extension/`: Chrome extension built with React, Vite, Tailwind, and CRXJS. Popup code lives in `apps/extension/src/popup`, content scripts in `apps/extension/src/content`, and background logic in `apps/extension/src/background`.
-- `packages/shared/`: Shared types, API contracts, source template data, and lookup helpers.
-- `tools/template-tools/`: Offline TypeScript catalog QA, benchmark, and promotion tooling.
-- `apps/api/src/memedrop_api/data/`: Generated language-neutral catalog consumed by FastAPI.
+- `apps/api/`: FastAPI, SQLAlchemy, Alembic, PostgreSQL/pgvector, Supabase S3 storage, and pytest.
+- `apps/extension/`: React, Vite, Tailwind, and CRXJS Chrome extension.
+- `apps/landing/`: statically exported Next.js landing page, deployed as its own Vercel project.
+- `packages/shared/`: TypeScript contracts and the source meme-template manifests.
+- `tools/template-tools/`: offline catalog QA, benchmark, review, and promotion tools.
 
-Root files include `docker-compose.yml` for local infrastructure, `tsconfig.base.json` for shared TypeScript settings, and `.env.example` for configuration reference.
+The FastAPI workspace is deliberately self-contained. It owns `pyproject.toml`, `uv.lock`,
+`.python-version`, `alembic.ini`, migrations, `app.py`, runtime catalog data, and tests so Vercel can
+build it with `apps/api` as the project root. Do not add a second backend or move Python metadata to
+the repository root.
 
-## Build, Test, and Development Commands
+## Tooling
 
-- `npm run dev:backend`: run FastAPI with Uvicorn on port `3001` by default.
-- `npm run dev:extension`: build the extension continuously with Vite watch mode.
-- `npm run build:extension`: typecheck and build the extension.
-- `npm run db:up` / `npm run db:down`: start or stop local Docker services.
-- `npm run db:init`: apply Alembic migrations and seed the development identity.
-- `npm run db:seed-memes`: download and insert missing verified catalog memes.
-- `npm run typecheck`: run Turbo-orchestrated Python and TypeScript checks.
+- Node.js 22.12+ and npm 11 manage the workspace and Turbo 2.x orchestration.
+- Python 3.13 and uv manage only `apps/api`.
+- Keep dependencies locked exactly. Update npm with `npm install` and Python with
+  `uv lock --project apps/api --upgrade`.
+- TypeScript is 7.x except in `apps/landing`, which stays on 6.x until stable Next.js supports the
+  TypeScript 7 compiler API. `@types/node` stays on major 22 to match production Node.
+- Prefer direct, readable code. Do not introduce abstractions without a current second use case;
+  localized `Any`/`any` is acceptable when it makes an untyped boundary clearer.
 
-## Coding Style & Naming Conventions
+## Essential commands
 
-Use typed Python with Ruff and mypy in `apps/api`. Use strict TypeScript and ES modules elsewhere. Follow existing two-space TypeScript indentation, double quotes, and semicolon style.
+```sh
+npm ci
+uv sync --project apps/api --frozen
+npm run dev:api
+npm run dev:extension
+npm run dev:landing
+npm run typecheck
+npm test
+npm run lint
+npm run build
+npm run release:dry-run
+```
 
-## Testing Guidelines
+For API changes, also run `npm run test:api`, `npm run lint:api`, and
+`npm run quality:api-process`. For persistence changes, start PostgreSQL with `npm run db:up` and
+run the integration suite with `MEMEDROP_TEST_DATABASE_URL` set. Run
+`npm run quality:backend-image` for container-related changes.
 
-FastAPI uses pytest with unit, HTTP, benchmark, and PostgreSQL integration coverage. Run `npm run test:api`, mypy, and Ruff for API changes; use `MEMEDROP_TEST_DATABASE_URL` for the integration suite. TypeScript tools and clients retain Node test suites.
+## Recommendation quality
 
-## Commit & Pull Request Guidelines
+Suggestion quality and latency are the product priorities. Preserve the local deterministic ranker
+as a fallback, keep external-model calls bounded, and return only verified templates by default.
+Changes to ranking, captions, catalog annotations, or feedback must include focused tests and pass:
 
-Recent commits use short, informal summaries such as `working: text overlay` and `improved meme templates`. Prefer concise, imperative messages that state the change, for example `add meme usage endpoint`. Pull requests should include a short description, validation steps, linked issue if applicable, and screenshots or extension recordings for UI changes.
+```sh
+npm run quality:benchmark
+npm run quality:suggestions
+npm run quality:dataset-plan
+```
 
-## Security & Configuration Tips
+Do not promote generated templates directly. Use the review and benchmark workflow documented in
+`QUALITY.md`. Usage events (`shown`, `clicked`, `used`, `saved`, `dismissed`) are learning signals;
+do not log raw tweet text in production.
 
-Keep secrets in `.env` files and never hard-code API keys. Treat root/app `.env` files, `apps/api/data/memes`, generated assets, and local database state as environment-specific. Update `.env.example` when adding required configuration.
+## Storage and environment isolation
+
+Meme assets use Supabase's S3-compatible API in hosted environments:
+
+- development: `meme-drop-dev`
+- production: `meme-drop-prod`
+
+Configuration rejects the wrong bucket for the active environment, and production rejects local
+storage. Never auto-create, empty, or delete either bucket. Never expose S3 access keys to the
+extension or landing page. Validate access with `npm run storage:check`; use
+`npm run storage:latency` only when a temporary write/read/delete probe is intended.
+
+Keep secrets in ignored `.env` files or deployment secret stores. Update `.env.example` and
+`.env.production.example` when configuration changes, using placeholders only.
+
+## Tests, docs, and commits
+
+Add tests at the closest boundary: pytest for API/service behavior, Node tests for shared/tooling,
+and extension tests for browser-facing logic. Test failures must not be hidden with broad skips.
+
+Keep only durable documentation. Update `README.md`, `architecture.md`, `QUALITY.md`,
+`docs/release.md`, and this file when their contracts change. App-specific detail belongs in the
+app's README.
+
+Use concise imperative commits and commit only a working, coherent change. Do not stage unrelated
+or untracked user files. Before pushing a dependency or release change, run
+`npm run quality:security`; its reviewed exceptions are exact and time-limited, not a blanket audit
+waiver.

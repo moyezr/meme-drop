@@ -67,6 +67,7 @@ ranker, which remains available when OpenRouter is not configured or temporarily
 
 Create a dedicated Vercel project with Root Directory set to `apps/api`. The app has its own
 `pyproject.toml`, `uv.lock`, Python version, catalog data, migrations, and recognized `app.py`
-entrypoint. Configure production environment variables from `.env.production.example` in the
+entrypoint. Configure production environment variables from the root
+`../../.env.production.example` in the
 project dashboard, then run `npm run db:migrate` and `npm run db:seed-memes` as controlled release
 steps rather than during a serverless build.

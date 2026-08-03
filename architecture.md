@@ -1,135 +1,119 @@
 # MemeDrop architecture
 
-## Migration status
+## Boundaries
 
-FastAPI under `apps/api/` is the production backend. It implements the complete extension-facing
-HTTP surface, including suggestions and tailored captions. Root development, database, build,
-container, and release commands all target FastAPI. The retired Fastify source remains temporarily
-only while its TypeScript catalog and evaluation tools are reorganized.
-
-New backend runtime work belongs in FastAPI. The legacy server must not gain new features.
-
-## System map
+MemeDrop is one source repository with three independent runtimes. Turborepo coordinates local and
+CI tasks; it does not couple their deployments.
 
 ```text
-X reply composer                         Extension popup
-       |                                       |
-       +---- Chrome extension service worker --+
-                              |
-                         FastAPI :3001
-                         /       |       \
-                   PostgreSQL  OpenRouter  Supabase Storage
-                    + pgvector
+apps/landing (static Next.js)        apps/extension (Chrome/React)
+        separate Vercel project                |
+                                                v
+                                      apps/api (FastAPI/Vercel)
+                                      /          |          \
+                              PostgreSQL     OpenRouter    Supabase S3
+                               + pgvector
 ```
 
-The monorepo is organized by deployable app and reusable package:
-
-| Path | Responsibility |
+| Workspace | Owns |
 | --- | --- |
-| `apps/api/` | FastAPI HTTP API, services, persistence, and Python tests |
-| `apps/extension/` | X integration, background worker, injected panel, and popup |
-| `apps/landing/` | Public Next.js landing page |
-| `packages/shared/` | TypeScript API contracts and source template data |
-| `tools/template-tools/` | Offline TypeScript catalog QA, benchmark, and promotion tools |
+| `apps/api` | HTTP contract, ranking/caption services, persistence, storage, Python tests |
+| `apps/extension` | X integration, service worker, suggestion UI, popup/library |
+| `apps/landing` | Public static marketing pages |
+| `packages/shared` | TypeScript contracts and source template manifests |
+| `tools/template-tools` | Offline dataset QA, review, benchmarks, and promotion |
 
-## HTTP surface
+`apps/api` is a standalone uv project so it can be deployed from that directory. The production
+backend is FastAPI only; no Fastify runtime remains.
 
-FastAPI preserves the extension's existing `/api/v1` JSON contract and camelCase response fields.
+## Request and media flow
+
+The extension sends an anonymous install ID in `x-memedrop-install-id`. Production requires it;
+development may use a fixed seed identity. This separates libraries and feedback but is not strong
+authentication.
+
+FastAPI preserves camelCase `/api/v1` responses for the extension:
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /health/live` | Process liveness |
-| `GET /health` and `GET /health/ready` | PostgreSQL readiness |
-| `GET /api/v1/memes` | Browse the global meme catalog |
-| `POST /api/v1/suggest` | Rank templates and generate contextual overlays |
-| `POST /api/v1/suggest/caption` | Generate an overlay for one meme |
-| `POST /api/v1/library/save` | Download, validate, store, and AI-tag an image |
-| `GET /api/v1/library` | Search and sort saved memes |
-| `PUT /api/v1/library/{id}` | Rename or tag a saved meme |
-| `DELETE /api/v1/library/{id}` | Delete a saved meme and local image |
-| `POST /api/v1/usage` | Record shown, used, and dismissed feedback |
-| `GET /api/v1/account/export` | Export saved memes and usage history |
-| `DELETE /api/v1/account` | Delete an install's data |
-| `GET /memes/{file}` | Serve stored meme media |
+| `GET /live` | process liveness |
+| `GET /health`, `GET /health/ready` | database-backed readiness |
+| `GET /api/v1/memes` | browse the global catalog |
+| `POST /api/v1/suggest` | rank templates and produce overlays |
+| `POST /api/v1/suggest/caption` | caption one selected template |
+| `POST /api/v1/library/save` | validate, tag, and save a remote image |
+| `GET /api/v1/library` | list/search saved memes |
+| `PUT`, `DELETE /api/v1/library/{id}` | update or remove a saved meme |
+| `POST /api/v1/usage` | record recommendation outcomes |
+| `GET /api/v1/account/export` | export install-scoped data |
+| `DELETE /api/v1/account` | delete install-scoped data and media |
+| `GET /memes/{path}` | serve local or S3-backed media |
 
-Install identity is carried in `x-memedrop-install-id`. Development can use the configured default
-identity; production can require the header. Rate limiting supports in-memory local operation and a
-PostgreSQL-backed mode for multiple API replicas.
+Saving an image rejects local/private network targets and unsafe redirects, streams within time and
+size limits, validates decoded image content, then stores the asset and database row. Hosted assets
+live in Supabase S3: `meme-drop-dev` for development and `meme-drop-prod` for production. The API
+proxies `/memes/...` responses with cache headers, so object credentials and bucket topology never
+enter the extension.
 
-## Suggestion path
+## Suggestion pipeline
 
 ```text
-tweet text
+tweet context
   -> deterministic context analysis
-  -> match database memes to verified catalog templates
-  -> local semantic ranking (always available)
-  -> optional OpenRouter structured template selection
-  -> one batched OpenRouter caption request
-  -> contextual deterministic caption fallback
-  -> overlay regions + structured tweet context
+  -> verified catalog/database candidate retrieval
+  -> local semantic ranking
+  -> optional bounded OpenRouter reranking
+  -> optional batched OpenRouter captions
+  -> deterministic contextual caption fallback
+  -> overlays + structured context + timings
 ```
 
-The language-neutral catalog is generated at
-`apps/api/src/memedrop_api/data/meme_catalog.json`. It records each
-template's aliases, use cases, anti-use cases, semantic tags, caption grammar, and layout regions.
-FastAPI loads verified curated and promoted templates by default; generated drafts remain opt-in.
+The packaged catalog at `apps/api/src/memedrop_api/data/meme_catalog.json` is generated from the
+TypeScript source manifests. It contains aliases, semantic tags, use/anti-use cases, caption rules,
+and overlay regions. Generated drafts remain excluded until human review, visual QA, benchmark
+coverage, and promotion succeed.
 
-The local ranker is the availability fallback and the quality baseline. Its benchmark test enforces
-minimum expected-family retrieval rates at top 3 and top 5. A model can reorder candidates, but an
-unavailable or malformed model response cannot make the endpoint fail. Caption generation is batched
-to keep latency bounded and every supported template has a deterministic contextual fallback.
+External model failure must not fail suggestions. The local ranker and caption fallback are always
+available, model calls have timeouts, and only a bounded shortlist is sent for reranking/captioning.
+Raw tweet text is hashed or redacted from production logs.
 
-Suggestions return `tweet_context` with the recommendation. The extension sends that context back in
-usage events so future ranking changes can learn from shown, dismissed, and used outcomes without
-storing raw tweet text in logs. Recommendation cache keys and application logs hash or redact tweet
-content.
+## Learning loop
 
-## Library path
+Suggestion responses contain structured `tweet_context`. The extension returns it with outcome
+events: shown, clicked, used, saved, and dismissed. PostgreSQL therefore retains enough contextual
+signal to evaluate template performance without relying on raw request logging.
 
-Saving a meme follows this sequence:
+Improvement should remain incremental and measurable:
 
-```text
-source image URL
-  -> reject private/loopback hosts and unsafe redirects
-  -> stream with byte and timeout limits
-  -> verify image content type and decoded dimensions
-  -> persist under configured meme storage
-  -> optional OpenRouter vision tags
-  -> insert user_memes row
-```
+1. Maintain a human-reviewed golden benchmark with acceptable and rejected meme families.
+2. Measure top-k relevance, rejection avoidance, caption specificity/layout, diversity, and stage
+   latency for every ranking change.
+3. Aggregate outcome rates by template and structured context only after enough impressions.
+4. Add versioned retrieval/reranking features behind the current candidate generator.
+5. Compare versions offline, then roll out observably with an immediate local fallback.
 
-Saved memes are available in the popup library but are not yet mixed into automatic suggestions.
-This separation avoids surfacing a private or low-quality saved image before personalized retrieval
-has explicit quality controls.
+PostgreSQL plus pgvector is appropriate while the catalog is modest and feedback joins matter. A
+separate vector database is justified only after measured retrieval latency or scale requires it;
+today external inference is the more likely latency bottleneck.
 
-## Persistence
+## Persistence and operations
 
-SQLAlchemy models preserve the existing PostgreSQL tables so the runtime can change without a data
-migration: `users`, `memes`, `user_memes`, `usage_events`, and `rate_limits`. pgvector columns remain
-available for learned/embedding retrieval work.
+SQLAlchemy owns `users`, `memes`, `user_memes`, `usage_events`, and `rate_limits`; Alembic owns
+schema changes. PostgreSQL-backed rate limiting is required across multiple production instances.
+Migrations and catalog seeding are controlled release operations, never import-time or build-time
+side effects.
 
-Repository methods form the boundary between API/service tests and PostgreSQL. The default suite uses
-deterministic in-memory collaborators; the integration marker runs the same repository against a real
-PostgreSQL instance with pgvector.
+Configuration enforces production invariants including S3 storage, the production bucket, explicit
+CORS, install IDs, and OpenRouter credentials. `/live` does not require PostgreSQL; readiness does.
+Request IDs are echoed for diagnostics, while production suggestion logs stay compact and redact
+tweet text.
 
-## Recommendation evolution
+## Verification boundaries
 
-Recommendation changes should improve measured relevance without sacrificing latency or fallback
-behavior. The intended progression is:
-
-1. Preserve reliable structured usage events and request context.
-2. Establish offline benchmark gates for retrieval, diversity, captions, and latency.
-3. Derive per-template and per-context outcome features from shown/used/dismissed events.
-4. Introduce a versioned learned reranker behind the existing local candidate generator.
-5. Compare model versions offline, then in an observable rollout with an immediate fallback.
-
-This keeps the HTTP API stable while allowing the ranking implementation to evolve independently.
-
-## Testing boundaries
-
-- Unit tests cover configuration, identity, context analysis, catalog lookup, captions, ranking,
-  downloads, vision responses, rate limiting, and repository-independent services.
-- HTTP tests cover every route, validation contract, failure response, and ownership boundary.
-- PostgreSQL integration tests exercise every repository data feature and pgvector-compatible schema.
-- The extension retains TypeScript contract and UI tests; release smoke tests will target the FastAPI
-  process and container once deployment migration is complete.
+- API unit/HTTP tests cover every route, configuration, storage behavior, ranking/caption fallback,
+  download safety, identity, rate limiting, and data ownership boundary.
+- Marked integration tests run repositories against real PostgreSQL/pgvector.
+- Shared/tool tests verify contracts, catalog integrity, benchmark quality, and promotion policy.
+- Extension tests verify API mapping and browser-facing logic.
+- Release checks build all workspaces, start the FastAPI wheel, smoke the Docker image, audit locked
+  dependencies, validate the extension manifest, and package the Chrome artifact.

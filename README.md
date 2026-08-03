@@ -1,221 +1,141 @@
 # MemeDrop
 
-MemeDrop is a local-first Chrome extension for replying on X/Twitter with meme suggestions. The repo includes:
+MemeDrop is a Chrome extension that suggests relevant meme replies for X, generates concise overlay
+text, and learns from which suggestions people use or dismiss.
 
-- a FastAPI API under `apps/api/` with complete extension-facing route parity
-- legacy TypeScript catalog/evaluation tooling, retained temporarily while it is reorganized
-- a Chrome extension built with React, Vite, Tailwind, and CRXJS
-- shared TypeScript types and meme template data
-- a small Next.js landing page that can be hosted separately on Vercel
+This is a Turborepo monorepo, but its applications deploy independently:
 
-This project is intended to be easy to run locally. The landing page can be hosted publicly, but the app itself is designed to work from your machine.
+| Path | Responsibility | Deployment |
+| --- | --- | --- |
+| `apps/api` | FastAPI, recommendation pipeline, PostgreSQL, object storage | Vercel project rooted at `apps/api` |
+| `apps/extension` | React/Vite Chrome extension for X | Chrome Web Store package |
+| `apps/landing` | Static Next.js marketing site | Vercel project rooted at `apps/landing` |
+| `packages/shared` | TypeScript API contracts and template manifests | workspace dependency |
+| `tools/template-tools` | Offline catalog QA and evaluation tools | local/CI tooling |
+
+The landing page and API share source control and Turbo tasks, not a runtime. Each Vercel project
+has its own root, build, environment, and deployment.
 
 ## Requirements
 
-- Node.js 22 or newer
-- npm
-- Docker Desktop or another Docker Compose runtime
-- Chrome or a Chromium-based browser
-- Optional: an OpenRouter API key for model-backed template selection and captions
+- Node.js 22.12 or newer
+- npm 11 or newer
+- Python 3.13 and [uv](https://docs.astral.sh/uv/)
+- Docker for local PostgreSQL/pgvector and container smoke tests
+- Chrome or another Chromium browser
+- Optional OpenRouter key; deterministic suggestion and caption fallbacks work without it locally
 
-MemeDrop still works without an OpenRouter key, but suggestions and captions will use local fallbacks.
-
-## Project Layout
-
-```text
-apps/api/   FastAPI application, PostgreSQL models, and Python tests
-tools/template-tools/  Offline TypeScript catalog QA and promotion tools
-apps/extension/  Chrome extension source, popup, content scripts, background worker
-packages/shared/  Shared types, API contracts, template manifest, lookup helpers
-apps/landing/    Next.js landing page
-scripts/    Root release, launch, and smoke-check scripts
-```
-
-FastAPI is the only backend started by root development, database, build, and deployment commands.
-The complete API can be validated with:
+## Setup
 
 ```sh
-npm install
-npm run lint:api
-npm run test:api
-npm run catalog:export
-```
-
-## Local Setup
-
-Install dependencies:
-
-```sh
-npm install
-```
-
-Create the local environment file:
-
-```sh
+npm ci
+uv sync --project apps/api --frozen
 cp .env.example .env
-```
-
-For a no-cost local setup, set `OPENROUTER_API_KEY=` or leave it unset. If you want model-backed captions, set:
-
-```sh
-OPENROUTER_API_KEY=your-openrouter-api-key
-```
-
-Start Postgres with pgvector:
-
-```sh
 npm run db:up
-```
-
-Initialize the database:
-
-```sh
 npm run db:init
-```
-
-Seed the meme catalog and local meme image files:
-
-```sh
 npm run db:seed-memes
 ```
 
-This downloads verified Imgflip templates into `apps/api/data/memes/` and inserts missing catalog rows. The idempotent command preserves existing rows, and generated image files are ignored by git.
+The default `.env.example` uses the `meme-drop-dev` Supabase S3 bucket. For fully offline work,
+change `MEMEDROP_STORAGE_BACKEND` to `local`; generated files then live under
+`apps/api/data/memes` and stay ignored by Git.
 
-## Run The App Locally
-
-Start the backend API:
-
-```sh
-npm run dev:backend
-```
-
-The API runs at:
-
-```text
-http://localhost:3001
-```
-
-In another terminal, build the extension in watch mode:
+Run the applications in separate terminals:
 
 ```sh
+npm run dev:api
 npm run dev:extension
-```
-
-Load the extension in Chrome:
-
-1. Open `chrome://extensions`.
-2. Enable Developer mode.
-3. Click "Load unpacked".
-4. Select `apps/extension/dist`.
-5. Open `https://x.com` or `https://twitter.com`.
-
-The extension defaults to `http://localhost:3001` for API calls. If you need a different API origin, run the extension build with `VITE_API_BASE_URL` set.
-
-For example, create `apps/extension/.env.local`:
-
-```sh
-VITE_API_BASE_URL=http://localhost:3001
-```
-
-## Landing Page
-
-The landing page is separate from the local apps/extension/backend workflow.
-
-Run it locally:
-
-```sh
 npm run dev:landing
 ```
 
-Build it:
+FastAPI listens on `http://localhost:3001`. Load `apps/extension/dist` from
+`chrome://extensions` after enabling Developer mode. Set `VITE_API_BASE_URL` in
+`apps/extension/.env.local` only when the API is not on the default origin.
+
+## Common commands
 
 ```sh
-npm run build:landing
+npm run typecheck             # TypeScript plus mypy through Turbo
+npm test                      # root, API, extension, shared, and tooling tests
+npm run lint                  # Ruff and workspace lint tasks
+npm run build                 # all buildable workspaces
+npm run quality:security      # npm graph and locked Python production dependencies
+npm run release:dry-run       # CI-safe promotion, security, and extension packaging gates
 ```
 
-For Vercel, use separate project roots: `apps/landing` for the website and `apps/api` for FastAPI.
-
-## Useful Commands
+API and infrastructure:
 
 ```sh
-npm run typecheck
-npm test
-npm run build:backend
-npm run build:extension
-npm run db:migrate
-npm run db:down
-```
-
-API-only:
-
-```sh
-npm run typecheck --workspace=@memedrop/api
 npm run test:api
 npm run test:api:integration
 npm run quality:api-process
+npm run quality:backend-image
+npm run db:migrate
+npm run storage:check
+npm run storage:latency
 ```
 
-Catalog tooling:
+Recommendation and catalog quality:
 
 ```sh
-npm run manifest:audit --workspace=@memedrop/template-tools
-npm run eval:quality --workspace=@memedrop/template-tools
+npm run quality:benchmark
+npm run quality:suggestions
+npm run quality:dataset-plan
+npm run dataset:taste-review
 ```
 
-Extension-only:
+See `QUALITY.md` before changing template annotations, benchmarks, ranking, captions, or promotion
+data. The deterministic local ranker is the availability and release-quality floor even when model
+reranking is enabled.
+
+## Object storage
+
+Hosted assets use Supabase Storage through its S3-compatible API. Environments are deliberately
+isolated:
+
+| Environment | Required bucket |
+| --- | --- |
+| development | `meme-drop-dev` |
+| production | `meme-drop-prod` |
+
+FastAPI validates this pairing on startup. It stores object keys in PostgreSQL and serves media
+through `/memes/...`, keeping S3 credentials server-side and the extension's API contract stable.
+The API response applies shared-cache headers. `storage:latency` measures a real temporary
+upload/read/delete round trip and cleans up the probe object.
+
+Do not put S3 keys in either browser application. Supabase S3 access keys are backend credentials
+and must live in ignored env files or the FastAPI project's secret store.
+
+## Deployment
+
+Create two independent Vercel projects from this repository:
+
+1. Landing project: Root Directory `apps/landing`.
+2. API project: Root Directory `apps/api`.
+
+The API workspace owns its Python lockfile, migrations, catalog, and `app.py` entrypoint. Apply
+migrations and seed memes as controlled release steps; do not do either during a serverless build.
+Use `.env.production.example` as the configuration schema, replace every placeholder, and run the
+production preflight before deployment:
 
 ```sh
-npm run typecheck --workspace=extension
-npm run test --workspace=extension
-npm run build --workspace=extension
+npm run quality:production-env
+VITE_API_BASE_URL=https://your-api.example npm run release:candidate
 ```
 
-## Environment Notes
+The extension release build requires an HTTPS API origin and rejects localhost permissions. The
+remaining production handoff and manual checks are in `docs/release.md`.
 
-Important API env vars live in the root `.env` or `apps/api/.env`:
+## Documentation
 
-```text
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedrop
-MEME_STORAGE_PATH=./apps/api/data/memes
-MEMEDROP_REQUIRE_INSTALL_ID=false
-MEMEDROP_RATE_LIMIT_STORE=memory
-```
-
-Extension env vars live in `apps/extension/.env.local` if you need to override defaults:
-
-```text
-VITE_API_BASE_URL=http://localhost:3001
-```
-
-Use `MEMEDROP_RATE_LIMIT_STORE=memory` for local development. Database-backed rate limiting is mainly for hosted production-style deployments.
-
-## Troubleshooting
-
-If the backend cannot connect to the database:
-
-```sh
-npm run db:up
-npm run db:init
-```
-
-If suggestions return no memes, seed the catalog:
-
-```sh
-npm run db:seed-memes
-```
-
-If Chrome does not show extension changes, rebuild or keep watch mode running, then click reload on the extension card in `chrome://extensions`.
-
-If meme images are broken, check the configured `MEME_STORAGE_PATH` and confirm FastAPI is running on `http://localhost:3001`.
-
-## Notes For Contributors
-
-- Keep local generated files out of git: `.memedrop/`, `dist/`, `apps/api/data/memes/*`, `.env`, and `*.tsbuildinfo` are ignored.
-- Use strict TypeScript and ES modules.
-- Keep local imports explicit with `.js` extensions where TypeScript emits ESM.
-- Prefer simple, readable code over broad abstractions.
-- Run typechecks and relevant tests before opening a PR.
+- `architecture.md`: runtime boundaries and recommendation evolution
+- `QUALITY.md`: evaluation, template curation, and security gates
+- `docs/release.md`: deployment and Chrome Web Store checklist
+- `PRIVACY.md`: current data-handling disclosure draft
+- `apps/api/README.md`: FastAPI development and Vercel notes
+- `AGENTS.md`: durable repository rules for future coding sessions
 
 ## License
 
-No license has been added yet. Add one before treating this as a reusable open-source package.
+No license has been selected. Add one before distributing the source as a reusable open-source
+project.

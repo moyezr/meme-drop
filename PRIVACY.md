@@ -1,66 +1,83 @@
-# MemeDrop Privacy Policy Draft
+# MemeDrop privacy policy draft
 
-Last updated: 2026-06-12
+Last updated: 2026-08-04
 
-This draft describes the current MemeDrop implementation. Review it before publishing and replace placeholders with the final company/contact details.
+This document describes the current MemeDrop implementation. It is not ready to publish until the
+contact placeholder is replaced and the final infrastructure retention settings are verified.
 
-## Product Purpose
+## Purpose
 
-MemeDrop is a Chrome extension that helps users create meme replies on X/Twitter. The extension reads the tweet or compose context needed to generate relevant meme suggestions and captions.
+MemeDrop is a Chrome extension that helps users create and insert meme replies on X. It reads the
+tweet or compose context only when needed to provide that function. It is not designed to collect
+unrelated browsing activity.
 
-## Data We Process
+## Data processed
 
-MemeDrop may process:
+MemeDrop processes:
 
-- Tweet text or compose context selected by the user for meme suggestions.
-- A random anonymous install ID stored by the extension to keep library and usage data separate from other installs.
-- Generated meme suggestion metadata, including meme IDs, scores, and captions.
-- Usage events such as which meme suggestions were shown, clicked, inserted or used, saved, and dismissed.
-- Images the user chooses to save to their meme library.
-- Technical logs needed to operate and secure the service.
+- tweet or compose text used to request a suggestion or caption;
+- a random anonymous install ID stored by the extension;
+- suggested meme IDs, captions, scores, and structured context such as intent, topic, or tone;
+- outcome events such as shown, clicked, inserted/used, saved, and dismissed;
+- images and tags the user chooses to save to a personal library;
+- limited security, error, latency, and request-ID logs needed to operate the service.
 
-MemeDrop should not collect unrelated browsing activity.
+The install ID separates one browser installation's library and feedback from another. It is not a
+name, email address, or durable account, and reinstalling the extension may create a new ID.
 
-## How We Use Data
+## Use of data
 
-We use data to:
+The data is used to:
 
-- Generate meme suggestions and captions.
-- Render and save memes selected by the user.
-- Improve ranking, caption quality, and product reliability.
-- Prevent abuse and operate the backend service.
+- generate, rank, and caption meme suggestions;
+- render, store, and retrieve memes selected by the user;
+- personalize and evaluate recommendation quality from aggregate outcomes;
+- diagnose failures, measure latency, rate-limit requests, and prevent abuse.
 
-## Third-Party Processing
+MemeDrop does not sell personal data or use it for unrelated advertising.
 
-The backend currently sends prompt content and image-tagging requests to OpenRouter-powered model APIs. This is used for tweet analysis, embeddings, caption generation, and meme tagging.
+## Processing and storage
 
-Before launch, verify the current third-party processor list and link the applicable third-party terms or privacy pages.
+Tweet text is processed by the extension and FastAPI service and may be sent to OpenRouter's model
+APIs for template selection and caption generation. It can remain in bounded in-memory suggestion
+caches for up to five minutes. The application does not write raw tweet text to its database, and
+production logs redact it.
 
-## Storage And Retention
+PostgreSQL stores the anonymous install ID, saved-library records, and usage events with structured
+tweet context. The input schema rejects raw tweet-text fields inside usage context. Saved image files
+are stored in Supabase Storage through its S3-compatible service. The landing page and API are hosted
+as separate Vercel projects.
 
-Current implementation stores:
+Current application retention is deletion-based:
 
-- An anonymous install ID in Chrome extension storage.
-- Saved meme library records and image files.
-- Usage events for quality reporting and personalization, including shown, clicked, inserted/used, saved, and dismissed meme events.
-- Generated system tags for saved memes.
+- in-memory suggestion caches expire after five minutes or process termination;
+- saved images and library records remain until the user deletes the item or installation data;
+- structured usage events remain until the user deletes installation data;
+- the anonymous install ID remains in Chrome storage until extension data is cleared;
+- infrastructure logs follow the retention configured in the final Vercel, Supabase, and model
+  provider accounts and must be verified before publication.
 
-Before launch, define exact retention windows for tweet context, usage events, saved images, and operational logs.
+Service providers process data only as needed to operate MemeDrop. The final published policy should
+link the applicable Vercel, Supabase, and OpenRouter privacy terms and reflect the exact production
+account settings.
 
 ## Sharing
 
-We do not sell user data. We share data only as needed to provide the MemeDrop service, operate infrastructure, comply with law, or protect the service from abuse.
+Data is shared only with service providers needed to operate MemeDrop, when required by law, or when
+needed to protect users and the service from abuse. MemeDrop does not sell user data.
 
-## User Controls
+## User controls
 
-Users can delete saved memes and usage history for the current browser install from the extension popup. The backend also exposes install-scoped export and deletion endpoints.
+Users can remove individual saved memes and can export or delete all data associated with the current
+browser install from the extension. The backend exposes install-scoped export and deletion endpoints.
+Because the current identity is installation-based, data from an old or removed installation cannot
+automatically be linked to a new installation.
 
-If account-based identity is added later, add account-level data export and deletion controls.
+For privacy questions or deletion help, contact: `<privacy-contact@example.com>`
 
-Contact: <privacy-contact@example.com>
+## Chrome Web Store limited use
 
-## Chrome Web Store Limited Use
-
-MemeDrop's use of Chrome extension user data should be limited to providing and improving its single purpose: generating and inserting meme replies selected by the user.
-
-Before publishing, verify this policy against the current Chrome Web Store User Data Policy and Limited Use requirements.
+MemeDrop's use of Chrome extension user data is limited to its single purpose: generating, saving,
+and inserting meme replies chosen by the user, and improving that user-facing functionality. The
+published policy and Chrome Web Store disclosures must be reviewed against the policies in effect at
+submission time.
