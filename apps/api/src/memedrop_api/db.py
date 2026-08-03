@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -129,6 +130,7 @@ class Database:
         )
         self.sessions = async_sessionmaker(self.engine, expire_on_commit=False)
 
+    @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
         async with self.sessions() as session:
             yield session

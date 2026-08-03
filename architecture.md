@@ -6,7 +6,10 @@
   recommendation, deployment, and extension integration parity are verified.
 
   The FastAPI foundation owns configuration, request IDs, safe errors, CORS, static meme media,
-  PostgreSQL/pgvector models, readiness, and liveness. New backend features must target FastAPI.
+  PostgreSQL/pgvector models, readiness, and liveness. Identity, rate limiting, account export and
+  deletion, usage feedback, meme browsing, saved-meme CRUD, safe image download, and vision tagging
+  now also run in FastAPI with API and PostgreSQL integration tests. The suggestion/caption pipeline
+  is the remaining runtime feature on Fastify. New backend features must target FastAPI.
 
 • Mental Model
   MemeDrop is a Chrome extension backed by a local recommendation API.

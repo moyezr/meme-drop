@@ -14,6 +14,9 @@ members = ["apps/api"]
 addopts = "--strict-config --strict-markers"
 asyncio_mode = "auto"
 testpaths = ["apps/api/tests"]
+markers = [
+  "integration: requires MEMEDROP_TEST_DATABASE_URL and a PostgreSQL server with pgvector",
+]
 
 [tool.ruff]
 line-length = 100

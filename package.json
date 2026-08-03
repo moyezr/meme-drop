@@ -10,6 +10,7 @@
   "scripts": {
     "dev:api": "uv run --package memedrop-api uvicorn memedrop_api.main:app --app-dir apps/api/src --host 0.0.0.0 --port 3001 --reload",
     "test:api": "uv run --package memedrop-api pytest apps/api/tests",
+    "test:api:integration": "uv run --package memedrop-api pytest -m integration apps/api/tests",
     "lint:api": "uv run --package memedrop-api ruff check apps/api",
     "format:api": "uv run --package memedrop-api ruff format apps/api",
     "dev:backend": "npm run dev --workspace=backend",
