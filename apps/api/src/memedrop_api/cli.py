@@ -236,6 +236,16 @@ def production_env_findings(
     database_url = value("DATABASE_URL")
     validate_url("DATABASE_URL", database_url, {"postgres", "postgresql"}, errors)
     reject_placeholder("DATABASE_URL", database_url)
+    database_endpoint = urlparse(database_url)
+    if (
+        database_endpoint.hostname
+        and database_endpoint.hostname.endswith(".supabase.co")
+        and database_endpoint.port == 5432
+    ):
+        errors.append(
+            "DATABASE_URL must use a Supabase pooler endpoint for the Vercel runtime, "
+            "preferably transaction mode on port 6543."
+        )
     site_url = value("OPENROUTER_SITE_URL")
     validate_url("OPENROUTER_SITE_URL", site_url, {"https"}, errors)
 

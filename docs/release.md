@@ -51,6 +51,12 @@ npm run db:seed-memes
 
 Do not run migrations or seed downloads during a Vercel build or function startup.
 
+For Vercel runtime traffic, `DATABASE_URL` should be Supabase's transaction pooler URL (normally
+`pooler.supabase.com:6543`), not the direct `db.<project>.supabase.co:5432` endpoint. FastAPI disables
+psycopg automatic prepared statements on port 6543 because Supavisor transaction mode does not
+support them. Use a direct or session-pooler connection for controlled migrations when the operator
+network supports it.
+
 ## 3. Vercel projects
 
 Import this GitHub repository twice.

@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -27,6 +28,13 @@ def normalize_database_url(url: str) -> str:
     if url.startswith("postgres://"):
         return url.replace("postgres://", "postgresql+psycopg://", 1)
     return url
+
+
+def database_connect_args(url: str) -> dict[str, Any]:
+    parsed = make_url(normalize_database_url(url))
+    if parsed.port == 6543:
+        return {"prepare_threshold": None}
+    return {}
 
 
 class Base(DeclarativeBase):
@@ -126,7 +134,9 @@ class UsageEvent(Base):
 class Database:
     def __init__(self, database_url: str) -> None:
         self.engine: AsyncEngine = create_async_engine(
-            normalize_database_url(database_url), pool_pre_ping=True
+            normalize_database_url(database_url),
+            pool_pre_ping=True,
+            connect_args=database_connect_args(database_url),
         )
         self.sessions = async_sessionmaker(self.engine, expire_on_commit=False)
 

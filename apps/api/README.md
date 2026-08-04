@@ -68,6 +68,11 @@ MEMEDROP_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedro
 MEMEDROP_TEST_REDIS_URL=redis://localhost:6379/0 npm run test:api:integration
 ```
 
+On Vercel, use Supabase's transaction pooler URL on port 6543 for `DATABASE_URL`. The database layer
+automatically disables psycopg prepared statements for transaction-pooler connections. A direct
+Supabase URL is intended for IPv6-capable persistent clients or controlled database operations, not
+the serverless runtime.
+
 The suggestion tests also run the offline benchmark at
 `tools/template-tools/evals/suggestion-benchmark.json`. They enforce a minimum relevance floor for the local
 ranker, which remains available when OpenRouter is not configured or temporarily fails.

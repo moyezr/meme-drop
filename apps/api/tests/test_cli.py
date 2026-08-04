@@ -96,6 +96,17 @@ def test_production_environment_rejects_example_credentials() -> None:
         assert any(error.startswith(name) and "placeholder" in error for error in errors)
 
 
+def test_production_environment_rejects_supabase_direct_runtime_url() -> None:
+    environment = valid_environment()
+    environment["DATABASE_URL"] = (
+        "postgresql://postgres:secret@db.abcdefghijklmnopqrst.supabase.co:5432/postgres"
+    )
+
+    errors, _ = production_env_findings(environment)
+
+    assert any("Supabase pooler endpoint" in error for error in errors)
+
+
 def test_repository_root_contains_workspace_config() -> None:
     assert (repository_root() / "pyproject.toml").is_file()
 
