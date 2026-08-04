@@ -65,180 +65,193 @@ let usedSuggestionIds = new Set<string>();
 let shownSuggestionIds = new Set<string>();
 let insertingSuggestionId: string | null = null;
 
-const PANEL_STYLES = `
+export const PANEL_STYLES = `
   :host {
     all: initial;
     position: fixed;
     z-index: 10001;
-    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-    color: #f8efe2;
+    color: #f1f3f4;
+    color-scheme: dark;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+  *, *::before, *::after {
+    box-sizing: border-box;
   }
   .panel {
     position: relative;
     overflow: hidden;
-    background:
-      radial-gradient(circle at 14% 2%, rgba(245, 170, 62, 0.18), transparent 34%),
-      radial-gradient(circle at 100% 0%, rgba(238, 82, 52, 0.2), transparent 28%),
-      rgba(18, 16, 13, 0.94);
-    border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 22px;
-    padding: 14px;
-    box-shadow: 0 20px 70px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.08);
-    max-width: min(560px, calc(100vw - 28px));
-    min-width: min(360px, calc(100vw - 28px));
+    max-width: min(552px, calc(100vw - 48px));
+    min-width: min(340px, calc(100vw - 48px));
+    padding: 12px;
+    border: 1px solid rgba(240, 246, 252, 0.1);
+    border-radius: 18px;
+    background: rgba(17, 20, 24, 0.94);
+    box-shadow: 0 20px 52px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.04);
     cursor: grab;
     user-select: none;
-    backdrop-filter: blur(18px);
-    animation: panel-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    animation: panel-in 180ms ease-out both;
   }
   .panel.dragging { cursor: grabbing; }
   .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 14px;
-    margin-bottom: 12px;
+    gap: 12px;
+    margin-bottom: 10px;
   }
   .title {
     min-width: 0;
-    color: #fff8ec;
-    font-size: 14px;
-    font-weight: 850;
     display: flex;
     align-items: center;
-    gap: 8px;
-    letter-spacing: -0.01em;
+    gap: 9px;
+    color: #f1f3f4;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
   }
   .title-icon {
     display: grid;
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     place-items: center;
-    border-radius: 999px;
-    color: #17120d;
-    background: #f4b23c;
-    font-size: 13px;
-    font-weight: 950;
+    border: 1px solid rgba(240, 246, 252, 0.12);
+    border-radius: 7px;
+    background: rgba(240, 246, 252, 0.06);
+    color: #d0d7de;
+    font-size: 11px;
+    font-weight: 500;
   }
   .subtitle {
     display: block;
     margin-top: 2px;
-    color: rgba(248,239,226,0.56);
+    color: #8b949e;
     font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0;
+    font-weight: 400;
   }
   .close-btn,
   .refresh-btn {
     display: grid;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     place-items: center;
-    background: rgba(255,255,255,0.07);
-    border: none;
-    color: rgba(255,255,255,0.66);
-    cursor: pointer;
-    font-size: 15px;
     padding: 0;
-    border-radius: 999px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: #8b949e;
+    cursor: pointer;
+    font: inherit;
+    font-size: 15px;
     line-height: 1;
-    transition: color 140ms ease, background 140ms ease, transform 140ms ease;
+    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
   }
   .close-btn:hover,
   .refresh-btn:hover {
-    color: #fff;
-    background: rgba(255,255,255,0.14);
-    transform: translateY(-1px);
+    border-color: rgba(240, 246, 252, 0.1);
+    background: rgba(240, 246, 252, 0.06);
+    color: #f1f3f4;
+  }
+  .close-btn:focus-visible,
+  .refresh-btn:focus-visible,
+  .meme-card:focus-visible {
+    outline: 2px solid #8ab4f8;
+    outline-offset: 2px;
   }
   .header-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
   }
   .meme-strip {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     overflow-x: auto;
     scroll-behavior: smooth;
-    padding: 1px 1px 8px;
+    padding: 2px 2px 7px;
     overscroll-behavior-x: contain;
+    scrollbar-color: #3d444d transparent;
+    scrollbar-width: thin;
   }
   .meme-strip::-webkit-scrollbar { height: 4px; }
   .meme-strip::-webkit-scrollbar-track { background: transparent; }
-  .meme-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 999px; }
+  .meme-strip::-webkit-scrollbar-thumb { background: #3d444d; border-radius: 999px; }
   .meme-card {
     flex-shrink: 0;
-    width: 118px;
-    cursor: pointer;
-    border-radius: 16px;
+    width: 116px;
+    padding: 0;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.1);
-    transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
-    background: rgba(255,255,255,0.065);
     position: relative;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    background: #1b1f24;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition: border-color 140ms ease, transform 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
   }
   .meme-card:hover {
-    border-color: rgba(244,178,60,0.82);
-    transform: translateY(-3px) rotate(-0.6deg);
-    background: rgba(255,255,255,0.1);
-    box-shadow: 0 14px 32px rgba(0,0,0,0.26);
+    border-color: #6e7681;
+    background: #20252b;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+    transform: translateY(-1px);
   }
   .meme-card.is-busy {
     pointer-events: none;
-    border-color: rgba(244,178,60,0.92);
+    border-color: #8b949e;
   }
   .meme-card img {
-    width: 118px;
-    height: 118px;
+    width: 116px;
+    height: 116px;
     object-fit: cover;
     display: block;
-    background: linear-gradient(115deg, rgba(255,255,255,0.07), rgba(255,255,255,0.14), rgba(255,255,255,0.07));
+    background: #21262d;
   }
   .source-badge {
     position: absolute;
-    top: 7px;
-    left: 7px;
-    padding: 3px 6px;
+    top: 6px;
+    left: 6px;
+    padding: 3px 5px;
+    border: 1px solid rgba(240, 246, 252, 0.12);
     border-radius: 999px;
-    background: rgba(0,0,0,0.66);
-    color: rgba(255,255,255,0.9);
-    font-size: 8px;
-    font-weight: 900;
-    letter-spacing: 0;
-    text-transform: uppercase;
-    backdrop-filter: blur(8px);
+    background: rgba(13, 17, 23, 0.82);
+    color: #d0d7de;
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
   }
   .tailored-badge {
     position: absolute;
-    top: 7px;
-    right: 7px;
-    padding: 3px 6px;
+    top: 6px;
+    right: 6px;
+    padding: 3px 5px;
     border-radius: 999px;
-    background: rgba(244,178,60,0.95);
-    color: #17120d;
-    font-size: 8px;
-    font-weight: 950;
-    letter-spacing: 0;
-    text-transform: uppercase;
+    background: rgba(240, 246, 252, 0.9);
+    color: #161b22;
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1;
   }
   .meme-reason {
-    padding: 8px 8px 3px;
+    padding: 8px 8px 2px;
     font-size: 11px;
-    font-weight: 850;
-    color: #fff;
-    text-align: center;
+    font-weight: 500;
+    color: #e6edf3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: -0.01em;
   }
   .meme-name {
     padding: 0 8px 8px;
-    font-size: 9.5px;
-    font-weight: 650;
-    color: rgba(255,255,255,0.46);
-    text-align: center;
+    font-size: 10px;
+    font-weight: 400;
+    color: #8b949e;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -250,12 +263,13 @@ const PANEL_STYLES = `
     align-items: center;
     justify-content: center;
     padding: 12px;
-    color: #fff8ec;
-    background: rgba(12,10,8,0.74);
-    backdrop-filter: blur(6px);
+    background: rgba(13, 17, 23, 0.86);
+    color: #f1f3f4;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
     text-align: center;
     font-size: 11px;
-    font-weight: 850;
+    font-weight: 400;
     line-height: 1.25;
   }
   .meme-card.is-busy .card-overlay {
@@ -265,15 +279,15 @@ const PANEL_STYLES = `
     width: 18px;
     height: 18px;
     margin: 0 auto 8px;
-    border: 2px solid rgba(255,255,255,0.28);
-    border-top-color: #f4b23c;
+    border: 2px solid #3d444d;
+    border-top-color: #d0d7de;
     border-radius: 50%;
     animation: spin 650ms linear infinite;
   }
   .loading {
-    color: rgba(255,255,255,0.66);
+    color: #8b949e;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 400;
     padding: 6px 2px 2px;
   }
   .loading-copy {
@@ -283,66 +297,81 @@ const PANEL_STYLES = `
     gap: 12px;
     margin-bottom: 12px;
   }
-  .loading-copy strong {
-    color: #fff8ec;
+  .loading-title {
+    color: #f1f3f4;
     font-size: 13px;
+    font-weight: 500;
   }
   .loading-copy span {
-    color: rgba(255,255,255,0.48);
+    color: #8b949e;
     font-size: 11px;
+    font-weight: 400;
   }
   .skeleton-row {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    overflow: hidden;
   }
   .skeleton-card {
-    width: 118px;
-    flex: 0 0 118px;
+    width: 116px;
+    flex: 0 0 116px;
   }
   .skeleton-img,
   .skeleton-line,
   .skeleton-short {
-    border-radius: 14px;
-    background: linear-gradient(100deg, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.14) 36%, rgba(255,255,255,0.06) 52%);
-    background-size: 220% 100%;
-    animation: shimmer 1050ms linear infinite;
+    background: #21262d;
+    animation: pulse 1400ms ease-in-out infinite;
   }
   .skeleton-img {
-    height: 118px;
+    height: 116px;
     margin-bottom: 8px;
+    border-radius: 12px;
   }
   .skeleton-line {
     height: 10px;
     margin: 0 8px 6px;
+    border-radius: 4px;
   }
   .skeleton-short {
     width: 64%;
     height: 8px;
     margin: 0 auto;
+    border-radius: 4px;
   }
   .empty {
-    color: rgba(255,255,255,0.58);
+    color: #8b949e;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 400;
     text-align: center;
     padding: 18px 10px 14px;
   }
   .nav-hint {
-    color: rgba(255,255,255,0.36);
+    color: #6e7681;
     font-size: 10.5px;
-    font-weight: 700;
+    font-weight: 400;
     text-align: center;
     margin-top: 2px;
   }
   @keyframes panel-in {
-    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    from { opacity: 0; transform: translateY(6px) scale(0.99); }
     to { opacity: 1; transform: translateY(0) scale(1); }
   }
-  @keyframes shimmer {
-    to { background-position-x: -220%; }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
   }
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .panel,
+    .spinner,
+    .skeleton-img,
+    .skeleton-line,
+    .skeleton-short {
+      animation: none;
+    }
+    .meme-strip { scroll-behavior: auto; }
   }
 `;
 
@@ -373,6 +402,9 @@ function renderLoading() {
 
   const panel = document.createElement("div");
   panel.className = "panel";
+  panel.setAttribute("role", "region");
+  panel.setAttribute("aria-label", "Meme suggestions");
+  panel.setAttribute("aria-busy", "true");
   panel.innerHTML = `
     <div class="header">
       <span class="title">
@@ -380,13 +412,13 @@ function renderLoading() {
         <span>MemeDrop<span class="subtitle">ranking visual matches first</span></span>
       </span>
       <div class="header-actions">
-        <button class="refresh-btn" title="Refresh suggestions">↻</button>
-        <button class="close-btn" title="Close">&times;</button>
+        <button type="button" class="refresh-btn" title="Refresh suggestions" aria-label="Refresh suggestions">↻</button>
+        <button type="button" class="close-btn" title="Close" aria-label="Close suggestions">&times;</button>
       </div>
     </div>
     <div class="loading">
       <div class="loading-copy">
-        <strong>Finding the right meme...</strong>
+        <span class="loading-title">Finding the right meme...</span>
         <span>analyzing context and punchline fit</span>
       </div>
       <div class="skeleton-row" aria-hidden="true">
@@ -423,6 +455,8 @@ function renderSuggestions(suggestions: Suggestion[]) {
 
   const panel = document.createElement("div");
   panel.className = "panel";
+  panel.setAttribute("role", "region");
+  panel.setAttribute("aria-label", "Meme suggestions");
 
   if (suggestions.length === 0) {
     panel.innerHTML = `
@@ -432,8 +466,8 @@ function renderSuggestions(suggestions: Suggestion[]) {
           <span>MemeDrop<span class="subtitle">no strong match yet</span></span>
         </span>
         <div class="header-actions">
-          <button class="refresh-btn" title="Refresh suggestions">↻</button>
-          <button class="close-btn" title="Close">&times;</button>
+          <button type="button" class="refresh-btn" title="Refresh suggestions" aria-label="Refresh suggestions">↻</button>
+          <button type="button" class="close-btn" title="Close" aria-label="Close suggestions">&times;</button>
         </div>
       </div>
       <div class="empty">No meme suggestions yet. Try refreshing.</div>
@@ -447,8 +481,8 @@ function renderSuggestions(suggestions: Suggestion[]) {
         <span>MemeDrop<span class="subtitle">click or drag into the reply</span></span>
       </span>
       <div class="header-actions">
-        <button class="refresh-btn" title="Refresh suggestions">↻</button>
-        <button class="close-btn" title="Close">&times;</button>
+        <button type="button" class="refresh-btn" title="Refresh suggestions" aria-label="Refresh suggestions">↻</button>
+        <button type="button" class="close-btn" title="Close" aria-label="Close suggestions">&times;</button>
       </div>
     `;
 
@@ -461,6 +495,9 @@ function renderSuggestions(suggestions: Suggestion[]) {
       card.dataset.memeId = s.meme_id;
       card.title = getCardTitle(s);
       card.draggable = true;
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-label", `Use ${s.name || "meme"}`);
 
       const img = document.createElement("img");
       img.src = getBestImageSrc(s);
@@ -478,7 +515,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
 
       const tailoredBadge = document.createElement("div");
       tailoredBadge.className = "tailored-badge";
-      tailoredBadge.textContent = "text";
+      tailoredBadge.textContent = "caption";
 
       const cardOverlay = document.createElement("div");
       cardOverlay.className = "card-overlay";
@@ -515,6 +552,12 @@ function renderSuggestions(suggestions: Suggestion[]) {
           console.error("[MemeDrop] Insert from suggestion failed:", err);
           showToast("Could not attach meme", "error");
         });
+      });
+
+      card.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        card.click();
       });
 
       card.addEventListener("dragstart", (e) => {
