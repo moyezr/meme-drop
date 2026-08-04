@@ -263,8 +263,11 @@ def production_env_findings(
         ):
             errors.append(f"MEMEDROP_CORS_ORIGINS has an invalid extension ID: {origin}.")
 
-    if value("MEMEDROP_RATE_LIMIT_STORE") != "database":
-        errors.append("MEMEDROP_RATE_LIMIT_STORE must be database.")
+    if value("MEMEDROP_RATE_LIMIT_STORE") != "redis":
+        errors.append("MEMEDROP_RATE_LIMIT_STORE must be redis.")
+    redis_url = value("REDIS_URL")
+    validate_url("REDIS_URL", redis_url, {"redis", "rediss"}, errors)
+    reject_placeholder("REDIS_URL", redis_url)
     if value("MEMEDROP_REQUIRE_INSTALL_ID").lower() not in {"1", "true", "yes", "on"}:
         errors.append("MEMEDROP_REQUIRE_INSTALL_ID must be true.")
     if environment.get("MEMEDROP_SUGGESTION_LOG_TEXT", "").strip().lower() == "full":

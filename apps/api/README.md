@@ -59,6 +59,15 @@ MEMEDROP_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedro
 
 Integration records use generated IDs and are removed after each run.
 
+Development rate limits use the Redis service in `docker-compose.yml`. Production requires a
+managed `REDIS_URL`; the in-memory store is only for isolated tests/offline work. Test both local
+data services with:
+
+```sh
+MEMEDROP_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedrop \
+MEMEDROP_TEST_REDIS_URL=redis://localhost:6379/0 npm run test:api:integration
+```
+
 The suggestion tests also run the offline benchmark at
 `tools/template-tools/evals/suggestion-benchmark.json`. They enforce a minimum relevance floor for the local
 ranker, which remains available when OpenRouter is not configured or temporarily fails.
@@ -67,7 +76,6 @@ ranker, which remains available when OpenRouter is not configured or temporarily
 
 Create a dedicated Vercel project with Root Directory set to `apps/api`. The app has its own
 `pyproject.toml`, `uv.lock`, Python version, catalog data, migrations, and recognized `app.py`
-entrypoint. Configure production environment variables from the root
-`../../.env.production.example` in the
+entrypoint. Configure production environment variables from the ignored root `.env.prod` in the
 project dashboard, then run `npm run db:migrate` and `npm run db:seed-memes` as controlled release
 steps rather than during a serverless build.

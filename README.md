@@ -21,7 +21,7 @@ has its own root, build, environment, and deployment.
 - Node.js 22.12 or newer
 - npm 11 or newer
 - Python 3.13 and [uv](https://docs.astral.sh/uv/)
-- Docker for local PostgreSQL/pgvector and container smoke tests
+- Docker for local PostgreSQL/pgvector, Redis, and container smoke tests
 - Chrome or another Chromium browser
 - Optional OpenRouter key; deterministic suggestion and caption fallbacks work without it locally
 
@@ -36,7 +36,8 @@ npm run db:init
 npm run db:seed-memes
 ```
 
-The default `.env.example` uses the `meme-drop-dev` Supabase S3 bucket. For fully offline work,
+The default `.env.example` connects to PostgreSQL and Redis in Docker while using the
+`meme-drop-dev` Supabase S3 bucket. For fully offline work,
 change `MEMEDROP_STORAGE_BACKEND` to `local`; generated files then live under
 `apps/api/data/memes` and stay ignored by Git.
 
@@ -115,8 +116,8 @@ Create two independent Vercel projects from this repository:
 
 The API workspace owns its Python lockfile, migrations, catalog, and `app.py` entrypoint. Apply
 migrations and seed memes as controlled release steps; do not do either during a serverless build.
-Use `.env.production.example` as the configuration schema, replace every placeholder, and run the
-production preflight before deployment:
+Load the ignored `.env.prod` file into the FastAPI Vercel project and run the production preflight
+before deployment. Production requires managed PostgreSQL, Redis, and Supabase S3:
 
 ```sh
 npm run quality:production-env

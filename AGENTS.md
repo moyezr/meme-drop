@@ -76,7 +76,9 @@ extension or landing page. Validate access with `npm run storage:check`; use
 `npm run storage:latency` only when a temporary write/read/delete probe is intended.
 
 Keep secrets in ignored `.env` files or deployment secret stores. Update `.env.example` and
-`.env.production.example` when configuration changes, using placeholders only.
+the deployment documentation when configuration changes, using placeholders only in tracked files.
+Development uses Docker PostgreSQL and Redis plus `meme-drop-dev`; production credentials live in
+ignored `.env.prod` and deployment secret stores and must select `meme-drop-prod`.
 
 ## Tests, docs, and commits
 

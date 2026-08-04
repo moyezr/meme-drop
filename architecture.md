@@ -10,9 +10,9 @@ apps/landing (static Next.js)        apps/extension (Chrome/React)
         separate Vercel project                |
                                                 v
                                       apps/api (FastAPI/Vercel)
-                                      /          |          \
-                              PostgreSQL     OpenRouter    Supabase S3
-                               + pgvector
+                                   /        |       |        \
+                           PostgreSQL    Redis  OpenRouter  Supabase S3
+                            + pgvector
 ```
 
 | Workspace | Owns |
@@ -98,8 +98,10 @@ today external inference is the more likely latency bottleneck.
 
 ## Persistence and operations
 
-SQLAlchemy owns `users`, `memes`, `user_memes`, `usage_events`, and `rate_limits`; Alembic owns
-schema changes. PostgreSQL-backed rate limiting is required across multiple production instances.
+SQLAlchemy owns `users`, `memes`, `user_memes`, and `usage_events`; Alembic owns schema changes.
+Redis provides atomic, expiring rate-limit counters shared across FastAPI instances. Development
+runs PostgreSQL and Redis in Docker; production uses managed services through `DATABASE_URL` and
+`REDIS_URL`.
 Migrations and catalog seeding are controlled release operations, never import-time or build-time
 side effects.
 

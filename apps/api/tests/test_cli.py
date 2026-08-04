@@ -16,7 +16,8 @@ def valid_environment() -> dict[str, str]:
         "OPENROUTER_SITE_URL": "https://api.memedrop.app",
         "OPENROUTER_APP_NAME": "MemeDrop",
         "MEMEDROP_CORS_ORIGINS": "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
-        "MEMEDROP_RATE_LIMIT_STORE": "database",
+        "MEMEDROP_RATE_LIMIT_STORE": "redis",
+        "REDIS_URL": "rediss://default:secret@redis.internal:6379/0",
         "MEMEDROP_REQUIRE_INSTALL_ID": "true",
         "MEMEDROP_SUGGESTION_LOG_TEXT": "redacted",
         "MEMEDROP_USE_DRAFT_TEMPLATES": "false",
@@ -77,6 +78,7 @@ def test_production_environment_rejects_example_credentials() -> None:
             "S3_REGION": "your-s3-region",
             "S3_ACCESS_KEY_ID": "change-me-s3-access-key",
             "S3_SECRET_ACCESS_KEY": "change-me-s3-secret-key",
+            "REDIS_URL": "rediss://default:change-me@redis.your-domain.com:6379/0",
         }
     )
 
@@ -89,6 +91,7 @@ def test_production_environment_rejects_example_credentials() -> None:
         "S3_REGION",
         "S3_ACCESS_KEY_ID",
         "S3_SECRET_ACCESS_KEY",
+        "REDIS_URL",
     ):
         assert any(error.startswith(name) and "placeholder" in error for error in errors)
 

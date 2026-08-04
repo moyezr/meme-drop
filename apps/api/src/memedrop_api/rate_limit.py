@@ -4,9 +4,10 @@ import asyncio
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
+from redis.asyncio import Redis
 from sqlalchemy import text
 
 from memedrop_api.db import Database
@@ -18,11 +19,19 @@ EXPENSIVE_ROUTES = {
     "GET /api/v1/account/export",
     "DELETE /api/v1/account",
 }
+REDIS_RATE_LIMIT_SCRIPT = """
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+return count
+"""
 
 
 class RateLimitStore(Protocol):
     async def setup(self) -> None: ...
     async def consume(self, key: str, window_ms: int, maximum: int) -> bool: ...
+    async def close(self) -> None: ...
 
 
 @dataclass
@@ -37,6 +46,9 @@ class MemoryRateLimitStore:
         self.lock = asyncio.Lock()
 
     async def setup(self) -> None:
+        return None
+
+    async def close(self) -> None:
         return None
 
     async def consume(self, key: str, window_ms: int, maximum: int) -> bool:
@@ -80,6 +92,9 @@ class PostgresRateLimitStore:
                 )
             )
 
+    async def close(self) -> None:
+        return None
+
     async def consume(self, key: str, window_ms: int, maximum: int) -> bool:
         statement = text(
             """
@@ -101,6 +116,38 @@ class PostgresRateLimitStore:
         async with self.database.engine.begin() as connection:
             result = await connection.execute(statement, {"key": key, "window_ms": window_ms})
             return int(result.scalar_one()) <= maximum
+
+
+class RedisRateLimitStore:
+    def __init__(
+        self,
+        redis_url: str,
+        *,
+        client: Any | None = None,
+        key_prefix: str = "memedrop:rate-limit:",
+    ) -> None:
+        self.client = client or Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        self.key_prefix = key_prefix
+
+    async def setup(self) -> None:
+        await self.client.ping()
+
+    async def close(self) -> None:
+        await self.client.aclose()
+
+    async def consume(self, key: str, window_ms: int, maximum: int) -> bool:
+        count = await self.client.eval(
+            REDIS_RATE_LIMIT_SCRIPT,
+            1,
+            f"{self.key_prefix}{key}",
+            window_ms,
+        )
+        return int(count) <= maximum
 
 
 def rate_limit_client_key(headers: Mapping[str, str], client_ip: str | None) -> str:

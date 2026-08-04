@@ -42,9 +42,10 @@ class Settings(BaseSettings):
         default="z-ai/glm-5.2", validation_alias="OPENROUTER_MEME_MODEL"
     )
     cors_origins_value: str = Field(default="", validation_alias="MEMEDROP_CORS_ORIGINS")
-    rate_limit_store: Literal["memory", "database"] = Field(
+    rate_limit_store: Literal["memory", "database", "redis"] = Field(
         default="memory", validation_alias="MEMEDROP_RATE_LIMIT_STORE"
     )
+    redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
     api_rate_limit_window_ms: int = Field(
         default=60_000, validation_alias="MEMEDROP_RATE_LIMIT_WINDOW_MS", gt=0
     )
@@ -143,6 +144,10 @@ class Settings(BaseSettings):
             allowed_schemes = {"https"} if self.is_production else {"http", "https"}
             if endpoint.scheme not in allowed_schemes or not endpoint.hostname:
                 raise ValueError("S3_ENDPOINT must be a valid storage endpoint URL")
+        if self.rate_limit_store == "redis":
+            redis_endpoint = urlparse(self.redis_url or "")
+            if redis_endpoint.scheme not in {"redis", "rediss"} or not redis_endpoint.hostname:
+                raise ValueError("REDIS_URL must be a valid redis:// or rediss:// URL")
         if self.is_production:
             if not self.openrouter_api_key:
                 raise ValueError("OPENROUTER_API_KEY is required in production")
@@ -152,4 +157,6 @@ class Settings(BaseSettings):
                 raise ValueError("MEMEDROP_CORS_ORIGINS must not include * in production")
             if self.storage_backend != "s3":
                 raise ValueError("MEMEDROP_STORAGE_BACKEND must be s3 in production")
+            if self.rate_limit_store != "redis":
+                raise ValueError("MEMEDROP_RATE_LIMIT_STORE must be redis in production")
         return self

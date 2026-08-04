@@ -21,7 +21,8 @@ expiry.
 
 ## 2. Supabase
 
-Provision PostgreSQL with the pgvector extension and create two Storage buckets manually:
+Production uses managed PostgreSQL/pgvector and Redis from `DATABASE_URL` and `REDIS_URL`. Create two
+Supabase Storage buckets manually:
 
 - development: `meme-drop-dev`
 - production: `meme-drop-prod`
@@ -67,11 +68,12 @@ API project:
 - Framework: FastAPI/Python
 - Entry point: `app.py`
 - Python: 3.13 from `.python-version`
-- Environment: use `.env.production.example` as the schema and replace every placeholder
+- Environment: load the ignored `.env.prod` values into Vercel's production secret store
 
-At minimum the API needs the production PostgreSQL URL, OpenRouter key/model settings, final Chrome
-extension CORS origin, database rate limiting, required install IDs, compact/redacted logs, and the
-production Supabase S3 endpoint/region/key pair with `MEMEDROP_STORAGE_BUCKET=meme-drop-prod`.
+At minimum the API needs the managed PostgreSQL and Redis URLs, OpenRouter key/model settings, final
+Chrome extension CORS origin, Redis rate limiting, required install IDs, compact/redacted logs, and
+the production Supabase S3 endpoint/region/key pair with
+`MEMEDROP_STORAGE_BUCKET=meme-drop-prod`.
 
 Before deploying with those values loaded:
 
@@ -137,7 +139,7 @@ model.
 The repository gates pass, but release remains blocked until all of these are supplied and tested:
 
 - a usable S3 secret and successful live checks for both Supabase buckets;
-- the real production database and successful migration/seed;
+- successful managed PostgreSQL and Redis connectivity plus the production migration/seed;
 - the final API origin and final Chrome Web Store extension ID/CORS origin;
 - a real privacy/support contact, hosted policy URL, verified provider log retention, listing copy,
   and screenshots;

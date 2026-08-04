@@ -49,7 +49,8 @@ def test_production_configuration_is_accepted() -> None:
         openrouter_api_key="secret",
         cors_origins_value="chrome-extension://abcdefghijklmnopabcdefghijklmnop",
         require_install_id=True,
-        rate_limit_store="database",
+        rate_limit_store="redis",
+        redis_url="rediss://default:secret@redis.internal:6379/0",
         suggestion_log_text="redacted",
         storage_backend="s3",
         s3_endpoint="https://project.storage.supabase.co/storage/v1/s3",
@@ -61,6 +62,22 @@ def test_production_configuration_is_accepted() -> None:
     assert settings.is_production is True
     assert settings.cors_origins == ["chrome-extension://abcdefghijklmnopabcdefghijklmnop"]
     assert settings.storage_bucket == "meme-drop-prod"
+
+
+def test_redis_rate_limit_store_requires_a_redis_url() -> None:
+    with pytest.raises(ValidationError, match="REDIS_URL must be a valid"):
+        Settings(
+            database_url="postgresql://localhost/memedrop",
+            rate_limit_store="redis",
+        )
+
+    settings = Settings(
+        database_url="postgresql://localhost/memedrop",
+        rate_limit_store="redis",
+        redis_url="redis://localhost:6379/0",
+    )
+
+    assert settings.redis_url == "redis://localhost:6379/0"
 
 
 def test_s3_configuration_requires_credentials_and_environment_bucket() -> None:

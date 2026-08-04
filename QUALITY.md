@@ -131,6 +131,14 @@ npm run storage:latency
 The latency form temporarily writes, reads, and deletes `_health/<uuid>.txt`. Run it against both
 environment buckets after credentials and regions are configured.
 
+Rate-limit behavior has deterministic unit coverage and a real Redis integration test. Run the
+integration suite with both local services available:
+
+```sh
+MEMEDROP_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedrop \
+MEMEDROP_TEST_REDIS_URL=redis://localhost:6379/0 npm run test:api:integration
+```
+
 ## Dependency security
 
 `npm run quality:security` audits the complete npm lock graph and exports the FastAPI production set

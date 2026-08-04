@@ -27,6 +27,7 @@ from memedrop_api.rate_limit import (
     MemoryRateLimitStore,
     PostgresRateLimitStore,
     RateLimitStore,
+    RedisRateLimitStore,
     rate_limit_client_key,
 )
 from memedrop_api.repositories import BackendStore, SqlAlchemyStore
@@ -63,17 +64,23 @@ def create_app(
         OpenRouterSuggestionGateway(app_settings),
         app_settings,
     )
-    limiter = rate_limiter or (
-        PostgresRateLimitStore(database)
-        if app_settings.rate_limit_store == "database"
-        else MemoryRateLimitStore()
-    )
+    if rate_limiter is not None:
+        limiter = rate_limiter
+    elif app_settings.rate_limit_store == "redis":
+        limiter = RedisRateLimitStore(app_settings.redis_url or "")
+    elif app_settings.rate_limit_store == "database":
+        limiter = PostgresRateLimitStore(database)
+    else:
+        limiter = MemoryRateLimitStore()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        await limiter.setup()
-        yield
-        await database.close()
+        try:
+            await limiter.setup()
+            yield
+        finally:
+            await limiter.close()
+            await database.close()
 
     app = FastAPI(
         title="MemeDrop API",
