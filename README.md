@@ -36,6 +36,11 @@ npm run db:init
 npm run db:seed-memes
 ```
 
+The meme seeder uploads legacy local image files into the configured object store, updates their
+database paths, and downloads only verified catalog templates that are still missing. It is safe to
+rerun; existing `catalog/` objects and rows are skipped. Migration stops before uploading if any
+referenced legacy file is missing.
+
 The default `.env.example` connects to PostgreSQL and Redis in Docker while using the
 `meme-drop-dev` Supabase S3 bucket. For fully offline work,
 change `MEMEDROP_STORAGE_BACKEND` to `local`; generated files then live under

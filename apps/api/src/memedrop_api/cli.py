@@ -20,7 +20,11 @@ from sqlalchemy.dialects.postgresql import insert
 from memedrop_api.config import Settings
 from memedrop_api.db import Database, Meme, User
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
-from memedrop_api.services.storage import create_meme_storage
+from memedrop_api.services.storage import (
+    MemeStorage,
+    create_meme_storage,
+    object_key_from_public_path,
+)
 from memedrop_api.services.usage_feedback import load_usage_feedback
 
 DEV_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -66,22 +70,42 @@ def db_seed() -> None:
 
 def db_seed_memes() -> None:
     settings = Settings()  # type: ignore[call-arg]
-    inserted, skipped = asyncio.run(seed_meme_catalog(settings))
-    print(f"[MemeDrop] Meme catalog seeded: inserted={inserted} skipped={skipped}")
+    inserted, migrated, skipped = asyncio.run(seed_meme_catalog(settings))
+    print(
+        f"[MemeDrop] Meme catalog seeded: inserted={inserted} "
+        f"migrated={migrated} skipped={skipped}"
+    )
 
 
-async def seed_meme_catalog(settings: Settings) -> tuple[int, int]:
+async def seed_meme_catalog(settings: Settings) -> tuple[int, int, int]:
     catalog = MemeCatalog.load()
     storage = create_meme_storage(settings)
-    async with httpx.AsyncClient(timeout=settings.image_download_timeout_ms / 1000) as client:
-        response = await client.get("https://api.imgflip.com/get_memes")
-        response.raise_for_status()
-        remote = cast(list[RemoteTemplate], response.json()["data"]["memes"])
-        by_name = {normalize_template_name(item["name"]): item for item in remote}
-        database = Database(settings.database_url)
-        inserted = 0
-        skipped = 0
-        try:
+    database = Database(settings.database_url)
+    inserted = 0
+    migrated = 0
+    skipped = 0
+    try:
+        if settings.storage_backend == "s3":
+            async with database.session() as session, session.begin():
+                legacy_memes = list(
+                    await session.scalars(
+                        select(Meme).where(
+                            Meme.file_path.like("/memes/%"),
+                            ~Meme.file_path.like("/memes/catalog/%"),
+                        )
+                    )
+                )
+                migrated = await migrate_legacy_meme_files(
+                    settings, storage, legacy_memes
+                )
+
+        async with httpx.AsyncClient(
+            timeout=settings.image_download_timeout_ms / 1000
+        ) as client:
+            response = await client.get("https://api.imgflip.com/get_memes")
+            response.raise_for_status()
+            remote = cast(list[RemoteTemplate], response.json()["data"]["memes"])
+            by_name = {normalize_template_name(item["name"]): item for item in remote}
             async with database.session() as session, session.begin():
                 for template in catalog.verified_templates:
                     item = match_remote_template(template.name, template.aliases, by_name)
@@ -118,9 +142,34 @@ async def seed_meme_catalog(settings: Settings) -> tuple[int, int]:
                         )
                     )
                     inserted += 1
-        finally:
-            await database.close()
-    return inserted, skipped
+    finally:
+        await database.close()
+    return inserted, migrated, skipped
+
+
+async def migrate_legacy_meme_files(
+    settings: Settings,
+    storage: MemeStorage,
+    memes: Sequence[Meme],
+) -> int:
+    root = settings.meme_storage_path.resolve()
+    pending: list[tuple[Meme, str, Path]] = []
+    for meme in memes:
+        object_key = object_key_from_public_path(meme.file_path)
+        if object_key is None or object_key.startswith("catalog/"):
+            continue
+        source = (root / object_key).resolve()
+        if not source.is_relative_to(root):
+            raise ValueError(f"Legacy meme path escaped the storage root: {object_key}")
+        if not source.is_file():
+            raise FileNotFoundError(f"Legacy meme file is missing: {object_key}")
+        pending.append((meme, object_key, source))
+
+    migrated = 0
+    for meme, object_key, source in pending:
+        meme.file_path = await storage.put_file(source, f"catalog/legacy/{object_key}")
+        migrated += 1
+    return migrated
 
 
 def match_remote_template(

@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from memedrop_api.cli import (
     RemoteTemplate,
     match_remote_template,
+    migrate_legacy_meme_files,
     production_env_findings,
     repository_root,
 )
+from memedrop_api.config import Settings
+from memedrop_api.db import Meme
+from memedrop_api.services.storage import LocalMemeStorage
 
 
 def valid_environment() -> dict[str, str]:
@@ -118,3 +126,51 @@ def test_seed_catalog_matches_remote_names_and_aliases() -> None:
 
     assert match_remote_template("Drake Hotline Bling", ("Drake",), remote) == remote["drake"]
     assert match_remote_template("Missing", (), remote) is None
+
+
+@pytest.mark.asyncio
+async def test_legacy_meme_migration_validates_all_files_before_upload(
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    (source_root / "available.jpg").write_bytes(b"meme")
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        database_url="postgresql://localhost/test",
+        meme_storage_path=source_root,
+    )
+    storage = LocalMemeStorage(tmp_path / "objects")
+    available = Meme(
+        name="Available",
+        file_path="/memes/available.jpg",
+        format_type="reaction_image",
+        source_url="https://example.test/available.jpg",
+    )
+    missing = Meme(
+        name="Missing",
+        file_path="/memes/missing.jpg",
+        format_type="reaction_image",
+        source_url="https://example.test/missing.jpg",
+    )
+    migrated = Meme(
+        name="Migrated",
+        file_path="/memes/catalog/already.jpg",
+        format_type="reaction_image",
+        source_url="https://example.test/already.jpg",
+    )
+
+    with pytest.raises(FileNotFoundError, match="missing.jpg"):
+        await migrate_legacy_meme_files(
+            settings, storage, [available, missing, migrated]
+        )
+
+    assert available.file_path == "/memes/available.jpg"
+    assert not (tmp_path / "objects/catalog/legacy/available.jpg").exists()
+
+    count = await migrate_legacy_meme_files(settings, storage, [available, migrated])
+
+    assert count == 1
+    assert available.file_path == "/memes/catalog/legacy/available.jpg"
+    assert (tmp_path / "objects/catalog/legacy/available.jpg").read_bytes() == b"meme"
+    assert migrated.file_path == "/memes/catalog/already.jpg"

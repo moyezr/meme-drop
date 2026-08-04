@@ -36,6 +36,11 @@ npm run db:seed-memes
 npm run quality:api-process
 ```
 
+`db:seed-memes` first migrates legacy local `/memes/...` files into the active S3 bucket under
+`catalog/legacy/`, then inserts any missing verified catalog templates. Database path updates are
+transactional, source files are retained after S3 upload, and reruns skip migrated rows. It validates
+every referenced legacy file before the first upload so missing data cannot be silently ignored.
+
 Meme files use Supabase's S3-compatible API. Development is pinned to `meme-drop-dev` and
 production to `meme-drop-prod`; configuration rejects a bucket from the wrong environment. Keep
 S3 credentials server-side. Validate access without writing, or measure the full object round trip:
