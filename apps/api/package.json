@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "uv run uvicorn memedrop_api.main:app --app-dir src --host 0.0.0.0 --port 3001 --reload",
+    "dev": "uv run --env-file ../../.env uvicorn memedrop_api.main:app --app-dir src --host 0.0.0.0 --port 3001 --reload",
     "build": "uv build --out-dir dist",
     "test": "uv run pytest tests",
     "test:integration": "uv run pytest -m integration tests",
@@ -12,12 +12,12 @@
     "lint": "uv run ruff check .",
     "format": "uv run ruff format .",
     "production-env": "uv run memedrop-validate-production-env",
-    "usage-feedback": "uv run memedrop-usage-feedback",
-    "storage:check": "uv run memedrop-storage-check",
-    "storage:latency": "uv run memedrop-storage-check --latency",
-    "db:init": "uv run memedrop-db-init",
-    "db:seed": "uv run memedrop-db-seed",
-    "db:seed-memes": "uv run memedrop-db-seed-memes",
-    "db:migrate": "uv run alembic upgrade head"
+    "usage-feedback": "uv run --env-file ../../.env memedrop-usage-feedback",
+    "storage:check": "uv run --env-file ../../.env memedrop-storage-check",
+    "storage:latency": "uv run --env-file ../../.env memedrop-storage-check --latency",
+    "db:init": "uv run --env-file ../../.env memedrop-db-init",
+    "db:seed": "uv run --env-file ../../.env memedrop-db-seed",
+    "db:seed-memes": "uv run --env-file ../../.env memedrop-db-seed-memes",
+    "db:migrate": "uv run --env-file ../../.env alembic upgrade head"
   }
 }
