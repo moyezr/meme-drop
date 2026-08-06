@@ -25,6 +25,7 @@ from memedrop_api.services.storage import (
     create_meme_storage,
     object_key_from_public_path,
 )
+from memedrop_api.services.thumbnails import THUMBNAIL_CONTENT_TYPE, make_thumbnail
 from memedrop_api.services.usage_feedback import load_usage_feedback
 
 DEV_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -110,17 +111,44 @@ async def seed_meme_catalog(settings: Settings) -> tuple[int, int, int]:
                 for template in catalog.verified_templates:
                     item = match_remote_template(template.name, template.aliases, by_name)
                     existing = await session.scalar(
-                        select(Meme.id).where(func.lower(Meme.name) == template.name.lower())
+                        select(Meme).where(func.lower(Meme.name) == template.name.lower())
                     )
-                    if item is None or existing is not None:
-                        skipped += 1
-                        continue
-                    image = await client.get(item["url"])
+                    existing_tags = dict(existing.system_tags or {}) if existing is not None else {}
+                    if existing is not None:
+                        if existing_tags.get("thumbnail_path"):
+                            skipped += 1
+                            continue
+                        source_url = existing.source_url or (
+                            item["url"] if item is not None else None
+                        )
+                        if source_url is None:
+                            skipped += 1
+                            continue
+                    else:
+                        if item is None:
+                            skipped += 1
+                            continue
+                        extension = Path(httpx.URL(item["url"]).path).suffix.lower()
+                        if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+                            skipped += 1
+                            continue
+                        source_url = item["url"]
+                    image = await client.get(source_url)
                     image.raise_for_status()
-                    extension = Path(httpx.URL(item["url"]).path).suffix.lower()
-                    if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+                    try:
+                        thumbnail_path = await upload_catalog_thumbnail(
+                            storage, template.template_id, image.content
+                        )
+                    except (OSError, ValueError):
                         skipped += 1
                         continue
+                    if existing is not None:
+                        existing.system_tags = {
+                            **existing_tags,
+                            "thumbnail_path": thumbnail_path,
+                        }
+                        continue
+                    assert item is not None
                     filename = f"seed-{template.template_id}{extension}"
                     file_path = await storage.put_bytes(
                         f"catalog/{filename}",
@@ -137,7 +165,10 @@ async def seed_meme_catalog(settings: Settings) -> tuple[int, int, int]:
                             if template.supports_overlay
                             else "reaction_image",
                             is_evergreen=True,
-                            system_tags={"caption_pattern": template.caption_guidance.pattern},
+                            system_tags={
+                                "caption_pattern": template.caption_guidance.pattern,
+                                "thumbnail_path": thumbnail_path,
+                            },
                             source_url=item["url"],
                         )
                     )
@@ -145,6 +176,17 @@ async def seed_meme_catalog(settings: Settings) -> tuple[int, int, int]:
     finally:
         await database.close()
     return inserted, migrated, skipped
+
+
+async def upload_catalog_thumbnail(
+    storage: MemeStorage, template_id: str, image_bytes: bytes
+) -> str:
+    thumbnail = await asyncio.to_thread(make_thumbnail, image_bytes)
+    return await storage.put_bytes(
+        f"catalog/thumbnails/{template_id}.webp",
+        thumbnail,
+        content_type=THUMBNAIL_CONTENT_TYPE,
+    )
 
 
 async def migrate_legacy_meme_files(

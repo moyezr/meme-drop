@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
+from PIL import Image
 
+import memedrop_api.cli as cli
 from memedrop_api.cli import (
     RemoteTemplate,
     match_remote_template,
@@ -172,3 +178,215 @@ async def test_legacy_meme_migration_validates_all_files_before_upload(
     assert available.file_path == "/memes/catalog/legacy/available.jpg"
     assert (tmp_path / "objects/catalog/legacy/available.jpg").read_bytes() == b"meme"
     assert migrated.file_path == "/memes/catalog/already.jpg"
+
+
+def png_bytes() -> bytes:
+    image = Image.new("RGB", (960, 480), color=(20, 30, 40))
+    output = BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
+
+
+class FakeStorage:
+    def __init__(self) -> None:
+        self.objects: list[tuple[str, bytes, str | None]] = []
+
+    async def put_bytes(
+        self, object_key: str, content: bytes, *, content_type: str | None = None
+    ) -> str:
+        self.objects.append((object_key, content, content_type))
+        return f"/memes/{object_key}"
+
+
+class FakeResponse:
+    def __init__(self, *, payload: dict[str, Any] | None = None, content: bytes = b"") -> None:
+        self.payload = payload
+        self.content = content
+        self.headers = {"content-type": "image/png"}
+
+    def json(self) -> dict[str, Any]:
+        assert self.payload is not None
+        return self.payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+
+class FakeHttpClient:
+    def __init__(self, responses: dict[str, FakeResponse]) -> None:
+        self.responses = responses
+        self.requested: list[str] = []
+
+    async def __aenter__(self) -> FakeHttpClient:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    async def get(self, url: str) -> FakeResponse:
+        self.requested.append(url)
+        return self.responses[url]
+
+
+class FakeSession:
+    def __init__(self, existing: Meme | None) -> None:
+        self.existing = existing
+        self.added: list[Meme] = []
+
+    async def __aenter__(self) -> FakeSession:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    @asynccontextmanager
+    async def begin(self) -> Any:
+        yield self
+
+    async def scalar(self, statement: object) -> Meme | None:
+        del statement
+        return self.existing
+
+    def add(self, row: Meme) -> None:
+        self.added.append(row)
+
+
+class FakeDatabase:
+    def __init__(self, session: FakeSession) -> None:
+        self.fake_session = session
+        self.closed = False
+
+    def session(self) -> FakeSession:
+        return self.fake_session
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def fake_catalog() -> SimpleNamespace:
+    template = SimpleNamespace(
+        name="Drake Hotline Bling",
+        aliases=["Drake"],
+        template_id="drake-hotline-bling",
+        caption_guidance=SimpleNamespace(pattern="top/bottom"),
+        supports_overlay=True,
+    )
+    return SimpleNamespace(verified_templates=[template])
+
+
+def seed_settings() -> Settings:
+    return cast(
+        Settings,
+        SimpleNamespace(storage_backend="local", image_download_timeout_ms=1, database_url="test"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_seed_catalog_uploads_original_and_thumbnail(monkeypatch: pytest.MonkeyPatch) -> None:
+    remote_url = "https://example.test/drake.png"
+    client = FakeHttpClient(
+        {
+            "https://api.imgflip.com/get_memes": FakeResponse(
+                payload={"data": {"memes": [{"name": "Drake", "url": remote_url}]}}
+            ),
+            remote_url: FakeResponse(content=png_bytes()),
+        }
+    )
+    storage = FakeStorage()
+    session = FakeSession(existing=None)
+    database = FakeDatabase(session)
+    monkeypatch.setattr(cli.MemeCatalog, "load", staticmethod(fake_catalog))
+    monkeypatch.setattr(cli, "create_meme_storage", lambda settings: storage)
+    monkeypatch.setattr(cli, "Database", lambda url: database)
+    monkeypatch.setattr(cli.httpx, "AsyncClient", lambda **kwargs: client)
+
+    inserted, migrated, skipped = await cli.seed_meme_catalog(seed_settings())
+
+    assert (inserted, migrated, skipped) == (1, 0, 0)
+    assert [item[0] for item in storage.objects] == [
+        "catalog/thumbnails/drake-hotline-bling.webp",
+        "catalog/seed-drake-hotline-bling.png",
+    ]
+    assert storage.objects[0][2] == "image/webp"
+    assert session.added[0].system_tags == {
+        "caption_pattern": "top/bottom",
+        "thumbnail_path": "/memes/catalog/thumbnails/drake-hotline-bling.webp",
+    }
+    assert database.closed
+
+
+@pytest.mark.asyncio
+async def test_seed_catalog_backfills_missing_thumbnail_from_existing_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    remote_url = "https://example.test/drake.png"
+    existing_source = "https://cdn.example.test/existing.png"
+    client = FakeHttpClient(
+        {
+            "https://api.imgflip.com/get_memes": FakeResponse(
+                payload={"data": {"memes": [{"name": "Drake", "url": remote_url}]}}
+            ),
+            existing_source: FakeResponse(content=png_bytes()),
+        }
+    )
+    existing = Meme(
+        name="Drake Hotline Bling",
+        file_path="/memes/catalog/seed-drake.png",
+        format_type="text_overlay",
+        system_tags={"caption_pattern": "top/bottom"},
+        source_url=existing_source,
+    )
+    storage = FakeStorage()
+    session = FakeSession(existing=existing)
+    database = FakeDatabase(session)
+    monkeypatch.setattr(cli.MemeCatalog, "load", staticmethod(fake_catalog))
+    monkeypatch.setattr(cli, "create_meme_storage", lambda settings: storage)
+    monkeypatch.setattr(cli, "Database", lambda url: database)
+    monkeypatch.setattr(cli.httpx, "AsyncClient", lambda **kwargs: client)
+
+    inserted, migrated, skipped = await cli.seed_meme_catalog(seed_settings())
+
+    assert (inserted, migrated, skipped) == (0, 0, 0)
+    assert client.requested == ["https://api.imgflip.com/get_memes", existing_source]
+    assert [item[0] for item in storage.objects] == [
+        "catalog/thumbnails/drake-hotline-bling.webp"
+    ]
+    assert existing.system_tags["thumbnail_path"] == (
+        "/memes/catalog/thumbnails/drake-hotline-bling.webp"
+    )
+    assert not session.added
+
+
+@pytest.mark.asyncio
+async def test_seed_catalog_backfills_existing_source_without_an_imgflip_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_source = "https://cdn.example.test/existing.png"
+    client = FakeHttpClient(
+        {
+            "https://api.imgflip.com/get_memes": FakeResponse(payload={"data": {"memes": []}}),
+            existing_source: FakeResponse(content=png_bytes()),
+        }
+    )
+    existing = Meme(
+        name="Drake Hotline Bling",
+        file_path="/memes/catalog/seed-drake.png",
+        format_type="text_overlay",
+        system_tags=None,  # type: ignore[arg-type]
+        source_url=existing_source,
+    )
+    storage = FakeStorage()
+    session = FakeSession(existing=existing)
+    database = FakeDatabase(session)
+    monkeypatch.setattr(cli.MemeCatalog, "load", staticmethod(fake_catalog))
+    monkeypatch.setattr(cli, "create_meme_storage", lambda settings: storage)
+    monkeypatch.setattr(cli, "Database", lambda url: database)
+    monkeypatch.setattr(cli.httpx, "AsyncClient", lambda **kwargs: client)
+
+    inserted, migrated, skipped = await cli.seed_meme_catalog(seed_settings())
+
+    assert (inserted, migrated, skipped) == (0, 0, 0)
+    assert client.requested == ["https://api.imgflip.com/get_memes", existing_source]
+    assert existing.system_tags == {
+        "thumbnail_path": "/memes/catalog/thumbnails/drake-hotline-bling.webp"
+    }
