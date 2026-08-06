@@ -45,7 +45,7 @@
     "quality:promotion": "npm run quality:static && npm run quality:api-process && npm run quality:benchmark && npm run quality:dataset-plan && npm run manifest:review-gate --workspace=@memedrop/template-tools && npm run manifest:coverage-gate --workspace=@memedrop/template-tools && npm run quality:release-metadata && npm run quality:store-readiness && npm run quality:release-config",
     "quality:production-env": "npm run production-env --workspace=@memedrop/api",
     "quality:security": "node scripts/security-audit.mjs",
-    "quality:suggestions": "npm run test:suggestions --workspace=@memedrop/api",
+    "quality:suggestions": "npm run test:suggestions --workspace=@memedrop/api && npm run eval:suggestions --workspace=@memedrop/api",
     "launch:status": "node scripts/launch-status.mjs",
     "store-listing:init": "npm run init:store-listing --workspace=@memedrop/extension --",
     "release:dry-run": "node scripts/release-candidate.mjs",
