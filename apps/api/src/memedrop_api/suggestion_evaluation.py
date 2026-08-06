@@ -17,12 +17,25 @@ from pathlib import Path
 from typing import Any
 
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
-from memedrop_api.services.suggestion_engine import Candidate, fallback_template_selections
+from memedrop_api.services.suggestion_engine import (
+    Candidate,
+    LexicalCandidateIndex,
+    fallback_template_selections,
+)
 
 TOP_1_FLOOR = 0.70
 TOP_3_FLOOR = 0.80
 TOP_5_FLOOR = 0.90
 REJECTED_TOP_5_CEILING = 0.15
+SCALE_CATALOG_SIZE = 5_000
+SCALE_WARM_RANKING_P95_CEILING_MS = 50.0
+SCALE_QUERIES = (
+    "Production is down after the dashboard turned red again.",
+    "Should we fix the bug properly or add a feature flag and pretend it was planned?",
+    "We renamed the same spreadsheet with macros a modern data platform.",
+    "The launch gave every team another button and nobody knows what it does.",
+    "Still waiting for the autonomous agent to finish its first task.",
+)
 
 
 @dataclass(frozen=True)
@@ -34,6 +47,15 @@ class EvaluationThresholds:
 
 
 DEFAULT_THRESHOLDS = EvaluationThresholds()
+
+
+@dataclass(frozen=True)
+class CatalogScaleThresholds:
+    catalog_size: int = SCALE_CATALOG_SIZE
+    warm_ranking_p95_ceiling_ms: float = SCALE_WARM_RANKING_P95_CEILING_MS
+
+
+DEFAULT_CATALOG_SCALE_THRESHOLDS = CatalogScaleThresholds()
 
 
 @dataclass(frozen=True)
@@ -129,7 +151,102 @@ def evaluate_benchmark(
                 ranking_latency_ms=latency_ms,
             )
         )
-    return build_report(results, benchmark_path=benchmark_path)
+    report = build_report(results, benchmark_path=benchmark_path)
+    catalog_scale = evaluate_catalog_scale(ranking_candidates)
+    report["catalog_scale"] = catalog_scale
+    report["passed"] = bool(report["passed"]) and bool(catalog_scale["passed"])
+    return report
+
+
+def build_scale_candidates(
+    candidates: Sequence[Candidate], *, catalog_size: int = SCALE_CATALOG_SIZE
+) -> list[Candidate]:
+    """Expand verified production templates into distinct synthetic catalog entries.
+
+    This is deliberately a catalog-scale performance fixture, not a quality fixture:
+    the source metadata remains production metadata while every copy has a distinct
+    template ID. That prevents the lexical index's deliberate duplicate-ID collapse
+    from hiding the cost of a future catalog containing thousands of templates.
+    """
+    if not candidates:
+        raise ValueError("Cannot build a scale catalog without production candidates.")
+    if catalog_size < 1:
+        raise ValueError("Scale catalog size must be positive.")
+
+    scaled: list[Candidate] = []
+    for position in range(catalog_size):
+        source = candidates[position % len(candidates)]
+        template_id = f"scale-{position:05d}-{source.template.template_id}"
+        template = source.template.model_copy(
+            update={"template_id": template_id, "meme_id": template_id}
+        )
+        scaled.append(
+            Candidate(
+                meme_id=template_id,
+                name=source.name,
+                image_url=source.image_url,
+                system_tags=dict(source.system_tags),
+                is_evergreen=source.is_evergreen,
+                template=template,
+                feedback_boost=source.feedback_boost,
+            )
+        )
+
+    unique_template_ids = {candidate.template.template_id for candidate in scaled}
+    if len(unique_template_ids) != catalog_size:
+        raise AssertionError("Scale catalog must contain unique template IDs.")
+    return scaled
+
+
+def evaluate_catalog_scale(
+    candidates: Sequence[Candidate],
+    *,
+    thresholds: CatalogScaleThresholds = DEFAULT_CATALOG_SCALE_THRESHOLDS,
+    queries: Sequence[str] = SCALE_QUERIES,
+) -> dict[str, object]:
+    """Measure a warmed production ranker against a deterministic 5,000-template catalog."""
+    if not queries:
+        raise ValueError("Scale evaluation requires at least one representative query.")
+    scaled_candidates = build_scale_candidates(candidates, catalog_size=thresholds.catalog_size)
+    started = time.perf_counter()
+    lexical_index = LexicalCandidateIndex.build(scaled_candidates)
+    index_build_ms = (time.perf_counter() - started) * 1000
+    if len(lexical_index.document_lengths) != len(scaled_candidates):
+        raise AssertionError("Scale index unexpectedly collapsed distinct template IDs.")
+
+    warm_latencies_ms: list[float] = []
+    for query in queries:
+        started = time.perf_counter()
+        selections = fallback_template_selections(
+            query,
+            scaled_candidates,
+            12,
+            lexical_index=lexical_index,
+        )
+        warm_latencies_ms.append((time.perf_counter() - started) * 1000)
+        if len(selections) != 12:
+            raise AssertionError("Scale ranker must return the requested twelve results.")
+
+    warm_p95_ms = percentile(warm_latencies_ms, 0.95)
+    gates = {
+        "warm_ranking_p95_ms": gate(
+            warm_p95_ms,
+            "<=",
+            thresholds.warm_ranking_p95_ceiling_ms,
+        )
+    }
+    return {
+        "catalog_size": len(scaled_candidates),
+        "unique_template_ids": len(lexical_index.document_lengths),
+        "index_build_ms": index_build_ms,
+        "warm_ranking_latency_ms": {
+            "queries": len(queries),
+            "p50": percentile(warm_latencies_ms, 0.50),
+            "p95": warm_p95_ms,
+        },
+        "gates": gates,
+        "passed": all(item["passed"] for item in gates.values()),
+    }
 
 
 def build_report(
@@ -285,6 +402,20 @@ def format_report(report: dict[str, object]) -> str:
         f"p50={float(latency['p50']):.3f}ms p95={float(latency['p95']):.3f}ms",
         f"gates: {'PASS' if report['passed'] else 'FAIL'}",
     ]
+    catalog_scale = report.get("catalog_scale")
+    if isinstance(catalog_scale, dict):
+        scale_latency = catalog_scale["warm_ranking_latency_ms"]
+        assert isinstance(scale_latency, dict)
+        lines.extend(
+            [
+                "catalog scale (synthetic verified templates): "
+                f"{catalog_scale['catalog_size']} unique={catalog_scale['unique_template_ids']}",
+                f"scale index build: {float(catalog_scale['index_build_ms']):.3f}ms",
+                "scale warm ranking latency: "
+                f"p50={float(scale_latency['p50']):.3f}ms "
+                f"p95={float(scale_latency['p95']):.3f}ms",
+            ]
+        )
     misses = report["misses"]
     assert isinstance(misses, list)
     if misses:

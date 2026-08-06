@@ -5,9 +5,13 @@ from typing import cast
 from memedrop_api.suggestion_evaluation import (
     DEFAULT_THRESHOLDS,
     CaseResult,
+    CatalogScaleThresholds,
     EvaluationThresholds,
     build_report,
+    build_scale_candidates,
+    evaluate_catalog_scale,
     percentile,
+    production_candidates,
 )
 
 
@@ -89,3 +93,20 @@ def test_report_fails_the_honest_retrieval_quality_gates() -> None:
 def test_percentile_uses_nearest_rank() -> None:
     assert percentile([1.0, 2.0, 3.0, 4.0], 0.50) == 2.0
     assert percentile([1.0, 2.0, 3.0, 4.0], 0.95) == 4.0
+
+
+def test_scale_catalog_uses_distinct_template_ids_and_a_warmed_index() -> None:
+    source_candidates = production_candidates()
+    scaled = build_scale_candidates(source_candidates, catalog_size=37)
+    report = evaluate_catalog_scale(
+        source_candidates,
+        thresholds=CatalogScaleThresholds(catalog_size=37, warm_ranking_p95_ceiling_ms=50.0),
+        queries=("The dashboard is red after the deploy.", "Still waiting for the launch."),
+    )
+
+    assert len({candidate.template.template_id for candidate in scaled}) == 37
+    assert report["catalog_size"] == 37
+    assert report["unique_template_ids"] == 37
+    latency = cast(dict[str, object], report["warm_ranking_latency_ms"])
+    assert latency["queries"] == 2
+    assert report["passed"] is True
