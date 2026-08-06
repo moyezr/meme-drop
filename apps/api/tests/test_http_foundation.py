@@ -73,6 +73,30 @@ async def test_cors_preflight_allows_extension_headers(client: httpx.AsyncClient
     assert "x-memedrop-install-id" in allowed
 
 
+async def test_cors_exposes_request_diagnostics_to_the_extension(
+    client: httpx.AsyncClient,
+) -> None:
+    response = await client.get("/live", headers={"origin": "http://localhost:5173"})
+
+    assert response.status_code == 200
+    exposed = response.headers["access-control-expose-headers"].lower()
+    assert "server-timing" in exposed
+    assert "x-request-id" in exposed
+
+
+async def test_suggest_rejects_response_limits_above_five(client: httpx.AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/suggest",
+        json={"tweet_text": "This should stay quick", "limit": 6},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "Invalid request"
+    assert response.json()["details"] == [
+        {"path": "limit", "message": "Input should be less than or equal to 5"}
+    ]
+
+
 async def test_static_meme_serving(settings: Settings, tmp_path: Path) -> None:
     storage = tmp_path / "static-memes"
     (storage / "catalog").mkdir(parents=True)

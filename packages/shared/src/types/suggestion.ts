@@ -47,7 +47,8 @@ export interface TweetContext extends FeedbackContext {
 
 export interface SuggestionRequest {
   tweet_text: string;
-  limit?: number;
+  /** At most five user-facing suggestions; retrieval may consider more internally. */
+  limit?: 1 | 2 | 3 | 4 | 5;
   refresh?: boolean;
   cache_key?: string;
 }

@@ -202,7 +202,9 @@ TweetText = Annotated[
 
 class SuggestRequest(StrictModel):
     tweet_text: TweetText
-    limit: int | None = Field(default=None, ge=1, le=10)
+    # The UI presents a deliberately small, decision-ready set. The service uses
+    # a larger internal shortlist before this response limit is applied.
+    limit: int | None = Field(default=None, ge=1, le=5)
     refresh: bool = False
     cache_key: str | None = Field(default=None, min_length=1, max_length=240)
 

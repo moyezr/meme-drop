@@ -112,6 +112,7 @@ def create_app(
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "x-memedrop-install-id", REQUEST_ID_HEADER],
+        expose_headers=["Server-Timing", REQUEST_ID_HEADER],
     )
 
     @app.middleware("http")
