@@ -17,7 +17,6 @@ from memedrop_api.services.suggestion_engine import (
     diversify_shortlist,
     fallback_template_selections,
     safe_log_cache_key,
-    safe_log_tweet_text,
     semantic_template_signals,
 )
 from tests.conftest import INSTALL_ID, ApiHarness
@@ -95,8 +94,8 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
     assert [item["name"] for item in result] == ["Surprised Pikachu", "This Is Fine"]
     assert result[0]["score"] == 0.96
     assert result[0]["use_case_label"] == "predictable consequence"
-    assert result[0]["tweet_context"]["intent"] == "dunking"
     assert result[0]["feedback_context"]["intent"] == "dunking"
+    assert "tweet_context" not in result[0]
     assert set(result[0]["feedback_context"]).isdisjoint(
         {"core_claim", "implied_context", "comedic_tension", "caption_anchors"}
     )
@@ -104,6 +103,26 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
     assert result[1]["tailored_overlay"] is not None
     assert gateway.joint_calls == 1
     assert gateway.caption_calls == 0
+
+
+async def test_service_uses_catalog_thumbnail_for_preview_and_preserves_attachment() -> None:
+    service, store, gateway = service_with_templates("this-is-fine")
+    gateway.fail_joint = True
+    meme = store.memes[0]
+    meme["systemTags"] = {"thumbnail_path": "/memes/catalog/thumbnails/this-is-fine.webp"}
+
+    thumbnail = (
+        await service.get_suggestions("Everything is on fire", user_id=INSTALL_ID, limit=1)
+    )[0]
+    assert thumbnail["preview_image_url"] == "/memes/catalog/thumbnails/this-is-fine.webp"
+    assert thumbnail["image_url"] == meme["filePath"]
+
+    fallback_service, _, fallback_gateway = service_with_templates("this-is-fine")
+    fallback_gateway.fail_joint = True
+    fallback = (
+        await fallback_service.get_suggestions("Everything is on fire", user_id=INSTALL_ID, limit=1)
+    )[0]
+    assert fallback["preview_image_url"] == fallback["image_url"]
 
 
 async def test_service_bounds_joint_shortlist_and_returns_at_most_five() -> None:
@@ -263,6 +282,18 @@ async def test_warm_feedback_cache_avoids_a_second_store_call() -> None:
     assert store.feedback_score_calls == [INSTALL_ID]
 
 
+async def test_invalidating_feedback_reloads_only_the_feedback_signal() -> None:
+    service, store, gateway = service_with_templates("this-is-fine")
+    gateway.fail_joint = True
+
+    await service.get_suggestions("Prod is down", user_id=INSTALL_ID)
+    service.invalidate_feedback(INSTALL_ID)
+    # A new request shape avoids the intentionally retained suggestion-result cache.
+    await service.get_suggestions("The dashboard is red", user_id=INSTALL_ID)
+
+    assert store.feedback_score_calls == [INSTALL_ID, INSTALL_ID]
+
+
 async def test_feedback_cache_expires_and_refresh_bypasses_it() -> None:
     service, store, gateway = service_with_templates("this-is-fine")
     gateway.fail_joint = True
@@ -390,7 +421,7 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
     assert valid.status_code == 200
     suggestion = valid.json()["suggestions"][0]
     assert suggestion["name"] == "This Is Fine"
-    assert suggestion["tweet_context"]
+    assert "tweet_context" not in suggestion
     assert suggestion["feedback_context"]
     feedback_context = suggestion["feedback_context"]
     assert set(feedback_context).isdisjoint(
@@ -467,11 +498,9 @@ async def test_caption_route_returns_overlay_and_null_for_missing_meme(
     assert missing.json() == {"tailored_overlay": None}
 
 
-def test_safe_suggestion_logs_hash_sensitive_text() -> None:
+def test_safe_suggestion_logs_hash_cache_keys() -> None:
     assert safe_log_cache_key("tweet text").startswith("sha256:")
     assert "tweet text" not in safe_log_cache_key("tweet text")
-    assert safe_log_tweet_text("secret tweet", "redacted").startswith("[redacted:")
-    assert safe_log_tweet_text("  local   preview ", "preview") == "local preview"
 
 
 def test_local_ranker_meets_benchmark_retrieval_gates() -> None:

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request
 from memedrop_api.identity import InstallHeader, resolve_request_user_id
 from memedrop_api.repositories import BackendStore, UsageEventData
 from memedrop_api.schemas import UsageBatchRequest, UsageRequest
+from memedrop_api.services.suggestion_engine import SuggestionService
 
 router = APIRouter(prefix="/api/v1", tags=["usage"])
 
@@ -27,6 +28,8 @@ async def record_usage(
     user_id = await resolve_request_user_id(request, install_id)
     store: BackendStore = request.app.state.store
     await store.record_usage_batch(user_id=user_id, events=[usage_event_data(body)])
+    suggestion_service: SuggestionService = request.app.state.suggestion_service
+    suggestion_service.invalidate_feedback(user_id)
     return {"logged": True}
 
 
@@ -42,4 +45,6 @@ async def record_usage_batch(
         user_id=user_id,
         events=[usage_event_data(event) for event in body.events],
     )
+    suggestion_service: SuggestionService = request.app.state.suggestion_service
+    suggestion_service.invalidate_feedback(user_id)
     return {"logged": len(body.events)}

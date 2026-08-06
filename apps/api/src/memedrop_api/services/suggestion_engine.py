@@ -424,16 +424,19 @@ class SuggestionService:
                     "meme_id": candidate.meme_id,
                     "name": candidate.name,
                     "image_url": candidate.image_url,
+                    # The original remains the attachment asset. Catalog publishing may
+                    # provide a smaller card asset under ``thumbnail_path`` instead.
+                    "preview_image_url": candidate.system_tags.get("thumbnail_path")
+                    or candidate.image_url,
                     "tailored_overlay": build_overlay(candidate.template, candidate.name, regions),
                     "use_case_label": candidate_use_case_label(candidate),
                     "match_explanation": selection.reason
                     or candidate.template.caption_guidance.pattern,
                     "score": round(selection.score or 1 - index * 0.08, 3),
                     "source": "global",
-                    # Keep the complete analysis for the current response contract, but give
-                    # clients a separate object that is safe to persist as usage feedback.
+                    # This is deliberately the only analysis exposed to clients: it is
+                    # structured for usage feedback and contains no source post text.
                     "feedback_context": usage_feedback_context(context),
-                    "tweet_context": context.model_dump(),
                 }
             )
         self._write_cache(key, result)
@@ -538,6 +541,15 @@ class SuggestionService:
         self._feedback_scores.move_to_end(user_id)
         while len(self._feedback_scores) > FEEDBACK_SCORE_CACHE_MAX:
             self._feedback_scores.popitem(last=False)
+
+    def invalidate_feedback(self, user_id: UUID) -> None:
+        """Forget one user's derived feedback scores after a usage write.
+
+        Suggestion results intentionally retain their short response-cache lifetime;
+        this only makes the next cache miss reload the ranking signal without adding a
+        write or a read to the hot ``/suggest`` path.
+        """
+        self._feedback_scores.pop(user_id, None)
 
     async def _load_global_candidates(self) -> tuple[Candidate, ...]:
         if self._global_candidates is not None:
@@ -930,12 +942,3 @@ def safe_log_cache_key(value: str) -> str:
 
 def elapsed_ms(started: float) -> float:
     return (time.perf_counter() - started) * 1000
-
-
-def safe_log_tweet_text(value: str, mode: str) -> str:
-    if mode == "full":
-        return re.sub(r"\s+", " ", value.strip())
-    if mode == "preview":
-        normalized = re.sub(r"\s+", " ", value.strip())
-        return normalized if len(normalized) <= 180 else f"{normalized[:177]}..."
-    return f"[redacted:{hashlib.sha256(value.encode()).hexdigest()[:12]}]"

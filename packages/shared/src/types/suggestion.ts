@@ -65,7 +65,6 @@ export interface SuggestionResult {
   score: number;
   source: "user" | "global";
   feedback_context?: FeedbackContext;
-  tweet_context?: TweetContext;
 }
 
 export interface MemeTextOverlay {

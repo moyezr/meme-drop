@@ -6,6 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from memedrop_api.identity import DEV_USER_ID, resolve_install_identity
+from memedrop_api.services.suggestion_engine import SuggestionService
 from tests.conftest import INSTALL_ID, ApiHarness
 
 HEADERS = {"x-memedrop-install-id": str(INSTALL_ID)}
@@ -91,6 +92,31 @@ async def test_usage_batch_records_events_and_ensures_user_once(api_harness: Api
     assert response.json() == {"logged": 2}
     assert api_harness.store.ensured_users == [INSTALL_ID]
     assert [event["action"] for event in api_harness.store.usage_events] == ["shown", "clicked"]
+
+
+async def test_usage_writes_invalidate_only_the_users_feedback_cache(
+    api_harness: ApiHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    invalidated: list[UUID] = []
+
+    def record_invalidation(_: SuggestionService, user_id: UUID) -> None:
+        invalidated.append(user_id)
+
+    monkeypatch.setattr(SuggestionService, "invalidate_feedback", record_invalidation)
+
+    single = await api_harness.client.post(
+        "/api/v1/usage",
+        headers=HEADERS,
+        json={"meme_id": str(MEME_ID), "action": "shown", "tweet_context": {}},
+    )
+    batch = await api_harness.client.post(
+        "/api/v1/usage/batch",
+        headers=HEADERS,
+        json={"events": [{"meme_id": str(MEME_ID), "action": "clicked", "tweet_context": {}}]},
+    )
+
+    assert single.status_code == batch.status_code == 200
+    assert invalidated == [INSTALL_ID, INSTALL_ID]
 
 
 async def test_usage_batch_requires_between_one_and_fifty_events(api_harness: ApiHarness) -> None:
