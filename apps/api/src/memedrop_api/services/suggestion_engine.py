@@ -28,6 +28,8 @@ from memedrop_api.services.openrouter import SuggestionModelGateway, TemplateSel
 LOGGER = logging.getLogger("memedrop.suggestions")
 SUGGESTION_CACHE_TTL_SECONDS = 5 * 60
 SUGGESTION_CACHE_MAX = 200
+FEEDBACK_SCORE_CACHE_TTL_SECONDS = 60
+FEEDBACK_SCORE_CACHE_MAX = 500
 
 USAGE_FEEDBACK_CONTEXT_FIELDS = (
     "sentiment",
@@ -53,6 +55,49 @@ class Candidate:
     is_evergreen: bool
     template: MemeTemplate
     feedback_boost: float = 0.0
+
+
+@dataclass(frozen=True)
+class SuggestionTiming:
+    """Non-sensitive durations for the user-visible suggestion pipeline."""
+
+    candidate_load_ms: float = 0.0
+    local_rank_ms: float = 0.0
+    joint_model_ms: float = 0.0
+    response_assembly_ms: float = 0.0
+    joint_outcome: str = "fallback"
+    cache_hit: bool = False
+
+    @classmethod
+    def cached(cls) -> SuggestionTiming:
+        return cls(joint_outcome="cache", cache_hit=True)
+
+    def server_timing_header(self, total_ms: float) -> str:
+        """Serialize timings using the standard HTTP Server-Timing header."""
+
+        metrics = (
+            ("candidate-load", self.candidate_load_ms, None),
+            ("local-rank", self.local_rank_ms, None),
+            ("joint-model", self.joint_model_ms, self.joint_outcome),
+            ("response-assembly", self.response_assembly_ms, None),
+            ("total", total_ms, None),
+        )
+        values = [
+            f'{name};dur={max(0.0, duration):.1f}'
+            + (f';desc="{outcome}"' if outcome is not None else "")
+            for name, duration, outcome in metrics
+        ]
+        if self.cache_hit:
+            values.append('cache;desc="hit"')
+        return ", ".join(values)
+
+
+@dataclass(frozen=True)
+class SuggestionRun:
+    """Suggestions plus their per-request, aggregate timing breakdown."""
+
+    suggestions: list[dict[str, Any]]
+    timing: SuggestionTiming
 
 
 @dataclass(frozen=True)
@@ -139,12 +184,17 @@ class SuggestionService:
         # A request can arrive from both the content script and a retry before the first
         # response has populated ``cache``. Keep just one computation in flight per
         # user/request shape so those callers do not duplicate the model request.
-        self._inflight_suggestions: dict[str, asyncio.Task[list[dict[str, Any]]]] = {}
+        self._inflight_suggestions: dict[str, asyncio.Task[SuggestionRun]] = {}
         # Global templates change only through a controlled release. Cache the immutable base
         # candidates for this process, then apply each user's feedback on a fresh copy.
         self._global_candidates: tuple[Candidate, ...] | None = None
         self._global_lexical_index: LexicalCandidateIndex | None = None
         self._global_candidates_lock = asyncio.Lock()
+        # Feedback is user-specific but changes much less often than suggestions. Keep
+        # it in a small process-local LRU so a warm request does not add a database
+        # round trip; the short TTL bounds how long new feedback takes to influence rank.
+        self._feedback_scores: OrderedDict[UUID, tuple[float, dict[str, float]]] = OrderedDict()
+        self._feedback_score_inflight: dict[UUID, asyncio.Task[dict[str, float]]] = {}
 
     async def get_suggestions(
         self,
@@ -155,6 +205,24 @@ class SuggestionService:
         refresh: bool = False,
         cache_key: str | None = None,
     ) -> list[dict[str, Any]]:
+        run = await self.get_suggestion_run(
+            tweet_text,
+            user_id=user_id,
+            limit=limit,
+            refresh=refresh,
+            cache_key=cache_key,
+        )
+        return run.suggestions
+
+    async def get_suggestion_run(
+        self,
+        tweet_text: str,
+        *,
+        user_id: UUID,
+        limit: int | None = None,
+        refresh: bool = False,
+        cache_key: str | None = None,
+    ) -> SuggestionRun:
         normalized_limit = max(1, min(5, int(limit or 5)))
         key = suggestion_request_key(
             tweet_text,
@@ -163,7 +231,7 @@ class SuggestionService:
             cache_key=cache_key,
         )
         if not refresh and (cached := self._read_cache(key)) is not None:
-            return cached
+            return SuggestionRun(cached, SuggestionTiming.cached())
         # A refresh must never read a completed cache entry. It may, however, share a
         # still-running refresh with an identical request. Keep refresh work separate
         # from ordinary cache-miss work so a refresh always triggers fresh inference.
@@ -176,6 +244,7 @@ class SuggestionService:
                     user_id=user_id,
                     limit=normalized_limit,
                     key=key,
+                    refresh_feedback=refresh,
                 )
             )
             self._inflight_suggestions[flight_key] = task
@@ -187,7 +256,7 @@ class SuggestionService:
         return await asyncio.shield(task)
 
     def _clear_inflight_suggestion(
-        self, key: str, completed: asyncio.Task[list[dict[str, Any]]]
+        self, key: str, completed: asyncio.Task[SuggestionRun]
     ) -> None:
         if self._inflight_suggestions.get(key) is completed:
             self._inflight_suggestions.pop(key, None)
@@ -199,20 +268,31 @@ class SuggestionService:
         user_id: UUID,
         limit: int,
         key: str,
-    ) -> list[dict[str, Any]]:
+        refresh_feedback: bool,
+    ) -> SuggestionRun:
         started = time.perf_counter()
         context = heuristic_tweet_context(tweet_text)
-        candidates = await self._load_candidates(user_id)
+        candidate_load_started = time.perf_counter()
+        candidates = await self._load_candidates(user_id, refresh_feedback=refresh_feedback)
+        candidate_load_ms = elapsed_ms(candidate_load_started)
         if not candidates:
-            return []
+            return SuggestionRun(
+                [],
+                SuggestionTiming(
+                    candidate_load_ms=candidate_load_ms,
+                    joint_outcome="fallback",
+                ),
+            )
         # Rank every candidate locally, but bound model input independently from the number
         # returned to the user. This keeps inference cost fixed as the catalog grows.
+        local_rank_started = time.perf_counter()
         ranked = fallback_template_selections(
             tweet_text,
             candidates,
             min(12, len(candidates)),
             lexical_index=self._global_lexical_index,
         )
+        local_rank_ms = elapsed_ms(local_rank_started)
         fallback = ranked[:limit]
         by_template = {candidate.template.template_id: candidate for candidate in candidates}
         shortlist_templates = [
@@ -220,6 +300,8 @@ class SuggestionService:
             for selection in ranked
             if selection.template_id in by_template
         ]
+        joint_model_started = time.perf_counter()
+        joint_outcome = "model"
         try:
             model = await self.gateway.select_and_caption(tweet_text, shortlist_templates, limit)
         except Exception:
@@ -228,15 +310,20 @@ class SuggestionService:
             LOGGER.exception("Joint suggestion generation failed; using local ranking")
             model_selections: list[TemplateSelection] = []
             generated: dict[str, dict[str, str]] = {}
+            joint_outcome = "fallback"
         else:
             model_selections = model.selections
             generated = model.captions
+            if not model_selections:
+                joint_outcome = "fallback"
+        joint_model_ms = elapsed_ms(joint_model_started)
         selections = fill_selections(model_selections, fallback, limit)
         selected = [
             (by_template[selection.template_id], selection)
             for selection in selections
             if selection.template_id in by_template
         ]
+        response_assembly_started = time.perf_counter()
         result = []
         for index, (candidate, selection) in enumerate(selected):
             regions = clean_generated_regions(
@@ -262,16 +349,28 @@ class SuggestionService:
                 }
             )
         self._write_cache(key, result)
+        timing = SuggestionTiming(
+            candidate_load_ms=candidate_load_ms,
+            local_rank_ms=local_rank_ms,
+            joint_model_ms=joint_model_ms,
+            response_assembly_ms=elapsed_ms(response_assembly_started),
+            joint_outcome=joint_outcome,
+        )
         LOGGER.info(
             "suggestions generated",
             extra={
                 "cache_key": safe_log_cache_key(key),
                 "templates": len(candidates),
                 "returned": len(result),
-                "duration_ms": round((time.perf_counter() - started) * 1000),
+                "duration_ms": round(elapsed_ms(started)),
+                "candidate_load_ms": round(timing.candidate_load_ms),
+                "local_rank_ms": round(timing.local_rank_ms),
+                "joint_model_ms": round(timing.joint_model_ms),
+                "response_assembly_ms": round(timing.response_assembly_ms),
+                "joint_outcome": timing.joint_outcome,
             },
         )
-        return result
+        return SuggestionRun(result, timing)
 
     async def get_tailored_overlay(self, tweet_text: str, meme_id: UUID) -> dict[str, Any] | None:
         row = await self.store.get_global_meme(meme_id)
@@ -294,14 +393,63 @@ class SuggestionService:
             regions = build_fallback_caption_set(tweet_text, context, template) or {}
         return build_overlay(template, str(row["name"]), regions)
 
-    async def _load_candidates(self, user_id: UUID) -> list[Candidate]:
+    async def _load_candidates(
+        self, user_id: UUID, *, refresh_feedback: bool = False
+    ) -> list[Candidate]:
         base_candidates, feedback = await asyncio.gather(
-            self._load_global_candidates(), self.store.global_meme_feedback_scores(user_id)
+            self._load_global_candidates(),
+            self._load_feedback_scores(user_id, refresh=refresh_feedback),
         )
         return [
             replace(candidate, feedback_boost=feedback.get(candidate.meme_id, 0.0))
             for candidate in base_candidates
         ]
+
+    async def _load_feedback_scores(self, user_id: UUID, *, refresh: bool) -> dict[str, float]:
+        if not refresh and (cached := self._read_feedback_scores(user_id)) is not None:
+            return cached
+        task = self._feedback_score_inflight.get(user_id)
+        if task is None:
+            task = asyncio.create_task(self._fetch_feedback_scores(user_id))
+            self._feedback_score_inflight[user_id] = task
+            task.add_done_callback(
+                lambda completed: self._clear_feedback_score_inflight(user_id, completed)
+            )
+        return await asyncio.shield(task)
+
+    async def _fetch_feedback_scores(self, user_id: UUID) -> dict[str, float]:
+        scores = await self.store.global_meme_feedback_scores(user_id)
+        # Copy at the storage boundary. In particular, fake or adapter stores must
+        # not be able to mutate an already-cached user's score map after returning.
+        cached_scores = dict(scores)
+        self._write_feedback_scores(user_id, cached_scores)
+        return cached_scores
+
+    def _clear_feedback_score_inflight(
+        self, user_id: UUID, completed: asyncio.Task[dict[str, float]]
+    ) -> None:
+        if self._feedback_score_inflight.get(user_id) is completed:
+            self._feedback_score_inflight.pop(user_id, None)
+
+    def _read_feedback_scores(self, user_id: UUID) -> dict[str, float] | None:
+        entry = self._feedback_scores.get(user_id)
+        if entry is None:
+            return None
+        expires_at, scores = entry
+        if expires_at <= time.monotonic():
+            self._feedback_scores.pop(user_id, None)
+            return None
+        self._feedback_scores.move_to_end(user_id)
+        return scores
+
+    def _write_feedback_scores(self, user_id: UUID, scores: dict[str, float]) -> None:
+        self._feedback_scores[user_id] = (
+            time.monotonic() + FEEDBACK_SCORE_CACHE_TTL_SECONDS,
+            scores,
+        )
+        self._feedback_scores.move_to_end(user_id)
+        while len(self._feedback_scores) > FEEDBACK_SCORE_CACHE_MAX:
+            self._feedback_scores.popitem(last=False)
 
     async def _load_global_candidates(self) -> tuple[Candidate, ...]:
         if self._global_candidates is not None:
@@ -588,6 +736,10 @@ def suggestion_request_key(
 
 def safe_log_cache_key(value: str) -> str:
     return f"sha256:{hashlib.sha256(value.encode()).hexdigest()[:16]}"
+
+
+def elapsed_ms(started: float) -> float:
+    return (time.perf_counter() - started) * 1000
 
 
 def safe_log_tweet_text(value: str, mode: str) -> str:

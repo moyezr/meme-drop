@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+import memedrop_api.services.suggestion_engine as suggestion_engine
 from memedrop_api.config import Settings
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
@@ -250,6 +251,59 @@ async def test_service_loads_global_catalog_once_and_applies_feedback_per_user()
     assert store.feedback_score_calls == [INSTALL_ID, another_user]
 
 
+async def test_warm_feedback_cache_avoids_a_second_store_call() -> None:
+    service, store, gateway = service_with_templates("this-is-fine")
+    gateway.fail_joint = True
+
+    await service.get_suggestions("Prod is down", user_id=INSTALL_ID)
+    await service.get_suggestions("The dashboard is red", user_id=INSTALL_ID)
+
+    assert store.feedback_score_calls == [INSTALL_ID]
+
+
+async def test_feedback_cache_expires_and_refresh_bypasses_it() -> None:
+    service, store, gateway = service_with_templates("this-is-fine")
+    gateway.fail_joint = True
+
+    await service.get_suggestions("Prod is down", user_id=INSTALL_ID)
+    expires_at, scores = service._feedback_scores[INSTALL_ID]
+    service._feedback_scores[INSTALL_ID] = (expires_at - 120, scores)
+    await service.get_suggestions("The dashboard is red", user_id=INSTALL_ID)
+    await service.get_suggestions("Everything is on fire", user_id=INSTALL_ID, refresh=True)
+
+    assert store.feedback_score_calls == [INSTALL_ID, INSTALL_ID, INSTALL_ID]
+
+
+async def test_feedback_cache_singleflight_isolated_by_user_and_bounded(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    service, store, gateway = service_with_templates("this-is-fine")
+    gateway.fail_joint = True
+    original_feedback = store.global_meme_feedback_scores
+    feedback_started = asyncio.Event()
+    allow_feedback = asyncio.Event()
+
+    async def delayed_feedback(user_id: UUID) -> dict[str, float]:
+        feedback_started.set()
+        await allow_feedback.wait()
+        return await original_feedback(user_id)
+
+    store.global_meme_feedback_scores = delayed_feedback  # type: ignore[method-assign]
+    first = asyncio.create_task(service._load_feedback_scores(INSTALL_ID, refresh=False))
+    await feedback_started.wait()
+    second = asyncio.create_task(service._load_feedback_scores(INSTALL_ID, refresh=False))
+    other_user = uuid4()
+    third = asyncio.create_task(service._load_feedback_scores(other_user, refresh=False))
+    await asyncio.sleep(0)
+    allow_feedback.set()
+    await asyncio.gather(first, second, third)
+
+    assert store.feedback_score_calls.count(INSTALL_ID) == 1
+    assert store.feedback_score_calls.count(other_user) == 1
+
+    monkeypatch.setattr(suggestion_engine, "FEEDBACK_SCORE_CACHE_MAX", 2)
+    service._write_feedback_scores(uuid4(), {})
+    assert len(service._feedback_scores) == 2
+
+
 async def test_concurrent_cold_suggestions_share_one_global_catalog_load() -> None:
     service, store, _ = service_with_templates("this-is-fine")
     original_load = store.list_global_memes
@@ -360,6 +414,34 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
 
     assert feedback.status_code == 200
     assert feedback.json() == {"logged": 1}
+
+
+async def test_suggestion_route_exposes_non_sensitive_server_timing(
+    api_harness: ApiHarness,
+) -> None:
+    api_harness.store.memes = [global_meme("This Is Fine")]
+    request = {
+        "tweet_text": "Prod is down and everything is on fire",
+        "limit": 1,
+    }
+    headers = {"x-memedrop-install-id": str(INSTALL_ID)}
+
+    cold = await api_harness.client.post("/api/v1/suggest", headers=headers, json=request)
+    warm = await api_harness.client.post("/api/v1/suggest", headers=headers, json=request)
+
+    assert cold.status_code == warm.status_code == 200
+    assert cold.json() == warm.json()
+    timing = cold.headers["server-timing"]
+    for metric in (
+        "candidate-load;dur=",
+        "local-rank;dur=",
+        "joint-model;dur=",
+        "response-assembly;dur=",
+        "total;dur=",
+    ):
+        assert metric in timing
+    assert "Prod is down" not in timing
+    assert 'cache;desc="hit"' in warm.headers["server-timing"]
 
 
 async def test_caption_route_returns_overlay_and_null_for_missing_meme(

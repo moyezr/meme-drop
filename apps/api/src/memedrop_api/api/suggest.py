@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
@@ -22,20 +24,28 @@ async def suggest(
         require_install_id=request.app.state.settings.require_install_id,
     )
     service: SuggestionService = request.app.state.suggestion_service
+    started = time.perf_counter()
     try:
-        suggestions = await service.get_suggestions(
+        run = await service.get_suggestion_run(
             body.tweet_text,
             user_id=user_id,
             limit=body.limit,
             refresh=body.refresh,
             cache_key=body.cache_key,
         )
-        return {"suggestions": suggestions}
+        return JSONResponse(
+            content={"suggestions": run.suggestions},
+            headers={"Server-Timing": run.timing.server_timing_header(elapsed_ms(started))},
+        )
     except Exception:
         return JSONResponse(
             status_code=500,
             content={"error": "Failed to generate suggestions", "suggestions": []},
         )
+
+
+def elapsed_ms(started: float) -> float:
+    return (time.perf_counter() - started) * 1000
 
 
 @router.post("/suggest/caption", response_model=None)
