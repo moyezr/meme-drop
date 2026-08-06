@@ -84,10 +84,12 @@ request and cache identifiers are logged only as short hashes.
 
 Retrieval is catalog-owned rather than a generic embedding lookup. Each verified template declares
 joke shapes plus positive and anti-use hints. A prebuilt BM25 index scores positive and anti signals
-separately; the ranker combines those signals with context-derived structural and semantic cues,
-bounded feedback adjustment, and an evergreen preference. It retains only a small top-relevance pool
-with a heap, then softly diversifies joke shapes before the 12-template shortlist. This is `O(N log k)`
-for a bounded `k`, not a linear sort of the full catalog.
+separately; a domain-neutral mechanic classifier maps paired language concepts onto those reviewed
+joke shapes. New templates therefore inherit retrieval behavior from their metadata without adding
+template IDs to ranking code. The ranker combines those signals with structural cues, bounded
+feedback adjustment, and an evergreen preference. It retains only a small top-relevance pool with a
+heap, then softly diversifies joke shapes before the 12-template shortlist. This is `O(N log k)` for
+a bounded `k`, not a linear sort of the full catalog.
 
 The offline evaluator runs the production ranker against a synthetic catalog of 5,000 distinct
 templates and fails when warm p95 ranking exceeds 50ms. pgvector remains available for future
@@ -102,14 +104,19 @@ controlled production release step to backfill thumbnails for existing catalog r
 
 The suggestion response emits non-sensitive `Server-Timing` stages for candidate load, local rank,
 joint model/fallback, response assembly, and total duration. The extension additionally measures API
-response, first/all preview readiness, and all-originals ready-to-attach locally. These diagnostics
-contain durations and counts only, never post text, captions, URLs, or template IDs.
+response, first/all preview readiness, all-originals ready-to-attach, and aggregate media failures
+and settlement locally. Media fetches have a 2.5-second deadline and can be retried on attachment.
+These diagnostics contain durations and counts only, never post text, captions, URLs, or template
+IDs. Text-only extension cache keys are SHA-256 hashes, and request generations prevent an older
+same-post response from overwriting a refresh.
 
 ## Learning loop
 
-Suggestion responses contain structured `tweet_context`. The extension returns it with outcome
-events: shown, clicked, used, saved, and dismissed. PostgreSQL therefore retains enough contextual
-signal to evaluate template performance without relying on raw request logging.
+Suggestion responses contain a bounded, categorical `feedback_context`. The extension returns it
+with outcome events: shown, clicked, used, saved, and dismissed. Source-derived targets and keywords
+remain server-internal for captioning and are never persisted as feedback. PostgreSQL therefore
+retains enough aggregate context to evaluate template performance without raw post storage or
+request logging.
 
 Improvement should remain incremental and measurable:
 
