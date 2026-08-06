@@ -223,7 +223,18 @@ HUMOR_CONCEPT_WORDS: dict[str, frozenset[str]] = {
         {"workaround", "routine", "process", "protocol", "training", "teach", "instruct", "ritual"}
     ),
     "group_choice": frozenset(
-        {"committee", "meeting", "group", "team", "management", "picked", "selected", "chose"}
+        {
+            "committee",
+            "meeting",
+            "group",
+            "team",
+            "staff",
+            "management",
+            "picked",
+            "selected",
+            "chose",
+            "voted",
+        }
     ),
     "responsible": frozenset(
         {"sensible", "responsible", "reasonable", "wise", "proper", "should", "better"}
@@ -232,13 +243,40 @@ HUMOR_CONCEPT_WORDS: dict[str, frozenset[str]] = {
         {"impulse", "urge", "temptation", "tempted", "brain", "mind", "thought", "voice", "wants"}
     ),
     "intent": frozenset(
-        {"goal", "plan", "planned", "started", "begin", "went", "trying", "tried", "wanted"}
+        {
+            "goal",
+            "plan",
+            "planned",
+            "started",
+            "begin",
+            "began",
+            "opened",
+            "headed",
+            "went",
+            "trying",
+            "tried",
+            "wanted",
+        }
     ),
     "sudden": frozenset(
         {"instant", "instantly", "immediate", "immediately", "sudden", "suddenly", "moment"}
     ),
     "derailment": frozenset(
-        {"emergency", "interrupted", "interruption", "erupted", "launched", "derailed", "blocked"}
+        {
+            "emergency",
+            "interrupted",
+            "interruption",
+            "erupted",
+            "launched",
+            "derailed",
+            "blocked",
+            "burst",
+            "broke",
+            "breakdown",
+            "failed",
+            "leak",
+            "crashed",
+        }
     ),
     "casual_advice": frozenset({"just", "simply", "easy", "easily", "casual", "quickly"}),
     "constraint": frozenset(
@@ -267,6 +305,123 @@ HUMOR_CONCEPT_WORDS: dict[str, frozenset[str]] = {
             "perspective",
             "actually",
             "overreacting",
+        }
+    ),
+    "group_rejection": frozenset(
+        {"rejected", "refused", "vetoed", "voted", "dismissed", "declined", "down"}
+    ),
+    "rationale": frozenset(
+        {"because", "rationale", "reason", "supposedly", "apparently", "claims", "makes"}
+    ),
+    "confidence": frozenset(
+        {"announced", "told", "promised", "confident", "knew", "sure", "guaranteed", "shortcut"}
+    ),
+    "obstacle": frozenset(
+        {"locked", "blocked", "closed", "barrier", "obstacle", "failed", "unavailable", "dead-end"}
+    ),
+    "renaming": frozenset(
+        {"renamed", "rebrand", "rebranded", "replaced", "called", "name", "named", "label"}
+    ),
+    "unchanged": frozenset(
+        {"same", "still", "unchanged", "remains", "continued", "continues", "somehow", "old"}
+    ),
+    "witness": frozenset(
+        {"saw", "watched", "noticed", "knew", "witnessed", "only", "secret", "hidden", "truth"}
+    ),
+    "crowd": frozenset({"everyone", "crowd", "room", "audience", "others", "all"}),
+    "celebration": frozenset(
+        {"celebrated", "applauded", "praised", "cheered", "congratulated", "impressed", "amazed"}
+    ),
+    "collective": frozenset({"everyone", "both", "all", "each", "groups", "sides"}),
+    "agreement": frozenset(
+        {"agree", "agreed", "conclusion", "consensus", "united", "same", "shared"}
+    ),
+    "hazard": frozenset(
+        {
+            "danger",
+            "hazard",
+            "unsafe",
+            "risk",
+            "failure",
+            "failed",
+            "breakdown",
+            "warning",
+            "accident",
+            "emergency",
+            "crisis",
+            "delay",
+        }
+    ),
+    "positive_spin": frozenset(
+        {
+            "positive",
+            "opportunity",
+            "experience",
+            "growth",
+            "exciting",
+            "enjoy",
+            "benefit",
+            "feature",
+            "adventure",
+        }
+    ),
+    "accusation": frozenset(
+        {"blamed", "blaming", "accused", "suspected", "scapegoat", "fault", "culprit"}
+    ),
+    "evidence": frozenset(
+        {"evidence", "showed", "revealed", "found", "discovered", "footage", "records", "proof"}
+    ),
+    "efficiency": frozenset(
+        {
+            "efficient",
+            "efficiency",
+            "optimize",
+            "optimization",
+            "faster",
+            "speed",
+            "save",
+            "seconds",
+            "streamline",
+        }
+    ),
+    "compensation": frozenset(
+        {
+            "extra",
+            "emergency",
+            "injury",
+            "damage",
+            "recovery",
+            "compensate",
+            "medical",
+            "replacement",
+        }
+    ),
+    "learning_source": frozenset(
+        {
+            "tutorial",
+            "guide",
+            "video",
+            "online",
+            "self-taught",
+            "learned",
+            "watched",
+            "instructions",
+        }
+    ),
+    "physical_failure": frozenset(
+        {"collapsed", "fell", "slid", "broke", "cracked", "dropped", "failed", "snapped"}
+    ),
+    "prerequisite": frozenset(
+        {
+            "prerequisite",
+            "requires",
+            "required",
+            "need",
+            "must",
+            "available",
+            "depends",
+            "access",
+            "confirmed",
         }
     ),
 }
@@ -1115,6 +1270,58 @@ MECHANIC_SHAPE_BOOSTS: dict[str, tuple[tuple[str, float], ...]] = {
         ("forced optimism", 0.38),
         ("group bad judgment", 0.34),
     ),
+    "group_rejects_improvement": (
+        ("group bad judgment", 0.46),
+        ("confident bad solution", 0.42),
+        ("flawed plan", 0.36),
+    ),
+    "confidence_meets_obstacle": (
+        ("confidence before disaster", 0.46),
+        ("sudden realization", 0.42),
+        ("flawed plan", 0.38),
+    ),
+    "fancy_name_same_outcome": (
+        ("fake distinction", 0.46),
+        ("euphemistic rebrand", 0.46),
+        ("false label", 0.42),
+        ("luxury makeover", 0.34),
+    ),
+    "sole_witness_hidden_truth": (
+        ("private knowledge", 0.46),
+        ("social isolation", 0.46),
+        ("awkward observation", 0.40),
+        ("guilty reaction", 0.32),
+    ),
+    "cross_group_agreement": (
+        ("unlikely agreement", 0.46),
+        ("shared outcome", 0.46),
+    ),
+    "danger_reframed_positive": (
+        ("forced optimism", 0.46),
+        ("confident bad solution", 0.42),
+        ("group bad judgment", 0.34),
+    ),
+    "evidence_reveals_culprit": (
+        ("hidden cause reveal", 0.46),
+        ("fake identity", 0.46),
+        ("awkward observation", 0.38),
+    ),
+    "efficiency_creates_harm": (
+        ("confident bad solution", 0.46),
+        ("predictable consequence", 0.42),
+        ("group bad judgment", 0.34),
+    ),
+    "self_taught_confidence_fails": (
+        ("confidence before disaster", 0.46),
+        ("sudden realization", 0.42),
+        ("flawed plan", 0.38),
+    ),
+    "recursive_prerequisite": (
+        ("recursive hype", 0.48),
+        ("thing inside itself", 0.48),
+        ("hard constraint", 0.40),
+        ("overengineering", 0.36),
+    ),
 }
 
 
@@ -1129,6 +1336,11 @@ def infer_humor_mechanics(text: str) -> set[str]:
     # negation such as "no" is meaningful for a contradiction even though it is
     # intentionally omitted from BM25 documents.
     tokens = set(tokenize_sequence(text)) | set(re.findall(r"[a-z0-9][a-z0-9_'’-]*", text.lower()))
+    repeated_content = Counter(
+        token
+        for token in re.findall(r"[a-z0-9][a-z0-9_'’-]*", text.lower())
+        if len(token) >= 4 and token not in RETRIEVAL_STOP_WORDS
+    )
 
     def has(concept: str) -> bool:
         if tokens & HUMOR_CONCEPT_WORDS[concept]:
@@ -1172,6 +1384,26 @@ def infer_humor_mechanics(text: str) -> set[str]:
         mechanics.add("casual_advice_hides_constraint")
     if has("request") and has("reply") and has("dismissal"):
         mechanics.add("dismissive_rebuttal")
+    if has("group_choice") and has("group_rejection") and has("rationale"):
+        mechanics.add("group_rejects_improvement")
+    if has("confidence") and has("obstacle"):
+        mechanics.add("confidence_meets_obstacle")
+    if has("renaming") and has("unchanged"):
+        mechanics.add("fancy_name_same_outcome")
+    if has("witness") and has("crowd") and has("celebration"):
+        mechanics.add("sole_witness_hidden_truth")
+    if has("collective") and has("agreement"):
+        mechanics.add("cross_group_agreement")
+    if has("hazard") and has("positive_spin") and (has("claim") or has("renaming")):
+        mechanics.add("danger_reframed_positive")
+    if has("accusation") and has("evidence"):
+        mechanics.add("evidence_reveals_culprit")
+    if has("removal") and has("efficiency") and has("compensation"):
+        mechanics.add("efficiency_creates_harm")
+    if has("confidence") and has("learning_source") and has("sudden") and has("physical_failure"):
+        mechanics.add("self_taught_confidence_fails")
+    if has("prerequisite") and any(count >= 2 for count in repeated_content.values()):
+        mechanics.add("recursive_prerequisite")
     return mechanics
 
 

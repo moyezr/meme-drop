@@ -780,6 +780,62 @@ def test_local_ranker_infers_choice_conflict_and_rebuttal_mechanics_from_paraphr
     assert "dismissive_rebuttal" in dismissive_rebuttal
 
 
+def test_local_ranker_infers_failure_reveal_and_consensus_mechanics_from_paraphrases() -> None:
+    rejected_improvement = infer_humor_mechanics(
+        "The committee rejected installing a simple guard because risk makes work exciting."
+    )
+    obstacle_reveal = infer_humor_mechanics(
+        "I guaranteed this route was faster, then found the entrance locked."
+    )
+    renamed_status_quo = infer_humor_mechanics(
+        "The clinic replaced its old queue with Priority Journey, but patients still wait."
+    )
+    interrupted_errand = infer_humor_mechanics(
+        "I began sorting the archive; a moment later a pipe burst and interrupted everything."
+    )
+    sole_witness = infer_humor_mechanics(
+        "The audience cheered the prediction; only I noticed the hidden earpiece."
+    )
+    unlikely_consensus = infer_humor_mechanics(
+        "Both architects and musicians agreed that the notification sound was unbearable."
+    )
+
+    assert "group_rejects_improvement" in rejected_improvement
+    assert "confidence_meets_obstacle" in obstacle_reveal
+    assert "fancy_name_same_outcome" in renamed_status_quo
+    assert "goal_instantly_derailed" in interrupted_errand
+    assert "sole_witness_hidden_truth" in sole_witness
+    assert "cross_group_agreement" in unlikely_consensus
+
+
+def test_local_ranker_infers_spin_culprit_and_recursive_failure_from_paraphrases() -> None:
+    positive_spin = infer_humor_mechanics(
+        "They called the failed safety test a growth opportunity and told everyone to enjoy "
+        "the experience."
+    )
+    culprit_reveal = infer_humor_mechanics(
+        "The office blamed interns for the missing snacks until access records revealed the "
+        "director taking them."
+    )
+    harmful_efficiency = infer_humor_mechanics(
+        "To save time, the team removed backup checks and ordered extra replacement parts "
+        "for the damage."
+    )
+    failed_self_teaching = infer_humor_mechanics(
+        "I guaranteed the shelf would hold after watching a tutorial; immediately it collapsed."
+    )
+    recursive_access = infer_humor_mechanics(
+        "The dashboard requires approval to request approval, and approval needs a dashboard "
+        "request."
+    )
+
+    assert "danger_reframed_positive" in positive_spin
+    assert "evidence_reveals_culprit" in culprit_reveal
+    assert "efficiency_creates_harm" in harmful_efficiency
+    assert "self_taught_confidence_fails" in failed_self_teaching
+    assert "recursive_prerequisite" in recursive_access
+
+
 def test_tokenizer_exposes_hyphenated_concept_components() -> None:
     terms = tokenize_sequence("A premium-label rollout")
 
