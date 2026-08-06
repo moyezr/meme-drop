@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -45,6 +46,8 @@ class OpenRouterSuggestionGateway:
         self.client = client
         self._owns_client = client is None
         self._client_lock = asyncio.Lock()
+        self._joint_circuit_lock = asyncio.Lock()
+        self._joint_cooldown_until = 0.0
         self._closed = False
 
     async def close(self) -> None:
@@ -63,24 +66,28 @@ class OpenRouterSuggestionGateway:
     ) -> JointSuggestionResult:
         if not self.settings.openrouter_api_key or not templates:
             return JointSuggestionResult([], {})
+        if await self._joint_circuit_open():
+            return JointSuggestionResult([], {})
         prompt = build_joint_suggestion_prompt(tweet_text, templates, limit)
-        payload = await self._chat_json(
-            [
-                {
-                    "role": "system",
-                    "content": joint_suggestion_system_prompt(),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.55,
-            max_tokens=1800,
-            # This used to be two sequential calls. Keep the joint call within the existing
-            # selection budget rather than combining the two deadlines.
-            timeout_ms=min(
-                self.settings.template_selection_timeout_ms,
-                self.settings.caption_timeout_ms,
-            ),
-        )
+        try:
+            payload = await self._chat_json(
+                [
+                    {
+                        "role": "system",
+                        "content": joint_suggestion_system_prompt(),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.55,
+                max_tokens=1800,
+                # The joint request is on the user-visible critical path. Its total provider
+                # budget must stay independent of the legacy standalone caption endpoint.
+                timeout_ms=self.settings.joint_suggestion_timeout_ms,
+            )
+        except Exception:
+            await self._open_joint_circuit()
+            raise
+        await self._close_joint_circuit()
         valid = {template.template_id for template in templates}
         seen: set[str] = set()
         selections = []
@@ -107,6 +114,26 @@ class OpenRouterSuggestionGateway:
             if len(selections) >= limit:
                 break
         return JointSuggestionResult(selections, captions)
+
+    async def _joint_circuit_open(self) -> bool:
+        """Return whether joint inference should use its deterministic fallback.
+
+        State is local to a gateway process. That is intentional: a short cooldown prevents a
+        failing upstream from consuming every request's latency budget without turning a single
+        transient failure into a distributed coordination dependency.
+        """
+        async with self._joint_circuit_lock:
+            return time.monotonic() < self._joint_cooldown_until
+
+    async def _open_joint_circuit(self) -> None:
+        async with self._joint_circuit_lock:
+            self._joint_cooldown_until = time.monotonic() + (
+                self.settings.joint_suggestion_cooldown_ms / 1000
+            )
+
+    async def _close_joint_circuit(self) -> None:
+        async with self._joint_circuit_lock:
+            self._joint_cooldown_until = 0.0
 
     async def generate_captions(
         self, tweet_text: str, templates: list[MemeTemplate]

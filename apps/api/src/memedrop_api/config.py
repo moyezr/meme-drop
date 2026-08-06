@@ -100,6 +100,16 @@ class Settings(BaseSettings):
     caption_timeout_ms: int = Field(
         default=20_000, validation_alias="MEMEDROP_CAPTION_TIMEOUT_MS", gt=0
     )
+    joint_suggestion_timeout_ms: int = Field(
+        default=2_500,
+        validation_alias="MEMEDROP_JOINT_SUGGESTION_TIMEOUT_MS",
+        gt=0,
+    )
+    joint_suggestion_cooldown_ms: int = Field(
+        default=30_000,
+        validation_alias="MEMEDROP_JOINT_SUGGESTION_COOLDOWN_MS",
+        ge=0,
+    )
     contextual_caption_fallback: bool = Field(
         default=True,
         validation_alias="MEMEDROP_USE_CONTEXTUAL_CAPTION_FALLBACK",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
@@ -140,6 +140,56 @@ async def test_gateway_is_disabled_without_api_key() -> None:
 
     assert (await gateway.select_and_caption("tweet", [template], 1)).selections == []
     assert await gateway.generate_captions("tweet", [template]) == {}
+
+
+async def test_joint_suggestion_failure_opens_a_cooldown_and_skips_repeat_provider_calls() -> None:
+    template = MemeCatalog.load().verified_templates[0]
+    calls = 0
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503, request=request)
+
+    transport = httpx.MockTransport(respond)
+    configured = Settings(
+        database_url="postgresql://localhost/test",
+        openrouter_api_key="secret",
+        joint_suggestion_cooldown_ms=30_000,
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        gateway = OpenRouterSuggestionGateway(configured, client)
+        with pytest.raises(httpx.HTTPStatusError):
+            await gateway.select_and_caption("tweet", [template], 1)
+
+        assert (await gateway.select_and_caption("tweet", [template], 1)).selections == []
+
+    assert calls == 1
+
+
+def test_joint_suggestion_uses_a_short_dedicated_provider_budget() -> None:
+    configured = Settings(database_url="postgresql://localhost/test")
+
+    assert configured.joint_suggestion_timeout_ms == 2_500
+    assert configured.joint_suggestion_cooldown_ms == 30_000
+
+
+async def test_joint_suggestion_passes_its_dedicated_deadline_to_the_provider() -> None:
+    template = MemeCatalog.load().verified_templates[0]
+    configured = Settings(
+        database_url="postgresql://localhost/test",
+        openrouter_api_key="secret",
+        joint_suggestion_timeout_ms=1_234,
+    )
+    gateway = OpenRouterSuggestionGateway(configured)
+    chat_json = AsyncMock(return_value={"suggestions": []})
+    gateway._chat_json = chat_json  # type: ignore[method-assign]
+
+    await gateway.select_and_caption("tweet", [template], 1)
+
+    await_args = chat_json.await_args
+    assert await_args is not None
+    assert await_args.kwargs["timeout_ms"] == 1_234
 
 
 def test_openrouter_helpers_handle_fences_and_bad_scores() -> None:
