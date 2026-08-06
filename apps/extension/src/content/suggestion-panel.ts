@@ -23,7 +23,7 @@ interface Suggestion {
   score: number;
   source: "user" | "global";
   tweet_text?: string;
-  tweet_context?: Record<string, unknown>;
+  feedback_context?: Record<string, unknown>;
 }
 
 interface MemeTextOverlay {
@@ -1162,7 +1162,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
           meme_id: payload.memeId,
           action: "used",
           source: suggestion?.source || payload.source,
-          tweet_context: suggestion?.tweet_context || {},
+          feedback_context: suggestion?.feedback_context || {},
         },
       });
     }
@@ -1382,7 +1382,7 @@ export function hidePanel() {
           meme_id: s.meme_id,
           action: "dismissed",
           source: s.source,
-          tweet_context: s.tweet_context || {},
+          feedback_context: s.feedback_context || {},
         },
       });
     }
@@ -1407,7 +1407,7 @@ function logSuggestionUsage(
       meme_id: suggestion.meme_id,
       action,
       source: suggestion.source,
-      tweet_context: suggestion.tweet_context || {},
+      feedback_context: suggestion.feedback_context || {},
     },
   });
 }

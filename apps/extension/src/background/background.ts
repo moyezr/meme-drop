@@ -1,5 +1,10 @@
 import { API_BASE_URL, apiUrl } from "../shared/config";
 import { apiErrorFromResponse, withApiRequestHeaders } from "../shared/api";
+import {
+  UsageTelemetryQueue,
+  type UsageEvent,
+  type UsageEventInput,
+} from "./usage-telemetry";
 
 interface Suggestion {
   meme_id: string;
@@ -11,7 +16,7 @@ interface Suggestion {
   score: number;
   source: "user" | "global";
   tweet_text?: string;
-  tweet_context?: Record<string, unknown>;
+  feedback_context?: Record<string, unknown>;
   image_data_url?: string | null;
 }
 
@@ -55,6 +60,9 @@ const MEDIA_CACHE_MAX = 40;
 const suggestionCache = new Map<string, CacheEntry>();
 const suggestionInflight = new Map<string, Promise<Suggestion[]>>();
 const mediaDataUrlCache = new Map<string, string>();
+const usageTelemetry = new UsageTelemetryQueue({
+  sendBatch: postUsageBatch,
+});
 
 function normalizeTweetText(text: string): string {
   return text.trim().replace(/\s+/g, " ").toLowerCase();
@@ -157,9 +165,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "LOG_USAGE") {
-    logUsage(message.payload).catch((err) => {
-      console.error("[MemeDrop] Usage log error:", err);
-    });
+    usageTelemetry.enqueue(message.payload as UsageEventInput);
     return false;
   }
 
@@ -173,6 +179,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     return true;
   }
+});
+
+chrome.runtime.onSuspend.addListener(() => {
+  void usageTelemetry.flush();
 });
 
 async function fetchSuggestions(
@@ -289,17 +299,15 @@ async function fetchCaption(tweetText: string, memeId: string): Promise<MemeText
   return data.tailored_overlay ?? null;
 }
 
-async function logUsage(payload: {
-  meme_id: string;
-  action: string;
-  tweet_context: Record<string, unknown>;
-  source?: "user" | "global";
-}) {
-  await fetch(apiUrl("/api/v1/usage"), {
+async function postUsageBatch(events: UsageEvent[]): Promise<void> {
+  const response = await fetch(apiUrl("/api/v1/usage/batch"), {
     method: "POST",
     headers: await withApiRequestHeaders(),
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ events }),
   });
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response);
+  }
 }
 
 function toAbsoluteMediaUrl(imageUrl: string): string {
