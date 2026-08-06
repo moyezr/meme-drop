@@ -191,6 +191,166 @@
       "expected_memes": ["Squidward window", "Hide the Pain Harold", "Monkey Puppet"],
       "keywords": ["relax", "neighbors", "bass", "night"],
       "rejected_memes": [{ "name": "Oprah You Get A", "reason": "giveaway hype misses the annoyed observer dynamic" }]
+    },
+    {
+      "id": "school-detention-rebrand",
+      "category": "euphemistic rebrand",
+      "tweet": "The principal rebranded detention as Reflection Club; lanyards made it seem honorary for eighth graders.",
+      "expected_memes": ["Is This A Pigeon", "They're The Same Picture", "Tuxedo Winnie The Pooh"],
+      "keywords": ["principal", "detention", "lanyards"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a giveaway format misses the dishonest polish applied to an ordinary punishment" }]
+    },
+    {
+      "id": "wedding-payment-tags",
+      "category": "exploitative offer",
+      "tweet": "A photographer was offered a twelve-hour wedding for two Instagram tags and the chance to meet the bride's aunt.",
+      "expected_memes": ["Pawn Stars Best I Can Do", "Trade Offer", "Woman Yelling At Cat"],
+      "keywords": ["photographer", "wedding", "Instagram"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "celebration is the wrong emotional response to an insultingly one-sided offer" }]
+    },
+    {
+      "id": "school-pickup-gridlock",
+      "category": "calm amid mayhem",
+      "tweet": "The school pickup lane became six lanes of horns and minivans, while one parent calmly reapplied lip balm in the driver's seat.",
+      "expected_memes": ["This Is Fine", "Panik Kalm Panik", "Disaster Girl"],
+      "keywords": ["pickup", "minivans", "horns"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "mutual agreement has no connection to one person's surreal calm during a public mess" }]
+    },
+    {
+      "id": "market-bus-promise",
+      "category": "recurring broken promise",
+      "tweet": "For the fourth spring, city hall unveiled a poster for a farmers-market bus that will definitely arrive next year.",
+      "expected_memes": ["Bernie I Am Once Again Asking For Your Support", "Say The Line Bart", "Waiting Skeleton"],
+      "keywords": ["spring", "city hall", "farmers-market"],
+      "rejected_memes": [{ "name": "Laughing Leo", "reason": "an amused reaction softens a pattern that is funny because it keeps failing predictably" }]
+    },
+    {
+      "id": "football-referee-tribes",
+      "category": "mirror-image grievance",
+      "tweet": "Fans in blue and fans in red spend Sunday insisting the referee conspires only against them, then quote an identical replay.",
+      "expected_memes": ["Spider Man Triple", "They're The Same Picture", "Woman Yelling At Cat"],
+      "keywords": ["fans", "referee", "replay"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "a waiting reaction misses the symmetrical tribal complaint at the center of the post" }]
+    },
+    {
+      "id": "frozen-grape-charcuterie",
+      "category": "pretentious relabeling",
+      "tweet": "My cousin put frozen grapes in a cereal bowl, called it a charcuterie board, and charged everyone seven dollars.",
+      "expected_memes": ["Is This A Pigeon", "They're The Same Picture", "Tuxedo Winnie The Pooh"],
+      "keywords": ["cousin", "grapes", "charcuterie"],
+      "rejected_memes": [{ "name": "This Is Fine", "reason": "passive disaster coping is weaker than exposing a ridiculous fancy label" }]
+    },
+    {
+      "id": "book-club-scheduling",
+      "category": "abandoned coordination",
+      "tweet": "Our book club's chat has been nothing but 'which Thursday works?' since last autumn; nobody has opened chapter one.",
+      "expected_memes": ["Waiting Skeleton", "Sad Pablo Escobar", "They Don't Know"],
+      "keywords": ["book club", "Thursday", "chapter"],
+      "rejected_memes": [{ "name": "Trade Offer", "reason": "an exchange format does not capture a group project quietly fossilizing in public" }]
+    },
+    {
+      "id": "nutrition-podcast-corkboard",
+      "category": "elaborate suspicion",
+      "tweet": "Dad's new nutrition podcast has three listeners, a corkboard of arrows, and a theory involving the oat-milk lobby.",
+      "expected_memes": ["Charlie Conspiracy", "Futurama Fry", "Is This A Pigeon"],
+      "keywords": ["podcast", "corkboard", "oat-milk"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "a toast cannot express doubt about an increasingly elaborate homemade theory" }]
+    },
+    {
+      "id": "text-period-thesis",
+      "category": "overinterpretation",
+      "tweet": "A two-word text reply has become a forty-seven-slide investigation into what the final period meant.",
+      "expected_memes": ["Charlie Conspiracy", "Expanding Brain", "Futurama Fry"],
+      "keywords": ["text reply", "slides", "period"],
+      "rejected_memes": [{ "name": "This Is Fine", "reason": "calm disaster acceptance misses the spiral of reading cosmic meaning into punctuation" }]
+    },
+    {
+      "id": "airport-trail-mix",
+      "category": "grim travel tradeoff",
+      "tweet": "At the airport I can buy eighteen-dollar trail mix or sit beside a toddler rehearsing a siren impression for three hours.",
+      "expected_memes": ["Two Buttons", "UNO Draw 25 Cards", "Two Paths"],
+      "keywords": ["airport", "trail mix", "toddler"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "excessive generosity is the opposite of being trapped between two bad travel outcomes" }]
+    },
+    {
+      "id": "newsletter-blockchain-wellness",
+      "category": "recursive hype",
+      "tweet": "The neighborhood newsletter added a blockchain column, a wellness column, and then a blockchain-wellness column.",
+      "expected_memes": ["Yo Dawg Heard You", "Oprah You Get A", "Expanding Brain"],
+      "keywords": ["newsletter", "blockchain", "wellness"],
+      "rejected_memes": [{ "name": "Sad Pablo Escobar", "reason": "lonely waiting does not fit a joke about multiplying fashionable labels without restraint" }]
+    },
+    {
+      "id": "bakery-dawn-celebration",
+      "category": "forced optimism",
+      "tweet": "The bakery added a 4 a.m. shift, labeled it a growth adventure, and decorated the break room with balloons.",
+      "expected_memes": ["This Is Fine", "Hide the Pain Harold", "Panik Kalm Panik"],
+      "keywords": ["bakery", "shift", "balloons"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "genuine celebration ignores the comic gap between shiny language and an exhausting reality" }]
+    },
+    {
+      "id": "dog-plant-alibi",
+      "category": "guilty reaction",
+      "tweet": "The dog knocked over the fern, stared at the soil for two seconds, and then acted offended that anyone noticed.",
+      "expected_memes": ["Monkey Puppet", "Hide the Pain Harold", "Disaster Girl"],
+      "keywords": ["dog", "fern", "soil"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "agreement imagery misses the quick guilty glance and comically bad alibi" }]
+    },
+    {
+      "id": "driving-test-party",
+      "category": "small win celebration",
+      "tweet": "My roommate passed the driving test on the fifth attempt, so the kitchen has a cake and an aggressively loud victory playlist.",
+      "expected_memes": ["Leonardo Dicaprio Cheers", "Laughing Leo", "Epic Handshake"],
+      "keywords": ["roommate", "driving test", "cake"],
+      "rejected_memes": [{ "name": "Panik Kalm Panik", "reason": "a panic sequence contradicts the affectionate celebration of a long-awaited small win" }]
+    },
+    {
+      "id": "coffee-experience-markup",
+      "category": "luxury makeover",
+      "tweet": "The cafe turned drip coffee into a bean-forward sensory experience and added six dollars to the price.",
+      "expected_memes": ["They're The Same Picture", "Tuxedo Winnie The Pooh", "Is This A Pigeon"],
+      "keywords": ["cafe", "coffee", "price"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "a time-passing reaction does not target the fake sophistication used to justify a markup" }]
+    },
+    {
+      "id": "weekend-itinerary-pdf",
+      "category": "overengineered plan",
+      "tweet": "My friend said the weekend trip had two stops; the itinerary arrived as a PDF with maps, dress codes, and a contingency appendix.",
+      "expected_memes": ["Gru's Plan", "Expanding Brain", "Monkey Puppet"],
+      "keywords": ["weekend", "itinerary", "appendix"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a giveaway format misses one person quietly turning a casual outing into a bureaucracy" }]
+    },
+    {
+      "id": "museum-empty-plinth",
+      "category": "grandiose art defense",
+      "tweet": "The museum audio guide described an empty plinth as a bold invitation to contemplate absence, and the crowd nodded solemnly.",
+      "expected_memes": ["Absolute Cinema", "Tuxedo Winnie The Pooh", "Change My Mind"],
+      "keywords": ["museum", "plinth", "audio guide"],
+      "rejected_memes": [{ "name": "This Is Fine", "reason": "disaster coping misses the affectionate mockery of a very serious defense of nothing" }]
+    },
+    {
+      "id": "rent-poster-policy",
+      "category": "confident bad solution",
+      "tweet": "A mayoral candidate proposed fixing rent with a motivational poster about abundance and a QR code for good vibes.",
+      "expected_memes": ["Roll Safe Think About It", "Expanding Brain", "Surprised Pikachu"],
+      "keywords": ["mayoral", "rent", "QR code"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "a toast treats a flimsy solution as a success instead of exposing its confident absurdity" }]
+    },
+    {
+      "id": "dentist-crown-choice",
+      "category": "self-inflicted consequence",
+      "tweet": "My dentist explained that flossing takes ninety seconds, so I have selected the three-thousand-dollar crown with tremendous confidence.",
+      "expected_memes": ["UNO Draw 25 Cards", "Two Buttons", "Roll Safe Think About It"],
+      "keywords": ["dentist", "flossing", "crown"],
+      "rejected_memes": [{ "name": "Laughing Leo", "reason": "simple amusement misses the knowingly disastrous choice made to avoid a tiny inconvenience" }]
+    },
+    {
+      "id": "complaint-portal-rebrand",
+      "category": "corporate euphemism",
+      "tweet": "The apartment company relabeled its complaint inbox the Resident Delight Portal and changed nothing except the color of the button.",
+      "expected_memes": ["Is This A Pigeon", "They're The Same Picture", "Tuxedo Winnie The Pooh"],
+      "keywords": ["apartment", "complaint inbox", "button"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "waiting is incidental here; the joke is the grand name pasted onto the same neglected channel" }]
     }
   ]
 }

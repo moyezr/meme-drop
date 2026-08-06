@@ -80,7 +80,9 @@ the serverless runtime.
 
 The suggestion tests also run the offline benchmark at
 `tools/template-tools/evals/suggestion-benchmark.json`. They enforce a minimum relevance floor for the local
-ranker, which remains available when OpenRouter is not configured or temporarily fails.
+ranker, which remains available when OpenRouter is not configured or temporarily fails. The evaluator
+requires at least 70% top-1, 80% top-3, and 90% top-5 acceptable-family retrieval, while keeping
+rejected-family intrusion at or below 15%.
 
 ## Vercel
 

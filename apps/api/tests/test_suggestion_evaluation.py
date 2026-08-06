@@ -3,11 +3,16 @@ from __future__ import annotations
 from typing import cast
 
 from memedrop_api.suggestion_evaluation import (
+    DEFAULT_THRESHOLDS,
     CaseResult,
     EvaluationThresholds,
     build_report,
     percentile,
 )
+
+
+def test_default_thresholds_include_a_top_one_quality_floor() -> None:
+    assert DEFAULT_THRESHOLDS.top_1_floor == 0.70
 
 
 def case_result(
@@ -38,6 +43,7 @@ def test_report_calculates_retrieval_intrusion_and_latency_metrics() -> None:
             case_result("miss", None, latency_ms=0.4),
         ],
         thresholds=EvaluationThresholds(
+            top_1_floor=0.25,
             top_3_floor=0.5,
             top_5_floor=0.75,
             rejected_top_5_ceiling=0.25,
@@ -57,6 +63,8 @@ def test_report_calculates_retrieval_intrusion_and_latency_metrics() -> None:
     assert [miss["id"] for miss in misses] == ["top-5", "miss"]
     assert misses[0]["reason"] == "rejected family in top 5"
     assert misses[1]["reason"] == "no acceptable family in top 5"
+    gates = cast(dict[str, dict[str, object]], report["gates"])
+    assert gates["top_1_acceptable_rate"]["passed"] is True
 
 
 def test_report_fails_the_honest_retrieval_quality_gates() -> None:
@@ -72,6 +80,7 @@ def test_report_fails_the_honest_retrieval_quality_gates() -> None:
 
     assert report["passed"] is False
     gates = cast(dict[str, dict[str, object]], report["gates"])
+    assert gates["top_1_acceptable_rate"]["passed"] is False
     assert gates["top_3_acceptable_rate"]["passed"] is False
     assert gates["top_5_acceptable_rate"]["passed"] is False
     assert gates["rejected_family_intrusion_at_top_5_rate"]["passed"] is False

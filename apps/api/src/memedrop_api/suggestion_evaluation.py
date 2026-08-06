@@ -19,6 +19,7 @@ from typing import Any
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.suggestion_engine import Candidate, fallback_template_selections
 
+TOP_1_FLOOR = 0.70
 TOP_3_FLOOR = 0.80
 TOP_5_FLOOR = 0.90
 REJECTED_TOP_5_CEILING = 0.15
@@ -26,6 +27,7 @@ REJECTED_TOP_5_CEILING = 0.15
 
 @dataclass(frozen=True)
 class EvaluationThresholds:
+    top_1_floor: float = TOP_1_FLOOR
     top_3_floor: float = TOP_3_FLOOR
     top_5_floor: float = TOP_5_FLOOR
     rejected_top_5_ceiling: float = REJECTED_TOP_5_CEILING
@@ -163,6 +165,9 @@ def build_report(
         },
     }
     gates = {
+        "top_1_acceptable_rate": gate(
+            metrics["top_1_acceptable_rate"], ">=", thresholds.top_1_floor
+        ),
         "top_3_acceptable_rate": gate(
             metrics["top_3_acceptable_rate"], ">=", thresholds.top_3_floor
         ),
