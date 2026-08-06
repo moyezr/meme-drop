@@ -40,6 +40,7 @@ interface MemeTemplate {
   quality: ManifestQuality;
   regions: TextRegion[];
   caption_guidance: CaptionGuidance;
+  retrieval: RetrievalMetadata;
 }
 
 interface TextRegion {
@@ -68,15 +69,22 @@ interface CaptionGuidance {
   bad_examples: Array<Record<string, string>>;
 }
 
+interface RetrievalMetadata {
+  version: 1;
+  joke_shapes: string[];
+  positive_hints: string[];
+  anti_hints: string[];
+}
+
 interface ModelTemplateResponse {
   supports_overlay?: boolean;
   quality?: ManifestQuality;
   regions?: Partial<TextRegion>[];
   caption_guidance?: Partial<CaptionGuidance>;
+  retrieval?: Partial<RetrievalMetadata>;
 }
 
 const rootDir = path.resolve(import.meta.dirname, "..", "..", "..");
-const toolDir = path.join(rootDir, "tools", "template-tools");
 const defaultOutputPath = path.join(
   rootDir,
   "packages",
@@ -313,6 +321,15 @@ Also include caption_guidance:
 - good_examples: two examples keyed by region id
 - bad_examples: two examples keyed by region id
 
+Also include retrieval, which is used only to retrieve this template before
+captioning. It must describe the reusable joke grammar rather than details
+visible in this one image:
+- joke_shapes: 1 to 4 short normalized labels, for example "contrast" or
+  "forced_choice"
+- positive_hints: up to 8 short situations or language cues that fit this meme
+- anti_hints: up to 8 short situations where this meme would be misleading or
+  repetitive
+
 Return exactly this JSON shape:
 {
   "supports_overlay": true,
@@ -322,6 +339,11 @@ Return exactly this JSON shape:
     "pattern": "",
     "good_examples": [],
     "bad_examples": []
+  },
+  "retrieval": {
+    "joke_shapes": [],
+    "positive_hints": [],
+    "anti_hints": []
   }
 }`;
 }
@@ -355,6 +377,7 @@ function normalizeTemplate({
     quality: generated.quality === "verified" ? "draft" : generated.quality || "draft",
     regions,
     caption_guidance: normalizeCaptionGuidance(generated.caption_guidance, regions),
+    retrieval: normalizeRetrievalMetadata(generated.retrieval),
   };
 }
 
@@ -418,6 +441,31 @@ function normalizeCaptionGuidance(
   };
 }
 
+function normalizeRetrievalMetadata(
+  metadata: Partial<RetrievalMetadata> | undefined
+): RetrievalMetadata {
+  return {
+    version: 1,
+    joke_shapes: normalizeRetrievalValues(metadata?.joke_shapes, 4, 48),
+    positive_hints: normalizeRetrievalValues(metadata?.positive_hints, 8, 160),
+    anti_hints: normalizeRetrievalValues(metadata?.anti_hints, 8, 160),
+  };
+}
+
+function normalizeRetrievalValues(
+  values: string[] | undefined,
+  maxItems: number,
+  maxLength: number
+): string[] {
+  if (!Array.isArray(values)) return [];
+
+  const normalized = values
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim().replace(/\s+/g, " ").slice(0, maxLength))
+    .filter(Boolean);
+  return [...new Set(normalized)].slice(0, maxItems);
+}
+
 function normalizeExamples(
   examples: Array<Record<string, string>> | undefined,
   regions: TextRegion[]
@@ -476,6 +524,12 @@ function buildDryRunResponse(meme: MemeInput): ModelTemplateResponse {
       good_examples: [],
       bad_examples: [],
     },
+    retrieval: {
+      version: 1,
+      joke_shapes: [],
+      positive_hints: [],
+      anti_hints: [],
+    },
   };
 }
 
@@ -489,7 +543,14 @@ function toLocalImagePath(filePath: string): string {
 
 function resolveStoragePath(input: string): string {
   if (path.isAbsolute(input)) return input;
-  return path.resolve(toolDir, input);
+
+  // API-owned .env files conventionally use paths relative to apps/api (for
+  // example ./data/memes). Root-level config may instead use a workspace
+  // relative path such as ./apps/api/data/memes, so preserve both forms.
+  if (input === "data" || input.startsWith("data/") || input.startsWith("./data/")) {
+    return path.resolve(rootDir, "apps", "api", input);
+  }
+  return path.resolve(rootDir, input);
 }
 
 function getOpenRouterApiKey(): string | undefined {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-03T15:23:14.194Z",
+  "generated_at": "2026-08-06T20:15:52.924Z",
   "sources": {
     "curated": 45,
     "promoted": 4,
@@ -70,6 +70,23 @@
             "reject": "being normal about production",
             "approve": "making it about production"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "preference contrast",
+          "reject versus approve"
+        ],
+        "positive_hints": [
+          "reject one option prefer another",
+          "bad choice versus better choice",
+          "before and after preference"
+        ],
+        "anti_hints": [
+          "equally painful dilemma",
+          "quiet waiting",
+          "hidden identity reveal"
         ]
       }
     },
@@ -158,6 +175,25 @@
             "person": "person"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "forced choice",
+          "painful dilemma"
+        ],
+        "positive_hints": [
+          "choose between two bad options",
+          "impossible tradeoff",
+          "either choice has a cost",
+          "torn between alternatives",
+          "one option or another unpleasant option"
+        ],
+        "anti_hints": [
+          "single confident opinion",
+          "celebration",
+          "passive waiting"
+        ]
       }
     },
     {
@@ -245,6 +281,24 @@
             "girlfriend": "good thing"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "shiny object temptation",
+          "neglected responsibility"
+        ],
+        "positive_hints": [
+          "tempted by a new distraction",
+          "abandon the sensible option",
+          "chasing novelty instead of finishing",
+          "new trend pulls attention away"
+        ],
+        "anti_hints": [
+          "balanced dilemma",
+          "patient waiting",
+          "successful outcome"
+        ]
       }
     },
     {
@@ -289,6 +343,24 @@
           {
             "sign": "we should talk about the implications of this issue"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "confident hot take",
+          "provocative opinion"
+        ],
+        "positive_hints": [
+          "direct unpopular opinion",
+          "bold claim inviting disagreement",
+          "workplace hot take",
+          "confident thesis"
+        ],
+        "anti_hints": [
+          "uncertain suspicion",
+          "quiet embarrassment",
+          "long narrative sequence"
         ]
       }
     },
@@ -355,6 +427,24 @@
             "realization": "I have realized a thing",
             "answer": "yes that thing is true"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "hidden truth reveal",
+          "inevitable realization"
+        ],
+        "positive_hints": [
+          "discover it was true all along",
+          "the reality was always obvious",
+          "dark realization",
+          "nothing actually changed"
+        ],
+        "anti_hints": [
+          "new achievement",
+          "negotiation",
+          "forced choice"
         ]
       }
     },
@@ -451,6 +541,23 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "ominous promise",
+          "hope turning to dread"
+        ],
+        "positive_hints": [
+          "confident promise followed by worried clarification",
+          "silence reveals bad implication",
+          "hopeful question gets no reassurance"
+        ],
+        "anti_hints": [
+          "simple celebration",
+          "equal comparison",
+          "quiet observation"
+        ]
       }
     },
     {
@@ -512,6 +619,24 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "exploitative exchange",
+          "lopsided deal"
+        ],
+        "positive_hints": [
+          "one side receives value and the other gets scraps",
+          "unfair offer",
+          "bad compensation for a large request",
+          "terrible consolation"
+        ],
+        "anti_hints": [
+          "clean win",
+          "equal partnership",
+          "patient waiting"
+        ]
       }
     },
     {
@@ -553,6 +678,24 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "recurring request",
+          "tired repetition"
+        ],
+        "positive_hints": [
+          "asking for the same thing again",
+          "repeated promise or request",
+          "once again waiting for action",
+          "familiar appeal returns"
+        ],
+        "anti_hints": [
+          "one-time victory",
+          "secret suspicion",
+          "luxury makeover"
+        ]
       }
     },
     {
@@ -594,6 +737,25 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "confident bad solution",
+          "fake wisdom"
+        ],
+        "positive_hints": [
+          "clever sounding logic with an obvious flaw",
+          "solve a problem by denying it",
+          "smug shortcut creates consequences",
+          "confidently irrational plan",
+          "fix a serious problem with a slogan poster or superficial gimmick"
+        ],
+        "anti_hints": [
+          "genuine useful advice",
+          "earned celebration",
+          "balanced debate"
+        ]
       }
     },
     {
@@ -655,6 +817,23 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "bad impulse",
+          "internal temptation"
+        ],
+        "positive_hints": [
+          "responsible self versus chaotic impulse",
+          "temptation to make the selfish choice",
+          "inner voice recommends trouble"
+        ],
+        "anti_hints": [
+          "external argument",
+          "public celebration",
+          "waiting alone"
+        ]
       }
     },
     {
@@ -731,6 +910,23 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "panic reversal",
+          "escalating crisis"
+        ],
+        "positive_hints": [
+          "panic then relief then worse panic",
+          "temporary calm before new disaster",
+          "rapid emotional reversal during chaos"
+        ],
+        "anti_hints": [
+          "stable success",
+          "quiet loneliness",
+          "straight comparison"
+        ]
       }
     },
     {
@@ -826,6 +1022,26 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "flawed plan",
+          "overengineered sequence"
+        ],
+        "positive_hints": [
+          "multi-step plan reveals its own flaw",
+          "elaborate itinerary or process goes wrong",
+          "confident plan ends in realization",
+          "too many steps for a simple goal",
+          "simple outing becomes a detailed itinerary with maps rules and contingencies",
+          "hours of effort end with realizing a personal mistake"
+        ],
+        "anti_hints": [
+          "simple preference",
+          "clean success",
+          "unrelated argument"
+        ]
       }
     },
     {
@@ -927,6 +1143,26 @@
             "level_4": "normal boring ending"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "absurd escalation",
+          "overengineering"
+        ],
+        "positive_hints": [
+          "each idea gets more elaborate",
+          "simple task becomes absurd system",
+          "overthinking a tiny issue",
+          "escalating levels of sophistication",
+          "pile on more categories until the combined hybrid becomes absurd",
+          "complex problem receives a grand superficial solution"
+        ],
+        "anti_hints": [
+          "quiet waiting",
+          "ordinary achievement",
+          "two-sided argument"
+        ]
       }
     },
     {
@@ -994,6 +1230,26 @@
             "bottom_caption": "covers Harold's face"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "awkward suffering",
+          "forced composure"
+        ],
+        "positive_hints": [
+          "smiling through discomfort",
+          "quietly endure a self-own",
+          "pretend everything is fine while hurting",
+          "resigned embarrassment",
+          "spend hours before realizing your own mistake",
+          "calm face during surrounding noise and disorder"
+        ],
+        "anti_hints": [
+          "genuine excitement",
+          "loud confrontation",
+          "confident accusation"
+        ]
       }
     },
     {
@@ -1039,6 +1295,23 @@
           {
             "top_reaction_caption": "Tiny text placed over Pikachu's face or body"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "predictable consequence",
+          "obvious outcome"
+        ],
+        "positive_hints": [
+          "ignored warning produces expected result",
+          "bad choice followed by fake surprise",
+          "who could have predicted the consequence"
+        ],
+        "anti_hints": [
+          "unexpected good luck",
+          "patient waiting",
+          "careful decision"
         ]
       }
     },
@@ -1107,6 +1380,25 @@
             "bottom_reveal_caption": "unrelated joke"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "fake distinction",
+          "euphemistic rebrand"
+        ],
+        "positive_hints": [
+          "two labels describe the same thing",
+          "rebrand changes wording not reality",
+          "new name for an unchanged idea",
+          "supposed alternatives are identical",
+          "change presentation and price while the base product stays unchanged"
+        ],
+        "anti_hints": [
+          "genuine transformation",
+          "unfair offer",
+          "celebration"
+        ]
       }
     },
     {
@@ -1173,6 +1465,25 @@
             "top_caption": "This is definitely a butterfly",
             "bottom_caption": "beautiful window"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "false label",
+          "pretentious relabeling"
+        ],
+        "positive_hints": [
+          "call an ordinary thing an inflated title",
+          "misidentify something obvious",
+          "corporate euphemism",
+          "fancy label for a basic object",
+          "ordinary product called a premium sensory experience"
+        ],
+        "anti_hints": [
+          "correct definition",
+          "reciprocal agreement",
+          "quiet waiting"
         ]
       }
     },
@@ -1241,6 +1552,26 @@
             "right_reaction": "text over the eyes"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "guilty reaction",
+          "awkward self-own"
+        ],
+        "positive_hints": [
+          "act innocent after causing the problem",
+          "look away when noticed",
+          "embarrassed realization",
+          "caught and pretending not to see",
+          "realize your own mistake after hours of effort",
+          "overbuild a simple plan and act awkward about it"
+        ],
+        "anti_hints": [
+          "public victory",
+          "confident debate",
+          "long wait"
+        ]
       }
     },
     {
@@ -1307,6 +1638,23 @@
             "top_statement": "Random setup",
             "bottom_statement": "unrelated punchline"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "hard constraint",
+          "not that simple"
+        ],
+        "positive_hints": [
+          "simple request is actually difficult",
+          "cannot casually complete the task",
+          "obvious obstacle blocks an easy claim"
+        ],
+        "anti_hints": [
+          "easy success",
+          "luxury rebrand",
+          "guilty reaction"
         ]
       }
     },
@@ -1375,6 +1723,24 @@
             "top_reaction_caption": "Long explanation",
             "bottom_reaction_caption": "generic reaction"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "suspicious ambiguity",
+          "doubtful claim"
+        ],
+        "positive_hints": [
+          "not sure whether claim is true",
+          "something feels suspicious",
+          "question a convenient explanation",
+          "uncertain hidden motive"
+        ],
+        "anti_hints": [
+          "certain revelation",
+          "celebration",
+          "simple preference"
         ]
       }
     },
@@ -1464,6 +1830,24 @@
             "shared_agreement": "full sentence"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "unlikely agreement",
+          "shared outcome"
+        ],
+        "positive_hints": [
+          "different groups unite over one thing",
+          "unlikely allies share a belief",
+          "both sides agree",
+          "common victory"
+        ],
+        "anti_hints": [
+          "tribal accusation",
+          "lonely waiting",
+          "one-sided exploitation"
+        ]
       }
     },
     {
@@ -1531,6 +1915,25 @@
             "bottom_caption": "tiny low-contrast text in the flames"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "calm amid mayhem",
+          "forced optimism"
+        ],
+        "positive_hints": [
+          "remain calm while everything collapses",
+          "pretend disaster is acceptable",
+          "chaos surrounds an unbothered person",
+          "label a bad situation as positive growth",
+          "someone calmly sits amid horns crowds and surrounding disorder"
+        ],
+        "anti_hints": [
+          "clean success",
+          "active forced choice",
+          "sincere tragedy"
+        ]
       }
     },
     {
@@ -1597,6 +2000,23 @@
             "woman_yelling": "tiny label",
             "cat_response": "paragraph that will not fit"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "dramatic confrontation",
+          "absurd rebuttal"
+        ],
+        "positive_hints": [
+          "angry complaint meets calm absurd response",
+          "two sides shout past each other",
+          "heated accusation and dismissive answer"
+        ],
+        "anti_hints": [
+          "quiet agreement",
+          "solitary waiting",
+          "clean celebration"
         ]
       }
     },
@@ -1683,6 +2103,25 @@
             "bottom_right_caption": "text on the man's head"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "abandoned waiting",
+          "lonely delay"
+        ],
+        "positive_hints": [
+          "left alone waiting for a response",
+          "coordination never happens",
+          "silence stretches for months",
+          "everyone else has disappeared",
+          "group chat scheduling is abandoned and nobody participates"
+        ],
+        "anti_hints": [
+          "fast action",
+          "crowded celebration",
+          "confident solution"
+        ]
       }
     },
     {
@@ -1749,6 +2188,24 @@
             "top_caption": "full explanation",
             "bottom_caption": "tiny unreadable text"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "smug amusement",
+          "watching a mistake"
+        ],
+        "positive_hints": [
+          "laugh at an obvious mistake",
+          "recognize an overconfident plan",
+          "amused reaction",
+          "victory with smug energy"
+        ],
+        "anti_hints": [
+          "sad abandonment",
+          "serious harm",
+          "uncertain suspicion"
         ]
       }
     },
@@ -1817,6 +2274,23 @@
             "bottom_caption": "tiny text over the eyes"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "awkward observation",
+          "consequence watching"
+        ],
+        "positive_hints": [
+          "peek at a self-own unfolding",
+          "watch suspicious consequences arrive",
+          "awkward reveal from the sidelines"
+        ],
+        "anti_hints": [
+          "direct argument",
+          "large celebration",
+          "formal negotiation"
+        ]
       }
     },
     {
@@ -1883,6 +2357,24 @@
             "top_caption": "long sentence covering his face",
             "bottom_caption": "tiny text over the glass"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "small win celebration",
+          "earned relief"
+        ],
+        "positive_hints": [
+          "celebrate a rare concrete success",
+          "raise a glass to finally winning",
+          "milestone after repeated attempts",
+          "victory feels unusually important"
+        ],
+        "anti_hints": [
+          "ongoing crisis",
+          "failure disguised as growth",
+          "lonely waiting"
         ]
       }
     },
@@ -1951,6 +2443,25 @@
             "bottom_reveal": "tiny caption in the crowd"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "everyone gets one",
+          "feature proliferation"
+        ],
+        "positive_hints": [
+          "give the same thing to every person",
+          "every page receives another feature",
+          "indiscriminate giveaway",
+          "repeat the addition everywhere",
+          "same addition repeated across every category"
+        ],
+        "anti_hints": [
+          "exclusive choice",
+          "single lowball offer",
+          "abandoned coordination"
+        ]
       }
     },
     {
@@ -2017,6 +2528,24 @@
             "left_speaker": "full backstory paragraph",
             "right_reaction": "unrelated reply"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "lowball offer",
+          "exploitative bargain"
+        ],
+        "positive_hints": [
+          "huge request gets tiny compensation",
+          "absurdly cheap counteroffer",
+          "offered exposure instead of payment",
+          "buyer undervalues the work"
+        ],
+        "anti_hints": [
+          "generous reward",
+          "mutual celebration",
+          "waiting in silence"
         ]
       }
     },
@@ -2106,6 +2635,24 @@
             "bart_prompt": "tiny caption over faces"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "recurring broken promise",
+          "predictable refrain"
+        ],
+        "positive_hints": [
+          "same familiar line appears again",
+          "everyone expects the repeated claim",
+          "promise returns every year",
+          "audience waits for the catchphrase"
+        ],
+        "anti_hints": [
+          "novel discovery",
+          "private guilt",
+          "successful completion"
+        ]
       }
     },
     {
@@ -2173,6 +2720,25 @@
             "top_reaction": "long text over Pooh's face",
             "bottom_reaction": "unrelated label"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "luxury makeover",
+          "pretentious upgrade"
+        ],
+        "positive_hints": [
+          "ordinary thing gets a fancy presentation",
+          "plain option versus inflated premium version",
+          "charge more after renaming it sophisticated",
+          "make basic idea sound luxurious",
+          "turn a basic product into a premium sensory experience with a higher price"
+        ],
+        "anti_hints": [
+          "unchanged identical labels",
+          "serious crisis",
+          "patient waiting"
         ]
       }
     },
@@ -2261,6 +2827,24 @@
             "decision_caption": "long sentence that covers the path"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "safe versus chaotic path",
+          "bad direction"
+        ],
+        "positive_hints": [
+          "choose the reckless route over the sensible one",
+          "fork between safe and chaotic options",
+          "person actively picks trouble",
+          "take one route or a worse alternative"
+        ],
+        "anti_hints": [
+          "equal painful dilemma",
+          "quiet reveal",
+          "celebration"
+        ]
       }
     },
     {
@@ -2346,6 +2930,25 @@
             "right_player_reaction": "text over face"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "stubborn refusal",
+          "self-inflicted consequence"
+        ],
+        "positive_hints": [
+          "accept a ridiculous penalty instead of simple action",
+          "choose costly consequence with confidence",
+          "refuse the obvious rule",
+          "would rather suffer than comply",
+          "do a simple action or accept an expensive consequence"
+        ],
+        "anti_hints": [
+          "accidental misfortune",
+          "clean victory",
+          "equal collaboration"
+        ]
       }
     },
     {
@@ -2412,6 +3015,25 @@
             "top_caption": "text over skull",
             "bottom_caption": "paragraph covering skeleton"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "extreme waiting",
+          "endless delay"
+        ],
+        "positive_hints": [
+          "wait so long it becomes the joke",
+          "still waiting after seasons pass",
+          "promise never arrives",
+          "coordination remains unresolved",
+          "which day works scheduling chat repeats for months"
+        ],
+        "anti_hints": [
+          "immediate result",
+          "energetic argument",
+          "celebration"
         ]
       }
     },
@@ -2480,6 +3102,25 @@
             "bottom_punchline": "no recursive twist"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "recursive hype",
+          "thing inside itself"
+        ],
+        "positive_hints": [
+          "put the same feature inside itself",
+          "combine two trends into a recursive version",
+          "nested product bloat",
+          "meta repetition",
+          "repeat the same word and combine it into a hybrid category"
+        ],
+        "anti_hints": [
+          "single simple feature",
+          "long abandonment",
+          "forced dilemma"
+        ]
       }
     },
     {
@@ -2546,6 +3187,23 @@
             "top_speech_bubble": "long paragraph in the bubble",
             "middle_speech_bubble": "text outside bubble"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "confidence before disaster",
+          "sudden realization"
+        ],
+        "positive_hints": [
+          "confident statement followed by bad realization",
+          "conversation turns ominous",
+          "about to discover the plan fails"
+        ],
+        "anti_hints": [
+          "extended waiting",
+          "shared agreement",
+          "luxury relabeling"
         ]
       }
     },
@@ -2631,6 +3289,23 @@
             "masked_identity": "long sentence that will not fit",
             "revealed_identity": "same thing repeated"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "hidden cause reveal",
+          "fake identity"
+        ],
+        "positive_hints": [
+          "remove the disguise to expose real cause",
+          "supposed new thing is old problem underneath",
+          "unmask the culprit"
+        ],
+        "anti_hints": [
+          "open celebration",
+          "balanced choice",
+          "simple request"
         ]
       }
     },
@@ -2737,6 +3412,23 @@
             "bottom_target": "detailed economics lecture"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "goal blocked by chaos",
+          "pulled away"
+        ],
+        "positive_hints": [
+          "simple goal dragged away by obstacle",
+          "responsibility loses to outside chaos",
+          "reaching for something while blocker intervenes"
+        ],
+        "anti_hints": [
+          "completed success",
+          "stationary waiting",
+          "direct opinion"
+        ]
       }
     },
     {
@@ -2803,6 +3495,24 @@
             "top_left_reaction": "tiny corner caption",
             "scroll_text": "unrelated word"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "uncomfortable truth",
+          "truth rejection"
+        ],
+        "positive_hints": [
+          "search for truth then reject blunt answer",
+          "real cause is disappointing",
+          "honest explanation nobody wants",
+          "unwelcome fact"
+        ],
+        "anti_hints": [
+          "pleasant surprise",
+          "marketing celebration",
+          "uncertain rumor"
         ]
       }
     },
@@ -2872,6 +3582,23 @@
             "cheems_label": "tiny face label"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "past versus present",
+          "strong versus weak"
+        ],
+        "positive_hints": [
+          "ideal powerful version compared with anxious weak version",
+          "then versus now decline",
+          "expectation compared with diminished reality"
+        ],
+        "anti_hints": [
+          "equal alternatives",
+          "hidden identity",
+          "one-time victory"
+        ]
       }
     },
     {
@@ -2938,6 +3665,23 @@
             "setup": "bird biology paragraph",
             "reaction": "no escalation"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "sudden overreaction",
+          "loud escalation"
+        ],
+        "positive_hints": [
+          "calm setup followed by yelling",
+          "tiny issue causes dramatic scream",
+          "reaction becomes disproportionately loud"
+        ],
+        "anti_hints": [
+          "quiet endurance",
+          "patient waiting",
+          "subtle suspicion"
         ]
       }
     },
@@ -3023,6 +3767,23 @@
             "top_left_observer": "long backstory paragraph",
             "bottom_left_pair": "text over faces"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "private knowledge",
+          "social isolation"
+        ],
+        "positive_hints": [
+          "one person knows awkward truth while room acts normal",
+          "secret fact separates observer from crowd",
+          "quiet internal realization at a gathering"
+        ],
+        "anti_hints": [
+          "public confrontation",
+          "everyone agrees",
+          "obvious giveaway"
         ]
       }
     },
@@ -3112,6 +3873,24 @@
             "top_right_counterclaim": "happy birthday"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "elaborate suspicion",
+          "overinterpretation"
+        ],
+        "positive_hints": [
+          "build a sprawling theory from tiny clues",
+          "corkboard of arrows and hidden connections",
+          "overanalyze a short message",
+          "frantic investigation"
+        ],
+        "anti_hints": [
+          "simple proven fact",
+          "earned celebration",
+          "calm acceptance"
+        ]
       }
     },
     {
@@ -3188,6 +3967,23 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "reasonable idea rejected",
+          "group bad judgment"
+        ],
+        "positive_hints": [
+          "group accepts bad ideas and punishes sensible suggestion",
+          "meeting ignores obvious solution",
+          "organization chooses nonsense"
+        ],
+        "anti_hints": [
+          "individual private guilt",
+          "patient waiting",
+          "successful agreement"
+        ]
       }
     },
     {
@@ -3226,6 +4022,23 @@
           }
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "mocking repetition",
+          "ridicule bad take"
+        ],
+        "positive_hints": [
+          "repeat a statement in sarcastic voice",
+          "mock an annoying claim",
+          "parody the exact words"
+        ],
+        "anti_hints": [
+          "sincere support",
+          "quiet sadness",
+          "complex plan"
+        ]
       }
     },
     {
@@ -3323,6 +4136,24 @@
             "bottom_center_punchline": "A LONG ESSAY EXPLAINING WHY THE ARTWORK HAS DEEP HISTORICAL VALUE"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "grandiose art defense",
+          "pretentious over-explanation"
+        ],
+        "positive_hints": [
+          "describe low effort work as profound art",
+          "grand analysis of something obviously basic",
+          "crowd solemnly praises empty or silly artwork",
+          "inflated cultural critique"
+        ],
+        "anti_hints": [
+          "real emergency",
+          "simple practical choice",
+          "lonely waiting"
+        ]
       }
     },
     {
@@ -3397,6 +4228,23 @@
           {
             "bottom_caption": "A LONG APOLOGY EXPLAINING EVERY DETAIL"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "smug chaos",
+          "guilty destruction"
+        ],
+        "positive_hints": [
+          "small reckless action causes mayhem",
+          "quietly proud while damage unfolds",
+          "culprit looks unbothered near chaos"
+        ],
+        "anti_hints": [
+          "sincere tragedy",
+          "clean win",
+          "careful prevention"
         ]
       }
     },
@@ -3494,6 +4342,24 @@
             "right_spider_man": "A LONG SENTENCE THAT TURNS THE MEME INTO AN ESSAY"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "mirror-image grievance",
+          "tribal hypocrisy"
+        ],
+        "positive_hints": [
+          "nearly identical sides accuse each other",
+          "rival groups make the same complaint",
+          "everyone points blame in a circular argument",
+          "mutual hypocrisy"
+        ],
+        "anti_hints": [
+          "one-sided abuse",
+          "lonely waiting",
+          "shared celebration"
+        ]
       }
     },
     {
@@ -3568,6 +4434,24 @@
           {
             "right_window_caption": "A LONG PARAGRAPH ABOUT NOISE RULES AND TENANT POLICY"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "annoyed observer",
+          "excluded from nearby fun"
+        ],
+        "positive_hints": [
+          "watch noisy people nearby with resentment",
+          "stuck observing neighbors create chaos",
+          "outsider watches others have fun",
+          "annoyed by repeated noise"
+        ],
+        "anti_hints": [
+          "active participant",
+          "major success",
+          "formal negotiation"
         ]
       }
     },
@@ -3666,6 +4550,24 @@
             "bottom_center_punchline": "A LONG ESSAY EXPLAINING WHY THE ARTWORK HAS DEEP HISTORICAL VALUE"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "grandiose art defense",
+          "pretentious over-explanation"
+        ],
+        "positive_hints": [
+          "describe low effort work as profound art",
+          "grand analysis of something obviously basic",
+          "crowd solemnly praises empty or silly artwork",
+          "inflated cultural critique"
+        ],
+        "anti_hints": [
+          "real emergency",
+          "simple practical choice",
+          "lonely waiting"
+        ]
       }
     },
     {
@@ -3742,6 +4644,24 @@
             "top_caption": "TEXT PLACED OVER THE EARTH",
             "bottom_caption": "TEXT PLACED OVER THE ASTRONAUTS"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "hidden truth reveal",
+          "inevitable realization"
+        ],
+        "positive_hints": [
+          "discover it was true all along",
+          "the reality was always obvious",
+          "dark realization",
+          "nothing actually changed"
+        ],
+        "anti_hints": [
+          "new achievement",
+          "negotiation",
+          "forced choice"
         ]
       }
     },
@@ -3873,6 +4793,12 @@
             "chaos_action": "Tiny caption placed over the moving arm and face"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -3984,6 +4910,23 @@
             "bottom_left_escalation": "Tiny caption placed directly over Anakin's eyes"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "ominous promise",
+          "hope turning to dread"
+        ],
+        "positive_hints": [
+          "confident promise followed by worried clarification",
+          "silence reveals bad implication",
+          "hopeful question gets no reassurance"
+        ],
+        "anti_hints": [
+          "simple celebration",
+          "equal comparison",
+          "quiet observation"
+        ]
       }
     },
     {
@@ -4084,6 +5027,12 @@
             "bottom_center_caption": "Putting the punchline over Batman's face"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -4156,6 +5105,24 @@
           {
             "bottom_caption": "Tiny text placed over Bernie’s face and glasses"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "recurring request",
+          "tired repetition"
+        ],
+        "positive_hints": [
+          "asking for the same thing again",
+          "repeated promise or request",
+          "once again waiting for action",
+          "familiar appeal returns"
+        ],
+        "anti_hints": [
+          "one-time victory",
+          "secret suspicion",
+          "luxury makeover"
         ]
       }
     },
@@ -4306,6 +5273,23 @@
             "bottom_top_left_caption": "A full paragraph of setup text that belongs in the top panel instead of the reaction inset."
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "reasonable idea rejected",
+          "group bad judgment"
+        ],
+        "positive_hints": [
+          "group accepts bad ideas and punishes sensible suggestion",
+          "meeting ignores obvious solution",
+          "organization chooses nonsense"
+        ],
+        "anti_hints": [
+          "individual private guilt",
+          "patient waiting",
+          "successful agreement"
+        ]
       }
     },
     {
@@ -4379,6 +5363,23 @@
             "cheems_label": "Tiny caption placed over the face or on the body"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "past versus present",
+          "strong versus weak"
+        ],
+        "positive_hints": [
+          "ideal powerful version compared with anxious weak version",
+          "then versus now decline",
+          "expectation compared with diminished reality"
+        ],
+        "anti_hints": [
+          "equal alternatives",
+          "hidden identity",
+          "one-time victory"
+        ]
       }
     },
     {
@@ -4451,6 +5452,24 @@
           {
             "top_caption": "This is the funniest thing ever and here's the entire setup"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "confident hot take",
+          "provocative opinion"
+        ],
+        "positive_hints": [
+          "direct unpopular opinion",
+          "bold claim inviting disagreement",
+          "workplace hot take",
+          "confident thesis"
+        ],
+        "anti_hints": [
+          "uncertain suspicion",
+          "quiet embarrassment",
+          "long narrative sequence"
         ]
       }
     },
@@ -4544,6 +5563,24 @@
             "top_left_claim": "A very long sentence that keeps going and going past the safe box and becomes unreadable"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "elaborate suspicion",
+          "overinterpretation"
+        ],
+        "positive_hints": [
+          "build a sprawling theory from tiny clues",
+          "corkboard of arrows and hidden connections",
+          "overanalyze a short message",
+          "frantic investigation"
+        ],
+        "anti_hints": [
+          "simple proven fact",
+          "earned celebration",
+          "calm acceptance"
+        ]
       }
     },
     {
@@ -4617,6 +5654,12 @@
             "bottom_caption": "Use a long paragraph that fills the whole image"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -4691,6 +5734,23 @@
           {
             "bottom_caption": "A LONG APOLOGY EXPLAINING EVERY DETAIL"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "smug chaos",
+          "guilty destruction"
+        ],
+        "positive_hints": [
+          "small reckless action causes mayhem",
+          "quietly proud while damage unfolds",
+          "culprit looks unbothered near chaos"
+        ],
+        "anti_hints": [
+          "sincere tragedy",
+          "clean win",
+          "careful prevention"
         ]
       }
     },
@@ -4784,6 +5844,24 @@
             "girlfriend": "Text placed over the face or body"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "shiny object temptation",
+          "neglected responsibility"
+        ],
+        "positive_hints": [
+          "tempted by a new distraction",
+          "abandon the sensible option",
+          "chasing novelty instead of finishing",
+          "new trend pulls attention away"
+        ],
+        "anti_hints": [
+          "balanced dilemma",
+          "patient waiting",
+          "successful outcome"
+        ]
       }
     },
     {
@@ -4860,6 +5938,23 @@
             "reject": "A very long sentence that will not fit in the box",
             "approve": "Another overly long sentence that breaks the layout"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "preference contrast",
+          "reject versus approve"
+        ],
+        "positive_hints": [
+          "reject one option prefer another",
+          "bad choice versus better choice",
+          "before and after preference"
+        ],
+        "anti_hints": [
+          "equally painful dilemma",
+          "quiet waiting",
+          "hidden identity reveal"
         ]
       }
     },
@@ -4953,6 +6048,24 @@
             "shared_agreement": "Something extremely specific that needs three lines and blocks the handshake"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "unlikely agreement",
+          "shared outcome"
+        ],
+        "positive_hints": [
+          "different groups unite over one thing",
+          "unlikely allies share a belief",
+          "both sides agree",
+          "common victory"
+        ],
+        "anti_hints": [
+          "tribal accusation",
+          "lonely waiting",
+          "one-sided exploitation"
+        ]
       }
     },
     {
@@ -5025,6 +6138,23 @@
           {
             "evil_kermit": "A neutral label with no contrast or temptation"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "bad impulse",
+          "internal temptation"
+        ],
+        "positive_hints": [
+          "responsible self versus chaotic impulse",
+          "temptation to make the selfish choice",
+          "inner voice recommends trouble"
+        ],
+        "anti_hints": [
+          "external argument",
+          "public celebration",
+          "waiting alone"
         ]
       }
     },
@@ -5137,6 +6267,26 @@
             "level_4": "A normal, non-escalating statement that does not feel bigger or funnier than the earlier panels"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "absurd escalation",
+          "overengineering"
+        ],
+        "positive_hints": [
+          "each idea gets more elaborate",
+          "simple task becomes absurd system",
+          "overthinking a tiny issue",
+          "escalating levels of sophistication",
+          "pile on more categories until the combined hybrid becomes absurd",
+          "complex problem receives a grand superficial solution"
+        ],
+        "anti_hints": [
+          "quiet waiting",
+          "ordinary achievement",
+          "two-sided argument"
+        ]
       }
     },
     {
@@ -5229,6 +6379,12 @@
             "top_reaction": "tiny caption in lowercase with no contrast"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -5302,6 +6458,12 @@
             "bottom_caption": "Tiny text placed over the hand and tape so it becomes unreadable"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -5374,6 +6536,24 @@
           {
             "bottom_reaction_caption": "THIS IS A VERY SPECIFIC TECHNICAL EXPLANATION WITH MULTIPLE CLAUSES AND NO PUNCHLINE"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "suspicious ambiguity",
+          "doubtful claim"
+        ],
+        "positive_hints": [
+          "not sure whether claim is true",
+          "something feels suspicious",
+          "question a convenient explanation",
+          "uncertain hidden motive"
+        ],
+        "anti_hints": [
+          "certain revelation",
+          "celebration",
+          "simple preference"
         ]
       }
     },
@@ -5448,6 +6628,12 @@
             "bottom_caption": "PUT TEXT OVER HER FACE, GLASSES, OR THE LAPTOP SCREEN"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -5521,6 +6707,12 @@
             "bottom_caption": "Long paragraph covering the blood trail and watermark"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -5632,6 +6824,26 @@
             "bottom_right": "Text placed over Gru's face instead of the sign"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "flawed plan",
+          "overengineered sequence"
+        ],
+        "positive_hints": [
+          "multi-step plan reveals its own flaw",
+          "elaborate itinerary or process goes wrong",
+          "confident plan ends in realization",
+          "too many steps for a simple goal",
+          "simple outing becomes a detailed itinerary with maps rules and contingencies",
+          "hours of effort end with realizing a personal mistake"
+        ],
+        "anti_hints": [
+          "simple preference",
+          "clean success",
+          "unrelated argument"
+        ]
       }
     },
     {
@@ -5705,6 +6917,12 @@
             "bottom_comparison": "text placed over his face and tie knot"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -5782,6 +7000,26 @@
             "bottom_caption": "or text covering the laptop and mug"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "awkward suffering",
+          "forced composure"
+        ],
+        "positive_hints": [
+          "smiling through discomfort",
+          "quietly endure a self-own",
+          "pretend everything is fine while hurting",
+          "resigned embarrassment",
+          "spend hours before realizing your own mistake",
+          "calm face during surrounding noise and disorder"
+        ],
+        "anti_hints": [
+          "genuine excitement",
+          "loud confrontation",
+          "confident accusation"
+        ]
       }
     },
     {
@@ -5855,6 +7093,12 @@
             "bottom_caption": "Tiny text placed over the face and fingers where it becomes unreadable"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -5932,6 +7176,23 @@
             "reaction": "that depends on reading the bird's face as a literal quote"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "sudden overreaction",
+          "loud escalation"
+        ],
+        "positive_hints": [
+          "calm setup followed by yelling",
+          "tiny issue causes dramatic scream",
+          "reaction becomes disproportionately loud"
+        ],
+        "anti_hints": [
+          "quiet endurance",
+          "patient waiting",
+          "subtle suspicion"
+        ]
       }
     },
     {
@@ -6005,6 +7266,25 @@
             "bottom_caption": "Look at the beautiful window behind him."
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "false label",
+          "pretentious relabeling"
+        ],
+        "positive_hints": [
+          "call an ordinary thing an inflated title",
+          "misidentify something obvious",
+          "corporate euphemism",
+          "fancy label for a basic object",
+          "ordinary product called a premium sensory experience"
+        ],
+        "anti_hints": [
+          "correct definition",
+          "reciprocal agreement",
+          "quiet waiting"
+        ]
       }
     },
     {
@@ -6077,6 +7357,24 @@
           {
             "bottom_caption": "Tiny text placed over the drink and jacket details so it becomes unreadable"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "smug amusement",
+          "watching a mistake"
+        ],
+        "positive_hints": [
+          "laugh at an obvious mistake",
+          "recognize an overconfident plan",
+          "amused reaction",
+          "victory with smug energy"
+        ],
+        "anti_hints": [
+          "sad abandonment",
+          "serious harm",
+          "uncertain suspicion"
         ]
       }
     },
@@ -6155,6 +7453,12 @@
             "car_drift_action": "UNRELATED PUNCHLINE"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -6228,6 +7532,24 @@
             "bottom_caption": "Tiny text placed over the glass and hand so it becomes unreadable"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "small win celebration",
+          "earned relief"
+        ],
+        "positive_hints": [
+          "celebrate a rare concrete success",
+          "raise a glass to finally winning",
+          "milestone after repeated attempts",
+          "victory feels unusually important"
+        ],
+        "anti_hints": [
+          "ongoing crisis",
+          "failure disguised as growth",
+          "lonely waiting"
+        ]
       }
     },
     {
@@ -6300,6 +7622,23 @@
           {
             "bottom_caption": "tiny text with low contrast placed over the eyes"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "awkward observation",
+          "consequence watching"
+        ],
+        "positive_hints": [
+          "peek at a self-own unfolding",
+          "watch suspicious consequences arrive",
+          "awkward reveal from the sidelines"
+        ],
+        "anti_hints": [
+          "direct argument",
+          "large celebration",
+          "formal negotiation"
         ]
       }
     },
@@ -6378,6 +7717,23 @@
             "bottom_caption": "Random punchline with no mocking repetition"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "mocking repetition",
+          "ridicule bad take"
+        ],
+        "positive_hints": [
+          "repeat a statement in sarcastic voice",
+          "mock an annoying claim",
+          "parody the exact words"
+        ],
+        "anti_hints": [
+          "sincere support",
+          "quiet sadness",
+          "complex plan"
+        ]
       }
     },
     {
@@ -6450,6 +7806,26 @@
           {
             "right_reaction": "A label placed directly over the monkey's eyes"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "guilty reaction",
+          "awkward self-own"
+        ],
+        "positive_hints": [
+          "act innocent after causing the problem",
+          "look away when noticed",
+          "embarrassed realization",
+          "caught and pretending not to see",
+          "realize your own mistake after hours of effort",
+          "overbuild a simple plan and act awkward about it"
+        ],
+        "anti_hints": [
+          "public victory",
+          "confident debate",
+          "long wait"
         ]
       }
     },
@@ -6528,6 +7904,23 @@
             "bottom_statement": "A tiny punchline that doesn't complete the joke"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "hard constraint",
+          "not that simple"
+        ],
+        "positive_hints": [
+          "simple request is actually difficult",
+          "cannot casually complete the task",
+          "obvious obstacle blocks an easy claim"
+        ],
+        "anti_hints": [
+          "easy success",
+          "luxury rebrand",
+          "guilty reaction"
+        ]
       }
     },
     {
@@ -6600,6 +7993,25 @@
           {
             "bottom_reveal": "tiny caption crammed into the crowd at the bottom"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "everyone gets one",
+          "feature proliferation"
+        ],
+        "positive_hints": [
+          "give the same thing to every person",
+          "every page receives another feature",
+          "indiscriminate giveaway",
+          "repeat the addition everywhere",
+          "same addition repeated across every category"
+        ],
+        "anti_hints": [
+          "exclusive choice",
+          "single lowball offer",
+          "abandoned coordination"
         ]
       }
     },
@@ -6693,6 +8105,23 @@
             "bottom_panik": "Tiny caption placed over the head or hands"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "panic reversal",
+          "escalating crisis"
+        ],
+        "positive_hints": [
+          "panic then relief then worse panic",
+          "temporary calm before new disaster",
+          "rapid emotional reversal during chaos"
+        ],
+        "anti_hints": [
+          "stable success",
+          "quiet loneliness",
+          "straight comparison"
+        ]
       }
     },
     {
@@ -6766,6 +8195,24 @@
             "right_reaction": "A tiny one-word reply that does not feel like a negotiation or refusal."
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "lowball offer",
+          "exploitative bargain"
+        ],
+        "positive_hints": [
+          "huge request gets tiny compensation",
+          "absurdly cheap counteroffer",
+          "offered exposure instead of payment",
+          "buyer undervalues the work"
+        ],
+        "anti_hints": [
+          "generous reward",
+          "mutual celebration",
+          "waiting in silence"
+        ]
       }
     },
     {
@@ -6838,6 +8285,25 @@
           {
             "punchline_caption": "Text placed over the face or hand where it blocks the iconic thinking gesture"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "confident bad solution",
+          "fake wisdom"
+        ],
+        "positive_hints": [
+          "clever sounding logic with an obvious flaw",
+          "solve a problem by denying it",
+          "smug shortcut creates consequences",
+          "confidently irrational plan",
+          "fix a serious problem with a slogan poster or superficial gimmick"
+        ],
+        "anti_hints": [
+          "genuine useful advice",
+          "earned celebration",
+          "balanced debate"
         ]
       }
     },
@@ -6950,6 +8416,23 @@
             "bottom_target": "AN EXTREMELY DETAILED EXPLANATION OF THE ECONOMY"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "goal blocked by chaos",
+          "pulled away"
+        ],
+        "positive_hints": [
+          "simple goal dragged away by obstacle",
+          "responsibility loses to outside chaos",
+          "reaching for something while blocker intervenes"
+        ],
+        "anti_hints": [
+          "completed success",
+          "stationary waiting",
+          "direct opinion"
+        ]
       }
     },
     {
@@ -7041,6 +8524,25 @@
           {
             "bottom_right_caption": "TEXT PLACED ON TOP OF THE MAN'S HEAD OR TOO CLOSE TO THE IMAGE EDGE"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "abandoned waiting",
+          "lonely delay"
+        ],
+        "positive_hints": [
+          "left alone waiting for a response",
+          "coordination never happens",
+          "silence stretches for months",
+          "everyone else has disappeared",
+          "group chat scheduling is abandoned and nobody participates"
+        ],
+        "anti_hints": [
+          "fast action",
+          "crowded celebration",
+          "confident solution"
         ]
       }
     },
@@ -7134,6 +8636,24 @@
             "bart_prompt": "Tiny caption squeezed into the corner over faces"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "recurring broken promise",
+          "predictable refrain"
+        ],
+        "positive_hints": [
+          "same familiar line appears again",
+          "everyone expects the repeated claim",
+          "promise returns every year",
+          "audience waits for the catchphrase"
+        ],
+        "anti_hints": [
+          "novel discovery",
+          "private guilt",
+          "successful completion"
+        ]
       }
     },
     {
@@ -7226,6 +8746,23 @@
             "revealed_identity": "Same thing as above, just repeated with no contrast or reveal"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "hidden cause reveal",
+          "fake identity"
+        ],
+        "positive_hints": [
+          "remove the disguise to expose real cause",
+          "supposed new thing is old problem underneath",
+          "unmask the culprit"
+        ],
+        "anti_hints": [
+          "open celebration",
+          "balanced choice",
+          "simple request"
+        ]
       }
     },
     {
@@ -7299,6 +8836,12 @@
             "bottom_reaction_caption": "I am very tired"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -7395,6 +8938,24 @@
             "right_spider_man": "A LONG SENTENCE THAT TURNS THE MEME INTO AN ESSAY"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "mirror-image grievance",
+          "tribal hypocrisy"
+        ],
+        "positive_hints": [
+          "nearly identical sides accuse each other",
+          "rival groups make the same complaint",
+          "everyone points blame in a circular argument",
+          "mutual hypocrisy"
+        ],
+        "anti_hints": [
+          "one-sided abuse",
+          "lonely waiting",
+          "shared celebration"
+        ]
       }
     },
     {
@@ -7470,6 +9031,24 @@
             "right_window_caption": "A LONG PARAGRAPH ABOUT NOISE RULES AND TENANT POLICY"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "annoyed observer",
+          "excluded from nearby fun"
+        ],
+        "positive_hints": [
+          "watch noisy people nearby with resentment",
+          "stuck observing neighbors create chaos",
+          "outsider watches others have fun",
+          "annoyed by repeated noise"
+        ],
+        "anti_hints": [
+          "active participant",
+          "major success",
+          "formal negotiation"
+        ]
       }
     },
     {
@@ -7517,6 +9096,23 @@
           {
             "top_reaction_caption": "Tiny text placed over Pikachu's face or body"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "predictable consequence",
+          "obvious outcome"
+        ],
+        "positive_hints": [
+          "ignored warning produces expected result",
+          "bad choice followed by fake surprise",
+          "who could have predicted the consequence"
+        ],
+        "anti_hints": [
+          "unexpected good luck",
+          "patient waiting",
+          "careful decision"
         ]
       }
     },
@@ -7591,6 +9187,23 @@
             "middle_speech_bubble": "Text placed outside the bubble over the character’s face or car interior."
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "confidence before disaster",
+          "sudden realization"
+        ],
+        "positive_hints": [
+          "confident statement followed by bad realization",
+          "conversation turns ominous",
+          "about to discover the plan fails"
+        ],
+        "anti_hints": [
+          "extended waiting",
+          "shared agreement",
+          "luxury relabeling"
+        ]
       }
     },
     {
@@ -7663,6 +9276,24 @@
           {
             "scroll_text": "A single word that doesn't use the scroll reveal"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "uncomfortable truth",
+          "truth rejection"
+        ],
+        "positive_hints": [
+          "search for truth then reject blunt answer",
+          "real cause is disappointing",
+          "honest explanation nobody wants",
+          "unwelcome fact"
+        ],
+        "anti_hints": [
+          "pleasant surprise",
+          "marketing celebration",
+          "uncertain rumor"
         ]
       }
     },
@@ -7756,6 +9387,23 @@
             "bottom_left_pair": "Tiny text placed over the faces and arms"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "private knowledge",
+          "social isolation"
+        ],
+        "positive_hints": [
+          "one person knows awkward truth while room acts normal",
+          "secret fact separates observer from crowd",
+          "quiet internal realization at a gathering"
+        ],
+        "anti_hints": [
+          "public confrontation",
+          "everyone agrees",
+          "obvious giveaway"
+        ]
       }
     },
     {
@@ -7829,6 +9477,25 @@
             "bottom_reveal_caption": "This is a completely unrelated joke with no comparison or reveal"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "fake distinction",
+          "euphemistic rebrand"
+        ],
+        "positive_hints": [
+          "two labels describe the same thing",
+          "rebrand changes wording not reality",
+          "new name for an unchanged idea",
+          "supposed alternatives are identical",
+          "change presentation and price while the base product stays unchanged"
+        ],
+        "anti_hints": [
+          "genuine transformation",
+          "unfair offer",
+          "celebration"
+        ]
       }
     },
     {
@@ -7901,6 +9568,25 @@
           {
             "bottom_caption": "Tiny text crammed into the flames with no contrast"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "calm amid mayhem",
+          "forced optimism"
+        ],
+        "positive_hints": [
+          "remain calm while everything collapses",
+          "pretend disaster is acceptable",
+          "chaos surrounds an unbothered person",
+          "label a bad situation as positive growth",
+          "someone calmly sits amid horns crowds and surrounding disorder"
+        ],
+        "anti_hints": [
+          "clean success",
+          "active forced choice",
+          "sincere tragedy"
         ]
       }
     },
@@ -8001,6 +9687,24 @@
             "you_receive": "text placed over the subject's hands"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "exploitative exchange",
+          "lopsided deal"
+        ],
+        "positive_hints": [
+          "one side receives value and the other gets scraps",
+          "unfair offer",
+          "bad compensation for a large request",
+          "terrible consolation"
+        ],
+        "anti_hints": [
+          "clean win",
+          "equal partnership",
+          "patient waiting"
+        ]
       }
     },
     {
@@ -8073,6 +9777,25 @@
           {
             "bottom_reaction": "Text placed on the right side over the blank white area, making the joke feel disconnected"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "luxury makeover",
+          "pretentious upgrade"
+        ],
+        "positive_hints": [
+          "ordinary thing gets a fancy presentation",
+          "plain option versus inflated premium version",
+          "charge more after renaming it sophisticated",
+          "make basic idea sound luxurious",
+          "turn a basic product into a premium sensory experience with a higher price"
+        ],
+        "anti_hints": [
+          "unchanged identical labels",
+          "serious crisis",
+          "patient waiting"
         ]
       }
     },
@@ -8175,6 +9898,25 @@
             "reaction_caption": "Text that tries to label every part of the image and covers the face and buttons"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "forced choice",
+          "painful dilemma"
+        ],
+        "positive_hints": [
+          "choose between two bad options",
+          "impossible tradeoff",
+          "either choice has a cost",
+          "torn between alternatives",
+          "one option or another unpleasant option"
+        ],
+        "anti_hints": [
+          "single confident opinion",
+          "celebration",
+          "passive waiting"
+        ]
       }
     },
     {
@@ -8266,6 +10008,24 @@
           {
             "decision_caption": "Me choosing the option that will definitely ruin my week"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "safe versus chaotic path",
+          "bad direction"
+        ],
+        "positive_hints": [
+          "choose the reckless route over the sensible one",
+          "fork between safe and chaotic options",
+          "person actively picks trouble",
+          "take one route or a worse alternative"
+        ],
+        "anti_hints": [
+          "equal painful dilemma",
+          "quiet reveal",
+          "celebration"
         ]
       }
     },
@@ -8363,6 +10123,25 @@
             "bottom_table_comment": "covering the UNO logo or card edges"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "stubborn refusal",
+          "self-inflicted consequence"
+        ],
+        "positive_hints": [
+          "accept a ridiculous penalty instead of simple action",
+          "choose costly consequence with confidence",
+          "refuse the obvious rule",
+          "would rather suffer than comply",
+          "do a simple action or accept an expensive consequence"
+        ],
+        "anti_hints": [
+          "accidental misfortune",
+          "clean victory",
+          "equal collaboration"
+        ]
       }
     },
     {
@@ -8436,6 +10215,25 @@
             "bottom_caption": "A long paragraph that covers the entire skeleton."
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "extreme waiting",
+          "endless delay"
+        ],
+        "positive_hints": [
+          "wait so long it becomes the joke",
+          "still waiting after seasons pass",
+          "promise never arrives",
+          "coordination remains unresolved",
+          "which day works scheduling chat repeats for months"
+        ],
+        "anti_hints": [
+          "immediate result",
+          "energetic argument",
+          "celebration"
+        ]
       }
     },
     {
@@ -8458,6 +10256,12 @@
           {}
         ],
         "bad_examples": []
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -8531,6 +10335,12 @@
             "goosebumps_text": "A detailed paragraph about taxes and municipal bonds"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -8603,6 +10413,23 @@
           {
             "cat_response": "long paragraph that won't fit in the box"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "dramatic confrontation",
+          "absurd rebuttal"
+        ],
+        "positive_hints": [
+          "angry complaint meets calm absurd response",
+          "two sides shout past each other",
+          "heated accusation and dismissive answer"
+        ],
+        "anti_hints": [
+          "quiet agreement",
+          "solitary waiting",
+          "clean celebration"
         ]
       }
     },
@@ -8677,6 +10504,12 @@
             "bottom_caption": "THIS IS A SERIOUS HISTORICAL ANALYSIS"
           }
         ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [],
+        "positive_hints": [],
+        "anti_hints": []
       }
     },
     {
@@ -8749,6 +10582,25 @@
           {
             "bottom_punchline": "THIS IS A SERIOUS QUOTE WITH NO RECURSIVE TWIST"
           }
+        ]
+      },
+      "retrieval": {
+        "version": 1,
+        "joke_shapes": [
+          "recursive hype",
+          "thing inside itself"
+        ],
+        "positive_hints": [
+          "put the same feature inside itself",
+          "combine two trends into a recursive version",
+          "nested product bloat",
+          "meta repetition",
+          "repeat the same word and combine it into a hybrid category"
+        ],
+        "anti_hints": [
+          "single simple feature",
+          "long abandonment",
+          "forced dilemma"
         ]
       }
     }

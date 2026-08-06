@@ -14,6 +14,7 @@ from memedrop_api.services.suggestion_engine import (
     Candidate,
     LexicalCandidateIndex,
     SuggestionService,
+    diversify_shortlist,
     fallback_template_selections,
     safe_log_cache_key,
     safe_log_tweet_text,
@@ -93,6 +94,7 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
 
     assert [item["name"] for item in result] == ["Surprised Pikachu", "This Is Fine"]
     assert result[0]["score"] == 0.96
+    assert result[0]["use_case_label"] == "predictable consequence"
     assert result[0]["tweet_context"]["intent"] == "dunking"
     assert result[0]["feedback_context"]["intent"] == "dunking"
     assert set(result[0]["feedback_context"]).isdisjoint(
@@ -586,3 +588,64 @@ def test_local_ranker_detects_forced_choice_and_false_label_joke_shapes() -> Non
     assert forced_choice["evil-kermit"] > 0
     assert false_label["is-this-a-pigeon"] > 0
     assert false_label["they-re-the-same-picture"] > 0
+
+
+def test_anti_use_hints_apply_a_bounded_negative_retrieval_signal() -> None:
+    catalog = MemeCatalog.load()
+    source_templates = catalog.verified_templates[:2]
+    candidates = []
+    for index, source in enumerate(source_templates):
+        retrieval = source.retrieval.model_copy(
+            update={
+                "joke_shapes": ["celebration"],
+                "positive_hints": ["celebrate a milestone victory"],
+                "anti_hints": ["milestone victory"] if index else [],
+            }
+        )
+        template = source.model_copy(update={"retrieval": retrieval})
+        candidates.append(
+            Candidate(
+                meme_id=template.template_id,
+                name=template.name,
+                image_url=f"/memes/{index}.png",
+                system_tags={},
+                is_evergreen=True,
+                template=template,
+            )
+        )
+
+    selections = fallback_template_selections("Celebrate the milestone victory", candidates, 2)
+
+    assert selections[0].template_id == candidates[0].template.template_id
+    assert selections[0].score > selections[1].score
+
+
+def test_soft_diversity_prevents_one_shape_from_monopolizing_shortlist() -> None:
+    catalog = MemeCatalog.load()
+    candidates = []
+    for index, source in enumerate(catalog.verified_templates[:4]):
+        shape = "same grammar" if index < 3 else "different grammar"
+        retrieval = source.retrieval.model_copy(update={"joke_shapes": [shape]})
+        template = source.model_copy(update={"retrieval": retrieval})
+        candidates.append(
+            Candidate(
+                meme_id=template.template_id,
+                name=template.name,
+                image_url=f"/memes/{index}.png",
+                system_tags={},
+                is_evergreen=True,
+                template=template,
+            )
+        )
+    relevance_pool = [
+        (0.90, candidates[0]),
+        (0.89, candidates[1]),
+        (0.88, candidates[2]),
+        (0.87, candidates[3]),
+    ]
+
+    selected = diversify_shortlist(relevance_pool, 3)
+
+    assert selected[0] == relevance_pool[0]
+    assert candidates[3] in [candidate for _, candidate in selected[:2]]
+    assert any(candidate in candidates[1:3] for _, candidate in selected)

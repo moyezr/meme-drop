@@ -24,9 +24,11 @@ export type {
   MemeTemplate,
   MemeTextTemplateRegion,
   MemeCaptionGuidance,
+  MemeRetrievalMetadata,
 } from "./types/template-manifest.js";
 
 export { MEME_TEMPLATE_MANIFEST } from "./data/meme-template-manifest.js";
+export { MEME_TEMPLATE_RETRIEVAL } from "./data/meme-template-retrieval.js";
 export {
   findMemeTemplate,
   findMemeTemplateForCandidate,

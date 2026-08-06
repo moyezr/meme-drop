@@ -44,6 +44,17 @@ class CaptionGuidance(BaseModel):
     bad_examples: list[dict[str, str]] = Field(default_factory=list)
 
 
+class RetrievalMetadata(BaseModel):
+    """Versioned retrieval annotations owned by the template catalog."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    version: Literal[1] = 1
+    joke_shapes: list[str] = Field(default_factory=list)
+    positive_hints: list[str] = Field(default_factory=list)
+    anti_hints: list[str] = Field(default_factory=list)
+
+
 class MemeTemplate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -56,6 +67,7 @@ class MemeTemplate(BaseModel):
     quality: Literal["verified", "draft", "disabled"]
     regions: list[TemplateRegion]
     caption_guidance: CaptionGuidance
+    retrieval: RetrievalMetadata = Field(default_factory=RetrievalMetadata)
 
 
 class CatalogManifest(BaseModel):

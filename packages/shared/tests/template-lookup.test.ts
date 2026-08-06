@@ -7,6 +7,7 @@ import promotedManifest from "../src/data/meme-template-manifest.promoted.json" 
   type: "json",
 };
 import { MEME_TEMPLATE_MANIFEST } from "../src/data/meme-template-manifest.js";
+import { MEME_TEMPLATE_RETRIEVAL } from "../src/data/meme-template-retrieval.js";
 import {
   findMemeTemplate,
   findMemeTemplateForCandidate,
@@ -59,6 +60,22 @@ test("promoted manifest only contains verified runtime templates", () => {
   for (const template of promotedTemplates) {
     assert.equal(template.supports_overlay, true);
     assert.equal(template.quality, "verified");
+  }
+});
+
+test("every verified runtime template has reviewed retrieval metadata", () => {
+  const verifiedRuntimeTemplates = [...MEME_TEMPLATE_MANIFEST.templates, ...promotedTemplates].filter(
+    (template) => template.supports_overlay && template.quality === "verified"
+  );
+  const runtimeIds = new Set(verifiedRuntimeTemplates.map((template) => template.template_id));
+
+  assert.deepEqual(new Set(Object.keys(MEME_TEMPLATE_RETRIEVAL)), runtimeIds);
+  for (const template of verifiedRuntimeTemplates) {
+    const retrieval = MEME_TEMPLATE_RETRIEVAL[template.template_id];
+    assert.equal(retrieval?.version, 1, template.template_id);
+    assert.ok(retrieval.joke_shapes.length > 0, template.template_id);
+    assert.ok(retrieval.positive_hints.length > 0, template.template_id);
+    assert.ok(retrieval.anti_hints.length > 0, template.template_id);
   }
 });
 

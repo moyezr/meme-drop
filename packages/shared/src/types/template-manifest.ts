@@ -19,6 +19,12 @@ export interface MemeTemplate {
   quality: ManifestQuality;
   regions: MemeTextTemplateRegion[];
   caption_guidance: MemeCaptionGuidance;
+  /**
+   * Catalog-owned signals for retrieval. These are deliberately separate from
+   * caption guidance: they describe when a meme's joke grammar fits a post,
+   * rather than copy that should be shown to a caption model.
+   */
+  retrieval?: MemeRetrievalMetadata;
 }
 
 export interface MemeTextTemplateRegion {
@@ -45,4 +51,12 @@ export interface MemeCaptionGuidance {
   pattern: string;
   good_examples: Array<Record<string, string>>;
   bad_examples: Array<Record<string, string>>;
+}
+
+export interface MemeRetrievalMetadata {
+  /** Schema version for retrieval annotations, independent of manifest version. */
+  version: 1;
+  joke_shapes: string[];
+  positive_hints: string[];
+  anti_hints: string[];
 }

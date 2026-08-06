@@ -30,6 +30,53 @@ SUGGESTION_CACHE_TTL_SECONDS = 5 * 60
 SUGGESTION_CACHE_MAX = 200
 FEEDBACK_SCORE_CACHE_TTL_SECONDS = 60
 FEEDBACK_SCORE_CACHE_MAX = 500
+RETRIEVAL_STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "been",
+    "being",
+    "by",
+    "can",
+    "could",
+    "did",
+    "do",
+    "does",
+    "for",
+    "from",
+    "had",
+    "has",
+    "have",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "of",
+    "on",
+    "one",
+    "person",
+    "some",
+    "someone",
+    "something",
+    "than",
+    "that",
+    "the",
+    "then",
+    "thing",
+    "this",
+    "to",
+    "was",
+    "were",
+    "while",
+    "will",
+    "with",
+    "would",
+}
 
 USAGE_FEEDBACK_CONTEXT_FIELDS = (
     "sentiment",
@@ -83,7 +130,7 @@ class SuggestionTiming:
             ("total", total_ms, None),
         )
         values = [
-            f'{name};dur={max(0.0, duration):.1f}'
+            f"{name};dur={max(0.0, duration):.1f}"
             + (f';desc="{outcome}"' if outcome is not None else "")
             for name, duration, outcome in metrics
         ]
@@ -114,52 +161,95 @@ class LexicalCandidateIndex:
     postings: dict[str, tuple[tuple[str, int], ...]]
     inverse_document_frequency: dict[str, float]
     average_document_length: float
+    anti_document_lengths: dict[str, int]
+    anti_postings: dict[str, tuple[tuple[str, int], ...]]
+    anti_inverse_document_frequency: dict[str, float]
+    anti_average_document_length: float
 
     @classmethod
     def build(cls, candidates: Iterable[Candidate]) -> LexicalCandidateIndex:
-        documents: dict[str, Counter[str]] = {}
+        positive_documents: dict[str, Counter[str]] = {}
+        anti_documents: dict[str, Counter[str]] = {}
         for candidate in candidates:
             template_id = candidate.template.template_id
             # A duplicate template is never a useful distinct retrieval result.
-            documents.setdefault(template_id, Counter(candidate_search_terms(candidate)))
+            positive_documents.setdefault(template_id, Counter(candidate_search_terms(candidate)))
+            anti_documents.setdefault(template_id, Counter(candidate_anti_terms(candidate)))
 
-        document_count = len(documents)
-        if not document_count:
-            return cls({}, {}, {}, 0.0)
-        raw_postings: dict[str, list[tuple[str, int]]] = defaultdict(list)
-        for template_id, terms in documents.items():
-            for term, frequency in terms.items():
-                raw_postings[term].append((template_id, frequency))
-        postings = {term: tuple(entries) for term, entries in raw_postings.items()}
-        idf = {
-            term: math.log(1 + (document_count - len(entries) + 0.5) / (len(entries) + 0.5))
-            for term, entries in postings.items()
-        }
-        lengths = {template_id: sum(terms.values()) for template_id, terms in documents.items()}
-        return cls(lengths, postings, idf, sum(lengths.values()) / document_count)
+        return cls(*build_bm25_corpus(positive_documents), *build_bm25_corpus(anti_documents))
 
     def score(self, query: str) -> dict[str, float]:
-        """Return BM25 scores only for templates sharing a meaningful query term."""
-        query_terms = Counter(tokenize_sequence(query))
-        if not query_terms or not self.average_document_length:
-            return {}
-        scores: dict[str, float] = defaultdict(float)
-        # Standard BM25 constants. Keeping this intentionally boring makes tuning
-        # reproducible as the catalog moves from dozens to thousands of templates.
-        k1 = 1.2
-        b = 0.75
-        for term, query_frequency in query_terms.items():
-            for template_id, term_frequency in self.postings.get(term, ()):
-                document_length = self.document_lengths[template_id]
-                denominator = term_frequency + k1 * (
-                    1 - b + b * document_length / self.average_document_length
-                )
-                scores[template_id] += (
-                    self.inverse_document_frequency[term]
-                    * (term_frequency * (k1 + 1) / denominator)
-                    * min(query_frequency, 2)
-                )
-        return dict(scores)
+        """Return positive BM25 scores for catalog retrieval signals."""
+        return score_bm25_corpus(
+            query,
+            self.document_lengths,
+            self.postings,
+            self.inverse_document_frequency,
+            self.average_document_length,
+        )
+
+    def anti_score(self, query: str) -> dict[str, float]:
+        """Return BM25 evidence that a template is a poor fit for the query."""
+        return score_bm25_corpus(
+            query,
+            self.anti_document_lengths,
+            self.anti_postings,
+            self.anti_inverse_document_frequency,
+            self.anti_average_document_length,
+        )
+
+
+def build_bm25_corpus(
+    documents: dict[str, Counter[str]],
+) -> tuple[
+    dict[str, int],
+    dict[str, tuple[tuple[str, int], ...]],
+    dict[str, float],
+    float,
+]:
+    document_count = len(documents)
+    if not document_count:
+        return {}, {}, {}, 0.0
+    raw_postings: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    for template_id, terms in documents.items():
+        for term, frequency in terms.items():
+            raw_postings[term].append((template_id, frequency))
+    postings = {term: tuple(entries) for term, entries in raw_postings.items()}
+    idf = {
+        term: math.log(1 + (document_count - len(entries) + 0.5) / (len(entries) + 0.5))
+        for term, entries in postings.items()
+    }
+    lengths = {template_id: sum(terms.values()) for template_id, terms in documents.items()}
+    return lengths, postings, idf, sum(lengths.values()) / document_count
+
+
+def score_bm25_corpus(
+    query: str,
+    document_lengths: dict[str, int],
+    postings: dict[str, tuple[tuple[str, int], ...]],
+    inverse_document_frequency: dict[str, float],
+    average_document_length: float,
+) -> dict[str, float]:
+    query_terms = Counter(tokenize_sequence(query))
+    if not query_terms or not average_document_length:
+        return {}
+    scores: dict[str, float] = defaultdict(float)
+    # Standard BM25 constants. Keeping this intentionally boring makes tuning
+    # reproducible as the catalog moves from dozens to thousands of templates.
+    k1 = 1.2
+    b = 0.75
+    for term, query_frequency in query_terms.items():
+        for template_id, term_frequency in postings.get(term, ()):
+            document_length = document_lengths[template_id]
+            denominator = term_frequency + k1 * (
+                1 - b + b * document_length / average_document_length
+            )
+            scores[template_id] += (
+                inverse_document_frequency[term]
+                * (term_frequency * (k1 + 1) / denominator)
+                * min(query_frequency, 2)
+            )
+    return dict(scores)
 
 
 def usage_feedback_context(context: TweetContext) -> dict[str, Any]:
@@ -255,9 +345,7 @@ class SuggestionService:
         # shared computation that other callers are relying on.
         return await asyncio.shield(task)
 
-    def _clear_inflight_suggestion(
-        self, key: str, completed: asyncio.Task[SuggestionRun]
-    ) -> None:
+    def _clear_inflight_suggestion(self, key: str, completed: asyncio.Task[SuggestionRun]) -> None:
         if self._inflight_suggestions.get(key) is completed:
             self._inflight_suggestions.pop(key, None)
 
@@ -337,7 +425,7 @@ class SuggestionService:
                     "name": candidate.name,
                     "image_url": candidate.image_url,
                     "tailored_overlay": build_overlay(candidate.template, candidate.name, regions),
-                    "use_case_label": "meme reply",
+                    "use_case_label": candidate_use_case_label(candidate),
                     "match_explanation": selection.reason
                     or candidate.template.caption_guidance.pattern,
                     "score": round(selection.score or 1 - index * 0.08, 3),
@@ -521,10 +609,13 @@ def fallback_template_selections(
     signals = semantic_template_signals(tweet_text)
     index = lexical_index or LexicalCandidateIndex.build(candidates)
     lexical_scores = index.score(tweet_text)
+    anti_scores = index.anti_score(tweet_text)
     max_lexical_score = max(lexical_scores.values(), default=0.0)
+    max_anti_score = max(anti_scores.values(), default=0.0)
 
     def rank(candidate: Candidate) -> tuple[float, Candidate]:
         signal_boost = signals.get(candidate.template.template_id, 0)
+        shape_boost = structural_joke_shape_boost(tweet_text, candidate)
         raw_lexical_score = lexical_scores.get(candidate.template.template_id, 0.0)
         # BM25 is unbounded and its absolute range changes with query length. Map
         # it relative to the strongest matching document for this query instead of
@@ -534,23 +625,35 @@ def fallback_template_selections(
             if raw_lexical_score and max_lexical_score
             else 0.0
         )
-        score = min(
-            1.0,
-            0.45
-            + lexical_boost
-            + signal_boost
-            + candidate.feedback_boost
-            + (0.04 if candidate.is_evergreen else 0),
+        raw_anti_score = anti_scores.get(candidate.template.template_id, 0.0)
+        anti_penalty = (
+            0.1 * math.log1p(raw_anti_score) / math.log1p(max_anti_score)
+            if raw_anti_score and max_anti_score
+            else 0.0
+        )
+        score = (
+            min(
+                1.0,
+                0.45
+                + lexical_boost
+                + signal_boost
+                + shape_boost
+                + candidate.feedback_boost
+                + (0.04 if candidate.is_evergreen else 0),
+            )
+            - anti_penalty
         )
         return score, candidate
 
-    # Only the shortlist reaches the model. A heap avoids sorting the entire
-    # catalog on every request as it grows from dozens to thousands of templates.
-    top_candidates = heapq.nsmallest(
-        max(0, limit),
+    # Keep a small relevance pool for a soft diversity pass. This is still O(N log k)
+    # because both the model shortlist and its expansion factor are bounded.
+    pool_limit = min(len(candidates), max(0, limit) * 3)
+    relevance_pool = heapq.nsmallest(
+        pool_limit,
         (rank(candidate) for candidate in candidates),
         key=lambda item: (-item[0], item[1].template.name),
     )
+    top_candidates = diversify_shortlist(relevance_pool, limit)
     return [
         TemplateSelection(
             template_id=candidate.template.template_id,
@@ -672,23 +775,63 @@ def fill_selections(
 
 def candidate_search_terms(candidate: Candidate) -> list[str]:
     """Build the stable per-template document indexed by the local retriever."""
-    guidance = candidate.template.caption_guidance
     values: list[str] = [
         candidate.template.name,
         *candidate.template.aliases,
-        guidance.pattern,
-        *(
-            value
-            for example in guidance.good_examples
-            for value in example.values()
-            if isinstance(value, str)
-        ),
         str(candidate.system_tags.get("emotion", "")),
         *string_tag_values(candidate.system_tags.get("use_cases")),
         *string_tag_values(candidate.system_tags.get("vibes")),
         *string_tag_values(candidate.system_tags.get("example_contexts")),
+        *candidate.template.retrieval.joke_shapes,
+        *candidate.template.retrieval.positive_hints,
     ]
     return [term for value in values for term in tokenize_sequence(value)]
+
+
+def candidate_anti_terms(candidate: Candidate) -> list[str]:
+    return [
+        term
+        for value in candidate.template.retrieval.anti_hints
+        for term in tokenize_sequence(value)
+    ]
+
+
+def candidate_use_case_label(candidate: Candidate) -> str:
+    shapes = candidate.template.retrieval.joke_shapes
+    return shapes[0].replace("_", " ") if shapes else "meme reply"
+
+
+def diversify_shortlist(
+    relevance_pool: list[tuple[float, Candidate]], limit: int
+) -> list[tuple[float, Candidate]]:
+    """Softly discourage one joke grammar from monopolizing the shortlist.
+
+    The best relevance result is always preserved. Subsequent choices pay only a
+    small penalty for shapes already selected, so a clearly better candidate can
+    still win and recall is not constrained by a hard one-per-shape rule.
+    """
+    remaining = list(relevance_pool)
+    selected: list[tuple[float, Candidate]] = []
+    shape_counts: Counter[str] = Counter()
+    while remaining and len(selected) < max(0, limit):
+        best = min(
+            remaining,
+            key=lambda item: (
+                -(
+                    item[0]
+                    - 0.035
+                    * max(
+                        (shape_counts[shape] for shape in item[1].template.retrieval.joke_shapes),
+                        default=0,
+                    )
+                ),
+                item[1].template.name,
+            ),
+        )
+        selected.append(best)
+        remaining.remove(best)
+        shape_counts.update(best[1].template.retrieval.joke_shapes)
+    return selected
 
 
 def string_tag_values(value: object) -> list[str]:
@@ -700,9 +843,56 @@ def string_tag_values(value: object) -> list[str]:
 
 
 def tokenize_sequence(value: str) -> list[str]:
-    return [
-        token for token in re.findall(r"[a-z0-9][a-z0-9_'’-]*", value.lower()) if len(token) > 2
+    result: list[str] = []
+    for token in re.findall(r"[a-z0-9][a-z0-9_'’-]*", value.lower()):
+        if len(token) <= 2 and token not in {"or", "vs"}:
+            continue
+        if token in RETRIEVAL_STOP_WORDS:
+            continue
+        result.append(token)
+        result.extend(token_stems(token))
+    return result
+
+
+def token_stems(token: str) -> list[str]:
+    """Return conservative English suffix variants without a runtime NLP dependency."""
+    stems: list[str] = []
+    if len(token) > 5 and token.endswith("ing"):
+        root = token[:-3]
+        stems.extend((root, f"{root}e"))
+    elif len(token) > 4 and token.endswith("ied"):
+        stems.append(f"{token[:-3]}y")
+    elif len(token) > 4 and token.endswith("ed"):
+        root = token[:-2]
+        stems.extend((root, f"{root}e"))
+    elif len(token) > 4 and token.endswith("s") and not token.endswith("ss"):
+        stems.append(token[:-1])
+    return [stem for stem in stems if len(stem) > 2 and stem != token]
+
+
+def structural_joke_shape_boost(tweet_text: str, candidate: Candidate) -> float:
+    """Map domain-neutral language structure onto catalog-owned joke shapes."""
+    raw_tokens = [
+        token
+        for token in re.findall(r"[a-z0-9][a-z0-9_'’-]*", tweet_text.lower())
+        if token not in RETRIEVAL_STOP_WORDS
     ]
+    shapes = set(candidate.template.retrieval.joke_shapes)
+    boost = 0.0
+    if "or" in raw_tokens and shapes & {
+        "forced choice",
+        "painful dilemma",
+        "safe versus chaotic path",
+        "self-inflicted consequence",
+    }:
+        boost += 0.24
+    content_counts = Counter(token for token in raw_tokens if len(token) >= 5)
+    if any(count >= 2 for count in content_counts.values()):
+        if shapes & {"recursive hype", "thing inside itself"}:
+            boost += 0.3
+        elif shapes & {"everyone gets one", "feature proliferation", "absurd escalation"}:
+            boost += 0.18
+    return min(boost, 0.3)
 
 
 def tokenize(value: str) -> set[str]:
