@@ -51,7 +51,6 @@ def test_production_configuration_is_accepted() -> None:
         require_install_id=True,
         rate_limit_store="redis",
         redis_url="rediss://default:secret@redis.internal:6379/0",
-        suggestion_log_text="redacted",
         storage_backend="s3",
         s3_endpoint="https://project.storage.supabase.co/storage/v1/s3",
         s3_region="ap-south-1",

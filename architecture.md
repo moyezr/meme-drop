@@ -107,8 +107,8 @@ side effects.
 
 Configuration enforces production invariants including S3 storage, the production bucket, explicit
 CORS, install IDs, and OpenRouter credentials. `/live` does not require PostgreSQL; readiness does.
-Request IDs are echoed for diagnostics, while production suggestion logs stay compact and redact
-tweet text.
+Request IDs are echoed for diagnostics. Suggestion logs record only operational metadata and never
+raw tweet text.
 
 ## Verification boundaries
 

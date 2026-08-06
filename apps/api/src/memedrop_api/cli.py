@@ -329,8 +329,6 @@ def production_env_findings(
     reject_placeholder("REDIS_URL", redis_url)
     if value("MEMEDROP_REQUIRE_INSTALL_ID").lower() not in {"1", "true", "yes", "on"}:
         errors.append("MEMEDROP_REQUIRE_INSTALL_ID must be true.")
-    if environment.get("MEMEDROP_SUGGESTION_LOG_TEXT", "").strip().lower() == "full":
-        errors.append("MEMEDROP_SUGGESTION_LOG_TEXT must not be full in production.")
     if environment.get("MEMEDROP_USE_DRAFT_TEMPLATES", "").strip().lower() == "true":
         errors.append("MEMEDROP_USE_DRAFT_TEMPLATES must not be true in production.")
     if value("MEMEDROP_STORAGE_BACKEND") != "s3":

@@ -83,19 +83,8 @@ class Settings(BaseSettings):
         default=None, validation_alias="MEMEDROP_STORAGE_BUCKET"
     )
     require_install_id: bool = Field(default=False, validation_alias="MEMEDROP_REQUIRE_INSTALL_ID")
-    suggestion_log_mode: Literal["off", "compact", "pretty"] = Field(
-        default="pretty", validation_alias="MEMEDROP_SUGGESTION_LOGS"
-    )
-    suggestion_log_text: Literal["full", "preview", "redacted"] = Field(
-        default="preview", validation_alias="MEMEDROP_SUGGESTION_LOG_TEXT"
-    )
     use_draft_templates: bool = Field(
         default=False, validation_alias="MEMEDROP_USE_DRAFT_TEMPLATES"
-    )
-    template_selection_timeout_ms: int = Field(
-        default=15_000,
-        validation_alias="MEMEDROP_TEMPLATE_SELECTION_TIMEOUT_MS",
-        gt=0,
     )
     caption_timeout_ms: int = Field(
         default=20_000, validation_alias="MEMEDROP_CAPTION_TIMEOUT_MS", gt=0

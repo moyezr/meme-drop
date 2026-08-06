@@ -45,10 +45,7 @@ try {
   }
 
   if (withSuggestionEval) {
-    run("Suggestion quality gate", ["npm", "run", "quality:suggestions"], {
-      ...env,
-      MEMEDROP_SUGGESTION_LOGS: env.MEMEDROP_SUGGESTION_LOGS || "compact",
-    });
+    run("Suggestion quality gate", ["npm", "run", "quality:suggestions"], env);
   }
 
   run("Package extension release", ["npm", "run", "package:extension:release"], env);
