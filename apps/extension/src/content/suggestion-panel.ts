@@ -31,9 +31,11 @@ interface Suggestion {
   meme_id: string;
   name: string;
   image_url: string;
+  preview_image_url?: string | null;
   tailored_overlay?: MemeTextOverlay | null;
   tailored_image_data_url?: string | null;
   image_data_url?: string | null;
+  preview_image_data_url?: string | null;
   use_case_label: string;
   match_explanation: string;
   score: number;
@@ -553,11 +555,11 @@ function renderSuggestions(suggestions: Suggestion[]) {
       if (name.textContent) card.appendChild(name);
       card.appendChild(cardOverlay);
 
-      if (s.image_data_url) {
+      if (s.preview_image_data_url) {
         if (s.tailored_overlay?.enabled) {
           void showTailoredPreview(s, img);
         } else {
-          img.src = s.image_data_url;
+          img.src = s.preview_image_data_url;
         }
       }
 
@@ -788,8 +790,8 @@ async function showTailoredPreview(suggestion: Suggestion, img: HTMLImageElement
 
   try {
     const previewDataUrl = await renderMemeWithOverlay(
-      suggestion.image_url,
-      suggestion.image_data_url,
+      suggestion.preview_image_url || suggestion.image_url,
+      suggestion.preview_image_data_url,
       suggestion.tailored_overlay,
       PREVIEW_MAX_DIMENSION
     );
@@ -1233,12 +1235,13 @@ function getBestImageSrc(suggestion: Suggestion): string {
     return suggestion.tailored_image_data_url;
   }
 
-  if (suggestion.image_data_url) {
-    return suggestion.image_data_url;
+  if (suggestion.preview_image_data_url) {
+    return suggestion.preview_image_data_url;
   }
 
-  if (/^(data:|blob:|filesystem:)/i.test(suggestion.image_url)) {
-    return suggestion.image_url;
+  const previewUrl = suggestion.preview_image_url || suggestion.image_url;
+  if (/^(data:|blob:|filesystem:)/i.test(previewUrl)) {
+    return previewUrl;
   }
 
   // Avoid broken localhost images inside X while the background worker is
@@ -1376,6 +1379,12 @@ export function updateSuggestionMedia(memeId: string, imageDataUrl: string) {
   const suggestion = currentSuggestions.find((item) => item.meme_id === memeId);
   if (!suggestion) return;
   suggestion.image_data_url = imageDataUrl;
+}
+
+export function updateSuggestionPreview(memeId: string, imageDataUrl: string) {
+  const suggestion = currentSuggestions.find((item) => item.meme_id === memeId);
+  if (!suggestion) return;
+  suggestion.preview_image_data_url = imageDataUrl;
 
   const card = Array.from(shadowRoot?.querySelectorAll<HTMLElement>(".meme-card") || [])
     .find((item) => item.dataset.memeId === memeId);

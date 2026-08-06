@@ -1,6 +1,8 @@
 import { API_BASE_URL, apiUrl } from "../shared/config";
 import { apiErrorFromResponse, withApiRequestHeaders } from "../shared/api";
 import { clampSuggestionLimit, limitSuggestions } from "../shared/suggestion-limits";
+import { getSuggestionMediaUrls } from "../shared/suggestion-media";
+import { createSingleFlight } from "../shared/single-flight";
 import {
   UsageTelemetryQueue,
   type UsageEvent,
@@ -11,6 +13,7 @@ interface Suggestion {
   meme_id: string;
   name: string;
   image_url: string;
+  preview_image_url?: string | null;
   tailored_overlay?: MemeTextOverlay | null;
   use_case_label: string;
   match_explanation: string;
@@ -19,6 +22,7 @@ interface Suggestion {
   tweet_text?: string;
   feedback_context?: Record<string, unknown>;
   image_data_url?: string | null;
+  preview_image_data_url?: string | null;
 }
 
 interface MemeTextOverlay {
@@ -62,6 +66,7 @@ const SUGGESTION_REQUEST_TIMEOUT_MS = 5_000;
 const suggestionCache = new Map<string, CacheEntry>();
 const suggestionInflight = new Map<string, Promise<Suggestion[]>>();
 const mediaDataUrlCache = new Map<string, string>();
+const mediaDataUrlInflight = createSingleFlight<string>();
 const usageTelemetry = new UsageTelemetryQueue({
   sendBatch: postUsageBatch,
 });
@@ -111,10 +116,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           });
         }
       },
-      onMedia: (suggestion) => {
+      onPreview: (suggestion) => {
+        if (sender.tab?.id && suggestion.preview_image_data_url) {
+          chrome.tabs.sendMessage(sender.tab.id, {
+            type: "SUGGESTION_PREVIEW_READY",
+            cache_key: message.payload.cache_key,
+            meme_id: suggestion.meme_id,
+            image_data_url: suggestion.preview_image_data_url,
+          });
+        }
+      },
+      onOriginal: (suggestion) => {
         if (sender.tab?.id && suggestion.image_data_url) {
           chrome.tabs.sendMessage(sender.tab.id, {
-            type: "SUGGESTION_MEDIA_READY",
+            type: "SUGGESTION_ORIGINAL_READY",
             cache_key: message.payload.cache_key,
             meme_id: suggestion.meme_id,
             image_data_url: suggestion.image_data_url,
@@ -194,7 +209,8 @@ async function fetchSuggestions(
     limit?: number;
     cacheKey?: string;
     onInitial?: (suggestions: Suggestion[]) => void;
-    onMedia?: (suggestion: Suggestion) => void;
+    onPreview?: (suggestion: Suggestion) => void;
+    onOriginal?: (suggestion: Suggestion) => void;
   } = {}
 ): Promise<Suggestion[]> {
   const limit = clampSuggestionLimit(options.limit);
@@ -226,7 +242,8 @@ async function fetchFreshSuggestions(
     limit?: number;
     cacheKey?: string;
     onInitial?: (suggestions: Suggestion[]) => void;
-    onMedia?: (suggestion: Suggestion) => void;
+    onPreview?: (suggestion: Suggestion) => void;
+    onOriginal?: (suggestion: Suggestion) => void;
   },
   cacheKey: string
 ): Promise<Suggestion[]> {
@@ -258,8 +275,12 @@ async function fetchFreshSuggestions(
     ...suggestion,
     name: (suggestion.name || "").trim(),
     image_url: toAbsoluteMediaUrl(suggestion.image_url),
+    preview_image_url: suggestion.preview_image_url
+      ? toAbsoluteMediaUrl(suggestion.preview_image_url)
+      : undefined,
     tweet_text: tweetText,
     image_data_url: null,
+    preview_image_data_url: null,
   }));
 
   options.onInitial?.(suggestions);
@@ -267,16 +288,50 @@ async function fetchFreshSuggestions(
 
   // X's page CSP can block injected localhost images. Fetch through the
   // extension background and render data URLs so cards display reliably.
-  // This remains parallel, but is deliberately detached from the suggestion
-  // response: a slow full-size asset must not hold the five-second UX budget.
+  // Preview assets are delivered independently so captioned cards can appear
+  // before their full-quality originals. Originals are still prefetched for
+  // attachment, but never used to render the capped card canvas.
   void Promise.allSettled(
-    suggestions.map(async (suggestion) => {
-      suggestion.image_data_url = await fetchMediaDataUrl(suggestion.image_url);
-      options.onMedia?.(suggestion);
-    })
+    suggestions.map((suggestion) => hydrateSuggestionMedia(suggestion, options))
   );
 
   return suggestions;
+}
+
+async function hydrateSuggestionMedia(
+  suggestion: Suggestion,
+  options: {
+    onPreview?: (suggestion: Suggestion) => void;
+    onOriginal?: (suggestion: Suggestion) => void;
+  }
+): Promise<void> {
+  const { previewUrl, originalUrl, sharesAsset } = getSuggestionMediaUrls(
+    suggestion.image_url,
+    suggestion.preview_image_url
+  );
+
+  // A catalog without generated thumbnails has the same URL for each use.
+  // Fetch it once, while preserving separate ready notifications for the
+  // preview renderer and attachment path.
+  if (sharesAsset) {
+    const dataUrl = await fetchMediaDataUrl(originalUrl);
+    suggestion.preview_image_data_url = dataUrl;
+    options.onPreview?.(suggestion);
+    suggestion.image_data_url = dataUrl;
+    options.onOriginal?.(suggestion);
+    return;
+  }
+
+  await Promise.all([
+    fetchMediaDataUrl(previewUrl).then((dataUrl) => {
+      suggestion.preview_image_data_url = dataUrl;
+      options.onPreview?.(suggestion);
+    }),
+    fetchMediaDataUrl(originalUrl).then((dataUrl) => {
+      suggestion.image_data_url = dataUrl;
+      options.onOriginal?.(suggestion);
+    }),
+  ]);
 }
 
 async function saveMeme(imageUrl: string, sourceTweetId?: string) {
@@ -331,22 +386,29 @@ async function fetchMediaDataUrl(imageUrl: string): Promise<string> {
     return cached;
   }
 
-  const response = await fetch(imageUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch media (${response.status})`);
-  }
+  return mediaDataUrlInflight.run(imageUrl, async () => {
+    // The first request may have populated the LRU before this caller entered
+    // the single-flight path.
+    const populated = mediaDataUrlCache.get(imageUrl);
+    if (populated) return populated;
 
-  const blob = await response.blob();
-  const buffer = await blob.arrayBuffer();
-  const base64 = arrayBufferToBase64(buffer);
-  const mimeType = blob.type || guessMimeType(imageUrl);
-  const dataUrl = `data:${mimeType};base64,${base64}`;
-  mediaDataUrlCache.set(imageUrl, dataUrl);
-  if (mediaDataUrlCache.size > MEDIA_CACHE_MAX) {
-    const oldestKey = mediaDataUrlCache.keys().next().value;
-    if (oldestKey) mediaDataUrlCache.delete(oldestKey);
-  }
-  return dataUrl;
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch media (${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const buffer = await blob.arrayBuffer();
+    const base64 = arrayBufferToBase64(buffer);
+    const mimeType = blob.type || guessMimeType(imageUrl);
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+    mediaDataUrlCache.set(imageUrl, dataUrl);
+    if (mediaDataUrlCache.size > MEDIA_CACHE_MAX) {
+      const oldestKey = mediaDataUrlCache.keys().next().value;
+      if (oldestKey) mediaDataUrlCache.delete(oldestKey);
+    }
+    return dataUrl;
+  });
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {

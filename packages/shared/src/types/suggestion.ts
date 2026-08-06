@@ -56,6 +56,8 @@ export interface SuggestionResult {
   meme_id: string;
   name: string;
   image_url: string;
+  /** A smaller card-preview asset. `image_url` always remains the attachment original. */
+  preview_image_url?: string | null;
   tailored_overlay?: MemeTextOverlay | null;
   use_case_label: string;
   match_explanation: string;

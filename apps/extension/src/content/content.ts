@@ -5,6 +5,7 @@ import {
   showSuggestionError,
   updateSuggestions,
   updateSuggestionMedia,
+  updateSuggestionPreview,
   insertMemeByUrl,
   hidePanel,
   isPanelVisible,
@@ -78,7 +79,16 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (
-    message.type === "SUGGESTION_MEDIA_READY" &&
+    message.type === "SUGGESTION_PREVIEW_READY" &&
+    message.cache_key === lastSuggestionCacheKey &&
+    message.meme_id &&
+    message.image_data_url
+  ) {
+    updateSuggestionPreview(message.meme_id, message.image_data_url);
+  }
+
+  if (
+    message.type === "SUGGESTION_ORIGINAL_READY" &&
     message.cache_key === lastSuggestionCacheKey &&
     message.meme_id &&
     message.image_data_url
