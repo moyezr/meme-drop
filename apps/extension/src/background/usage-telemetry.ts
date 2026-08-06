@@ -28,10 +28,8 @@ const SAFE_FEEDBACK_CONTEXT_KEYS = new Set([
   "intensity",
   "reply_style",
   "ideal_meme_vibe",
-  "joke_target",
   "social_dynamic",
   "humor_angle",
-  "keywords",
 ]);
 
 function safeFeedbackContext(values: Record<string, unknown> | undefined) {

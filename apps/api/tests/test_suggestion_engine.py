@@ -8,16 +8,21 @@ from uuid import UUID, uuid4
 
 import memedrop_api.services.suggestion_engine as suggestion_engine
 from memedrop_api.config import Settings
+from memedrop_api.schemas import UsageBatchRequest
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.suggestion_engine import (
     Candidate,
     LexicalCandidateIndex,
     SuggestionService,
+    candidate_joke_shape_boost,
     diversify_shortlist,
     fallback_template_selections,
+    infer_humor_mechanics,
+    inferred_joke_shape_boosts,
     safe_log_cache_key,
     semantic_template_signals,
+    tokenize_sequence,
 )
 from tests.conftest import INSTALL_ID, ApiHarness
 from tests.fakes import FakeStore
@@ -97,12 +102,58 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
     assert result[0]["feedback_context"]["intent"] == "dunking"
     assert "tweet_context" not in result[0]
     assert set(result[0]["feedback_context"]).isdisjoint(
-        {"core_claim", "implied_context", "comedic_tension", "caption_anchors"}
+        {
+            "core_claim",
+            "implied_context",
+            "comedic_tension",
+            "caption_anchors",
+            "joke_target",
+            "keywords",
+        }
     )
     assert result[0]["tailored_overlay"]["regions"][0]["text"] == ("Skipped tests + Friday deploy")
     assert result[1]["tailored_overlay"] is not None
     assert gateway.joint_calls == 1
     assert gateway.caption_calls == 0
+
+
+async def test_feedback_context_excludes_source_derived_terms_for_a_max_length_post() -> None:
+    service, _, gateway = service_with_templates("this-is-fine")
+    gateway.fail_joint = True
+    raw_token = "ultravioletpineapple"
+    tweet = f"{raw_token} " + "ordinary words " * 18
+    tweet = tweet[:280]
+    assert len(tweet) == 280
+
+    suggestion = (await service.get_suggestions(tweet, user_id=INSTALL_ID, limit=1))[0]
+    feedback_context = suggestion["feedback_context"]
+    parsed = UsageBatchRequest.model_validate(
+        {
+            "events": [
+                {
+                    "meme_id": suggestion["meme_id"],
+                    "action": "shown",
+                    "source": suggestion["source"],
+                    "tweet_context": feedback_context,
+                }
+            ]
+        }
+    )
+
+    assert parsed.events[0].tweet_context.model_dump(exclude_none=True) == feedback_context
+    assert raw_token not in str(feedback_context).lower()
+    assert set(feedback_context).isdisjoint({"joke_target", "keywords"})
+
+
+async def test_service_preserves_a_legitimate_zero_selection_score() -> None:
+    service, _, gateway = service_with_templates("this-is-fine")
+    gateway.selections = [TemplateSelection("this-is-fine", "deliberately neutral", 0.0)]
+
+    suggestion = (
+        await service.get_suggestions("Everything is on fire", user_id=INSTALL_ID, limit=1)
+    )[0]
+
+    assert suggestion["score"] == 0.0
 
 
 async def test_service_uses_catalog_thumbnail_for_preview_and_preserves_attachment() -> None:
@@ -294,6 +345,40 @@ async def test_invalidating_feedback_reloads_only_the_feedback_signal() -> None:
     assert store.feedback_score_calls == [INSTALL_ID, INSTALL_ID]
 
 
+async def test_feedback_invalidation_cannot_repopulate_cache_from_a_pre_write_read() -> None:
+    service, store, _ = service_with_templates("this-is-fine")
+    snapshot_taken = asyncio.Event()
+    release_stale_read = asyncio.Event()
+    stale_scores = {store.memes[0]["id"]: 0.04}
+    fresh_scores = {store.memes[0]["id"]: 0.12}
+
+    async def delayed_feedback(user_id: UUID) -> dict[str, float]:
+        store.feedback_score_calls.append(user_id)
+        snapshot = dict(stale_scores)
+        snapshot_taken.set()
+        await release_stale_read.wait()
+        return snapshot
+
+    store.global_meme_feedback_scores = delayed_feedback  # type: ignore[method-assign]
+    stale_read = asyncio.create_task(service._load_feedback_scores(INSTALL_ID, refresh=False))
+    await snapshot_taken.wait()
+    service.invalidate_feedback(INSTALL_ID)
+    release_stale_read.set()
+    assert await stale_read == stale_scores
+    assert INSTALL_ID not in service._feedback_scores
+    assert INSTALL_ID not in service._feedback_cache_generation
+
+    async def fresh_feedback(user_id: UUID) -> dict[str, float]:
+        store.feedback_score_calls.append(user_id)
+        return dict(fresh_scores)
+
+    store.global_meme_feedback_scores = fresh_feedback  # type: ignore[method-assign]
+    assert await service._load_feedback_scores(INSTALL_ID, refresh=False) == fresh_scores
+    assert service._feedback_scores[INSTALL_ID][1] == fresh_scores
+    assert store.feedback_score_calls == [INSTALL_ID, INSTALL_ID]
+    assert INSTALL_ID not in service._feedback_cache_generation
+
+
 async def test_feedback_cache_expires_and_refresh_bypasses_it() -> None:
     service, store, gateway = service_with_templates("this-is-fine")
     gateway.fail_joint = True
@@ -425,7 +510,14 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
     assert suggestion["feedback_context"]
     feedback_context = suggestion["feedback_context"]
     assert set(feedback_context).isdisjoint(
-        {"core_claim", "implied_context", "comedic_tension", "caption_anchors"}
+        {
+            "core_claim",
+            "implied_context",
+            "comedic_tension",
+            "caption_anchors",
+            "joke_target",
+            "keywords",
+        }
     )
     assert suggestion["source"] == "global"
     assert api_harness.store.ensured_users == []
@@ -617,6 +709,83 @@ def test_local_ranker_detects_forced_choice_and_false_label_joke_shapes() -> Non
     assert forced_choice["evil-kermit"] > 0
     assert false_label["is-this-a-pigeon"] > 0
     assert false_label["they-re-the-same-picture"] > 0
+
+
+def test_local_ranker_infers_reusable_mechanics_from_paraphrased_language() -> None:
+    calm_interrupted = infer_humor_mechanics(
+        "The wellness retreat promised a peaceful meditation, then road crews began drilling "
+        "outside the studio."
+    )
+    ceremony_for_trivial_change = infer_humor_mechanics(
+        "The company held a launch event with an audience to announce a slightly different "
+        "brand color."
+    )
+    self_serving_loophole = infer_humor_mechanics(
+        "My activity tracker counted carrying cookies upstairs as exercise, so I treated "
+        "myself to dessert."
+    )
+
+    assert "calm_interrupted" in calm_interrupted
+    assert "ceremony_for_trivial_change" in ceremony_for_trivial_change
+    assert "self_serving_loophole" in self_serving_loophole
+
+    catalog = MemeCatalog.load()
+    future_source = catalog.verified_templates[0]
+    future_template = future_source.model_copy(
+        update={
+            "template_id": "future-annoyed-observer",
+            "name": "Future Annoyed Observer",
+            "retrieval": future_source.retrieval.model_copy(
+                update={"joke_shapes": ["annoyed observer"]}
+            ),
+        }
+    )
+    future_candidate = Candidate(
+        meme_id=future_template.template_id,
+        name=future_template.name,
+        image_url="/memes/future.png",
+        system_tags={},
+        is_evergreen=True,
+        template=future_template,
+    )
+
+    assert (
+        candidate_joke_shape_boost(inferred_joke_shape_boosts(calm_interrupted), future_candidate)
+        == 0.46
+    )
+
+
+def test_local_ranker_infers_choice_conflict_and_rebuttal_mechanics_from_paraphrases() -> None:
+    absurd_workaround = infer_humor_mechanics(
+        "The committee had a direct repair available but selected a lengthy training protocol."
+    )
+    internal_temptation = infer_humor_mechanics(
+        "The reasonable voice in my mind says to save the draft; an impulse wants to delete it."
+    )
+    derailed_goal = infer_humor_mechanics(
+        "I started cleaning the desk; moments later a sprinkler erupted and interrupted everything."
+    )
+    hidden_constraint = infer_humor_mechanics(
+        "They said to simply upload the file, having never encountered the blocked approval system."
+    )
+    dismissive_rebuttal = infer_humor_mechanics(
+        "Residents requested the broken lift be fixed; management responded that they should "
+        "relax and enjoy the stairs."
+    )
+
+    assert "absurd_workaround_chosen" in absurd_workaround
+    assert "responsibility_versus_temptation" in internal_temptation
+    assert "goal_instantly_derailed" in derailed_goal
+    assert "casual_advice_hides_constraint" in hidden_constraint
+    assert "dismissive_rebuttal" in dismissive_rebuttal
+
+
+def test_tokenizer_exposes_hyphenated_concept_components() -> None:
+    terms = tokenize_sequence("A premium-label rollout")
+
+    assert "premium-label" in terms
+    assert "premium" in terms
+    assert "label" in terms
 
 
 def test_anti_use_hints_apply_a_bounded_negative_retrieval_signal() -> None:

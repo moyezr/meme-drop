@@ -351,6 +351,198 @@
       "expected_memes": ["Is This A Pigeon", "They're The Same Picture", "Tuxedo Winnie The Pooh"],
       "keywords": ["apartment", "complaint inbox", "button"],
       "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "waiting is incidental here; the joke is the grand name pasted onto the same neglected channel" }]
+    },
+    {
+      "id": "civic-bench-ribbon",
+      "category": "politics-neutral civic spectacle",
+      "tweet": "The council held a ribbon ceremony for a park bench that has been beside the duck pond since 2019.",
+      "expected_memes": ["Absolute Cinema", "Tuxedo Winnie The Pooh", "They're The Same Picture"],
+      "keywords": ["council", "ribbon", "park bench"],
+      "rejected_memes": [{ "name": "This Is Fine", "reason": "disaster tolerance misses the inflated pageantry around an achievement that is not new" }]
+    },
+    {
+      "id": "family-recipe-voice-note",
+      "category": "family overcomplication",
+      "tweet": "I asked for Grandma's soup recipe and received a nineteen-minute voice note containing a feud, a weather report, and no quantities.",
+      "expected_memes": ["Charlie Conspiracy", "Expanding Brain", "Monkey Puppet"],
+      "keywords": ["Grandma", "soup recipe", "voice note"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "a celebratory toast cannot convey affectionate bewilderment at an answer spiraling away from the question" }]
+    },
+    {
+      "id": "work-font-town-hall",
+      "category": "workplace ceremony",
+      "tweet": "Management booked a forty-five-minute town hall, complete with opening music, to announce that the logo now uses a rounder font.",
+      "expected_memes": ["Boardroom Meeting Suggestion", "Absolute Cinema", "Expanding Brain"],
+      "keywords": ["management", "town hall", "font"],
+      "rejected_memes": [{ "name": "Disaster Girl", "reason": "smug destruction overstates a situation whose humor comes from pomp attached to a microscopic update" }]
+    },
+    {
+      "id": "school-project-title-page",
+      "category": "unequal group contribution",
+      "tweet": "Our group presentation has forty slides; Noah chose the title color and is already asking where to put his name for equal credit.",
+      "expected_memes": ["Trade Offer", "Pawn Stars Best I Can Do", "Woman Yelling At Cat"],
+      "keywords": ["presentation", "title color", "credit"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "delay is not the point; the comic conflict is tiny effort demanding an equal reward" }]
+    },
+    {
+      "id": "hotel-ocean-view-angle",
+      "category": "travel listing deception",
+      "tweet": "The hotel's ocean-view room requires leaning over the laundry vent and using phone zoom to locate a blue triangle between two roofs.",
+      "expected_memes": ["Is This A Pigeon", "Tuxedo Winnie The Pooh", "They're The Same Picture"],
+      "keywords": ["hotel", "ocean-view", "laundry vent"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "agreement imagery does not expose the gulf between a glamorous listing and the actual view" }]
+    },
+    {
+      "id": "streaming-cancel-recommend",
+      "category": "entertainment platform absurdity",
+      "tweet": "The streaming app canceled my favorite series halfway through the story and immediately recommended I begin it again from episode one.",
+      "expected_memes": ["Surprised Pikachu", "Roll Safe Think About It", "Gru's Plan"],
+      "keywords": ["streaming", "series", "episode"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "celebration contradicts the platform creating frustration and presenting it as a helpful recommendation" }]
+    },
+    {
+      "id": "relationship-no-gift-board",
+      "category": "relationship mixed message",
+      "tweet": "My partner said our anniversary needs no present, then shared a mood board titled Things That Would Look Nice Wrapped.",
+      "expected_memes": ["Anakin Padme 4 Panel", "Futurama Fry", "Two Buttons"],
+      "keywords": ["partner", "anniversary", "mood board"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "unlimited gifting misses the uneasy attempt to decode a very specific indirect message" }]
+    },
+    {
+      "id": "cereal-family-size-air",
+      "category": "consumer shrinkflation",
+      "tweet": "The cereal box says family size, but after opening it I discovered the family is apparently two people and a generous pocket of air.",
+      "expected_memes": ["Pawn Stars Best I Can Do", "Trade Offer", "Surprised Pikachu"],
+      "keywords": ["cereal", "family size", "air"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "mutual appreciation is incompatible with a customer receiving far less than the packaging implies" }]
+    },
+    {
+      "id": "tasting-menu-biography",
+      "category": "food presentation excess",
+      "tweet": "The tasting menu served one roasted carrot on a stone, followed by a seven-minute biography of the farm where it grew.",
+      "expected_memes": ["Absolute Cinema", "Tuxedo Winnie The Pooh", "Hide the Pain Harold"],
+      "keywords": ["tasting menu", "carrot", "farm"],
+      "rejected_memes": [{ "name": "Panik Kalm Panik", "reason": "rapid panic swings do not fit restrained mockery of solemn presentation surrounding a tiny serving" }]
+    },
+    {
+      "id": "soccer-kit-before-practice",
+      "category": "sports misplaced priorities",
+      "tweet": "Our casual soccer team bought matching warm-up jackets, hired a photographer, and has yet to learn everyone's positions.",
+      "expected_memes": ["Tuxedo Winnie The Pooh", "Expanding Brain", "Gru's Plan"],
+      "keywords": ["soccer", "jackets", "photographer"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "the delay itself is secondary to polishing the image before acquiring the basic competence" }]
+    },
+    {
+      "id": "fitness-watch-dessert-credit",
+      "category": "health metric loophole",
+      "tweet": "My fitness watch counted whisking cake batter as an intense workout, and I have accepted this scientific permission to eat two slices.",
+      "expected_memes": ["Roll Safe Think About It", "Expanding Brain", "Hide the Pain Harold"],
+      "keywords": ["fitness watch", "cake batter", "workout"],
+      "rejected_memes": [{ "name": "Woman Yelling At Cat", "reason": "an angry confrontation is too combative for a self-serving interpretation of a flattering measurement" }]
+    },
+    {
+      "id": "silent-yoga-jackhammer",
+      "category": "neighborhood expectation collision",
+      "tweet": "The courtyard advertised silent sunrise yoga; the building next door began jackhammering exactly as the instructor whispered breathe.",
+      "expected_memes": ["Squidward window", "This Is Fine", "Hide the Pain Harold"],
+      "keywords": ["courtyard", "yoga", "jackhammering"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "giveaway exuberance cannot express the clash between promised tranquility and invasive noise" }]
+    },
+    {
+      "id": "freezer-alarm-workaround",
+      "category": "preference contrast",
+      "tweet": "The restaurant can replace a three-dollar freezer alarm, or teach everyone a clapping routine whenever it starts beeping. The meeting picked the routine.",
+      "expected_memes": ["Drake Hotline Bling", "Roll Safe Think About It", "Boardroom Meeting Suggestion"],
+      "keywords": ["restaurant", "freezer", "clapping"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "an extended-delay reaction misses the explicit rejection of a simple fix for an absurd substitute" }]
+    },
+    {
+      "id": "midnight-email-goblin",
+      "category": "internal temptation",
+      "tweet": "Every sensible thought says go to bed; the tiny goblin in my brain wants to answer the 11:58 p.m. email with a forty-slide deck.",
+      "expected_memes": ["Evil Kermit", "Distracted Boyfriend", "Two Paths"],
+      "keywords": ["bed", "email", "deck"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "a victory toast does not capture the private urge to make a reckless choice" }]
+    },
+    {
+      "id": "zipline-will-question",
+      "category": "ominous promise",
+      "tweet": "The guide said the zip line had never failed, then paused to ask whether any of us had written a will.",
+      "expected_memes": ["Anakin Padme 4 Panel", "The Rock Driving", "Panik Kalm Panik"],
+      "keywords": ["guide", "zip line", "will"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "shared agreement has none of the hopeful statement curdling into dread" }]
+    },
+    {
+      "id": "resident-app-unmasking",
+      "category": "hidden cause reveal",
+      "tweet": "The building unveiled a revolutionary resident app; behind the new logo was the same maintenance form that has ignored my radiator for two winters.",
+      "expected_memes": ["Scooby Doo Mask Reveal", "They're The Same Picture", "Always Has Been"],
+      "keywords": ["building", "resident app", "radiator"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "feature-giveaway energy misses the reveal that a supposed new solution is the old problem in costume" }]
+    },
+    {
+      "id": "bath-time-sofa-emergency",
+      "category": "goal blocked by chaos",
+      "tweet": "I went to give the toddler a bath, and the instant I touched the tap the dog launched an emergency sofa-cushion evacuation.",
+      "expected_memes": ["Running Away Balloon", "Panik Kalm Panik", "This Is Fine"],
+      "keywords": ["toddler", "bath", "dog"],
+      "rejected_memes": [{ "name": "Change My Mind", "reason": "a declarative hot-take format misses a simple task being yanked off course by sudden chaos" }]
+    },
+    {
+      "id": "decaf-taboo",
+      "category": "sudden overreaction",
+      "tweet": "Someone asked whether the cafe had decaf, and the barista instantly yelled, 'WE DO NOT DISCUSS THAT HERE.'",
+      "expected_memes": ["Inhaling Seagull", "Woman Yelling At Cat", "Panik Kalm Panik"],
+      "keywords": ["cafe", "decaf", "barista"],
+      "rejected_memes": [{ "name": "Sad Pablo Escobar", "reason": "lonely waiting cannot convey a tiny question detonating into a theatrical response" }]
+    },
+    {
+      "id": "soup-can-secret",
+      "category": "private knowledge",
+      "tweet": "At dinner everyone praised the host's new cookbook; I was the only one who watched the recipe come straight from the back of a soup can.",
+      "expected_memes": ["They Don't Know", "Megamind Peeking", "Monkey Puppet"],
+      "keywords": ["dinner", "cookbook", "soup can"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a giveaway setup misses one observer carrying an awkward fact while the room celebrates" }]
+    },
+    {
+      "id": "between-ideas-voice",
+      "category": "mocking repetition",
+      "tweet": "My brother says he is 'between ideas' after quitting his job, and I have discovered a very useful mocking voice.",
+      "expected_memes": ["Mocking Spongebob", "Change My Mind", "Laughing Leo"],
+      "keywords": ["brother", "ideas", "job"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "a long-delay image does not target the sarcastic echo of an unconvincing phrase" }]
+    },
+    {
+      "id": "festival-ferry-lunch",
+      "category": "hard constraint",
+      "tweet": "'Just take the ferry over for lunch,' says the person who has never tried booking one during the lantern festival.",
+      "expected_memes": ["One Does Not Simply", "Gru's Plan", "Two Buttons"],
+      "keywords": ["ferry", "lunch", "lantern festival"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "celebration undercuts the point that an apparently casual request has an immovable obstacle" }]
+    },
+    {
+      "id": "cafe-vibe-rebuttal",
+      "category": "absurd rebuttal",
+      "tweet": "Neighbors asked the cafe to stop shaking their windows with bass; the owner replied, 'Have you tried appreciating the vibe?'",
+      "expected_memes": ["Woman Yelling At Cat", "This Is Fine", "Boardroom Meeting Suggestion"],
+      "keywords": ["neighbors", "cafe", "bass"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "waiting is not the joke when a legitimate complaint receives a calmly ridiculous answer" }]
+    },
+    {
+      "id": "shortcut-locked-gate",
+      "category": "confidence before disaster",
+      "tweet": "I announced that I knew a shortcut; five minutes later the trail ended at a locked gate and the sun was setting.",
+      "expected_memes": ["The Rock Driving", "Gru's Plan", "Hide the Pain Harold"],
+      "keywords": ["shortcut", "trail", "gate"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "mutual accord misses the confident claim collapsing into an immediate personal problem" }]
+    },
+    {
+      "id": "hand-dryer-consensus",
+      "category": "unlikely agreement",
+      "tweet": "The opera fan, the metalhead, and the toddler all agree on one thing: the automatic hand dryer is too loud.",
+      "expected_memes": ["Epic Handshake", "Inhaling Seagull", "Squidward window"],
+      "keywords": ["opera", "metalhead", "hand dryer"],
+      "rejected_memes": [{ "name": "Trade Offer", "reason": "a lopsided negotiation format misses unlike people unexpectedly sharing the same complaint" }]
     }
   ]
 }

@@ -61,6 +61,8 @@ test("usage telemetry projects only feedback context into the API context field"
     feedback_context: {
       topic: "work",
       humor_angle: "deadline pressure",
+      joke_target: "do not transmit source-derived targets",
+      keywords: ["do", "not", "transmit"],
       core_claim: "do not transmit this either",
     },
     // Runtime messages are untyped; prove an accidental raw field is ignored.

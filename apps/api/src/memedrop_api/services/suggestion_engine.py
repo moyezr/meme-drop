@@ -78,6 +78,199 @@ RETRIEVAL_STOP_WORDS = {
     "would",
 }
 
+# Small domain-neutral vocabulary groups used to recognize a joke's *mechanic*
+# before looking at its subject matter.  They deliberately describe everyday
+# language (a promise contradicted by a shopping list; a quiet plan interrupted
+# by noise) rather than social-network or benchmark vocabulary.  This lets the
+# local ranker bridge paraphrases without an embedding call on its hot path.
+HUMOR_CONCEPT_WORDS: dict[str, frozenset[str]] = {
+    "calm": frozenset({"calm", "quiet", "silent", "peaceful", "relax", "meditation", "serene"}),
+    "disruption": frozenset(
+        {
+            "chaos",
+            "construction",
+            "drilling",
+            "hammer",
+            "machinery",
+            "noise",
+            "loud",
+            "alarm",
+            "traffic",
+        }
+    ),
+    "ceremony": frozenset(
+        {
+            "ceremony",
+            "ceremonial",
+            "launch",
+            "presentation",
+            "town",
+            "hall",
+            "music",
+            "photographer",
+        }
+    ),
+    "polish": frozenset(
+        {"branding", "logo", "font", "color", "uniform", "jacket", "matching", "wrapped", "package"}
+    ),
+    "display": frozenset(
+        {"served", "serving", "menu", "plate", "plated", "display", "exhibit", "gallery"}
+    ),
+    "trivial": frozenset({"tiny", "minor", "small", "cosmetic", "basic", "ordinary", "rounder"}),
+    "excess": frozenset(
+        {
+            "long",
+            "lengthy",
+            "elaborate",
+            "detailed",
+            "many",
+            "hours",
+            "minute",
+            "minutes",
+            "slides",
+            "biography",
+            "steps",
+        }
+    ),
+    "unfinished": frozenset(
+        {"before", "yet", "unfinished", "unprepared", "incomplete", "learn", "learned", "starting"}
+    ),
+    "claim": frozenset(
+        {
+            "advertised",
+            "advertise",
+            "claimed",
+            "claim",
+            "listed",
+            "label",
+            "labeled",
+            "called",
+            "says",
+            "promised",
+            "promise",
+            "size",
+            "view",
+        }
+    ),
+    "reality": frozenset(
+        {
+            "actually",
+            "apparent",
+            "apparently",
+            "requires",
+            "require",
+            "only",
+            "just",
+            "empty",
+            "air",
+            "hidden",
+            "between",
+        }
+    ),
+    "removal": frozenset(
+        {
+            "cancel",
+            "canceled",
+            "cancelled",
+            "remove",
+            "removed",
+            "delete",
+            "deleted",
+            "discontinue",
+            "ended",
+        }
+    ),
+    "repeat": frozenset(
+        {"again", "repeat", "repeated", "restart", "return", "begin", "episode", "cycle"}
+    ),
+    "contribution": frozenset(
+        {
+            "credit",
+            "contribution",
+            "contributed",
+            "effort",
+            "work",
+            "equal",
+            "share",
+            "payment",
+            "compensation",
+        }
+    ),
+    "minimal": frozenset({"only", "just", "nothing", "zero", "no", "none", "title"}),
+    "exercise": frozenset(
+        {"fitness", "workout", "exercise", "activity", "burned", "calories", "intense"}
+    ),
+    "indulgence": frozenset(
+        {"dessert", "cake", "treat", "reward", "eat", "eating", "permission", "slices"}
+    ),
+    "explanation": frozenset(
+        {
+            "explained",
+            "explanation",
+            "details",
+            "story",
+            "instructions",
+            "measurements",
+            "answer",
+            "directions",
+        }
+    ),
+    "desire": frozenset({"gift", "present", "wishlist", "wish", "shopping", "wrapped", "want"}),
+    "simple_fix": frozenset(
+        {"simple", "direct", "obvious", "straightforward", "fix", "repair", "replace", "solve"}
+    ),
+    "workaround": frozenset(
+        {"workaround", "routine", "process", "protocol", "training", "teach", "instruct", "ritual"}
+    ),
+    "group_choice": frozenset(
+        {"committee", "meeting", "group", "team", "management", "picked", "selected", "chose"}
+    ),
+    "responsible": frozenset(
+        {"sensible", "responsible", "reasonable", "wise", "proper", "should", "better"}
+    ),
+    "temptation": frozenset(
+        {"impulse", "urge", "temptation", "tempted", "brain", "mind", "thought", "voice", "wants"}
+    ),
+    "intent": frozenset(
+        {"goal", "plan", "planned", "started", "begin", "went", "trying", "tried", "wanted"}
+    ),
+    "sudden": frozenset(
+        {"instant", "instantly", "immediate", "immediately", "sudden", "suddenly", "moment"}
+    ),
+    "derailment": frozenset(
+        {"emergency", "interrupted", "interruption", "erupted", "launched", "derailed", "blocked"}
+    ),
+    "casual_advice": frozenset({"just", "simply", "easy", "easily", "casual", "quickly"}),
+    "constraint": frozenset(
+        {
+            "never",
+            "impossible",
+            "difficult",
+            "hard",
+            "requires",
+            "required",
+            "unavailable",
+            "blocked",
+        }
+    ),
+    "request": frozenset(
+        {"asked", "requested", "complained", "complaint", "please", "stop", "fix", "issue"}
+    ),
+    "reply": frozenset({"replied", "responded", "response", "answered", "answer"}),
+    "dismissal": frozenset(
+        {
+            "appreciate",
+            "enjoy",
+            "relax",
+            "ignore",
+            "deal",
+            "perspective",
+            "actually",
+            "overreacting",
+        }
+    ),
+}
+
 USAGE_FEEDBACK_CONTEXT_FIELDS = (
     "sentiment",
     "tone",
@@ -86,10 +279,8 @@ USAGE_FEEDBACK_CONTEXT_FIELDS = (
     "intensity",
     "reply_style",
     "ideal_meme_vibe",
-    "joke_target",
     "social_dynamic",
     "humor_angle",
-    "keywords",
 )
 
 
@@ -145,6 +336,14 @@ class SuggestionRun:
 
     suggestions: list[dict[str, Any]]
     timing: SuggestionTiming
+
+
+@dataclass
+class FeedbackCacheGeneration:
+    """Per-user invalidation state retained only while detached reads finish."""
+
+    value: int = 0
+    stale_reads: int = 0
 
 
 @dataclass(frozen=True)
@@ -285,6 +484,9 @@ class SuggestionService:
         # round trip; the short TTL bounds how long new feedback takes to influence rank.
         self._feedback_scores: OrderedDict[UUID, tuple[float, dict[str, float]]] = OrderedDict()
         self._feedback_score_inflight: dict[UUID, asyncio.Task[dict[str, float]]] = {}
+        # Incremented after every usage write. A read that began before the write may
+        # still complete for its original caller, but it must never refill this cache.
+        self._feedback_cache_generation: dict[UUID, FeedbackCacheGeneration] = {}
 
     async def get_suggestions(
         self,
@@ -432,7 +634,10 @@ class SuggestionService:
                     "use_case_label": candidate_use_case_label(candidate),
                     "match_explanation": selection.reason
                     or candidate.template.caption_guidance.pattern,
-                    "score": round(selection.score or 1 - index * 0.08, 3),
+                    "score": round(
+                        selection.score if selection.score is not None else 1 - index * 0.08,
+                        3,
+                    ),
                     "source": "global",
                     # This is deliberately the only analysis exposed to clients: it is
                     # structured for usage feedback and contains no source post text.
@@ -501,26 +706,51 @@ class SuggestionService:
             return cached
         task = self._feedback_score_inflight.get(user_id)
         if task is None:
-            task = asyncio.create_task(self._fetch_feedback_scores(user_id))
+            state = self._feedback_cache_generation.get(user_id)
+            generation = state.value if state is not None else 0
+            task = asyncio.create_task(self._fetch_feedback_scores(user_id, generation))
             self._feedback_score_inflight[user_id] = task
             task.add_done_callback(
                 lambda completed: self._clear_feedback_score_inflight(user_id, completed)
             )
         return await asyncio.shield(task)
 
-    async def _fetch_feedback_scores(self, user_id: UUID) -> dict[str, float]:
-        scores = await self.store.global_meme_feedback_scores(user_id)
-        # Copy at the storage boundary. In particular, fake or adapter stores must
-        # not be able to mutate an already-cached user's score map after returning.
-        cached_scores = dict(scores)
-        self._write_feedback_scores(user_id, cached_scores)
-        return cached_scores
+    async def _fetch_feedback_scores(self, user_id: UUID, generation: int) -> dict[str, float]:
+        try:
+            scores = await self.store.global_meme_feedback_scores(user_id)
+            # Copy at the storage boundary. In particular, fake or adapter stores must
+            # not be able to mutate an already-cached user's score map after returning.
+            cached_scores = dict(scores)
+            state = self._feedback_cache_generation.get(user_id)
+            if state is None or state.value == generation:
+                self._write_feedback_scores(user_id, cached_scores)
+            return cached_scores
+        finally:
+            self._finish_feedback_score_fetch(user_id, generation)
 
     def _clear_feedback_score_inflight(
         self, user_id: UUID, completed: asyncio.Task[dict[str, float]]
     ) -> None:
         if self._feedback_score_inflight.get(user_id) is completed:
             self._feedback_score_inflight.pop(user_id, None)
+        self._clear_feedback_generation_if_idle(user_id)
+
+    def _finish_feedback_score_fetch(self, user_id: UUID, generation: int) -> None:
+        state = self._feedback_cache_generation.get(user_id)
+        if state is not None and generation != state.value:
+            state.stale_reads -= 1
+            if state.stale_reads < 0:
+                raise AssertionError("Feedback cache generation lost track of a stale read.")
+        self._clear_feedback_generation_if_idle(user_id)
+
+    def _clear_feedback_generation_if_idle(self, user_id: UUID) -> None:
+        state = self._feedback_cache_generation.get(user_id)
+        if (
+            state is not None
+            and state.stale_reads == 0
+            and user_id not in self._feedback_score_inflight
+        ):
+            self._feedback_cache_generation.pop(user_id, None)
 
     def _read_feedback_scores(self, user_id: UUID) -> dict[str, float] | None:
         entry = self._feedback_scores.get(user_id)
@@ -550,6 +780,15 @@ class SuggestionService:
         write or a read to the hot ``/suggest`` path.
         """
         self._feedback_scores.pop(user_id, None)
+        # Detach an older read so the next request does not attach to data that
+        # predates the write. It remains alive for any caller already awaiting it.
+        detached = self._feedback_score_inflight.pop(user_id, None)
+        if detached is None:
+            self._clear_feedback_generation_if_idle(user_id)
+            return
+        state = self._feedback_cache_generation.setdefault(user_id, FeedbackCacheGeneration())
+        state.value += 1
+        state.stale_reads += 1
 
     async def _load_global_candidates(self) -> tuple[Candidate, ...]:
         if self._global_candidates is not None:
@@ -619,6 +858,8 @@ def fallback_template_selections(
     utility for tests, the offline evaluator, and small one-off catalogs.
     """
     signals = semantic_template_signals(tweet_text)
+    inferred_mechanics = infer_humor_mechanics(tweet_text)
+    inferred_shape_boosts = inferred_joke_shape_boosts(inferred_mechanics)
     index = lexical_index or LexicalCandidateIndex.build(candidates)
     lexical_scores = index.score(tweet_text)
     anti_scores = index.anti_score(tweet_text)
@@ -627,7 +868,9 @@ def fallback_template_selections(
 
     def rank(candidate: Candidate) -> tuple[float, Candidate]:
         signal_boost = signals.get(candidate.template.template_id, 0)
-        shape_boost = structural_joke_shape_boost(tweet_text, candidate)
+        shape_boost = structural_joke_shape_boost(
+            tweet_text, candidate
+        ) + candidate_joke_shape_boost(inferred_shape_boosts, candidate)
         raw_lexical_score = lexical_scores.get(candidate.template.template_id, 0.0)
         # BM25 is unbounded and its absolute range changes with query length. Map
         # it relative to the strongest matching document for this query instead of
@@ -770,6 +1013,195 @@ def semantic_template_signals(tweet_text: str) -> dict[str, float]:
     return signals
 
 
+# Catalog-owned joke shapes, rather than template IDs, connect inferred
+# mechanics to ranking. New reviewed templates automatically benefit when they
+# reuse a shape, and the max-combination keeps this signal bounded per candidate.
+MECHANIC_SHAPE_BOOSTS: dict[str, tuple[tuple[str, float], ...]] = {
+    "calm_interrupted": (
+        ("annoyed observer", 0.46),
+        ("calm amid mayhem", 0.36),
+        ("forced composure", 0.28),
+    ),
+    "ceremony_for_trivial_change": (
+        ("grandiose art defense", 0.46),
+        ("pretentious over-explanation", 0.46),
+        ("group bad judgment", 0.38),
+        ("overengineering", 0.34),
+    ),
+    "polish_before_substance": (
+        ("luxury makeover", 0.46),
+        ("pretentious upgrade", 0.46),
+        ("overengineering", 0.38),
+        ("flawed plan", 0.34),
+    ),
+    "claim_reality_gap": (
+        ("false label", 0.46),
+        ("pretentious relabeling", 0.46),
+        ("fake distinction", 0.38),
+        ("euphemistic rebrand", 0.38),
+        ("pretentious upgrade", 0.34),
+    ),
+    "bad_value_exchange": (
+        ("lowball offer", 0.46),
+        ("exploitative bargain", 0.46),
+        ("exploitative exchange", 0.42),
+        ("lopsided deal", 0.42),
+        ("predictable consequence", 0.30),
+    ),
+    "self_defeating_cycle": (
+        ("predictable consequence", 0.46),
+        ("obvious outcome", 0.46),
+        ("confident bad solution", 0.42),
+        ("fake wisdom", 0.42),
+        ("flawed plan", 0.38),
+    ),
+    "unequal_credit": (
+        ("exploitative exchange", 0.46),
+        ("lopsided deal", 0.46),
+        ("lowball offer", 0.42),
+        ("dramatic confrontation", 0.30),
+    ),
+    "self_serving_loophole": (
+        ("confident bad solution", 0.46),
+        ("fake wisdom", 0.46),
+        ("absurd escalation", 0.38),
+        ("forced composure", 0.32),
+    ),
+    "ominous_contradiction": (
+        ("ominous promise", 0.46),
+        ("hope turning to dread", 0.46),
+        ("suspicious ambiguity", 0.38),
+        ("forced choice", 0.32),
+    ),
+    "overexplained_simple_thing": (
+        ("grandiose art defense", 0.46),
+        ("pretentious over-explanation", 0.46),
+        ("luxury makeover", 0.38),
+        ("forced composure", 0.30),
+    ),
+    "nonanswer_with_details": (
+        ("elaborate suspicion", 0.46),
+        ("overinterpretation", 0.46),
+        ("overengineering", 0.40),
+        ("guilty reaction", 0.30),
+    ),
+    "absurd_workaround_chosen": (
+        ("preference contrast", 0.46),
+        ("reject versus approve", 0.46),
+        ("confident bad solution", 0.42),
+        ("group bad judgment", 0.38),
+    ),
+    "responsibility_versus_temptation": (
+        ("bad impulse", 0.46),
+        ("internal temptation", 0.46),
+        ("shiny object temptation", 0.40),
+        ("safe versus chaotic path", 0.34),
+    ),
+    "goal_instantly_derailed": (
+        ("goal blocked by chaos", 0.46),
+        ("pulled away", 0.46),
+        ("panic reversal", 0.40),
+        ("calm amid mayhem", 0.34),
+    ),
+    "casual_advice_hides_constraint": (
+        ("hard constraint", 0.48),
+        ("not that simple", 0.48),
+        ("flawed plan", 0.38),
+        ("forced choice", 0.30),
+    ),
+    "dismissive_rebuttal": (
+        ("dramatic confrontation", 0.46),
+        ("absurd rebuttal", 0.46),
+        ("forced optimism", 0.38),
+        ("group bad judgment", 0.34),
+    ),
+}
+
+
+def infer_humor_mechanics(text: str) -> set[str]:
+    """Infer broad joke grammars from ordinary language, without a model call.
+
+    The output is deliberately small and reusable across subjects.  Each rule
+    requires two independent concepts, which prevents a single topical word
+    such as ``quiet`` or ``package`` from overwhelming lexical relevance.
+    """
+    # Keep short structural words here as well as indexed content terms: a
+    # negation such as "no" is meaningful for a contradiction even though it is
+    # intentionally omitted from BM25 documents.
+    tokens = set(tokenize_sequence(text)) | set(re.findall(r"[a-z0-9][a-z0-9_'’-]*", text.lower()))
+
+    def has(concept: str) -> bool:
+        if tokens & HUMOR_CONCEPT_WORDS[concept]:
+            return True
+        # Compound nouns such as a road-drill or a jackhammer are still a
+        # disruption even when English joins their parts without a hyphen.
+        return concept == "disruption" and any(
+            token.endswith(("hammer", "drill")) for token in tokens
+        )
+
+    mechanics: set[str] = set()
+    if has("calm") and has("disruption"):
+        mechanics.add("calm_interrupted")
+    if has("ceremony") and (has("trivial") or has("polish")):
+        mechanics.add("ceremony_for_trivial_change")
+    if has("polish") and has("unfinished"):
+        mechanics.add("polish_before_substance")
+    if has("claim") and has("reality"):
+        mechanics.add("claim_reality_gap")
+    if has("claim") and ("air" in tokens or "empty" in tokens):
+        mechanics.add("bad_value_exchange")
+    if has("removal") and has("repeat"):
+        mechanics.add("self_defeating_cycle")
+    if has("contribution") and has("minimal"):
+        mechanics.add("unequal_credit")
+    if has("exercise") and has("indulgence"):
+        mechanics.add("self_serving_loophole")
+    if re.search(r"\b(?:no|without|nothing)\b.{0,90}\b(?:but|then|yet)\b", text) and has("desire"):
+        mechanics.add("ominous_contradiction")
+    if has("excess") and (has("trivial") or has("polish") or has("display")):
+        mechanics.add("overexplained_simple_thing")
+    if has("excess") and re.search(r"\b(?:no|without|missing|instead)\b", text):
+        mechanics.add("nonanswer_with_details")
+    if has("simple_fix") and has("workaround") and has("group_choice"):
+        mechanics.add("absurd_workaround_chosen")
+    if has("responsible") and has("temptation"):
+        mechanics.add("responsibility_versus_temptation")
+    if has("intent") and has("sudden") and has("derailment"):
+        mechanics.add("goal_instantly_derailed")
+    if has("casual_advice") and has("constraint"):
+        mechanics.add("casual_advice_hides_constraint")
+    if has("request") and has("reply") and has("dismissal"):
+        mechanics.add("dismissive_rebuttal")
+    return mechanics
+
+
+def inferred_joke_shape_boosts(mechanics: set[str]) -> dict[str, float]:
+    """Compile inferred mechanics into bounded catalog joke-shape weights."""
+    shape_boosts: dict[str, float] = {}
+    for mechanic in mechanics:
+        for shape, weight in MECHANIC_SHAPE_BOOSTS[mechanic]:
+            shape_boosts[shape] = max(weight, shape_boosts.get(shape, 0.0))
+    return shape_boosts
+
+
+def candidate_joke_shape_boost(
+    inferred_shape_boosts: dict[str, float], candidate: Candidate
+) -> float:
+    """Score precompiled mechanics against the candidate's reviewed grammar.
+
+    Taking the strongest shape match avoids double-counting synonymous catalog
+    labels and bounds this deterministic signal even when several mechanics are
+    inferred from one post.
+    """
+    return max(
+        (
+            inferred_shape_boosts.get(shape, 0.0)
+            for shape in candidate.template.retrieval.joke_shapes
+        ),
+        default=0.0,
+    )
+
+
 def fill_selections(
     primary: list[TemplateSelection], fallback: list[TemplateSelection], limit: int
 ) -> list[TemplateSelection]:
@@ -863,6 +1295,14 @@ def tokenize_sequence(value: str) -> list[str]:
             continue
         result.append(token)
         result.extend(token_stems(token))
+        # Hyphenated compounds carry both a phrase-level meaning (which we keep
+        # above) and ordinary component concepts.  Indexing the latter makes a
+        # query like "premium-label" share useful retrieval evidence with a
+        # catalog hint about a "premium label" without requiring a phrase model.
+        for component in re.split(r"[-–]", token):
+            if component != token and len(component) > 2 and component not in RETRIEVAL_STOP_WORDS:
+                result.append(component)
+                result.extend(token_stems(component))
     return result
 
 

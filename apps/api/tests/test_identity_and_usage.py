@@ -44,7 +44,7 @@ async def test_invalid_install_identity_is_rejected(api_harness: ApiHarness) -> 
     assert response.json() == {"error": "x-memedrop-install-id must be a UUID"}
 
 
-async def test_usage_records_all_context_and_ensures_user(api_harness: ApiHarness) -> None:
+async def test_usage_records_safe_context_and_ensures_user(api_harness: ApiHarness) -> None:
     response = await api_harness.client.post(
         "/api/v1/usage",
         headers=HEADERS,
@@ -58,7 +58,6 @@ async def test_usage_records_all_context_and_ensures_user(api_harness: ApiHarnes
                 "topic": "tech",
                 "intent": "dunking",
                 "intensity": 0.8,
-                "keywords": ["deploy", "prod"],
             },
         },
     )
@@ -72,8 +71,27 @@ async def test_usage_records_all_context_and_ensures_user(api_harness: ApiHarnes
         "topic": "tech",
         "intent": "dunking",
         "intensity": 0.8,
-        "keywords": ["deploy", "prod"],
     }
+
+
+async def test_usage_accepts_legacy_source_fields_but_never_persists_them(
+    api_harness: ApiHarness,
+) -> None:
+    response = await api_harness.client.post(
+        "/api/v1/usage",
+        headers=HEADERS,
+        json={
+            "meme_id": str(MEME_ID),
+            "action": "used",
+            "tweet_context": {
+                "joke_target": "the exact post subject",
+                "keywords": ["source", "terms"],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert api_harness.store.usage_events[0]["tweetContext"] == {}
 
 
 async def test_usage_batch_records_events_and_ensures_user_once(api_harness: ApiHarness) -> None:

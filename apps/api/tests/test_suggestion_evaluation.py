@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from typing import cast
 
+import memedrop_api.suggestion_evaluation as suggestion_evaluation
 from memedrop_api.suggestion_evaluation import (
     DEFAULT_THRESHOLDS,
     CaseResult,
@@ -9,6 +11,7 @@ from memedrop_api.suggestion_evaluation import (
     EvaluationThresholds,
     build_report,
     build_scale_candidates,
+    evaluate_benchmark,
     evaluate_catalog_scale,
     percentile,
     production_candidates,
@@ -110,3 +113,49 @@ def test_scale_catalog_uses_distinct_template_ids_and_a_warmed_index() -> None:
     latency = cast(dict[str, object], report["warm_ranking_latency_ms"])
     assert latency["queries"] == 2
     assert report["passed"] is True
+
+
+def test_benchmark_reuses_one_prebuilt_lexical_index(
+    tmp_path, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    benchmark_path = tmp_path / "benchmark.json"
+    benchmark_path.write_text(
+        json.dumps(
+            {
+                "cases": [
+                    {
+                        "id": "first",
+                        "category": "test",
+                        "tweet": "The dashboard is red after deploy.",
+                        "expected_memes": ["This Is Fine"],
+                    },
+                    {
+                        "id": "second",
+                        "category": "test",
+                        "tweet": "Everything remains totally under control.",
+                        "expected_memes": ["This Is Fine"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    builds = 0
+    original_build = suggestion_evaluation.LexicalCandidateIndex.build
+
+    def counting_build(candidates):  # type: ignore[no-untyped-def]
+        nonlocal builds
+        builds += 1
+        return original_build(candidates)
+
+    monkeypatch.setattr(suggestion_evaluation.LexicalCandidateIndex, "build", counting_build)
+    monkeypatch.setattr(
+        suggestion_evaluation,
+        "evaluate_catalog_scale",
+        lambda candidates: {"passed": True},
+    )
+
+    report = evaluate_benchmark(benchmark_path, candidates=production_candidates())
+
+    assert builds == 1
+    assert len(cast(list[dict[str, object]], report["cases"])) == 2

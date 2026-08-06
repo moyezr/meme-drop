@@ -48,7 +48,9 @@ class UpdateMemeRequest(StrictModel):
         return self
 
 
-class TweetContextInput(StrictModel):
+class FeedbackContextInput(StrictModel):
+    """Safe, source-text-free feedback fields accepted by usage endpoints."""
+
     sentiment: Literal["positive", "negative", "neutral"] | None = None
     tone: (
         Literal[
@@ -94,9 +96,12 @@ class TweetContextInput(StrictModel):
     intensity: float | None = Field(default=None, ge=0, le=1)
     reply_style: str | None = Field(default=None, max_length=80)
     ideal_meme_vibe: str | None = Field(default=None, max_length=180)
-    joke_target: str | None = Field(default=None, max_length=120)
     social_dynamic: str | None = Field(default=None, max_length=160)
     humor_angle: str | None = Field(default=None, max_length=180)
+    # Older extensions can still send these source-derived fields. Accept them
+    # during a rolling deployment, but Pydantic excludes them from every
+    # ``model_dump`` used by the persistence boundary.
+    joke_target: str | None = Field(default=None, max_length=120, exclude=True)
     keywords: (
         list[
             Annotated[
@@ -105,7 +110,7 @@ class TweetContextInput(StrictModel):
             ]
         ]
         | None
-    ) = Field(default=None, max_length=6)
+    ) = Field(default=None, max_length=6, exclude=True)
 
 
 USAGE_FEEDBACK_ACTIONS = (
@@ -125,7 +130,7 @@ UsageFeedbackAction = Literal[
 class UsageRequest(StrictModel):
     meme_id: UUID
     action: UsageFeedbackAction
-    tweet_context: TweetContextInput = Field(default_factory=TweetContextInput)
+    tweet_context: FeedbackContextInput = Field(default_factory=FeedbackContextInput)
     source: Literal["user", "global"] | None = None
 
 

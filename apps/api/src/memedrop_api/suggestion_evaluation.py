@@ -108,6 +108,10 @@ def evaluate_benchmark(
         candidate.template.template_id: normalize_template_name(candidate.name)
         for candidate in ranking_candidates
     }
+    # The verified catalog is stable for a complete evaluation run, exactly as it
+    # is in the production service. Build its retrieval index once rather than
+    # letting each benchmark case measure index construction instead of ranking.
+    lexical_index = LexicalCandidateIndex.build(ranking_candidates)
     results: list[CaseResult] = []
     for raw_case in raw_cases:
         if not isinstance(raw_case, dict):
@@ -119,7 +123,12 @@ def evaluate_benchmark(
         rejected = normalized_rejected_names(raw_case.get("rejected_memes"), case_id)
 
         started = time.perf_counter()
-        selections = fallback_template_selections(tweet, ranking_candidates, 5)
+        selections = fallback_template_selections(
+            tweet,
+            ranking_candidates,
+            5,
+            lexical_index=lexical_index,
+        )
         latency_ms = (time.perf_counter() - started) * 1000
         selected = tuple(
             names_by_id[selection.template_id]

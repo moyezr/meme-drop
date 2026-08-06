@@ -32,17 +32,19 @@ export interface FeedbackContext {
   intensity: number;
   reply_style: string;
   ideal_meme_vibe: string;
-  joke_target: string;
   social_dynamic: string;
   humor_angle: string;
-  keywords?: string[];
 }
 
 export interface TweetContext extends FeedbackContext {
+  /** Internal caption-generation detail; never send this with usage telemetry. */
+  joke_target: string;
   core_claim: string;
   implied_context: string;
   comedic_tension: string;
   caption_anchors: string[];
+  /** Internal source-derived terms; never send this with usage telemetry. */
+  keywords: string[];
 }
 
 export interface SuggestionRequest {
