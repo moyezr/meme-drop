@@ -1,5 +1,6 @@
 import { API_BASE_URL, apiUrl } from "../shared/config";
 import { apiErrorFromResponse, withApiRequestHeaders } from "../shared/api";
+import { clampSuggestionLimit, limitSuggestions } from "../shared/suggestion-limits";
 import {
   UsageTelemetryQueue,
   type UsageEvent,
@@ -57,6 +58,7 @@ interface CacheEntry {
 const SUGGESTION_TTL_MS = 5 * 60 * 1000;
 const SUGGESTION_CACHE_MAX = 100;
 const MEDIA_CACHE_MAX = 40;
+const SUGGESTION_REQUEST_TIMEOUT_MS = 5_000;
 const suggestionCache = new Map<string, CacheEntry>();
 const suggestionInflight = new Map<string, Promise<Suggestion[]>>();
 const mediaDataUrlCache = new Map<string, string>();
@@ -195,7 +197,9 @@ async function fetchSuggestions(
     onMedia?: (suggestion: Suggestion) => void;
   } = {}
 ): Promise<Suggestion[]> {
-  const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${options.limit || 5}|quality:v1`;
+  const limit = clampSuggestionLimit(options.limit);
+  const requestOptions = { ...options, limit };
+  const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${limit}|quality:v1`;
   if (!options.refresh) {
     const cached = readCachedSuggestions(cacheKey);
     if (cached) return cached;
@@ -204,7 +208,7 @@ async function fetchSuggestions(
     if (inflight) return inflight;
   }
 
-  const request = fetchFreshSuggestions(tweetText, options, cacheKey);
+  const request = fetchFreshSuggestions(tweetText, requestOptions, cacheKey);
   if (!options.refresh) {
     suggestionInflight.set(cacheKey, request);
   }
@@ -227,7 +231,7 @@ async function fetchFreshSuggestions(
   cacheKey: string
 ): Promise<Suggestion[]> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 75000);
+  const timer = setTimeout(() => controller.abort(), SUGGESTION_REQUEST_TIMEOUT_MS);
   let res: Response;
   try {
     res = await fetch(apiUrl("/api/v1/suggest"), {
@@ -250,7 +254,7 @@ async function fetchFreshSuggestions(
   const data = await res.json();
   const raw = (data.suggestions ?? []) as Suggestion[];
 
-  const suggestions: Suggestion[] = raw.map((suggestion) => ({
+  const suggestions: Suggestion[] = limitSuggestions(raw).map((suggestion) => ({
     ...suggestion,
     name: (suggestion.name || "").trim(),
     image_url: toAbsoluteMediaUrl(suggestion.image_url),
@@ -259,17 +263,19 @@ async function fetchFreshSuggestions(
   }));
 
   options.onInitial?.(suggestions);
+  writeCachedSuggestions(cacheKey, suggestions);
 
   // X's page CSP can block injected localhost images. Fetch through the
   // extension background and render data URLs so cards display reliably.
-  await Promise.allSettled(
+  // This remains parallel, but is deliberately detached from the suggestion
+  // response: a slow full-size asset must not hold the five-second UX budget.
+  void Promise.allSettled(
     suggestions.map(async (suggestion) => {
       suggestion.image_data_url = await fetchMediaDataUrl(suggestion.image_url);
       options.onMedia?.(suggestion);
     })
   );
 
-  writeCachedSuggestions(cacheKey, suggestions);
   return suggestions;
 }
 

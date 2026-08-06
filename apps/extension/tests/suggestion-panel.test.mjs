@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { PANEL_STYLES } = await import("../src/content/suggestion-panel.ts");
+const { PANEL_STYLES, getPreviewDimensions } = await import("../src/content/suggestion-panel.ts");
+
+test("captioned previews are capped while preserving their aspect ratio", () => {
+  assert.deepEqual(getPreviewDimensions(1600, 900), { width: 480, height: 270 });
+  assert.deepEqual(getPreviewDimensions(900, 1600), { width: 270, height: 480 });
+  assert.deepEqual(getPreviewDimensions(320, 180), { width: 320, height: 180 });
+});
 
 test("suggestion panel uses flat dark surfaces without gradients", () => {
   assert.doesNotMatch(PANEL_STYLES, /(?:linear|radial|conic)-gradient/i);

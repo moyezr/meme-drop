@@ -6,10 +6,26 @@
 import { SELECTORS } from "./selectors";
 import { showToast } from "./toast";
 import { API_BASE_URL } from "../shared/config";
+import { limitSuggestions } from "../shared/suggestion-limits";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const IMAGE_PLACEHOLDER =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+const PREVIEW_MAX_DIMENSION = 480;
+
+export function getPreviewDimensions(
+  width: number,
+  height: number,
+  maxDimension = PREVIEW_MAX_DIMENSION
+): { width: number; height: number } {
+  const largestDimension = Math.max(width, height);
+  if (largestDimension <= maxDimension) return { width, height };
+  const scale = maxDimension / largestDimension;
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
 
 interface Suggestion {
   meme_id: string;
@@ -445,7 +461,7 @@ function renderLoading() {
 
 function renderSuggestions(suggestions: Suggestion[]) {
   if (!shadowRoot) return;
-  currentSuggestions = suggestions;
+  currentSuggestions = limitSuggestions(suggestions);
   insertingSuggestionId = null;
   usedSuggestionIds.clear();
   shownSuggestionIds.clear();
@@ -458,7 +474,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
   panel.setAttribute("role", "region");
   panel.setAttribute("aria-label", "Meme suggestions");
 
-  if (suggestions.length === 0) {
+  if (currentSuggestions.length === 0) {
     panel.innerHTML = `
       <div class="header">
         <span class="title">
@@ -489,7 +505,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
     const strip = document.createElement("div");
     strip.className = "meme-strip";
 
-    for (const s of suggestions.slice(0, 10)) {
+    for (const s of currentSuggestions) {
       const card = document.createElement("div");
       card.className = "meme-card";
       card.dataset.memeId = s.meme_id;
@@ -539,7 +555,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
 
       if (s.image_data_url) {
         if (s.tailored_overlay?.enabled) {
-          hydrateTailoredPreview(s, img);
+          void showTailoredPreview(s, img);
         } else {
           img.src = s.image_data_url;
         }
@@ -600,12 +616,6 @@ function renderSuggestions(suggestions: Suggestion[]) {
     panel.appendChild(header);
     panel.appendChild(strip);
 
-    if (suggestions.length > 5) {
-      const hint = document.createElement("div");
-      hint.className = "nav-hint";
-      hint.textContent = "Scroll for more →";
-      panel.appendChild(hint);
-    }
   }
 
   panel.querySelector(".close-btn")!.addEventListener("click", dismissPanel);
@@ -763,20 +773,6 @@ async function toPngFile(blob: Blob, filename = "meme.png"): Promise<File> {
   return new File([pngBlob], filename, { type: "image/png" });
 }
 
-async function hydrateTailoredPreview(suggestion: Suggestion, img: HTMLImageElement) {
-  if (!suggestion.tailored_overlay?.enabled) return;
-
-  try {
-    const dataUrl = await renderTailoredMemeDataUrl(suggestion);
-    suggestion.tailored_image_data_url = dataUrl;
-    if (currentSuggestions.some((s) => s.meme_id === suggestion.meme_id)) {
-      img.src = dataUrl;
-    }
-  } catch (err) {
-    console.warn("[MemeDrop] Tailored meme preview failed:", err);
-  }
-}
-
 async function renderTailoredMemeDataUrl(suggestion: Suggestion): Promise<string> {
   if (suggestion.tailored_image_data_url) return suggestion.tailored_image_data_url;
   const overlay = suggestion.tailored_overlay;
@@ -787,27 +783,53 @@ async function renderTailoredMemeDataUrl(suggestion: Suggestion): Promise<string
   return renderMemeWithOverlay(suggestion.image_url, suggestion.image_data_url, overlay);
 }
 
+async function showTailoredPreview(suggestion: Suggestion, img: HTMLImageElement) {
+  if (!suggestion.tailored_overlay?.enabled) return;
+
+  try {
+    const previewDataUrl = await renderMemeWithOverlay(
+      suggestion.image_url,
+      suggestion.image_data_url,
+      suggestion.tailored_overlay,
+      PREVIEW_MAX_DIMENSION
+    );
+    if (currentSuggestions.some((item) => item.meme_id === suggestion.meme_id)) {
+      img.src = previewDataUrl;
+    }
+  } catch (err) {
+    console.warn("[MemeDrop] Tailored meme preview failed:", err);
+  }
+}
+
 async function renderMemeWithOverlay(
   imageUrl: string,
   imageDataUrl: string | null | undefined,
-  overlay: MemeTextOverlay
+  overlay: MemeTextOverlay,
+  maxDimension?: number
 ): Promise<string> {
   const raw = await resolveMemeBlob(imageUrl, imageDataUrl);
   const bitmap = await createImageBitmap(raw);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
+  try {
+    const canvas = document.createElement("canvas");
+    const dimensions = maxDimension
+      ? getPreviewDimensions(bitmap.width, bitmap.height, maxDimension)
+      : { width: bitmap.width, height: bitmap.height };
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
 
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas 2d context unavailable");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2d context unavailable");
 
-  ctx.drawImage(bitmap, 0, 0);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
-  for (const region of overlay.regions) {
-    drawImpactText(ctx, canvas.width, canvas.height, region);
+    for (const region of overlay.regions) {
+      drawImpactText(ctx, canvas.width, canvas.height, region);
+    }
+
+    return canvas.toDataURL("image/png");
+  } finally {
+    bitmap.close();
   }
-
-  return canvas.toDataURL("image/png");
 }
 
 function drawImpactText(
@@ -1361,7 +1383,7 @@ export function updateSuggestionMedia(memeId: string, imageDataUrl: string) {
   if (!img) return;
 
   if (suggestion.tailored_overlay?.enabled) {
-    hydrateTailoredPreview(suggestion, img);
+    void showTailoredPreview(suggestion, img);
   } else {
     img.src = imageDataUrl;
   }
