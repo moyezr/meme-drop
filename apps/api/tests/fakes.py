@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
+
+from memedrop_api.repositories import UsageEventData
 
 
 class FakeStore:
@@ -107,16 +109,32 @@ class FakeStore:
         tweet_context: Mapping[str, Any],
         source: str | None,
     ) -> None:
-        self.usage_events.append(
+        await self.record_usage_batch(
+            user_id=user_id,
+            events=[
+                UsageEventData(
+                    meme_id=meme_id,
+                    action=action,
+                    tweet_context=tweet_context,
+                    source=source,
+                )
+            ],
+        )
+
+    async def record_usage_batch(
+        self, *, user_id: UUID, events: Sequence[UsageEventData]
+    ) -> None:
+        self.usage_events.extend(
             {
                 "id": str(uuid4()),
                 "userId": str(user_id),
-                "memeId": str(meme_id),
-                "action": action,
-                "tweetContext": dict(tweet_context),
-                "source": source,
+                "memeId": str(event.meme_id),
+                "action": event.action,
+                "tweetContext": dict(event.tweet_context),
+                "source": event.source,
                 "createdAt": datetime.now(UTC).isoformat(),
             }
+            for event in events
         )
 
     async def export_account(

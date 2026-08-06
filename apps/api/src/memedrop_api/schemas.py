@@ -129,6 +129,10 @@ class UsageRequest(StrictModel):
     source: Literal["user", "global"] | None = None
 
 
+class UsageBatchRequest(StrictModel):
+    events: list[UsageRequest] = Field(min_length=1, max_length=50)
+
+
 class AutoTagResult(StrictModel):
     name: str = Field(min_length=1, max_length=100)
     emotion: Literal["sarcastic", "absurdist", "wholesome", "savage", "confused", "celebratory"]

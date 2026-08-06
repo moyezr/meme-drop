@@ -1,4 +1,4 @@
-import type { SuggestionRequest, SuggestionResult, TweetContext } from "./suggestion.js";
+import type { FeedbackContext, SuggestionRequest, SuggestionResult } from "./suggestion.js";
 import type { Meme, UserMeme } from "./meme.js";
 
 // POST /api/v1/suggest
@@ -14,8 +14,15 @@ export interface UsageRequest {
   Body: {
     meme_id: string;
     action: "suggested" | "shown" | "clicked" | "used" | "inserted" | "saved" | "dismissed";
-    tweet_context: TweetContext;
+    tweet_context: Partial<FeedbackContext>;
     source?: "user" | "global";
+  };
+}
+
+// POST /api/v1/usage/batch
+export interface UsageBatchRequest {
+  Body: {
+    events: UsageRequest["Body"][];
   };
 }
 

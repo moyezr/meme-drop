@@ -61,6 +61,43 @@ async def test_usage_records_all_context_and_ensures_user(api_harness: ApiHarnes
     }
 
 
+async def test_usage_batch_records_events_and_ensures_user_once(api_harness: ApiHarness) -> None:
+    response = await api_harness.client.post(
+        "/api/v1/usage/batch",
+        headers=HEADERS,
+        json={
+            "events": [
+                {"meme_id": str(MEME_ID), "action": "shown", "tweet_context": {}},
+                {"meme_id": str(MEME_ID), "action": "clicked", "tweet_context": {}},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"logged": 2}
+    assert api_harness.store.ensured_users == [INSTALL_ID]
+    assert [event["action"] for event in api_harness.store.usage_events] == ["shown", "clicked"]
+
+
+async def test_usage_batch_requires_between_one_and_fifty_events(api_harness: ApiHarness) -> None:
+    empty = await api_harness.client.post(
+        "/api/v1/usage/batch", headers=HEADERS, json={"events": []}
+    )
+    oversized = await api_harness.client.post(
+        "/api/v1/usage/batch",
+        headers=HEADERS,
+        json={
+            "events": [
+                {"meme_id": str(MEME_ID), "action": "shown", "tweet_context": {}}
+                for _ in range(51)
+            ]
+        },
+    )
+
+    assert empty.status_code == 400
+    assert oversized.status_code == 400
+
+
 async def test_usage_accepts_every_supported_action(api_harness: ApiHarness) -> None:
     actions = ["suggested", "shown", "clicked", "used", "inserted", "saved", "dismissed"]
     for action in actions:

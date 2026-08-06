@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
@@ -10,6 +11,14 @@ from sqlalchemy import String, and_, asc, cast, delete, desc, func, or_, select,
 from memedrop_api.db import Database, Meme, UsageEvent, User, UserMeme
 
 JsonRecord = dict[str, Any]
+
+
+@dataclass(frozen=True)
+class UsageEventData:
+    meme_id: UUID
+    action: str
+    tweet_context: Mapping[str, Any]
+    source: str | None
 
 
 class BackendStore(Protocol):
@@ -63,6 +72,10 @@ class BackendStore(Protocol):
         action: str,
         tweet_context: Mapping[str, Any],
         source: str | None,
+    ) -> None: ...
+
+    async def record_usage_batch(
+        self, *, user_id: UUID, events: Sequence[UsageEventData]
     ) -> None: ...
 
     async def export_account(self, user_id: UUID) -> tuple[list[JsonRecord], list[JsonRecord]]: ...
@@ -230,30 +243,75 @@ class SqlAlchemyStore:
         tweet_context: Mapping[str, Any],
         source: str | None,
     ) -> None:
-        async with self.database.session() as session, session.begin():
-            resolved_source = source
-            if resolved_source is None:
-                found = await session.scalar(
-                    select(UserMeme.id).where(
-                        and_(UserMeme.id == meme_id, UserMeme.user_id == user_id)
-                    )
-                )
-                resolved_source = "user" if found else "global"
-            session.add(
-                UsageEvent(
-                    user_id=user_id,
-                    user_meme_id=meme_id if resolved_source == "user" else None,
-                    global_meme_id=meme_id if resolved_source == "global" else None,
+        await self.record_usage_batch(
+            user_id=user_id,
+            events=[
+                UsageEventData(
+                    meme_id=meme_id,
                     action=action,
-                    tweet_context=dict(tweet_context),
+                    tweet_context=tweet_context,
+                    source=source,
                 )
+            ],
+        )
+
+    async def record_usage_batch(
+        self, *, user_id: UUID, events: Sequence[UsageEventData]
+    ) -> None:
+        if not events:
+            return
+        async with self.database.session() as session, session.begin():
+            unresolved_ids = {event.meme_id for event in events if event.source is None}
+            user_meme_ids: set[UUID] = set()
+            if unresolved_ids:
+                user_meme_ids = set(
+                    (
+                        await session.scalars(
+                            select(UserMeme.id).where(
+                                and_(
+                                    UserMeme.user_id == user_id,
+                                    UserMeme.id.in_(unresolved_ids),
+                                )
+                            )
+                        )
+                    ).all()
+                )
+            resolved_events = [
+                (
+                    event,
+                    event.source or ("user" if event.meme_id in user_meme_ids else "global"),
+                )
+                for event in events
+            ]
+            session.add_all(
+                [
+                    UsageEvent(
+                        user_id=user_id,
+                        user_meme_id=event.meme_id if source == "user" else None,
+                        global_meme_id=event.meme_id if source == "global" else None,
+                        action=event.action,
+                        tweet_context=dict(event.tweet_context),
+                    )
+                    for event, source in resolved_events
+                ]
             )
-            if action in {"used", "inserted"} and resolved_source == "user":
+            used_user_meme_counts: dict[UUID, int] = {}
+            for event, source in resolved_events:
+                if source == "user" and event.action in {"used", "inserted"}:
+                    used_user_meme_counts[event.meme_id] = (
+                        used_user_meme_counts.get(event.meme_id, 0) + 1
+                    )
+            for meme_id, use_increment in used_user_meme_counts.items():
                 await session.execute(
                     update(UserMeme)
-                    .where(and_(UserMeme.id == meme_id, UserMeme.user_id == user_id))
+                    .where(
+                        and_(
+                            UserMeme.id == meme_id,
+                            UserMeme.user_id == user_id,
+                        )
+                    )
                     .values(
-                        use_count=UserMeme.use_count + 1,
+                        use_count=UserMeme.use_count + use_increment,
                         last_used_at=datetime.now(UTC),
                     )
                 )

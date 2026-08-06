@@ -11,6 +11,7 @@ from uuid import UUID
 
 from memedrop_api.config import Settings
 from memedrop_api.repositories import BackendStore
+from memedrop_api.schemas import TweetContext
 from memedrop_api.services.catalog import MemeCatalog, MemeTemplate
 from memedrop_api.services.context_analyzer import heuristic_tweet_context
 from memedrop_api.services.meme_text import (
@@ -24,6 +25,20 @@ LOGGER = logging.getLogger("memedrop.suggestions")
 SUGGESTION_CACHE_TTL_SECONDS = 5 * 60
 SUGGESTION_CACHE_MAX = 200
 
+USAGE_FEEDBACK_CONTEXT_FIELDS = (
+    "sentiment",
+    "tone",
+    "topic",
+    "intent",
+    "intensity",
+    "reply_style",
+    "ideal_meme_vibe",
+    "joke_target",
+    "social_dynamic",
+    "humor_angle",
+    "keywords",
+)
+
 
 @dataclass(frozen=True)
 class Candidate:
@@ -34,6 +49,12 @@ class Candidate:
     is_evergreen: bool
     template: MemeTemplate
     feedback_boost: float = 0.0
+
+
+def usage_feedback_context(context: TweetContext) -> dict[str, Any]:
+    """Project analysis onto the strictly structured, non-text feedback schema."""
+    values = context.model_dump()
+    return {field: values[field] for field in USAGE_FEEDBACK_CONTEXT_FIELDS}
 
 
 class SuggestionService:
@@ -109,6 +130,9 @@ class SuggestionService:
                     or candidate.template.caption_guidance.pattern,
                     "score": round(selection.score or 1 - index * 0.08, 3),
                     "source": "global",
+                    # Keep the complete analysis for the current response contract, but give
+                    # clients a separate object that is safe to persist as usage feedback.
+                    "feedback_context": usage_feedback_context(context),
                     "tweet_context": context.model_dump(),
                 }
             )

@@ -88,6 +88,10 @@ async def test_service_uses_model_order_batched_captions_and_context() -> None:
     assert [item["name"] for item in result] == ["Surprised Pikachu", "This Is Fine"]
     assert result[0]["score"] == 0.96
     assert result[0]["tweet_context"]["intent"] == "dunking"
+    assert result[0]["feedback_context"]["intent"] == "dunking"
+    assert set(result[0]["feedback_context"]).isdisjoint(
+        {"core_claim", "implied_context", "comedic_tension", "caption_anchors"}
+    )
     assert result[0]["tailored_overlay"]["regions"][0]["text"] == ("Skipped tests + Friday deploy")
     assert result[1]["tailored_overlay"] is not None
     assert gateway.caption_calls == 1
@@ -158,7 +162,30 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
     suggestion = valid.json()["suggestions"][0]
     assert suggestion["name"] == "This Is Fine"
     assert suggestion["tweet_context"]
+    assert suggestion["feedback_context"]
+    feedback_context = suggestion["feedback_context"]
+    assert set(feedback_context).isdisjoint(
+        {"core_claim", "implied_context", "comedic_tension", "caption_anchors"}
+    )
     assert suggestion["source"] == "global"
+
+    feedback = await api_harness.client.post(
+        "/api/v1/usage/batch",
+        headers={"x-memedrop-install-id": str(INSTALL_ID)},
+        json={
+            "events": [
+                {
+                    "meme_id": suggestion["meme_id"],
+                    "action": "shown",
+                    "source": suggestion["source"],
+                    "tweet_context": feedback_context,
+                }
+            ]
+        },
+    )
+
+    assert feedback.status_code == 200
+    assert feedback.json() == {"logged": 1}
 
 
 async def test_caption_route_returns_overlay_and_null_for_missing_meme(

@@ -11,6 +11,7 @@ export type { User } from "./types/user.js";
 
 export type {
   TweetContext,
+  FeedbackContext,
   SuggestionRequest,
   SuggestionResult,
   MemeTextOverlay,
@@ -37,6 +38,7 @@ export type {
   SuggestRequest,
   SuggestResponse,
   UsageRequest,
+  UsageBatchRequest,
   LibrarySaveRequest,
   LibrarySaveResponse,
   LibraryListQuery,

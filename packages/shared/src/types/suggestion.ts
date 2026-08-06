@@ -1,4 +1,4 @@
-export interface TweetContext {
+export interface FeedbackContext {
   sentiment: "positive" | "negative" | "neutral";
   tone:
     | "sarcastic"
@@ -35,11 +35,14 @@ export interface TweetContext {
   joke_target: string;
   social_dynamic: string;
   humor_angle: string;
+  keywords?: string[];
+}
+
+export interface TweetContext extends FeedbackContext {
   core_claim: string;
   implied_context: string;
   comedic_tension: string;
   caption_anchors: string[];
-  keywords: string[];
 }
 
 export interface SuggestionRequest {
@@ -58,6 +61,7 @@ export interface SuggestionResult {
   match_explanation: string;
   score: number;
   source: "user" | "global";
+  feedback_context?: FeedbackContext;
   tweet_context?: TweetContext;
 }
 
