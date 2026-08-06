@@ -18,6 +18,9 @@ class FakeStore:
         self.last_library_filters: dict[str, Any] | None = None
         self.deleted_account = False
         self.feedback_scores: dict[str, float] = {}
+        self.feedback_scores_by_user: dict[UUID, dict[str, float]] = {}
+        self.list_global_memes_calls = 0
+        self.feedback_score_calls: list[UUID] = []
 
     async def ensure_install_user(self, user_id: UUID) -> None:
         self.ensured_users.append(user_id)
@@ -33,13 +36,15 @@ class FakeStore:
         return self.memes
 
     async def list_global_memes(self) -> list[dict[str, Any]]:
+        self.list_global_memes_calls += 1
         return self.memes
 
     async def get_global_meme(self, meme_id: UUID) -> dict[str, Any] | None:
         return next((row for row in self.memes if row["id"] == str(meme_id)), None)
 
     async def global_meme_feedback_scores(self, user_id: UUID) -> dict[str, float]:
-        return self.feedback_scores
+        self.feedback_score_calls.append(user_id)
+        return self.feedback_scores_by_user.get(user_id, self.feedback_scores)
 
     async def create_user_meme(
         self,

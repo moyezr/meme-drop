@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -109,6 +110,52 @@ async def test_service_cache_avoids_repeating_model_work_and_refresh_bypasses() 
     assert gateway.caption_calls == 2
 
 
+async def test_service_loads_global_catalog_once_and_applies_feedback_per_user() -> None:
+    service, store, gateway = service_with_templates("change-my-mind", "disaster-girl")
+    gateway.fail_selection = True
+    preferred = next(row for row in store.memes if row["name"] == "Disaster Girl")
+    another_user = uuid4()
+    store.feedback_scores_by_user[INSTALL_ID] = {preferred["id"]: 0.12}
+
+    first = await service.get_suggestions("A generic reaction", user_id=INSTALL_ID, limit=1)
+    second = await service.get_suggestions("A generic reaction", user_id=another_user, limit=1)
+
+    assert first[0]["name"] == "Disaster Girl"
+    assert second[0]["name"] == "Change My Mind"
+    assert store.list_global_memes_calls == 1
+    assert store.feedback_score_calls == [INSTALL_ID, another_user]
+
+
+async def test_concurrent_cold_suggestions_share_one_global_catalog_load() -> None:
+    service, store, _ = service_with_templates("this-is-fine")
+    original_load = store.list_global_memes
+    original_feedback = store.global_meme_feedback_scores
+    load_started = asyncio.Event()
+    feedback_started = asyncio.Event()
+    allow_load = asyncio.Event()
+
+    async def delayed_load() -> list[dict[str, Any]]:
+        load_started.set()
+        await allow_load.wait()
+        return await original_load()
+
+    async def delayed_feedback(user_id: UUID) -> dict[str, float]:
+        feedback_started.set()
+        return await original_feedback(user_id)
+
+    store.list_global_memes = delayed_load  # type: ignore[method-assign]
+    store.global_meme_feedback_scores = delayed_feedback  # type: ignore[method-assign]
+    first = asyncio.create_task(service.get_suggestions("Prod is down", user_id=INSTALL_ID))
+    await load_started.wait()
+    await feedback_started.wait()
+    second = asyncio.create_task(service.get_suggestions("Prod is down", user_id=uuid4()))
+    await asyncio.sleep(0)
+    allow_load.set()
+    await asyncio.gather(first, second)
+
+    assert store.list_global_memes_calls == 1
+
+
 async def test_service_falls_back_when_selection_model_fails() -> None:
     service, _, gateway = service_with_templates(
         "this-is-fine", "oprah-you-get-a", "surprised-pikachu"
@@ -168,6 +215,7 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
         {"core_claim", "implied_context", "comedic_tension", "caption_anchors"}
     )
     assert suggestion["source"] == "global"
+    assert api_harness.store.ensured_users == []
 
     feedback = await api_harness.client.post(
         "/api/v1/usage/batch",

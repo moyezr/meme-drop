@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from memedrop_api.identity import InstallHeader, resolve_request_user_id
+from memedrop_api.identity import InstallHeader, resolve_install_identity
 from memedrop_api.schemas import CaptionRequest, SuggestRequest
 from memedrop_api.services.suggestion_engine import SuggestionService
 
@@ -16,7 +16,11 @@ async def suggest(
     request: Request,
     install_id: InstallHeader = None,
 ) -> dict[str, object] | JSONResponse:
-    user_id = await resolve_request_user_id(request, install_id)
+    # Suggestions are read-only. Avoid a database write/existence check on this hot path.
+    user_id = resolve_install_identity(
+        install_id=install_id,
+        require_install_id=request.app.state.settings.require_install_id,
+    )
     service: SuggestionService = request.app.state.suggestion_service
     try:
         suggestions = await service.get_suggestions(

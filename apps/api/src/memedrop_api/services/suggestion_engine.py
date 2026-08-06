@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import re
 import time
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
@@ -70,6 +71,10 @@ class SuggestionService:
         self.gateway = gateway
         self.settings = settings
         self.cache: OrderedDict[str, tuple[float, list[dict[str, Any]]]] = OrderedDict()
+        # Global templates change only through a controlled release. Cache the immutable base
+        # candidates for this process, then apply each user's feedback on a fresh copy.
+        self._global_candidates: tuple[Candidate, ...] | None = None
+        self._global_candidates_lock = asyncio.Lock()
 
     async def get_suggestions(
         self,
@@ -170,10 +175,31 @@ class SuggestionService:
         return build_overlay(template, str(row["name"]), regions)
 
     async def _load_candidates(self, user_id: UUID) -> list[Candidate]:
+        base_candidates, feedback = await asyncio.gather(
+            self._load_global_candidates(), self.store.global_meme_feedback_scores(user_id)
+        )
+        return [
+            replace(candidate, feedback_boost=feedback.get(candidate.meme_id, 0.0))
+            for candidate in base_candidates
+        ]
+
+    async def _load_global_candidates(self) -> tuple[Candidate, ...]:
+        if self._global_candidates is not None:
+            return self._global_candidates
+        async with self._global_candidates_lock:
+            if self._global_candidates is not None:
+                return self._global_candidates
+            self._global_candidates = self._build_global_candidates(
+                await self.store.list_global_memes()
+            )
+            return self._global_candidates
+
+    def _build_global_candidates(
+        self, rows: list[dict[str, Any]]
+    ) -> tuple[Candidate, ...]:
         result = []
         seen: set[str] = set()
-        feedback = await self.store.global_meme_feedback_scores(user_id)
-        for row in await self.store.list_global_memes():
+        for row in rows:
             template = self.catalog.find_template(
                 str(row["name"]),
                 meme_id=str(row["id"]),
@@ -190,10 +216,9 @@ class SuggestionService:
                     system_tags=dict(row.get("systemTags") or {}),
                     is_evergreen=bool(row.get("isEvergreen", True)),
                     template=template,
-                    feedback_boost=feedback.get(str(row["id"]), 0.0),
                 )
             )
-        return sorted(result, key=lambda candidate: candidate.template.name)
+        return tuple(sorted(result, key=lambda candidate: candidate.template.name))
 
     def _read_cache(self, key: str) -> list[dict[str, Any]] | None:
         entry = self.cache.get(key)

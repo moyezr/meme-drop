@@ -2,10 +2,24 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import pytest
+from fastapi import HTTPException
+
+from memedrop_api.identity import DEV_USER_ID, resolve_install_identity
 from tests.conftest import INSTALL_ID, ApiHarness
 
 HEADERS = {"x-memedrop-install-id": str(INSTALL_ID)}
 MEME_ID = UUID("22222222-2222-4222-8222-222222222222")
+
+
+def test_resolve_install_identity_preserves_development_and_production_rules() -> None:
+    assert resolve_install_identity(install_id=None, require_install_id=False) == DEV_USER_ID
+    assert (
+        resolve_install_identity(install_id=str(INSTALL_ID), require_install_id=True) == INSTALL_ID
+    )
+
+    with pytest.raises(HTTPException, match="x-memedrop-install-id is required"):
+        resolve_install_identity(install_id=None, require_install_id=True)
 
 
 async def test_usage_requires_install_identity(api_harness: ApiHarness) -> None:

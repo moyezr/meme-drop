@@ -13,12 +13,21 @@ INSTALL_ID_HEADER = "x-memedrop-install-id"
 InstallHeader = Annotated[str | None, Header(alias=INSTALL_ID_HEADER)]
 
 
-async def resolve_request_user_id(request: Request, install_id: InstallHeader = None) -> UUID:
+def resolve_install_identity(*, install_id: str | None, require_install_id: bool) -> UUID:
+    """Resolve an install ID without reading or changing persistent state."""
     if install_id is None:
-        if request.app.state.settings.require_install_id:
+        if require_install_id:
             raise HTTPException(status_code=401, detail=f"{INSTALL_ID_HEADER} is required")
         return DEV_USER_ID
-    user_id = parse_install_id(install_id)
+    return parse_install_id(install_id)
+
+
+async def resolve_request_user_id(request: Request, install_id: InstallHeader = None) -> UUID:
+    """Resolve an install identity and ensure its user record for write-capable routes."""
+    user_id = resolve_install_identity(
+        install_id=install_id,
+        require_install_id=request.app.state.settings.require_install_id,
+    )
     store: BackendStore = request.app.state.store
     await store.ensure_install_user(user_id)
     return user_id
