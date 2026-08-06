@@ -95,28 +95,35 @@ class SuggestionService:
         candidates = await self._load_candidates(user_id)
         if not candidates:
             return []
-        fallback = fallback_template_selections(tweet_text, candidates, normalized_limit)
+        # Rank every candidate locally, but bound model input independently from the number
+        # returned to the user. This keeps inference cost fixed as the catalog grows.
+        ranked = fallback_template_selections(tweet_text, candidates, min(12, len(candidates)))
+        fallback = ranked[:normalized_limit]
+        by_template = {candidate.template.template_id: candidate for candidate in candidates}
+        shortlist_templates = [
+            by_template[selection.template_id].template
+            for selection in ranked
+            if selection.template_id in by_template
+        ]
         try:
-            model = await self.gateway.select_templates(
-                tweet_text, [candidate.template for candidate in candidates], normalized_limit
+            model = await self.gateway.select_and_caption(
+                tweet_text, shortlist_templates, normalized_limit
             )
         except Exception:
-            LOGGER.exception("Template selection failed; using local ranking")
-            model = []
-        selections = fill_selections(model, fallback, normalized_limit)
-        by_template = {candidate.template.template_id: candidate for candidate in candidates}
+            # Do not retry captioning through the provider: a provider-level failure must
+            # immediately take the deterministic local path.
+            LOGGER.exception("Joint suggestion generation failed; using local ranking")
+            model_selections: list[TemplateSelection] = []
+            generated: dict[str, dict[str, str]] = {}
+        else:
+            model_selections = model.selections
+            generated = model.captions
+        selections = fill_selections(model_selections, fallback, normalized_limit)
         selected = [
             (by_template[selection.template_id], selection)
             for selection in selections
             if selection.template_id in by_template
         ]
-        try:
-            generated = await self.gateway.generate_captions(
-                tweet_text, [candidate.template for candidate, _ in selected]
-            )
-        except Exception:
-            LOGGER.exception("Caption generation failed; using contextual fallbacks")
-            generated = {}
         result = []
         for index, (candidate, selection) in enumerate(selected):
             regions = clean_generated_regions(

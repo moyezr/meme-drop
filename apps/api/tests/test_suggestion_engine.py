@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from memedrop_api.config import Settings
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
-from memedrop_api.services.openrouter import TemplateSelection
+from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.suggestion_engine import (
     Candidate,
     SuggestionService,
@@ -24,15 +24,17 @@ class FakeGateway:
     def __init__(self) -> None:
         self.selections: list[TemplateSelection] = []
         self.captions: dict[str, dict[str, str]] = {}
-        self.selection_calls = 0
+        self.joint_calls = 0
         self.caption_calls = 0
-        self.fail_selection = False
+        self.fail_joint = False
+        self.seen_template_counts: list[int] = []
 
-    async def select_templates(self, tweet_text, templates, limit):  # type: ignore[no-untyped-def]
-        self.selection_calls += 1
-        if self.fail_selection:
+    async def select_and_caption(self, tweet_text, templates, limit):  # type: ignore[no-untyped-def]
+        self.joint_calls += 1
+        self.seen_template_counts.append(len(templates))
+        if self.fail_joint:
             raise RuntimeError("model unavailable")
-        return self.selections[:limit]
+        return JointSuggestionResult(self.selections[:limit], self.captions)
 
     async def generate_captions(self, tweet_text, templates):  # type: ignore[no-untyped-def]
         self.caption_calls += 1
@@ -70,7 +72,7 @@ def service_with_templates(*template_ids: str) -> tuple[SuggestionService, FakeS
     return service, store, gateway
 
 
-async def test_service_uses_model_order_batched_captions_and_context() -> None:
+async def test_service_uses_one_joint_model_call_and_context() -> None:
     service, _, gateway = service_with_templates("this-is-fine", "surprised-pikachu")
     gateway.selections = [
         TemplateSelection("surprised-pikachu", "predictable result", 0.96),
@@ -95,7 +97,43 @@ async def test_service_uses_model_order_batched_captions_and_context() -> None:
     )
     assert result[0]["tailored_overlay"]["regions"][0]["text"] == ("Skipped tests + Friday deploy")
     assert result[1]["tailored_overlay"] is not None
-    assert gateway.caption_calls == 1
+    assert gateway.joint_calls == 1
+    assert gateway.caption_calls == 0
+
+
+async def test_service_bounds_joint_shortlist_and_returns_at_most_five() -> None:
+    catalog = MemeCatalog.load()
+    template_ids = [template.template_id for template in catalog.verified_templates]
+    service, _, gateway = service_with_templates(*template_ids)
+    gateway.selections = [
+        TemplateSelection(template.template_id, "fit", 0.9)
+        for template in catalog.verified_templates[:6]
+    ]
+
+    result = await service.get_suggestions("A generic post", user_id=INSTALL_ID, limit=99)
+
+    assert len(result) == 5
+    assert gateway.joint_calls == 1
+    assert gateway.seen_template_counts == [min(12, len(template_ids))]
+
+
+async def test_service_fills_missing_joint_results_from_local_ranking() -> None:
+    service, _, gateway = service_with_templates(
+        "this-is-fine", "oprah-you-get-a", "surprised-pikachu"
+    )
+    gateway.selections = [TemplateSelection("surprised-pikachu", "model pick", 0.96)]
+
+    result = await service.get_suggestions(
+        "Prod is down and the dashboard is red", user_id=INSTALL_ID, limit=3
+    )
+
+    assert result[0]["name"] == "Surprised Pikachu"
+    assert len(result) == 3
+    assert {item["name"] for item in result} == {
+        "Surprised Pikachu",
+        "This Is Fine",
+        "Oprah You Get A",
+    }
 
 
 async def test_service_cache_avoids_repeating_model_work_and_refresh_bypasses() -> None:
@@ -106,13 +144,13 @@ async def test_service_cache_avoids_repeating_model_work_and_refresh_bypasses() 
     refreshed = await service.get_suggestions("Prod is down", user_id=INSTALL_ID, refresh=True)
 
     assert first == second == refreshed
-    assert gateway.selection_calls == 2
-    assert gateway.caption_calls == 2
+    assert gateway.joint_calls == 2
+    assert gateway.caption_calls == 0
 
 
 async def test_service_loads_global_catalog_once_and_applies_feedback_per_user() -> None:
     service, store, gateway = service_with_templates("change-my-mind", "disaster-girl")
-    gateway.fail_selection = True
+    gateway.fail_joint = True
     preferred = next(row for row in store.memes if row["name"] == "Disaster Girl")
     another_user = uuid4()
     store.feedback_scores_by_user[INSTALL_ID] = {preferred["id"]: 0.12}
@@ -156,22 +194,24 @@ async def test_concurrent_cold_suggestions_share_one_global_catalog_load() -> No
     assert store.list_global_memes_calls == 1
 
 
-async def test_service_falls_back_when_selection_model_fails() -> None:
+async def test_service_falls_back_when_joint_model_fails_without_a_second_provider_call() -> None:
     service, _, gateway = service_with_templates(
         "this-is-fine", "oprah-you-get-a", "surprised-pikachu"
     )
-    gateway.fail_selection = True
+    gateway.fail_joint = True
 
     result = await service.get_suggestions(
         "Prod is down and the dashboard is red", user_id=INSTALL_ID, limit=1
     )
 
     assert result[0]["name"] == "This Is Fine"
+    assert gateway.joint_calls == 1
+    assert gateway.caption_calls == 0
 
 
 async def test_local_ranking_uses_bounded_personal_feedback() -> None:
     service, store, gateway = service_with_templates("change-my-mind", "disaster-girl")
-    gateway.fail_selection = True
+    gateway.fail_joint = True
     preferred = next(row for row in store.memes if row["name"] == "Disaster Girl")
     store.feedback_scores[preferred["id"]] = 0.12
 
