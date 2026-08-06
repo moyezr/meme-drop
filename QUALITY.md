@@ -47,12 +47,17 @@ npm run quality:suggestions
 The benchmark corpus covers reply intents and records several acceptable families plus explicit
 rejections. The deterministic API evaluation enforces:
 
-- expected-family retrieval at top 3 and top 5;
+- acceptable-family retrieval of at least 70% at top 1, 80% at top 3, and 90% at top 5;
 - avoidance of explicitly wrong families;
 - specific, short, non-generic captions;
 - text that fits verified overlay regions;
 - overlay availability for returned templates;
 - graceful model failure and deterministic fallback behavior.
+
+It also creates a synthetic 5,000-template catalog from the verified metadata and fails if warm
+local ranking p95 exceeds 50ms. Keep the scale fixture separate from relevance evaluation: it guards
+algorithmic cost, not taste. Do not weaken benchmark cases or thresholds to accommodate a ranker
+change.
 
 When changing ranking, record stage timings and compare results on the same corpus. Relevance,
 diversity, caption quality, fallback availability, and p95 latency are joint constraints; an average
@@ -114,12 +119,19 @@ batch at a time so a regression is attributable and reversible.
 The external inference path is more likely to dominate latency than PostgreSQL or pgvector. Keep the
 pipeline ordered around that fact:
 
-1. retrieve and rank a bounded local candidate set;
-2. cache normalized context analysis where privacy permits;
-3. make optional model reranking/captioning bounded and timed;
-4. batch caption work for only the top verified candidates;
-5. retain contextual deterministic captions for timeout/provider failure;
-6. use measured stage timings before changing infrastructure.
+1. rank every verified candidate locally, using catalog-owned positive/anti BM25 signals plus
+   structural, semantic, feedback, and diversity signals;
+2. cache catalog candidates and short-lived feedback scores, and share concurrent identical work;
+3. perform independent candidate and feedback reads in parallel on a cold request;
+4. send a diversified shortlist of no more than 12 templates to one joint select-and-caption call;
+5. return no more than five results, with a 2.5-second provider deadline and local fallback/cooldown;
+6. render thumbnail previews while prefetching original assets for attachment in parallel;
+7. inspect API `Server-Timing` and local extension ready-to-attach timings before changing
+   infrastructure.
+
+The catalog seeder produces the thumbnail path for new rows and backfills missing ones on rerun. Run
+`npm run db:seed-memes` as a controlled release operation after deploying this pipeline; never seed
+inside a serverless build.
 
 Measure the hosted object-storage round trip from the deployment region with:
 

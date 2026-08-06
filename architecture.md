@@ -60,12 +60,12 @@ enter the extension.
 ```text
 tweet context
   -> deterministic context analysis
-  -> verified catalog/database candidate retrieval
-  -> local semantic ranking
-  -> optional bounded OpenRouter reranking
-  -> optional batched OpenRouter captions
+  -> cached verified catalog/database candidates + cached feedback (parallel on a cold request)
+  -> deterministic rank across the whole catalog
+  -> diversified shortlist of at most 12 templates
+  -> one bounded OpenRouter selection + caption call for at most five results
   -> deterministic contextual caption fallback
-  -> overlays + structured context + timings
+  -> five-or-fewer overlays + feedback context + timings
 ```
 
 The packaged catalog at `apps/api/src/memedrop_api/data/meme_catalog.json` is generated from the
@@ -73,9 +73,37 @@ TypeScript source manifests. It contains aliases, semantic tags, use/anti-use ca
 and overlay regions. Generated drafts remain excluded until human review, visual QA, benchmark
 coverage, and promotion succeed.
 
-External model failure must not fail suggestions. The local ranker and caption fallback are always
-available, model calls have timeouts, and only a bounded shortlist is sent for reranking/captioning.
-Raw tweet text is hashed or redacted from production logs.
+The API returns at most five user-visible suggestions. The model call has a dedicated 2.5-second
+deadline. A failed call opens a short, process-local provider cooldown and immediately uses the local
+selection and contextual captions, rather than retrying on the user-visible path. Catalog candidates
+and short-lived per-install feedback scores are cached; concurrent identical requests use
+singleflight so one calculation serves all waiters. Raw post text is never logged in production;
+request and cache identifiers are logged only as short hashes.
+
+### Local ranker and scale boundary
+
+Retrieval is catalog-owned rather than a generic embedding lookup. Each verified template declares
+joke shapes plus positive and anti-use hints. A prebuilt BM25 index scores positive and anti signals
+separately; the ranker combines those signals with context-derived structural and semantic cues,
+bounded feedback adjustment, and an evergreen preference. It retains only a small top-relevance pool
+with a heap, then softly diversifies joke shapes before the 12-template shortlist. This is `O(N log k)`
+for a bounded `k`, not a linear sort of the full catalog.
+
+The offline evaluator runs the production ranker against a synthetic catalog of 5,000 distinct
+templates and fails when warm p95 ranking exceeds 50ms. pgvector remains available for future
+retrieval experiments and feedback joins; it is not a synchronous dependency of the current hot path.
+
+### Media and timing
+
+Catalog seeding creates a 480px WebP thumbnail at `catalog/thumbnails/<template-id>.webp`. Suggestion
+cards fetch that preview and the original attachment asset concurrently; previews can render before
+the full file is ready, while attachment always uses the original. Rerun `npm run db:seed-memes` as a
+controlled production release step to backfill thumbnails for existing catalog rows.
+
+The suggestion response emits non-sensitive `Server-Timing` stages for candidate load, local rank,
+joint model/fallback, response assembly, and total duration. The extension additionally measures API
+response, first/all preview readiness, and all-originals ready-to-attach locally. These diagnostics
+contain durations and counts only, never post text, captions, URLs, or template IDs.
 
 ## Learning loop
 

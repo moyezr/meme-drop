@@ -13,9 +13,11 @@ columns, install identity semantics, and extension-facing error contract.
 - saved-meme download, SSRF protection, vision tagging, listing, editing, and deletion
 - usage feedback validation and persistence
 - account data export and deletion
-- catalog-backed template ranking with benchmarked local fallback
-- optional OpenRouter template selection and batched caption generation
+- catalog-owned, benchmarked ranking across every verified template
+- one optional OpenRouter selection-and-caption call over a 12-template shortlist
 - deterministic contextual overlays for model outages
+- five-result response cap, cached candidates/feedback, and singleflight request sharing
+- preview-thumbnail/original-attachment media path and `Server-Timing` diagnostics
 
 FastAPI has route parity and is the runtime used by root development, build, database, container,
 and deployment commands.
@@ -37,9 +39,12 @@ npm run quality:api-process
 ```
 
 `db:seed-memes` first migrates legacy local `/memes/...` files into the active S3 bucket under
-`catalog/legacy/`, then inserts any missing verified catalog templates. Database path updates are
-transactional, source files are retained after S3 upload, and reruns skip migrated rows. It validates
-every referenced legacy file before the first upload so missing data cannot be silently ignored.
+`catalog/legacy/`, then inserts any missing verified catalog templates. It creates a 480px WebP
+thumbnail under `catalog/thumbnails/` and backfills rows lacking `thumbnail_path` on rerun. Database
+path updates are transactional, source files are retained after S3 upload, and reruns skip migrated
+rows and existing thumbnails. It validates every referenced legacy file before the first upload so
+missing data cannot be silently ignored. Rerun this command as a controlled production release step
+to backfill existing catalog previews.
 
 Meme files use Supabase's S3-compatible API. Development is pinned to `meme-drop-dev` and
 production to `meme-drop-prod`; configuration rejects a bucket from the wrong environment. Keep
@@ -82,7 +87,16 @@ The suggestion tests also run the offline benchmark at
 `tools/template-tools/evals/suggestion-benchmark.json`. They enforce a minimum relevance floor for the local
 ranker, which remains available when OpenRouter is not configured or temporarily fails. The evaluator
 requires at least 70% top-1, 80% top-3, and 90% top-5 acceptable-family retrieval, while keeping
-rejected-family intrusion at or below 15%.
+rejected-family intrusion at or below 15%. It also checks warm p95 local ranking at a 5,000-template
+catalog is no slower than 50ms.
+
+`POST /api/v1/suggest` always returns at most five results. The service scores the full verified
+catalog locally, diversifies a 12-template shortlist, and makes at most one joint OpenRouter request
+to select and caption the user-visible results. That request has a 2.5-second deadline; failure opens
+a short per-process cooldown and returns deterministic selection/captions without a retry. Candidate
+and feedback reads run in parallel when cold, caches avoid repeat reads, and singleflight merges
+concurrent identical requests. `Server-Timing` reports non-sensitive stage durations; clients should
+use thumbnail URLs for fast card rendering and prefetch the original image for attachment.
 
 ## Vercel
 

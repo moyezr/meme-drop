@@ -37,9 +37,11 @@ npm run db:seed-memes
 ```
 
 The meme seeder uploads legacy local image files into the configured object store, updates their
-database paths, and downloads only verified catalog templates that are still missing. It is safe to
-rerun; existing `catalog/` objects and rows are skipped. Migration stops before uploading if any
-referenced legacy file is missing.
+database paths, and downloads only verified catalog templates that are still missing. It also
+backfills the 480px WebP preview thumbnail for catalog rows that do not have one. It is safe to
+rerun; existing catalog objects, rows, and thumbnails are skipped. Migration stops before uploading
+if any referenced legacy file is missing. Run `npm run db:seed-memes` as a controlled production
+release step after this change to backfill thumbnails for the deployed catalog.
 
 The default `.env.example` connects to PostgreSQL and Redis in Docker while using the
 `meme-drop-dev` Supabase S3 bucket. For fully offline work,
@@ -93,6 +95,21 @@ npm run dataset:taste-review
 See `QUALITY.md` before changing template annotations, benchmarks, ranking, captions, or promotion
 data. The deterministic local ranker is the availability and release-quality floor even when model
 reranking is enabled.
+
+## Suggestion path
+
+Each X post yields **at most five** user-visible, ready-to-attach replies. The API scores every
+verified catalog candidate locally, sends no more than 12 strong and varied candidates to one joint
+model call, then asks that call to select up to five and write their captions together. This avoids
+paying to caption templates the user will never see. A 2.5-second model budget, short provider
+cooldown after a failure, and deterministic selection/caption fallback keep a provider outage from
+blocking the strip.
+
+Catalog and per-install feedback scores are cached; concurrent identical suggestion requests share
+one in-flight calculation, and the first candidate and feedback reads run in parallel. Cards use a
+small preview thumbnail while the extension prefetches the original image in parallel for attachment.
+The response exposes stage durations through `Server-Timing`, while the extension records local
+API, preview, and ready-to-attach durations without retaining post text or captions.
 
 ## Object storage
 
