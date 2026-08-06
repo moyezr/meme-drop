@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import Mock
 
 import httpx
+import pytest
 
 from memedrop_api.config import Settings
 from memedrop_api.services.catalog import MemeCatalog
@@ -57,6 +59,61 @@ async def test_gateway_parses_batched_caption_response() -> None:
         result = await gateway.generate_captions("tweet", [template])
 
     assert result == {template.template_id: {template.regions[0].id: "caption"}}
+
+
+async def test_gateway_reuses_owned_client_for_selection_and_captions(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    template = MemeCatalog.load().verified_templates[0]
+    responses = iter(
+        [
+            {"suggestions": [{"template_id": template.template_id, "score": 0.9}]},
+            {"captions": {template.template_id: {"regions": {template.regions[0].id: "caption"}}}},
+        ]
+    )
+    requests: list[httpx.Request] = []
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda request: (
+                requests.append(request)
+                or httpx.Response(
+                    200,
+                    json={"choices": [{"message": {"content": json.dumps(next(responses))}}]},
+                    request=request,
+                )
+            )
+        )
+    )
+    client_factory = Mock(return_value=client)
+    monkeypatch.setattr("memedrop_api.services.openrouter.httpx.AsyncClient", client_factory)
+    gateway = OpenRouterSuggestionGateway(settings())
+
+    await gateway.select_templates("tweet", [template], 1)
+    await gateway.generate_captions("tweet", [template])
+
+    assert client_factory.call_count == 1
+    assert len(requests) == 2
+    await gateway.close()
+
+
+async def test_gateway_close_only_closes_owned_client(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    owned_client = httpx.AsyncClient()
+    injected_client = httpx.AsyncClient()
+    factory = Mock(return_value=owned_client)
+    monkeypatch.setattr("memedrop_api.services.openrouter.httpx.AsyncClient", factory)
+    owned_gateway = OpenRouterSuggestionGateway(settings())
+
+    await owned_gateway._get_client()
+    await owned_gateway.close()
+    await owned_gateway.close()
+
+    assert owned_client.is_closed
+    with pytest.raises(RuntimeError, match="gateway is closed"):
+        await owned_gateway._get_client()
+
+    injected_gateway = OpenRouterSuggestionGateway(settings(), injected_client)
+    await injected_gateway.close()
+
+    assert not injected_client.is_closed
+    await injected_client.aclose()
 
 
 async def test_gateway_is_disabled_without_api_key() -> None:

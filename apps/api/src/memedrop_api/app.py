@@ -58,12 +58,17 @@ def create_app(
     meme_storage = storage or create_meme_storage(app_settings)
     database = Database(app_settings.database_url)
     backend_store = store or SqlAlchemyStore(database)
-    suggestions = suggestion_service or SuggestionService(
-        backend_store,
-        MemeCatalog.load(),
-        OpenRouterSuggestionGateway(app_settings),
-        app_settings,
-    )
+    default_gateway: OpenRouterSuggestionGateway | None = None
+    if suggestion_service is None:
+        default_gateway = OpenRouterSuggestionGateway(app_settings)
+        suggestions = SuggestionService(
+            backend_store,
+            MemeCatalog.load(),
+            default_gateway,
+            app_settings,
+        )
+    else:
+        suggestions = suggestion_service
     if rate_limiter is not None:
         limiter = rate_limiter
     elif app_settings.rate_limit_store == "redis":
@@ -79,6 +84,8 @@ def create_app(
             await limiter.setup()
             yield
         finally:
+            if default_gateway is not None:
+                await default_gateway.close()
             await limiter.close()
             await database.close()
 

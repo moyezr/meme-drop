@@ -35,6 +35,20 @@ class OpenRouterSuggestionGateway:
     def __init__(self, settings: Settings, client: httpx.AsyncClient | None = None) -> None:
         self.settings = settings
         self.client = client
+        self._owns_client = client is None
+        self._client_lock = asyncio.Lock()
+        self._closed = False
+
+    async def close(self) -> None:
+        """Close the client owned by this gateway, if it has been created."""
+        if not self._owns_client:
+            return
+        async with self._client_lock:
+            if self._closed:
+                return
+            self._closed = True
+            if self.client is not None:
+                await self.client.aclose()
 
     async def select_templates(
         self, tweet_text: str, templates: list[MemeTemplate], limit: int
@@ -128,32 +142,39 @@ grammar over keyword overlap and choose different joke shapes. Return JSON only 
         max_tokens: int,
         timeout_ms: int,
     ) -> dict[str, Any]:
-        owns_client = self.client is None
-        client = self.client or httpx.AsyncClient()
-        try:
-            async with asyncio.timeout(timeout_ms / 1000):
-                response = await client.post(
-                    f"{OPENROUTER_BASE_URL}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.settings.openrouter_api_key}",
-                        "HTTP-Referer": self.settings.openrouter_site_url,
-                        "X-Title": self.settings.openrouter_app_name,
-                    },
-                    json={
-                        "model": self.settings.openrouter_meme_model,
-                        "temperature": temperature,
-                        "max_tokens": max_tokens,
-                        "reasoning": {"effort": "low", "exclude": True},
-                        "response_format": {"type": "json_object"},
-                        "messages": messages,
-                    },
-                )
-                response.raise_for_status()
-                content = response.json()["choices"][0]["message"]["content"]
-                return json.loads(strip_json_fence(content))
-        finally:
-            if owns_client:
-                await client.aclose()
+        client = await self._get_client()
+        async with asyncio.timeout(timeout_ms / 1000):
+            response = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.settings.openrouter_api_key}",
+                    "HTTP-Referer": self.settings.openrouter_site_url,
+                    "X-Title": self.settings.openrouter_app_name,
+                },
+                json={
+                    "model": self.settings.openrouter_meme_model,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "reasoning": {"effort": "low", "exclude": True},
+                    "response_format": {"type": "json_object"},
+                    "messages": messages,
+                },
+            )
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+            return json.loads(strip_json_fence(content))
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._closed:
+            raise RuntimeError("OpenRouter suggestion gateway is closed")
+        if self.client is not None:
+            return self.client
+        async with self._client_lock:
+            if self._closed:
+                raise RuntimeError("OpenRouter suggestion gateway is closed")
+            if self.client is None:
+                self.client = httpx.AsyncClient()
+            return self.client
 
 
 def strip_json_fence(content: str) -> str:

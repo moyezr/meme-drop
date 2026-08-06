@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 from fastapi import Request
@@ -88,3 +89,25 @@ async def test_static_meme_serving(settings: Settings, tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.text == "meme-bytes"
+
+
+async def test_lifespan_closes_only_the_default_suggestion_gateway(
+    settings: Settings, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    default_gateway = type("Gateway", (), {"close": AsyncMock()})()
+    gateway_factory = Mock(return_value=default_gateway)
+    monkeypatch.setattr("memedrop_api.app.OpenRouterSuggestionGateway", gateway_factory)
+
+    app = create_app(settings)
+    async with app.router.lifespan_context(app):
+        pass
+
+    default_gateway.close.assert_awaited_once()
+
+    injected_service = type("InjectedSuggestionService", (), {"close": AsyncMock()})()
+    app = create_app(settings, suggestion_service=injected_service)  # type: ignore[arg-type]
+    async with app.router.lifespan_context(app):
+        pass
+
+    assert gateway_factory.call_count == 1
+    injected_service.close.assert_not_awaited()
