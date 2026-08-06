@@ -674,6 +674,9 @@ function dismissPanel(e: Event) {
 }
 
 async function insertMemeIntoComposer(suggestion: Suggestion) {
+  const selectedAt = performance.now();
+  let fullRenderMs = 0;
+  let attachMs = 0;
   setCardBusy(suggestion.meme_id, true, "Preparing caption...");
 
   try {
@@ -686,21 +689,37 @@ async function insertMemeIntoComposer(suggestion: Suggestion) {
 
     if (suggestion.tailored_overlay?.enabled && !suggestion.tailored_image_data_url) {
       setCardBusy(suggestion.meme_id, true, "Rendering meme...");
+      const renderStartedAt = performance.now();
       suggestion.tailored_image_data_url = await renderTailoredMemeDataUrl(suggestion).catch(
         () => null
       );
+      fullRenderMs = Math.max(0, Math.round((performance.now() - renderStartedAt) * 10) / 10);
     }
 
     setCardBusy(suggestion.meme_id, true, "Attaching to X...");
-    await insertMemeByUrl({
-      imageUrl: suggestion.image_url,
-      imageDataUrl: suggestion.image_data_url ?? null,
-      tailoredImageDataUrl: suggestion.tailored_image_data_url ?? null,
-      tailoredOverlay: suggestion.tailored_overlay ?? null,
-      memeId: suggestion.meme_id,
-      source: suggestion.source,
-    });
+    const attachStartedAt = performance.now();
+    try {
+      await insertMemeByUrl({
+        imageUrl: suggestion.image_url,
+        imageDataUrl: suggestion.image_data_url ?? null,
+        tailoredImageDataUrl: suggestion.tailored_image_data_url ?? null,
+        tailoredOverlay: suggestion.tailored_overlay ?? null,
+        memeId: suggestion.meme_id,
+        source: suggestion.source,
+      });
+    } finally {
+      attachMs = Math.max(0, Math.round((performance.now() - attachStartedAt) * 10) / 10);
+    }
   } finally {
+    window.dispatchEvent(
+      new CustomEvent("memedrop:suggestion-attach-performance", {
+        detail: {
+          full_render_ms: fullRenderMs,
+          attach_ms: attachMs,
+          selected_total_ms: Math.max(0, Math.round((performance.now() - selectedAt) * 10) / 10),
+        },
+      })
+    );
     setCardBusy(suggestion.meme_id, false);
   }
 }

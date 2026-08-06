@@ -2,6 +2,13 @@ import { API_BASE_URL, apiUrl } from "../shared/config";
 import { apiErrorFromResponse, withApiRequestHeaders } from "../shared/api";
 import { clampSuggestionLimit, limitSuggestions } from "../shared/suggestion-limits";
 import { getSuggestionMediaUrls } from "../shared/suggestion-media";
+import {
+  SuggestionPerformanceTracker,
+} from "../shared/suggestion-performance";
+import {
+  SuggestionRequestObservers,
+  type SuggestionRequestObserver,
+} from "../shared/suggestion-observers";
 import { createSingleFlight } from "../shared/single-flight";
 import {
   UsageTelemetryQueue,
@@ -64,7 +71,12 @@ const SUGGESTION_CACHE_MAX = 100;
 const MEDIA_CACHE_MAX = 40;
 const SUGGESTION_REQUEST_TIMEOUT_MS = 5_000;
 const suggestionCache = new Map<string, CacheEntry>();
-const suggestionInflight = new Map<string, Promise<Suggestion[]>>();
+interface InflightSuggestionRequest {
+  suggestions: Promise<Suggestion[]>;
+  observers: SuggestionRequestObservers<Suggestion>;
+}
+
+const suggestionInflight = new Map<string, InflightSuggestionRequest>();
 const mediaDataUrlCache = new Map<string, string>();
 const mediaDataUrlInflight = createSingleFlight<string>();
 const usageTelemetry = new UsageTelemetryQueue({
@@ -102,12 +114,28 @@ function writeCachedSuggestions(key: string, suggestions: Suggestion[]) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_SUGGESTIONS") {
     let sentInitialSuggestions = false;
+    const performance = new SuggestionPerformanceTracker();
+    const reportPerformance = () => {
+      if (!sender.tab?.id) return;
+      chrome.tabs.sendMessage(sender.tab.id, {
+        type: "SUGGESTION_PERFORMANCE",
+        cache_key: message.payload.cache_key,
+        diagnostics: performance.snapshot(),
+      });
+    };
     fetchSuggestions(message.payload.tweet_text, {
       refresh: message.payload.refresh,
       limit: message.payload.limit,
       cacheKey: message.payload.cache_key,
-      onInitial: (suggestions) => {
+      onInitial: (suggestions, cacheHit) => {
         sentInitialSuggestions = true;
+        performance.setSuggestions(suggestions.length, cacheHit);
+        if (cacheHit) {
+          for (const suggestion of suggestions) {
+            if (suggestion.preview_image_data_url) performance.markPreviewReady(suggestion.meme_id);
+            if (suggestion.image_data_url) performance.markOriginalReady(suggestion.meme_id);
+          }
+        }
         if (sender.tab?.id) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
@@ -115,8 +143,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             suggestions,
           });
         }
+        reportPerformance();
+      },
+      onApiResponse: (durationMs, serverTiming) => {
+        performance.markApiResponse(durationMs, serverTiming);
       },
       onPreview: (suggestion) => {
+        performance.markPreviewReady(suggestion.meme_id);
         if (sender.tab?.id && suggestion.preview_image_data_url) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTION_PREVIEW_READY",
@@ -125,8 +158,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             image_data_url: suggestion.preview_image_data_url,
           });
         }
+        reportPerformance();
       },
       onOriginal: (suggestion) => {
+        performance.markOriginalReady(suggestion.meme_id);
         if (sender.tab?.id && suggestion.image_data_url) {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTION_ORIGINAL_READY",
@@ -135,6 +170,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             image_data_url: suggestion.image_data_url,
           });
         }
+        reportPerformance();
       },
     })
       .then((suggestions) => {
@@ -204,51 +240,69 @@ chrome.runtime.onSuspend.addListener(() => {
 
 async function fetchSuggestions(
   tweetText: string,
-  options: {
-    refresh?: boolean;
-    limit?: number;
-    cacheKey?: string;
-    onInitial?: (suggestions: Suggestion[]) => void;
-    onPreview?: (suggestion: Suggestion) => void;
-    onOriginal?: (suggestion: Suggestion) => void;
-  } = {}
+  options: SuggestionOptions = {}
 ): Promise<Suggestion[]> {
   const limit = clampSuggestionLimit(options.limit);
   const requestOptions = { ...options, limit };
   const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${limit}|quality:v1`;
   if (!options.refresh) {
-    const cached = readCachedSuggestions(cacheKey);
-    if (cached) return cached;
-
     const inflight = suggestionInflight.get(cacheKey);
-    if (inflight) return inflight;
+    if (inflight) {
+      inflight.observers.subscribe(options);
+      return inflight.suggestions;
+    }
+
+    const cached = readCachedSuggestions(cacheKey);
+    if (cached) {
+      options.onInitial?.(cached, true);
+      return cached;
+    }
   }
 
-  const request = fetchFreshSuggestions(tweetText, requestOptions, cacheKey);
+  const observers = new SuggestionRequestObservers<Suggestion>();
+  observers.subscribe(options);
+  let entry: InflightSuggestionRequest | undefined;
+  const releaseInflight = () => {
+    if (entry && suggestionInflight.get(cacheKey) === entry) {
+      suggestionInflight.delete(cacheKey);
+    }
+  };
+  const request = fetchFreshSuggestions(
+    tweetText,
+    {
+      ...requestOptions,
+      onInitial: (suggestions, cacheHit) => observers.notifyInitial(suggestions, cacheHit),
+      onApiResponse: (durationMs, serverTiming) =>
+        observers.notifyApiResponse(durationMs, serverTiming),
+      onPreview: (suggestion) => observers.notifyPreview(suggestion),
+      onOriginal: (suggestion) => observers.notifyOriginal(suggestion),
+      onMediaSettled: releaseInflight,
+    },
+    cacheKey
+  );
+  entry = { suggestions: request, observers };
   if (!options.refresh) {
-    suggestionInflight.set(cacheKey, request);
+    suggestionInflight.set(cacheKey, entry);
   }
-  try {
-    return await request;
-  } finally {
-    suggestionInflight.delete(cacheKey);
-  }
+  void request.catch(releaseInflight);
+  return request;
 }
+
+type SuggestionOptions = SuggestionRequestObserver<Suggestion> & {
+  refresh?: boolean;
+  limit?: number;
+  cacheKey?: string;
+  onMediaSettled?: () => void;
+};
 
 async function fetchFreshSuggestions(
   tweetText: string,
-  options: {
-    refresh?: boolean;
-    limit?: number;
-    cacheKey?: string;
-    onInitial?: (suggestions: Suggestion[]) => void;
-    onPreview?: (suggestion: Suggestion) => void;
-    onOriginal?: (suggestion: Suggestion) => void;
-  },
+  options: SuggestionOptions,
   cacheKey: string
 ): Promise<Suggestion[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SUGGESTION_REQUEST_TIMEOUT_MS);
+  const apiStartedAt = performance.now();
   let res: Response;
   try {
     res = await fetch(apiUrl("/api/v1/suggest"), {
@@ -265,6 +319,7 @@ async function fetchFreshSuggestions(
     if (!res.ok) {
       throw await apiErrorFromResponse(res);
     }
+    options.onApiResponse?.(performance.now() - apiStartedAt, res.headers.get("server-timing"));
   } finally {
     clearTimeout(timer);
   }
@@ -283,7 +338,7 @@ async function fetchFreshSuggestions(
     preview_image_data_url: null,
   }));
 
-  options.onInitial?.(suggestions);
+  options.onInitial?.(suggestions, false);
   writeCachedSuggestions(cacheKey, suggestions);
 
   // X's page CSP can block injected localhost images. Fetch through the
@@ -291,8 +346,8 @@ async function fetchFreshSuggestions(
   // Preview assets are delivered independently so captioned cards can appear
   // before their full-quality originals. Originals are still prefetched for
   // attachment, but never used to render the capped card canvas.
-  void Promise.allSettled(
-    suggestions.map((suggestion) => hydrateSuggestionMedia(suggestion, options))
+  void Promise.allSettled(suggestions.map((suggestion) => hydrateSuggestionMedia(suggestion, options))).then(
+    () => options.onMediaSettled?.()
   );
 
   return suggestions;
@@ -300,10 +355,7 @@ async function fetchFreshSuggestions(
 
 async function hydrateSuggestionMedia(
   suggestion: Suggestion,
-  options: {
-    onPreview?: (suggestion: Suggestion) => void;
-    onOriginal?: (suggestion: Suggestion) => void;
-  }
+  options: Pick<SuggestionOptions, "onPreview" | "onOriginal">
 ): Promise<void> {
   const { previewUrl, originalUrl, sharesAsset } = getSuggestionMediaUrls(
     suggestion.image_url,

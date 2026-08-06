@@ -96,6 +96,16 @@ chrome.runtime.onMessage.addListener((message) => {
     updateSuggestionMedia(message.meme_id, message.image_data_url);
   }
 
+  if (
+    message.type === "SUGGESTION_PERFORMANCE" &&
+    message.cache_key === lastSuggestionCacheKey &&
+    message.diagnostics
+  ) {
+    // Diagnostics contain only counts and duration values. They stay local to
+    // the extension console and are intentionally not usage telemetry.
+    console.debug("[MemeDrop] suggestion performance", message.diagnostics);
+  }
+
   if (message.type === "INSERT_MEME_FROM_POPUP" && message.payload?.image_url) {
     insertMemeByUrl({
       imageUrl: message.payload.image_url,
@@ -450,6 +460,13 @@ window.addEventListener("memedrop:refresh-suggestions", () => {
   requestSuggestionsForCurrentCompose(true).catch((err) => {
     console.error("[MemeDrop] Refresh suggestions failed:", err);
   });
+});
+
+window.addEventListener("memedrop:suggestion-attach-performance", (event) => {
+  const diagnostics = (event as CustomEvent<unknown>).detail;
+  if (!diagnostics || typeof diagnostics !== "object") return;
+  // The panel emits durations only, never post text, captions, or template ids.
+  console.debug("[MemeDrop] selected meme performance", diagnostics);
 });
 
 window.addEventListener("memedrop:suggestions-dismissed", () => {
