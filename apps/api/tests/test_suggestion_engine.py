@@ -11,10 +11,12 @@ from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.suggestion_engine import (
     Candidate,
+    LexicalCandidateIndex,
     SuggestionService,
     fallback_template_selections,
     safe_log_cache_key,
     safe_log_tweet_text,
+    semantic_template_signals,
 )
 from tests.conftest import INSTALL_ID, ApiHarness
 from tests.fakes import FakeStore
@@ -146,6 +148,90 @@ async def test_service_cache_avoids_repeating_model_work_and_refresh_bypasses() 
     assert first == second == refreshed
     assert gateway.joint_calls == 2
     assert gateway.caption_calls == 0
+
+
+async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
+    service, _, gateway = service_with_templates("this-is-fine")
+    original_select = gateway.select_and_caption
+    model_started = asyncio.Event()
+    allow_model = asyncio.Event()
+
+    async def delayed_select(tweet_text, templates, limit):  # type: ignore[no-untyped-def]
+        model_started.set()
+        await allow_model.wait()
+        return await original_select(tweet_text, templates, limit)
+
+    gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
+    first = asyncio.create_task(service.get_suggestions("Prod is down", user_id=INSTALL_ID))
+    await model_started.wait()
+    second = asyncio.create_task(service.get_suggestions("Prod is down", user_id=INSTALL_ID))
+    await asyncio.sleep(0)
+
+    allow_model.set()
+    first_result, second_result = await asyncio.gather(first, second)
+
+    assert first_result == second_result
+    assert gateway.joint_calls == 1
+
+
+async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None:
+    service, _, gateway = service_with_templates("this-is-fine")
+    await service.get_suggestions("Prod is down", user_id=INSTALL_ID)
+    original_select = gateway.select_and_caption
+    model_started = asyncio.Event()
+    allow_model = asyncio.Event()
+
+    async def delayed_select(tweet_text, templates, limit):  # type: ignore[no-untyped-def]
+        model_started.set()
+        await allow_model.wait()
+        return await original_select(tweet_text, templates, limit)
+
+    gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
+    first = asyncio.create_task(
+        service.get_suggestions("Prod is down", user_id=INSTALL_ID, refresh=True)
+    )
+    await model_started.wait()
+    second = asyncio.create_task(
+        service.get_suggestions("Prod is down", user_id=INSTALL_ID, refresh=True)
+    )
+    await asyncio.sleep(0)
+
+    allow_model.set()
+    await asyncio.gather(first, second)
+
+    # One initial call warmed the cache; the two refreshes ran one new shared request.
+    assert gateway.joint_calls == 2
+
+
+async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_text() -> None:
+    service, _, gateway = service_with_templates("this-is-fine")
+    original_select = gateway.select_and_caption
+    model_started = asyncio.Event()
+    allow_model = asyncio.Event()
+
+    async def delayed_select(tweet_text, templates, limit):  # type: ignore[no-untyped-def]
+        model_started.set()
+        await allow_model.wait()
+        return await original_select(tweet_text, templates, limit)
+
+    gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
+    first = asyncio.create_task(
+        service.get_suggestions("Prod is down", user_id=INSTALL_ID, cache_key="same-client-key")
+    )
+    await model_started.wait()
+    second = asyncio.create_task(
+        service.get_suggestions(
+            "Different post entirely",
+            user_id=uuid4(),
+            cache_key="same-client-key",
+        )
+    )
+    await asyncio.sleep(0)
+
+    allow_model.set()
+    await asyncio.gather(first, second)
+
+    assert gateway.joint_calls == 2
 
 
 async def test_service_loads_global_catalog_once_and_applies_feedback_per_user() -> None:
@@ -353,3 +439,68 @@ def test_local_ranker_meets_benchmark_retrieval_gates() -> None:
 
     assert top3 / len(cases) >= 0.55
     assert top5 / len(cases) >= 0.75
+
+
+def test_local_ranker_uses_bm25_signal_instead_of_catalog_position() -> None:
+    catalog = MemeCatalog.load()
+    first, second = [
+        next(
+            template
+            for template in catalog.verified_templates
+            if template.template_id == template_id
+        )
+        for template_id in ("change-my-mind", "this-is-fine")
+    ]
+    candidates = [
+        Candidate(
+            meme_id=first.template_id,
+            name=first.name,
+            image_url="/memes/first.png",
+            system_tags={},
+            is_evergreen=True,
+            template=first,
+        ),
+        Candidate(
+            meme_id=second.template_id,
+            name=second.name,
+            image_url="/memes/second.png",
+            system_tags={"example_contexts": ["neonflux telemetry"]},
+            is_evergreen=True,
+            template=second,
+        ),
+    ]
+
+    lexical_index = LexicalCandidateIndex.build(candidates)
+    selections = fallback_template_selections(
+        "The neonflux telemetry is acting strange", candidates, 2, lexical_index=lexical_index
+    )
+
+    assert lexical_index.score("neonflux telemetry")["this-is-fine"] > 0
+    assert [selection.template_id for selection in selections] == ["this-is-fine", "change-my-mind"]
+
+
+async def test_service_reuses_precomputed_global_lexical_index() -> None:
+    service, _, gateway = service_with_templates("this-is-fine", "change-my-mind")
+    gateway.fail_joint = True
+
+    await service.get_suggestions("Prod is down", user_id=INSTALL_ID)
+    index = service._global_lexical_index
+    await service.get_suggestions("Prod is down again", user_id=uuid4())
+
+    assert index is not None
+    assert service._global_lexical_index is index
+
+
+def test_local_ranker_detects_forced_choice_and_false_label_joke_shapes() -> None:
+    forced_choice = semantic_template_signals(
+        "Should I fix the bug properly or add another feature flag and pretend it was planned?"
+    )
+    false_label = semantic_template_signals(
+        "Calling this spreadsheet with macros a modern data platform is certainly "
+        "one way to describe it."
+    )
+
+    assert forced_choice["two-buttons"] > 0
+    assert forced_choice["evil-kermit"] > 0
+    assert false_label["is-this-a-pigeon"] > 0
+    assert false_label["they-re-the-same-picture"] > 0
