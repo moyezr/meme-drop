@@ -10,6 +10,12 @@ import {
   hidePanel,
   isPanelVisible,
 } from "./suggestion-panel";
+import {
+  buildSuggestionCacheKey,
+  createSuggestionRequestId,
+  isCurrentSuggestionGeneration,
+  isCurrentSuggestionMessage,
+} from "../shared/suggestion-request";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const DEBUG_PREFIX = "[MemeDrop]";
@@ -40,6 +46,10 @@ initSaveButton();
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "SUGGESTIONS_RESULT") {
+    if (!isCurrentSuggestionMessage(message, activeSuggestionRequestId)) {
+      logDebug("Ignored stale suggestions result", "- reason: request generation changed");
+      return;
+    }
     if (!isComposeRoute()) {
       logDebug(
         "Ignored suggestions result",
@@ -80,6 +90,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
   if (
     message.type === "SUGGESTION_PREVIEW_READY" &&
+    isCurrentSuggestionMessage(message, activeSuggestionRequestId) &&
     message.cache_key === lastSuggestionCacheKey &&
     message.meme_id &&
     message.image_data_url
@@ -89,6 +100,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
   if (
     message.type === "SUGGESTION_ORIGINAL_READY" &&
+    isCurrentSuggestionMessage(message, activeSuggestionRequestId) &&
     message.cache_key === lastSuggestionCacheKey &&
     message.meme_id &&
     message.image_data_url
@@ -98,6 +110,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
   if (
     message.type === "SUGGESTION_PERFORMANCE" &&
+    isCurrentSuggestionMessage(message, activeSuggestionRequestId) &&
     message.cache_key === lastSuggestionCacheKey &&
     message.diagnostics
   ) {
@@ -124,13 +137,6 @@ function extractTweetText(tweetTextEl: Element): string {
 function logDebug(title: string, details = "") {
   console.log(`${DEBUG_PREFIX}
 ${title}${details ? `\n${details}` : ""}`);
-}
-
-function buildTextPreview(text: string | null, maxLength = 180): string {
-  if (!text) return "(none)";
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
 function isComposeRoute(url = window.location.href): boolean {
@@ -293,16 +299,20 @@ function logReplyTweetSnapshot(snapshot: ReplyTweetSnapshot, label: string) {
 - has likely tweet container: ${snapshot.hasLikelyTweetContainer}
 - has tweet root: ${snapshot.hasTweetRoot}
 - tweet text nodes: ${snapshot.tweetTextNodeCount}
-- extracted text length: ${snapshot.text?.length || 0}
-- extracted text preview: ${buildTextPreview(snapshot.text)}`
+- extracted text length: ${snapshot.text?.length || 0}`
   );
 }
 
 // The compose cache key we last requested suggestions for. It is normally the
-// source tweet id parsed from the canonical URL, with tweet text as fallback.
+// source tweet id parsed from the canonical URL, with a SHA-256 text hash as
+// fallback.
 let lastSuggestionCacheKey: string | null = null;
 let dismissedSuggestionCacheKey: string | null = null;
 let currentComposeDismissed = false;
+// Every compose request gets a new generation, including refreshes for the
+// same tweet. This keeps late media/results from a prior request out of the
+// currently visible panel.
+let activeSuggestionRequestId: string | null = null;
 // Token used to abandon stale waitForTweetText() loops when the URL changes
 // again before tweet text appears.
 let waitToken = 0;
@@ -342,12 +352,6 @@ function getCanonicalTweetId(): string | null {
   }
 }
 
-function buildSuggestionCacheKey(tweetText: string): string {
-  const tweetId = getCanonicalTweetId();
-  if (tweetId) return `tweet:${tweetId}`;
-  return `text:${tweetText.trim().replace(/\s+/g, " ").toLowerCase()}`;
-}
-
 async function requestSuggestionsForCurrentCompose(refresh = false) {
   if (!isComposeRoute()) {
     logDebug(
@@ -370,6 +374,7 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
   }
 
   const token = ++waitToken;
+  const requestId = createSuggestionRequestId(token);
   showSuggestionPanel();
   logDebug(
     "Suggestion request started",
@@ -398,6 +403,9 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
   }
   if (!text) {
     lastSuggestionCacheKey = null;
+    // No replacement request will be sent, so stop accepting results from an
+    // earlier compose request while the error is visible.
+    if (token === waitToken) activeSuggestionRequestId = null;
     showSuggestionError(
       "Could not find the tweet you are replying to. Reopen the reply dialog and try again."
     );
@@ -405,7 +413,8 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
   }
 
   const suggestionText = text;
-  const cacheKey = buildSuggestionCacheKey(suggestionText);
+  const cacheKey = await buildSuggestionCacheKey(suggestionText, getCanonicalTweetId());
+  if (!isCurrentSuggestionGeneration(token, waitToken)) return;
 
   if (!refresh && (currentComposeDismissed || cacheKey === dismissedSuggestionCacheKey)) {
     logDebug(
@@ -428,13 +437,16 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
     );
     return;
   }
+  // Only replace the active generation when this invocation will actually
+  // send. A duplicate route event must keep receiving the in-flight request's
+  // progressive media updates.
+  activeSuggestionRequestId = requestId;
   lastSuggestionCacheKey = cacheKey;
 
   logDebug(
     "Sending suggestions request",
     `- cache key: ${cacheKey}
-- text length: ${suggestionText.length}
-- text preview: ${buildTextPreview(suggestionText)}`
+- text length: ${suggestionText.length}`
   );
 
   chrome.runtime.sendMessage({
@@ -444,6 +456,7 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
       limit: 5,
       refresh,
       cache_key: cacheKey,
+      request_id: requestId,
     },
   });
 }
@@ -495,6 +508,7 @@ function onUrlChanged(url = window.location.href) {
   lastSuggestionCacheKey = null;
   dismissedSuggestionCacheKey = null;
   currentComposeDismissed = false;
+  activeSuggestionRequestId = null;
   waitToken++;
   hidePanel();
 }

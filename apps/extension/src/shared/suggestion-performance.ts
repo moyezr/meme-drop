@@ -10,6 +10,8 @@ export interface SuggestionPerformanceSnapshot {
   first_preview_ready_ms?: number;
   all_previews_ready_ms?: number;
   ready_to_attach_ms?: number;
+  media_settled_ms?: number;
+  media_failure_count: number;
   server_timing?: Record<string, number>;
 }
 
@@ -40,6 +42,8 @@ export class SuggestionPerformanceTracker {
   private firstPreviewReadyMs: number | undefined;
   private allPreviewsReadyMs: number | undefined;
   private readyToAttachMs: number | undefined;
+  private mediaSettledMs: number | undefined;
+  private mediaFailureCount = 0;
   private serverTiming: Record<string, number> | undefined;
   private readonly previewIds = new Set<string>();
   private readonly originalIds = new Set<string>();
@@ -72,10 +76,19 @@ export class SuggestionPerformanceTracker {
     if (this.originalIds.size >= this.suggestionCount) this.readyToAttachMs ??= this.elapsed();
   }
 
+  markMediaFailure(): void {
+    this.mediaFailureCount += 1;
+  }
+
+  markMediaSettled(): void {
+    this.mediaSettledMs ??= this.elapsed();
+  }
+
   snapshot(): SuggestionPerformanceSnapshot {
     return {
       suggestion_count: this.suggestionCount,
       cache_hit: this.cacheHit,
+      media_failure_count: this.mediaFailureCount,
       ...(this.apiResponseMs === undefined ? {} : { api_response_ms: this.apiResponseMs }),
       ...(this.firstPreviewReadyMs === undefined
         ? {}
@@ -86,6 +99,7 @@ export class SuggestionPerformanceTracker {
       ...(this.readyToAttachMs === undefined
         ? {}
         : { ready_to_attach_ms: this.readyToAttachMs }),
+      ...(this.mediaSettledMs === undefined ? {} : { media_settled_ms: this.mediaSettledMs }),
       ...(this.serverTiming ? { server_timing: this.serverTiming } : {}),
     };
   }

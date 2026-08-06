@@ -33,10 +33,31 @@ test("records API, preview, and ready-to-attach milestones only once", () => {
   assert.deepEqual(tracker.snapshot(), {
     suggestion_count: 2,
     cache_hit: false,
+    media_failure_count: 0,
     api_response_ms: 42.5,
     first_preview_ready_ms: 20,
     all_previews_ready_ms: 50,
     ready_to_attach_ms: 80,
     server_timing: { model: 31.2 },
+  });
+});
+
+test("records media failures and a final all-settled milestone without media identifiers", () => {
+  let now = 100;
+  const tracker = new SuggestionPerformanceTracker(() => now);
+  tracker.setSuggestions(2);
+
+  now = 170;
+  tracker.markMediaFailure();
+  tracker.markMediaFailure();
+  tracker.markMediaSettled();
+  now = 220;
+  tracker.markMediaSettled();
+
+  assert.deepEqual(tracker.snapshot(), {
+    suggestion_count: 2,
+    cache_hit: false,
+    media_failure_count: 2,
+    media_settled_ms: 70,
   });
 });

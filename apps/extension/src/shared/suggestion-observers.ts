@@ -3,6 +3,8 @@ export interface SuggestionRequestObserver<T> {
   onApiResponse?: (durationMs: number, serverTiming: string | null) => void;
   onPreview?: (suggestion: T) => void;
   onOriginal?: (suggestion: T) => void;
+  onMediaFailure?: () => void;
+  onMediaSettled?: () => void;
 }
 
 /**
@@ -16,6 +18,8 @@ export class SuggestionRequestObservers<T> {
   private apiResponse: { durationMs: number; serverTiming: string | null } | undefined;
   private readonly previews: T[] = [];
   private readonly originals: T[] = [];
+  private mediaFailureCount = 0;
+  private mediaSettled = false;
 
   subscribe(observer: SuggestionRequestObserver<T>): void {
     this.observers.add(observer);
@@ -23,6 +27,8 @@ export class SuggestionRequestObservers<T> {
     if (this.initial) observer.onInitial?.(this.initial.suggestions, this.initial.cacheHit);
     for (const suggestion of this.previews) observer.onPreview?.(suggestion);
     for (const suggestion of this.originals) observer.onOriginal?.(suggestion);
+    for (let index = 0; index < this.mediaFailureCount; index += 1) observer.onMediaFailure?.();
+    if (this.mediaSettled) observer.onMediaSettled?.();
   }
 
   notifyInitial(suggestions: T[], cacheHit: boolean): void {
@@ -43,6 +49,17 @@ export class SuggestionRequestObservers<T> {
   notifyOriginal(suggestion: T): void {
     this.originals.push(suggestion);
     this.forEach((observer) => observer.onOriginal?.(suggestion));
+  }
+
+  notifyMediaFailure(): void {
+    this.mediaFailureCount += 1;
+    this.forEach((observer) => observer.onMediaFailure?.());
+  }
+
+  notifyMediaSettled(): void {
+    if (this.mediaSettled) return;
+    this.mediaSettled = true;
+    this.forEach((observer) => observer.onMediaSettled?.());
   }
 
   private forEach(callback: (observer: SuggestionRequestObserver<T>) => void): void {

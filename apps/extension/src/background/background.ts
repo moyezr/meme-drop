@@ -10,6 +10,8 @@ import {
   type SuggestionRequestObserver,
 } from "../shared/suggestion-observers";
 import { createSingleFlight } from "../shared/single-flight";
+import { buildSuggestionCacheKey } from "../shared/suggestion-request";
+import { fetchMediaWithTimeout } from "../shared/media-fetch";
 import {
   UsageTelemetryQueue,
   type UsageEvent,
@@ -83,10 +85,6 @@ const usageTelemetry = new UsageTelemetryQueue({
   sendBatch: postUsageBatch,
 });
 
-function normalizeTweetText(text: string): string {
-  return text.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
 function readCachedSuggestions(key: string): Suggestion[] | null {
   const entry = suggestionCache.get(key);
   if (!entry) return null;
@@ -115,11 +113,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_SUGGESTIONS") {
     let sentInitialSuggestions = false;
     const performance = new SuggestionPerformanceTracker();
+    const requestId = message.payload.request_id;
     const reportPerformance = () => {
       if (!sender.tab?.id) return;
       chrome.tabs.sendMessage(sender.tab.id, {
         type: "SUGGESTION_PERFORMANCE",
         cache_key: message.payload.cache_key,
+        request_id: requestId,
         diagnostics: performance.snapshot(),
       });
     };
@@ -140,6 +140,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
             cache_key: message.payload.cache_key,
+            request_id: requestId,
             suggestions,
           });
         }
@@ -154,6 +155,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTION_PREVIEW_READY",
             cache_key: message.payload.cache_key,
+            request_id: requestId,
             meme_id: suggestion.meme_id,
             image_data_url: suggestion.preview_image_data_url,
           });
@@ -166,10 +168,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTION_ORIGINAL_READY",
             cache_key: message.payload.cache_key,
+            request_id: requestId,
             meme_id: suggestion.meme_id,
             image_data_url: suggestion.image_data_url,
           });
         }
+        reportPerformance();
+      },
+      onMediaFailure: () => {
+        performance.markMediaFailure();
+        reportPerformance();
+      },
+      onMediaSettled: () => {
+        performance.markMediaSettled();
         reportPerformance();
       },
     })
@@ -178,6 +189,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
             cache_key: message.payload.cache_key,
+            request_id: requestId,
             suggestions,
           });
         }
@@ -189,6 +201,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: "SUGGESTIONS_RESULT",
             cache_key: message.payload.cache_key,
+            request_id: requestId,
             suggestions: [],
           });
         }
@@ -244,7 +257,8 @@ async function fetchSuggestions(
 ): Promise<Suggestion[]> {
   const limit = clampSuggestionLimit(options.limit);
   const requestOptions = { ...options, limit };
-  const cacheKey = `${options.cacheKey || `text:${normalizeTweetText(tweetText)}`}|limit:${limit}|quality:v1`;
+  const baseCacheKey = options.cacheKey || await buildSuggestionCacheKey(tweetText);
+  const cacheKey = `${baseCacheKey}|limit:${limit}|quality:v1`;
   if (!options.refresh) {
     const inflight = suggestionInflight.get(cacheKey);
     if (inflight) {
@@ -255,6 +269,7 @@ async function fetchSuggestions(
     const cached = readCachedSuggestions(cacheKey);
     if (cached) {
       options.onInitial?.(cached, true);
+      options.onMediaSettled?.();
       return cached;
     }
   }
@@ -276,7 +291,11 @@ async function fetchSuggestions(
         observers.notifyApiResponse(durationMs, serverTiming),
       onPreview: (suggestion) => observers.notifyPreview(suggestion),
       onOriginal: (suggestion) => observers.notifyOriginal(suggestion),
-      onMediaSettled: releaseInflight,
+      onMediaFailure: () => observers.notifyMediaFailure(),
+      onMediaSettled: () => {
+        observers.notifyMediaSettled();
+        releaseInflight();
+      },
     },
     cacheKey
   );
@@ -347,7 +366,12 @@ async function fetchFreshSuggestions(
   // before their full-quality originals. Originals are still prefetched for
   // attachment, but never used to render the capped card canvas.
   void Promise.allSettled(suggestions.map((suggestion) => hydrateSuggestionMedia(suggestion, options))).then(
-    () => options.onMediaSettled?.()
+    (results) => {
+      for (const result of results) {
+        if (result.status === "rejected") options.onMediaFailure?.();
+      }
+      options.onMediaSettled?.();
+    }
   );
 
   return suggestions;
@@ -444,7 +468,7 @@ async function fetchMediaDataUrl(imageUrl: string): Promise<string> {
     const populated = mediaDataUrlCache.get(imageUrl);
     if (populated) return populated;
 
-    const response = await fetch(imageUrl);
+    const response = await fetchMediaWithTimeout(imageUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch media (${response.status})`);
     }
