@@ -70,17 +70,17 @@ async def test_gateway_reuses_owned_client_for_selection_and_captions(monkeypatc
         ]
     )
     requests: list[httpx.Request] = []
-    client = httpx.AsyncClient(
-        transport=httpx.MockTransport(
-            lambda request: (
-                requests.append(request)
-                or httpx.Response(
-                    200,
-                    json={"choices": [{"message": {"content": json.dumps(next(responses))}}]},
-                    request=request,
-                )
-            )
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(next(responses))}}]},
+            request=request,
         )
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(respond)
     )
     client_factory = Mock(return_value=client)
     monkeypatch.setattr("memedrop_api.services.openrouter.httpx.AsyncClient", client_factory)
