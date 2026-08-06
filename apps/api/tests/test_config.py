@@ -13,6 +13,21 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.port == 3001
     assert settings.cors_origins == list(DEFAULT_ALLOWED_ORIGINS)
     assert settings.require_install_id is False
+    assert settings.joint_provider_sort == "throughput"
+    assert settings.joint_provider_preferred_p90_latency_seconds == 2.5
+
+
+def test_joint_provider_latency_preference_has_a_bounded_positive_value() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url="postgresql://localhost/memedrop",
+            joint_provider_preferred_p90_latency_seconds=0,
+        )
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url="postgresql://localhost/memedrop",
+            joint_provider_preferred_p90_latency_seconds=30.1,
+        )
 
 
 def test_production_requires_openrouter_key() -> None:

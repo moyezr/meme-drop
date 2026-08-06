@@ -69,6 +69,56 @@ async def test_gateway_parses_batched_caption_response() -> None:
     assert result == {template.template_id: {template.regions[0].id: "caption"}}
 
 
+async def test_joint_request_uses_throughput_routing_with_p90_latency_preference() -> None:
+    template = MemeCatalog.load().verified_templates[0]
+    captured: dict[str, object] = {}
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"suggestions": []}'}}]},
+            request=request,
+        )
+
+    configured = Settings(
+        database_url="postgresql://localhost/test",
+        openrouter_api_key="secret",
+        joint_provider_sort="throughput",
+        joint_provider_preferred_p90_latency_seconds=2.5,
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        gateway = OpenRouterSuggestionGateway(configured, client)
+        await gateway.select_and_caption("tweet", [template], 1)
+
+    assert captured["max_tokens"] == 1000
+    assert captured["provider"] == {
+        "sort": "throughput",
+        "preferred_max_latency": {"p90": 2.5},
+        "allow_fallbacks": True,
+    }
+
+
+async def test_standalone_caption_request_does_not_apply_joint_provider_routing() -> None:
+    template = MemeCatalog.load().verified_templates[0]
+    captured: dict[str, object] = {}
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"captions": {}}'}}]},
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        gateway = OpenRouterSuggestionGateway(settings(), client)
+        await gateway.generate_captions("tweet", [template])
+
+    assert captured["max_tokens"] == 1800
+    assert "provider" not in captured
+
+
 async def test_gateway_reuses_owned_client_for_joint_suggestions_and_captions(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     template = MemeCatalog.load().verified_templates[0]
     responses = iter(
@@ -190,6 +240,12 @@ async def test_joint_suggestion_passes_its_dedicated_deadline_to_the_provider() 
     await_args = chat_json.await_args
     assert await_args is not None
     assert await_args.kwargs["timeout_ms"] == 1_234
+    assert await_args.kwargs["max_tokens"] == 1000
+    assert await_args.kwargs["provider"] == {
+        "sort": "throughput",
+        "preferred_max_latency": {"p90": 2.5},
+        "allow_fallbacks": True,
+    }
 
 
 def test_openrouter_helpers_handle_fences_and_bad_scores() -> None:

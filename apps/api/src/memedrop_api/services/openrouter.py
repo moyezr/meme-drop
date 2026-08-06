@@ -79,10 +79,20 @@ class OpenRouterSuggestionGateway:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.55,
-                max_tokens=1800,
+                max_tokens=1000,
                 # The joint request is on the user-visible critical path. Its total provider
                 # budget must stay independent of the legacy standalone caption endpoint.
                 timeout_ms=self.settings.joint_suggestion_timeout_ms,
+                provider={
+                    # OpenRouter treats these as preferences, so a slow preferred endpoint does
+                    # not turn into an availability failure. Its normal provider fallbacks remain
+                    # available when no endpoint meets the p90 target.
+                    "sort": self.settings.joint_provider_sort,
+                    "preferred_max_latency": {
+                        "p90": self.settings.joint_provider_preferred_p90_latency_seconds,
+                    },
+                    "allow_fallbacks": True,
+                },
             )
         except Exception:
             await self._open_joint_circuit()
@@ -170,9 +180,20 @@ class OpenRouterSuggestionGateway:
         temperature: float,
         max_tokens: int,
         timeout_ms: int,
+        provider: dict[str, object] | None = None,
     ) -> dict[str, Any]:
         client = await self._get_client()
         async with asyncio.timeout(timeout_ms / 1000):
+            request_body: dict[str, object] = {
+                "model": self.settings.openrouter_meme_model,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "reasoning": {"effort": "low", "exclude": True},
+                "response_format": {"type": "json_object"},
+                "messages": messages,
+            }
+            if provider is not None:
+                request_body["provider"] = provider
             response = await client.post(
                 f"{OPENROUTER_BASE_URL}/chat/completions",
                 headers={
@@ -180,14 +201,7 @@ class OpenRouterSuggestionGateway:
                     "HTTP-Referer": self.settings.openrouter_site_url,
                     "X-Title": self.settings.openrouter_app_name,
                 },
-                json={
-                    "model": self.settings.openrouter_meme_model,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "reasoning": {"effort": "low", "exclude": True},
-                    "response_format": {"type": "json_object"},
-                    "messages": messages,
-                },
+                json=request_body,
             )
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]

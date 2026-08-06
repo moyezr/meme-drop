@@ -94,6 +94,16 @@ class Settings(BaseSettings):
         validation_alias="MEMEDROP_JOINT_SUGGESTION_TIMEOUT_MS",
         gt=0,
     )
+    joint_provider_sort: Literal["throughput", "latency", "price"] = Field(
+        default="throughput",
+        validation_alias="MEMEDROP_JOINT_PROVIDER_SORT",
+    )
+    joint_provider_preferred_p90_latency_seconds: float = Field(
+        default=2.5,
+        validation_alias="MEMEDROP_JOINT_PROVIDER_P90_MAX_LATENCY_SECONDS",
+        gt=0,
+        le=30,
+    )
     joint_suggestion_cooldown_ms: int = Field(
         default=30_000,
         validation_alias="MEMEDROP_JOINT_SUGGESTION_COOLDOWN_MS",
