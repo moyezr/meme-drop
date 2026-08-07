@@ -543,6 +543,286 @@
       "expected_memes": ["Epic Handshake", "Inhaling Seagull", "Squidward window"],
       "keywords": ["opera", "metalhead", "hand dryer"],
       "rejected_memes": [{ "name": "Trade Offer", "reason": "a lopsided negotiation format misses unlike people unexpectedly sharing the same complaint" }]
+    },
+    {
+      "id": "orchard-safety-contacts",
+      "category": "safety briefing dread",
+      "tweet": "Before the orchard tour, the manager said the ladder route was perfectly safe, then asked us to update our emergency contacts.",
+      "expected_memes": ["Anakin Padme 4 Panel", "The Rock Driving", "Panik Kalm Panik"],
+      "keywords": ["orchard", "ladder", "emergency contacts"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "mutual accord cannot convey a reassuring statement that immediately becomes alarming" }]
+    },
+    {
+      "id": "library-kiosk-under-the-paint",
+      "category": "cosmetic continuity",
+      "tweet": "The library announced a brand-new self-checkout kiosk; after the ribbon cutting, its screen showed the same overdue-fee form from the old desk.",
+      "expected_memes": ["Scooby Doo Mask Reveal", "They're The Same Picture", "Always Has Been"],
+      "keywords": ["library", "self-checkout", "overdue-fee"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a broad giveaway has nothing to do with a fresh facade covering an unchanged system" }]
+    },
+    {
+      "id": "spa-cucumber-water-tariff",
+      "category": "premiumization",
+      "tweet": "The gym started charging five dollars for tap water with one cucumber slice and named it a recovery infusion.",
+      "expected_memes": ["Tuxedo Winnie The Pooh", "Is This A Pigeon", "They're The Same Picture"],
+      "keywords": ["gym", "cucumber", "infusion"],
+      "rejected_memes": [{ "name": "This Is Fine", "reason": "disaster acceptance misses the joke of dressing up a basic item to justify a markup" }]
+    },
+    {
+      "id": "choir-fundraiser-roster",
+      "category": "competing obligations",
+      "tweet": "For the choir fundraiser I can run the bake-sale table in the rain or spend Saturday counting raffle tickets in a windowless storage room.",
+      "expected_memes": ["Two Buttons", "Two Paths", "Evil Kermit"],
+      "keywords": ["choir", "bake-sale", "raffle tickets"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "a toast is the wrong response to deciding between two equally unappealing duties" }]
+    },
+    {
+      "id": "planetarium-meeting-veto",
+      "category": "collective self-sabotage",
+      "tweet": "At the planetarium, the staff voted down dimming the lobby lights because the glare makes the star show feel more interactive.",
+      "expected_memes": ["Boardroom Meeting Suggestion", "Roll Safe Think About It", "Gru's Plan"],
+      "keywords": ["planetarium", "lobby lights", "star show"],
+      "rejected_memes": [{ "name": "Sad Pablo Escobar", "reason": "lonely delay misses a group deliberately selecting the option that defeats its own goal" }]
+    },
+    {
+      "id": "boat-ramp-shortcut",
+      "category": "bravado meets reality",
+      "tweet": "I told everyone the marina had a faster back way, then led the trailer directly into a locked service ramp at low tide.",
+      "expected_memes": ["The Rock Driving", "Gru's Plan", "Hide the Pain Harold"],
+      "keywords": ["marina", "trailer", "locked ramp"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "shared agreement does not fit a confident announcement collapsing into an immediate obstacle" }]
+    },
+    {
+      "id": "bicycle-shop-membership-name",
+      "category": "plain-language laundering",
+      "tweet": "The bike shop replaced its repair queue with a Bicycle Wellness Membership and somehow the tune-up still takes three weeks.",
+      "expected_memes": ["They're The Same Picture", "Is This A Pigeon", "Tuxedo Winnie The Pooh"],
+      "keywords": ["bike shop", "repair queue", "tune-up"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "the long turnaround is background; the gag is the carefully polished name for the same old service" }]
+    },
+    {
+      "id": "beekeeping-inspection-derailed",
+      "category": "errand derailed by disruption",
+      "tweet": "I opened the hives for a routine inspection, and at that exact moment the sprinkler line burst across the entire community garden.",
+      "expected_memes": ["Running Away Balloon", "Panik Kalm Panik", "This Is Fine"],
+      "keywords": ["hives", "inspection", "sprinkler line"],
+      "rejected_memes": [{ "name": "Change My Mind", "reason": "a declarative opinion format cannot express a small task being abruptly pulled into unrelated chaos" }]
+    },
+    {
+      "id": "archery-club-gluten-question",
+      "category": "minor question explosion",
+      "tweet": "Someone at archery club asked whether the snack bars were gluten-free, and the coach shouted, 'WE NEVER SPEAK OF THE BARS.'",
+      "expected_memes": ["Inhaling Seagull", "Woman Yelling At Cat", "Panik Kalm Panik"],
+      "keywords": ["archery", "snack bars", "gluten-free"],
+      "rejected_memes": [{ "name": "Sad Pablo Escobar", "reason": "silent isolation cannot express a trivial question triggering an outsized public response" }]
+    },
+    {
+      "id": "magic-show-cue-card",
+      "category": "sole witness knowledge",
+      "tweet": "Everyone applauded the magician's impossible prediction; I was the only one who saw the answer written on the cue card under his sleeve.",
+      "expected_memes": ["They Don't Know", "Megamind Peeking", "Monkey Puppet"],
+      "keywords": ["magician", "prediction", "cue card"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a celebratory giveaway misses one observer privately holding the embarrassing explanation" }]
+    },
+    {
+      "id": "aquarium-cleaner-alliance",
+      "category": "cross-group complaint",
+      "tweet": "The marine biologist, the kindergarten class, and the skeptical janitor all reached the same conclusion: the new aquarium glass cleaner smells awful.",
+      "expected_memes": ["Epic Handshake", "Inhaling Seagull", "Squidward window"],
+      "keywords": ["marine biologist", "kindergarten", "aquarium cleaner"],
+      "rejected_memes": [{ "name": "Trade Offer", "reason": "a bad bargain setup misses wildly different people unexpectedly agreeing on one complaint" }]
+    },
+    {
+      "id": "ice-core-radio-revival",
+      "category": "technological regression",
+      "tweet": "The glacier station's new satellite terminal froze before breakfast; we smiled professionally at it while the retired shortwave radio got the rescue forecast through.",
+      "expected_memes": ["Buff Doge vs Cheems", "Drake Hotline Bling", "Hide the Pain Harold"],
+      "keywords": ["glacier station", "satellite terminal", "shortwave radio"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a mass-giveaway format misses the contrast between an overmatched new tool and a sturdy old one" }]
+    },
+    {
+      "id": "probate-portal-loop",
+      "category": "bureaucratic recursion",
+      "tweet": "The estate portal asks me to upload the notarized form, then generates a form certifying that I uploaded the form so I can request the notarized form.",
+      "expected_memes": ["Yo Dawg Heard You", "Expanding Brain", "Gru's Plan"],
+      "keywords": ["estate portal", "notarized form", "upload"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "there is no completed milestone to celebrate in a paperwork loop" }]
+    },
+    {
+      "id": "luthier-exposure-offer",
+      "category": "creative labor undervaluation",
+      "tweet": "A concert hall asked the luthier restoring its century-old cello to donate the work in exchange for a thank-you in the program's smallest type.",
+      "expected_memes": ["Pawn Stars Best I Can Do", "Trade Offer", "Hide the Pain Harold"],
+      "keywords": ["concert hall", "luthier", "cello"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "mutual agreement imagery would imply a fair exchange rather than a lopsided request" }]
+    },
+    {
+      "id": "regatta-lightning-spin",
+      "category": "hazard rebranding",
+      "tweet": "The regatta committee called the lightning delay an immersive weather experience and suggested spectators enjoy the character-building rain.",
+      "expected_memes": ["This Is Fine", "Roll Safe Think About It", "Boardroom Meeting Suggestion"],
+      "keywords": ["regatta", "lightning delay", "rain"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "a toast treats the storm as a genuine win instead of a strained attempt to spin a hazard" }]
+    },
+    {
+      "id": "wildlife-camera-culprit",
+      "category": "evidence-based unmasking",
+      "tweet": "After weeks blaming raccoons for the missing birdseed, the trail camera showed the groundskeeper refilling his own feeder every night.",
+      "expected_memes": ["Scooby Doo Mask Reveal", "Always Has Been", "Megamind Peeking"],
+      "keywords": ["trail camera", "birdseed", "groundskeeper"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a giveaway scene cannot convey a hidden culprit being exposed by evidence" }]
+    },
+    {
+      "id": "cliffside-elevator-assurance",
+      "category": "reassurance that backfires",
+      "tweet": "The ranger said the cliffside elevator was inspected daily, then asked whether anyone had a spare carabiner before we stepped inside.",
+      "expected_memes": ["Anakin Padme 4 Panel", "The Rock Driving", "Panik Kalm Panik"],
+      "keywords": ["ranger", "cliffside elevator", "carabiner"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "shared accord has none of the abrupt shift from reassurance to alarm" }]
+    },
+    {
+      "id": "marathon-water-stop-optimization",
+      "category": "misguided efficiency",
+      "tweet": "Our marathon coach removed every water stop to save seconds, then scheduled an extra ambulance at the finish line for the heat.",
+      "expected_memes": ["Roll Safe Think About It", "Surprised Pikachu", "Boardroom Meeting Suggestion"],
+      "keywords": ["marathon", "water stop", "ambulance"],
+      "rejected_memes": [{ "name": "Sad Pablo Escobar", "reason": "lonely waiting does not capture a plan that creates the emergency it claims to optimize away" }]
+    },
+    {
+      "id": "masonry-shortcut-collapse",
+      "category": "overconfident craftsmanship",
+      "tweet": "I told the restoration crew I could repoint the cathedral wall from a tutorial, and my first brick immediately slid into the wheelbarrow.",
+      "expected_memes": ["The Rock Driving", "Gru's Plan", "Hide the Pain Harold"],
+      "keywords": ["cathedral wall", "repoint", "brick"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "a cooperative agreement does not fit a bold claim failing on first contact with reality" }]
+    },
+    {
+      "id": "reef-team-algae-consensus",
+      "category": "unexpected expert consensus",
+      "tweet": "The coral biologist, the dive instructor, and the boat mechanic all agreed the new algae scrubber sounds like a leaf blower underwater.",
+      "expected_memes": ["Epic Handshake", "Inhaling Seagull", "Squidward window"],
+      "keywords": ["coral biologist", "dive instructor", "algae scrubber"],
+      "rejected_memes": [{ "name": "Trade Offer", "reason": "an uneven deal format misses distinct specialists arriving at the same complaint" }]
+    },
+    {
+      "id": "knitting-circle-window-envy",
+      "category": "outsider frustration",
+      "tweet": "From the repair shop window, I watched the knitting circle next door hold a perfect silent auction while my air compressor performed its third solo of the morning.",
+      "expected_memes": ["Squidward window", "Hide the Pain Harold", "This Is Fine"],
+      "keywords": ["repair shop", "knitting circle", "air compressor"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "celebration cannot express an irritated observer stuck beside someone else's serenity" }]
+    },
+    {
+      "id": "consulate-appointment-paradox",
+      "category": "access prerequisite paradox",
+      "tweet": "The consulate website says I need an appointment to ask how to book an appointment, and the booking page is only available after an appointment is confirmed.",
+      "expected_memes": ["Yo Dawg Heard You", "One Does Not Simply", "Expanding Brain"],
+      "keywords": ["consulate", "appointment", "booking page"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "the circular prerequisite blocks progress rather than marking an achievement" }]
+    },
+    {
+      "id": "storm-drain-culvert-reveal",
+      "category": "infrastructure scapegoat reveal",
+      "tweet": "The town blamed every flooded intersection on unusual rain until the drain crew opened the culvert and found last year's campaign banners packed inside.",
+      "expected_memes": ["Scooby Doo Mask Reveal", "The Scroll Of Truth", "Always Has Been"],
+      "keywords": ["flooded intersection", "culvert", "campaign banners"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a cheerful distribution format cannot express an inconvenient concrete cause being uncovered" }]
+    },
+    {
+      "id": "optician-clipboard-rebrand",
+      "category": "administrative varnish",
+      "tweet": "My optician unveiled a patient-powered check-in experience, then slid the same clipboard across the counter with a new teal logo.",
+      "expected_memes": ["They're The Same Picture", "Is This A Pigeon", "Tuxedo Winnie The Pooh"],
+      "keywords": ["optician", "check-in", "clipboard"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "a toast does not express an old form receiving a glossy name" }]
+    },
+    {
+      "id": "post-office-label-loop",
+      "category": "self-service recursion",
+      "tweet": "The post office kiosk told me to scan a code to print the card that contains the code needed to use the kiosk.",
+      "expected_memes": ["Yo Dawg Heard You", "Gru's Plan", "One Does Not Simply"],
+      "keywords": ["post office", "kiosk", "code"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "mutual agreement misses a machine trapping a customer in a circular instruction" }]
+    },
+    {
+      "id": "funeral-home-exposure-rate",
+      "category": "bereavement lowball",
+      "tweet": "A funeral home asked the florist for three hundred arrangements by Friday and offered a framed thank-you note in the lobby as payment.",
+      "expected_memes": ["Pawn Stars Best I Can Do", "Trade Offer", "Woman Yelling At Cat"],
+      "keywords": ["funeral home", "florist", "payment"],
+      "rejected_memes": [{ "name": "Waiting Skeleton", "reason": "delay is not the joke when the offer itself is insulting" }]
+    },
+    {
+      "id": "dojo-belt-announcement",
+      "category": "ceremonial overproduction",
+      "tweet": "The dojo scheduled a ninety-minute awards gala with smoke machines to announce that every beginner may now tie their belt without help.",
+      "expected_memes": ["Absolute Cinema", "Oprah You Get A", "Expanding Brain"],
+      "keywords": ["dojo", "awards gala", "belt"],
+      "rejected_memes": [{ "name": "Sad Pablo Escobar", "reason": "lonely waiting cannot capture a wildly inflated celebration of a tiny milestone" }]
+    },
+    {
+      "id": "record-store-genre-war",
+      "category": "shelf-label tribalism",
+      "tweet": "At the record store, the jazz regulars and vinyl purists spent an hour accusing each other of ruining music while both bought the same reissue.",
+      "expected_memes": ["Spider Man Triple", "They're The Same Picture", "Epic Handshake"],
+      "keywords": ["record store", "jazz", "reissue"],
+      "rejected_memes": [{ "name": "Trade Offer", "reason": "a lopsided bargain has no place in two camps making the identical choice" }]
+    },
+    {
+      "id": "nail-salon-appointment-famine",
+      "category": "appointment scarcity comedy",
+      "tweet": "My nail salon opens bookings at 7:00 a.m.; by 7:00:04 every slot is gone and the waitlist promises to contact me next season.",
+      "expected_memes": ["Waiting Skeleton", "Sad Pablo Escobar", "Bernie I Am Once Again Asking For Your Support"],
+      "keywords": ["nail salon", "bookings", "waitlist"],
+      "rejected_memes": [{ "name": "Leonardo Dicaprio Cheers", "reason": "there is no victory in an instantly vanished appointment calendar" }]
+    },
+    {
+      "id": "landfill-recycling-discovery",
+      "category": "sorting-line revelation",
+      "tweet": "The recycling center spent months blaming residents for contamination until a mechanic opened the sorter and found its sensor had been rejecting every blue bin.",
+      "expected_memes": ["Scooby Doo Mask Reveal", "The Scroll Of Truth", "Always Has Been"],
+      "keywords": ["recycling center", "sorter", "sensor"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a giveaway format cannot reveal the specific hidden cause of the failure" }]
+    },
+    {
+      "id": "watchmaker-magnet-plan",
+      "category": "precision shortcut folly",
+      "tweet": "I told the watchmaker I could speed up a delicate repair with a fridge magnet, and he slowly placed the entire tray of gears out of my reach.",
+      "expected_memes": ["Roll Safe Think About It", "The Rock Driving", "Hide the Pain Harold"],
+      "keywords": ["watchmaker", "magnet", "gears"],
+      "rejected_memes": [{ "name": "Epic Handshake", "reason": "shared approval is the opposite of an expert bracing for a terrible shortcut" }]
+    },
+    {
+      "id": "taxidermy-catalog-upgrade",
+      "category": "macabre premium naming",
+      "tweet": "The taxidermy shop raised its prices after renaming a glass case of preserved sparrows a limited avian memory collection.",
+      "expected_memes": ["Tuxedo Winnie The Pooh", "Is This A Pigeon", "They're The Same Picture"],
+      "keywords": ["taxidermy", "sparrows", "collection"],
+      "rejected_memes": [{ "name": "Panik Kalm Panik", "reason": "emotional whiplash misses an ordinary product being dressed up with luxury language" }]
+    },
+    {
+      "id": "snowplow-route-choice",
+      "category": "winter duty dilemma",
+      "tweet": "The snowplow dispatcher offered me two routes: the hill with black ice or the alley where a delivery truck has been wedged since dawn.",
+      "expected_memes": ["Two Buttons", "Two Paths", "UNO Draw 25 Cards"],
+      "keywords": ["snowplow", "black ice", "delivery truck"],
+      "rejected_memes": [{ "name": "This Is Fine", "reason": "passively accepting chaos misses being forced to select between two disasters" }]
+    },
+    {
+      "id": "puppet-theater-silent-sponsor",
+      "category": "unspoken sponsorship truth",
+      "tweet": "At the puppet theater, everyone praised the magical moon prop; I was the only one who saw the sponsor logo still glowing through the fabric.",
+      "expected_memes": ["They Don't Know", "Megamind Peeking", "Monkey Puppet"],
+      "keywords": ["puppet theater", "moon prop", "sponsor logo"],
+      "rejected_memes": [{ "name": "Oprah You Get A", "reason": "a broad giveaway cannot convey one observer quietly noticing the awkward fact" }]
+    },
+    {
+      "id": "hardware-store-expert-consensus",
+      "category": "aislewide annoyance alliance",
+      "tweet": "The contractor, the weekend gardener, and the cashier all agreed that the hardware store's new talking paint display should stop offering commentary.",
+      "expected_memes": ["Epic Handshake", "Inhaling Seagull", "Squidward window"],
+      "keywords": ["hardware store", "paint display", "commentary"],
+      "rejected_memes": [{ "name": "Pawn Stars Best I Can Do", "reason": "a lowball negotiation is unrelated to strangers sharing one loud complaint" }]
     }
   ]
 }
