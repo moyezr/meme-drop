@@ -63,6 +63,7 @@ tweet context
   -> cached verified catalog/database candidates + cached feedback (parallel on a cold request)
   -> deterministic rank across the whole catalog
   -> diversified shortlist of at most 12 templates
+  -> bounded comedy brief + catalog-owned visual grammar for each shortlisted template
   -> one bounded OpenRouter selection + caption call for at most five results
   -> deterministic contextual caption fallback
   -> five-or-fewer overlays + feedback context + timings

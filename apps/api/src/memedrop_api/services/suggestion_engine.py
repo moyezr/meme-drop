@@ -748,7 +748,9 @@ class SuggestionService:
         joint_model_started = time.perf_counter()
         joint_outcome = "model"
         try:
-            model = await self.gateway.select_and_caption(tweet_text, shortlist_templates, limit)
+            model = await self.gateway.select_and_caption(
+                tweet_text, shortlist_templates, limit, context=context
+            )
         except Exception:
             # Do not retry captioning through the provider: a provider-level failure must
             # immediately take the deterministic local path.
@@ -772,7 +774,10 @@ class SuggestionService:
         result = []
         for index, (candidate, selection) in enumerate(selected):
             regions = clean_generated_regions(
-                generated.get(candidate.template.template_id, {}), candidate.template
+                generated.get(candidate.template.template_id, {}),
+                candidate.template,
+                require_complete=True,
+                reject_overlong=True,
             )
             if not regions and self.settings.contextual_caption_fallback:
                 regions = build_fallback_caption_set(tweet_text, context, candidate.template) or {}
@@ -836,10 +841,17 @@ class SuggestionService:
             return None
         context = heuristic_tweet_context(tweet_text)
         try:
-            generated = await self.gateway.generate_captions(tweet_text, [template])
+            generated = await self.gateway.generate_captions(
+                tweet_text, [template], context=context
+            )
         except Exception:
             generated = {}
-        regions = clean_generated_regions(generated.get(template.template_id, {}), template)
+        regions = clean_generated_regions(
+            generated.get(template.template_id, {}),
+            template,
+            require_complete=True,
+            reject_overlong=True,
+        )
         if not regions and self.settings.contextual_caption_fallback:
             regions = build_fallback_caption_set(tweet_text, context, template) or {}
         return build_overlay(template, str(row["name"]), regions)

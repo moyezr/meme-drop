@@ -129,6 +129,13 @@ pipeline ordered around that fact:
 7. inspect API `Server-Timing` and local extension ready-to-attach timings before changing
    infrastructure.
 
+The joint call reuses the deterministic context analysis as a bounded comedy brief: reply voice,
+joke target, social dynamic, comic tension, humor angle, and at most three caption anchors. Each
+shortlisted template contributes its reviewed visual grammar, joke shapes, region roles and limits,
+and one contrastive good/bad example. These are hints rather than facts; the raw post remains
+canonical. Captions must enact the post's comic turn through every required visual region, not
+paraphrase the post or copy an example. This adds no model call or network hop.
+
 The catalog seeder produces the thumbnail path for new rows and backfills missing ones on rerun. Run
 `npm run db:seed-memes` as a controlled release operation after deploying this pipeline; never seed
 inside a serverless build.

@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 import memedrop_api.services.suggestion_engine as suggestion_engine
 from memedrop_api.config import Settings
-from memedrop_api.schemas import UsageBatchRequest
+from memedrop_api.schemas import TweetContext, UsageBatchRequest
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.suggestion_engine import (
@@ -36,15 +36,21 @@ class FakeGateway:
         self.caption_calls = 0
         self.fail_joint = False
         self.seen_template_counts: list[int] = []
+        self.seen_contexts: list[TweetContext | None] = []
 
-    async def select_and_caption(self, tweet_text, templates, limit):  # type: ignore[no-untyped-def]
+    async def select_and_caption(  # type: ignore[no-untyped-def]
+        self, tweet_text, templates, limit, *, context=None
+    ):
         self.joint_calls += 1
         self.seen_template_counts.append(len(templates))
+        self.seen_contexts.append(context)
         if self.fail_joint:
             raise RuntimeError("model unavailable")
         return JointSuggestionResult(self.selections[:limit], self.captions)
 
-    async def generate_captions(self, tweet_text, templates):  # type: ignore[no-untyped-def]
+    async def generate_captions(  # type: ignore[no-untyped-def]
+        self, tweet_text, templates, *, context=None
+    ):
         self.caption_calls += 1
         return self.captions
 
@@ -100,6 +106,10 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
     assert result[0]["score"] == 0.96
     assert result[0]["use_case_label"] == "predictable consequence"
     assert result[0]["feedback_context"]["intent"] == "dunking"
+    assert gateway.seen_contexts[0] is not None
+    assert gateway.seen_contexts[0].comedic_tension == (
+        "what they expected vs the predictable consequence"
+    )
     assert "tweet_context" not in result[0]
     assert set(result[0]["feedback_context"]).isdisjoint(
         {
@@ -229,10 +239,12 @@ async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
     model_started = asyncio.Event()
     allow_model = asyncio.Event()
 
-    async def delayed_select(tweet_text, templates, limit):  # type: ignore[no-untyped-def]
+    async def delayed_select(  # type: ignore[no-untyped-def]
+        tweet_text, templates, limit, *, context=None
+    ):
         model_started.set()
         await allow_model.wait()
-        return await original_select(tweet_text, templates, limit)
+        return await original_select(tweet_text, templates, limit, context=context)
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
     first = asyncio.create_task(service.get_suggestions("Prod is down", user_id=INSTALL_ID))
@@ -254,10 +266,12 @@ async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None
     model_started = asyncio.Event()
     allow_model = asyncio.Event()
 
-    async def delayed_select(tweet_text, templates, limit):  # type: ignore[no-untyped-def]
+    async def delayed_select(  # type: ignore[no-untyped-def]
+        tweet_text, templates, limit, *, context=None
+    ):
         model_started.set()
         await allow_model.wait()
-        return await original_select(tweet_text, templates, limit)
+        return await original_select(tweet_text, templates, limit, context=context)
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
     first = asyncio.create_task(
@@ -282,10 +296,12 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
     model_started = asyncio.Event()
     allow_model = asyncio.Event()
 
-    async def delayed_select(tweet_text, templates, limit):  # type: ignore[no-untyped-def]
+    async def delayed_select(  # type: ignore[no-untyped-def]
+        tweet_text, templates, limit, *, context=None
+    ):
         model_started.set()
         await allow_model.wait()
-        return await original_select(tweet_text, templates, limit)
+        return await original_select(tweet_text, templates, limit, context=context)
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
     first = asyncio.create_task(

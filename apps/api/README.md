@@ -98,6 +98,11 @@ and feedback reads run in parallel when cold, caches avoid repeat reads, and sin
 concurrent identical requests. `Server-Timing` reports non-sensitive stage durations; clients should
 use thumbnail URLs for fast card rendering and prefetch the original image for attachment.
 
+The same request includes the already-computed comedy brief plus each template's visual grammar,
+joke shapes, ordered region roles, physical text limits, and contrastive examples. It asks the model
+to turn a specific post anchor into a new implication or reframe. No extra inference step is added,
+and incomplete or overlong model overlays fall back locally instead of rendering a clipped joke.
+
 ## Vercel
 
 Create a dedicated Vercel project with Root Directory set to `apps/api`. The app has its own
