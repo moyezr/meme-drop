@@ -32,6 +32,12 @@ The extension sends an anonymous install ID in `x-memedrop-install-id`. Producti
 development may use a fixed seed identity. This separates libraries and feedback but is not strong
 authentication.
 
+Suggestion inference is explicitly user-triggered. X's native Reply action remains untouched and
+opens a normal composer without contacting MemeDrop. A separate MemeDrop action is injected into
+each timeline post; it transiently captures that post's text/id, forwards to X's native Reply action,
+and arms exactly one suggestion request when the composer route opens. Abandoned intent expires and
+post text is never persisted by the extension.
+
 FastAPI preserves camelCase `/api/v1` responses for the extension:
 
 | Endpoint | Purpose |

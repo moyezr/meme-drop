@@ -1,5 +1,6 @@
 import { SELECTORS, URL_PATTERNS } from "./selectors";
 import { initSaveButton } from "./save-button";
+import { initMemeReplyButtons } from "./meme-reply-button";
 import {
   showSuggestionPanel,
   showSuggestionError,
@@ -16,6 +17,10 @@ import {
   isCurrentSuggestionGeneration,
   isCurrentSuggestionMessage,
 } from "../shared/suggestion-request";
+import {
+  MemeReplyIntent,
+  type MemeReplySource,
+} from "../shared/meme-reply-intent";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const DEBUG_PREFIX = "[MemeDrop]";
@@ -41,6 +46,30 @@ interface ReplyTweetSnapshot {
   hasTweetRoot: boolean;
   tweetTextNodeCount: number;
 }
+
+const memeReplyIntent = new MemeReplyIntent();
+const memeReplyButtons = initMemeReplyButtons((source) => {
+  memeReplyIntent.arm(source);
+  logDebug(
+    "Meme reply armed",
+    `- has tweet id: ${Boolean(source.tweetId)}
+- extracted text length: ${source.tweetText?.length || 0}`
+  );
+});
+
+// A native X Reply click must never inherit an abandoned MemeDrop intent.
+// Programmatic forwarding from our own button is synchronous and explicitly exempted.
+document.addEventListener(
+  "click",
+  (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest(SELECTORS.nativeReply)) return;
+    if (!memeReplyButtons.isForwardingNativeReply()) {
+      memeReplyIntent.clear();
+    }
+  },
+  true
+);
 
 initSaveButton();
 
@@ -313,6 +342,9 @@ let currentComposeDismissed = false;
 // same tweet. This keeps late media/results from a prior request out of the
 // currently visible panel.
 let activeSuggestionRequestId: string | null = null;
+// Set only when the composer was opened through MemeDrop's explicit tweet-card button.
+// The source is in-memory for the lifetime of this composer and powers refreshes.
+let activeMemeReplySource: MemeReplySource | null = null;
 // Token used to abandon stale waitForTweetText() loops when the URL changes
 // again before tweet text appears.
 let waitToken = 0;
@@ -352,7 +384,10 @@ function getCanonicalTweetId(): string | null {
   }
 }
 
-async function requestSuggestionsForCurrentCompose(refresh = false) {
+async function requestSuggestionsForCurrentCompose(
+  refresh = false,
+  source = activeMemeReplySource
+) {
   if (!isComposeRoute()) {
     logDebug(
       "Suggestion request skipped",
@@ -383,7 +418,7 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
 - url: ${window.location.href}`
   );
 
-  const text = await waitForTweetText(token);
+  const text = source?.tweetText || (await waitForTweetText(token));
   if (token !== waitToken) {
     logDebug(
       "Suggestion request abandoned",
@@ -413,7 +448,10 @@ async function requestSuggestionsForCurrentCompose(refresh = false) {
   }
 
   const suggestionText = text;
-  const cacheKey = await buildSuggestionCacheKey(suggestionText, getCanonicalTweetId());
+  const cacheKey = await buildSuggestionCacheKey(
+    suggestionText,
+    source?.tweetId || getCanonicalTweetId()
+  );
   if (!isCurrentSuggestionGeneration(token, waitToken)) return;
 
   if (!refresh && (currentComposeDismissed || cacheKey === dismissedSuggestionCacheKey)) {
@@ -500,11 +538,27 @@ function onUrlChanged(url = window.location.href) {
   );
 
   if (isCompose) {
+    const source = memeReplyIntent.consume();
+    if (!source) {
+      // X's own Reply button and direct compose routes remain completely native.
+      activeMemeReplySource = null;
+      lastSuggestionCacheKey = null;
+      dismissedSuggestionCacheKey = null;
+      currentComposeDismissed = false;
+      activeSuggestionRequestId = null;
+      waitToken++;
+      hidePanel();
+      logDebug("Native compose detected", "- MemeDrop inference not requested");
+      return;
+    }
+    activeMemeReplySource = source;
     currentComposeDismissed = false;
-    requestSuggestionsForCurrentCompose();
+    requestSuggestionsForCurrentCompose(false, source);
     return;
   }
 
+  memeReplyIntent.clear();
+  activeMemeReplySource = null;
   lastSuggestionCacheKey = null;
   dismissedSuggestionCacheKey = null;
   currentComposeDismissed = false;

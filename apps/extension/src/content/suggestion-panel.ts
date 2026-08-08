@@ -1,6 +1,6 @@
 /**
  * Suggestion panel — Shadow DOM component injected into X.com
- * Shows meme suggestions in a horizontal strip when a reply composer is detected.
+ * Shows meme suggestions after the user explicitly opens a reply through MemeDrop.
  */
 
 import { SELECTORS } from "./selectors";

@@ -10,6 +10,12 @@ export const SELECTORS = {
   /** Root article node for a tweet */
   tweet: 'article[data-testid="tweet"]',
 
+  /** X's native reply action inside a tweet card */
+  nativeReply: '[data-testid="reply"]',
+
+  /** Tweet action bar containing reply, repost, like, and view actions */
+  tweetActions: 'div[role="group"]',
+
   /** Contains nested spans with display name and @handle */
   userName: 'div[data-testid="User-Name"]',
 
