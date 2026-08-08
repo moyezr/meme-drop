@@ -154,6 +154,7 @@ remaining production handoff and manual checks are in `docs/release.md`.
 - `architecture.md`: runtime boundaries and recommendation evolution
 - `QUALITY.md`: evaluation, template curation, and security gates
 - `docs/release.md`: deployment and Chrome Web Store checklist
+- `docs/private-beta-deployment.md`: end-to-end production and private-beta sequence
 - `PRIVACY.md`: current data-handling disclosure draft
 - `apps/api/README.md`: FastAPI development and Vercel notes
 - `AGENTS.md`: durable repository rules for future coding sessions
