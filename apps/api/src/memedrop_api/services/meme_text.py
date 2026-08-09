@@ -10,6 +10,7 @@ from memedrop_api.services.context_analyzer import (
     ACTION_WORDS,
     OUTCOME_WORDS,
     heuristic_tweet_context,
+    is_quantity_comparison,
 )
 
 
@@ -160,7 +161,11 @@ def clean_generated_regions(
     ):
         return {}
     nonempty = [value for value in cleaned.values() if value]
-    if not nonempty or (len(nonempty) > 1 and len(set(map(str.lower, nonempty))) == 1):
+    if (
+        not nonempty
+        or (len(nonempty) > 1 and len(set(map(str.lower, nonempty))) == 1)
+        or has_superficial_region_variation(nonempty)
+    ):
         return {}
     return cleaned
 
@@ -168,37 +173,10 @@ def clean_generated_regions(
 def build_fallback_caption_set(
     tweet_text: str, context: TweetContext, template: MemeTemplate
 ) -> dict[str, str] | None:
-    specific = template_specific_fallback(tweet_text, context, template)
-    if specific:
-        return specific
-    subject = pick_subject(tweet_text, context)
-    contrast = pick_contrast(context, subject)
-    candidates = list(
-        dict.fromkeys(
-            sanitize_text(value.lower(), 42)
-            for value in [*context.caption_anchors, context.joke_target, subject, contrast]
-            if value
-        )
-    )
-    result: dict[str, str] = {}
-    used: set[str] = set()
-    for index, region in enumerate(template.regions):
-        proposed = fallback_text_for_region(template.template_id, region, subject, contrast)
-        text = sanitize_text(proposed, region.max_chars)
-        if normalize_caption(text) in used:
-            text = next(
-                (
-                    sanitize_text(candidate, region.max_chars)
-                    for candidate in candidates[index:] + candidates[:index]
-                    if normalize_caption(candidate) not in used
-                    and len(candidate) <= region.max_chars
-                ),
-                text,
-            )
-        if text:
-            result[region.id] = text
-            used.add(normalize_caption(text))
-    return result or None
+    # A generic region filler produced plausible-looking but structurally meaningless
+    # overlays (for example, repeating one noun phrase and appending "again"). Only
+    # reviewed, grammar-preserving strategies are safe enough for the no-model path.
+    return template_specific_fallback(tweet_text, context, template)
 
 
 def template_specific_fallback(
@@ -251,65 +229,63 @@ def template_specific_fallback(
             ),
             reveal.id: "Same picture",
         }
+    if template.template_id == "this-is-fine":
+        bubble = find_region(template, "speech_bubble_text")
+        situation = find_region(template, "bottom_caption")
+        if (
+            not bubble
+            or not situation
+            or not re.search(
+                r"\b(?:broken|chaos|crash|down|explod(?:e|ed|ing)|failed|fire|outage|red)\b",
+                tweet_text,
+                re.I,
+            )
+        ):
+            return None
+        outcome = next(
+            (anchor for anchor in context.caption_anchors if OUTCOME_WORDS.search(anchor)),
+            pick_subject(tweet_text, context),
+        )
+        return {
+            bubble.id: "This is fine",
+            situation.id: sanitize_text(outcome, situation.max_chars),
+        }
+    if template.template_id == "one-does-not-simply":
+        setup = find_region(template, "top_statement")
+        punchline = find_region(template, "bottom_statement")
+        match = re.search(
+            r"\b(?:just|simply|easy to)\s+(.+?)(?:[,.!?]|$)",
+            tweet_text,
+            re.I,
+        )
+        if not setup or not punchline or not match:
+            return None
+        return {
+            setup.id: "One does not simply",
+            punchline.id: sanitize_text(match.group(1), punchline.max_chars),
+        }
+    if template.template_id == "buff-doge-vs-cheems" and is_quantity_comparison(
+        tweet_text.lower()
+    ):
+        strong = find_region(template, "buff_doge_label")
+        weak = find_region(template, "cheems_label")
+        subject_match = re.search(
+            r"^\s*(.{2,32}?)\s+(?:hired|hires|hiring)\b",
+            tweet_text,
+            re.I,
+        )
+        quantity_match = re.search(r"\b\d[\d,.]*\b", tweet_text)
+        if not strong or not weak or not subject_match or not quantity_match:
+            return None
+        subject = sanitize_text(subject_match.group(1), 10)
+        target = sanitize_text(context.joke_target, 10)
+        return {
+            strong.id: sanitize_text(
+                f"{subject}: {quantity_match.group(0)} hires", strong.max_chars
+            ),
+            weak.id: sanitize_text(f"{target} sweating", weak.max_chars),
+        }
     return None
-
-
-def fallback_text_for_region(
-    template_id: str, region: TemplateRegion, subject: str, contrast: str
-) -> str:
-    region_id = region.id
-    rules: dict[str, Any] = {
-        "drake-hotline-bling": lambda: f"ignoring {subject}" if region_id == "reject" else contrast,
-        "always-has-been": lambda: (
-            "always has been" if region_id == "answer" else f"wait, it's {subject}?"
-        ),
-        "trade-offer": lambda: subject if region_id == "i_receive" else contrast,
-        "the-rock-driving": lambda: subject if region_id == "top_speech_bubble" else contrast,
-        "mocking-spongebob": lambda: subject,
-    }
-    if template_id == "two-buttons":
-        return (
-            f"fix {subject}"
-            if "left" in region_id
-            else f"hide {subject}"
-            if "right" in region_id
-            else f"{subject} choice"
-        )
-    if template_id == "distracted-boyfriend":
-        return (
-            f"new {subject}"
-            if region_id == "temptation"
-            else "me"
-            if region_id == "boyfriend"
-            else subject
-        )
-    if template_id == "anakin-padme-4-panel":
-        return (
-            f"we'll handle {subject}"
-            if region_id == "promise"
-            else "..."
-            if region_id == "silence"
-            else f"{subject} gets fixed, right?"
-        )
-    if template_id == "panik-kalm-panik":
-        return (
-            subject
-            if region_id == "panic_1"
-            else f"{subject} contained"
-            if region_id == "calm"
-            else contrast
-        )
-    if template_id == "boardroom-meeting-suggestion":
-        return (
-            f"fix {subject}"
-            if region_id == "good_idea"
-            else "add follow-up"
-            if region_id.endswith("2")
-            else "schedule meeting"
-        )
-    if template_id in rules:
-        return str(rules[template_id]())
-    return contrast if should_use_contrast(region_id, region.role) else subject
 
 
 def pick_subject(tweet_text: str, context: TweetContext) -> str:
@@ -320,30 +296,16 @@ def pick_subject(tweet_text: str, context: TweetContext) -> str:
     return sanitize_text((anchor or context.joke_target or tweet_text).lower(), 26)
 
 
-def pick_contrast(context: TweetContext, subject: str) -> str:
-    outcome = next(
-        (
-            item
-            for item in context.caption_anchors
-            if OUTCOME_WORDS.search(item) and normalize_caption(item) != normalize_caption(subject)
-        ),
-        None,
-    )
-    if outcome:
-        return sanitize_text(outcome.lower(), 28)
-    return sanitize_text(
-        f"{subject} consequences" if context.intent == "dunking" else f"{subject} again", 28
-    )
-
-
-def should_use_contrast(region_id: str, role: str) -> bool:
-    descriptor = re.sub(r"[^a-z0-9]+", " ", f"{region_id} {role}".lower())
-    return bool(
-        re.search(
-            r"\b(punch|answer|verdict|reveal|result|bad|wrong|worse|after|right|bottom|counterpoint|consequence|payoff|reaction|response)\b",
-            descriptor,
-        )
-    )
+def has_superficial_region_variation(values: list[str]) -> bool:
+    filler = {"again", "choice", "consequences", "outcome", "reaction", "situation"}
+    token_rows = [normalize_caption(value).split() for value in values]
+    for index, left in enumerate(token_rows):
+        for right in token_rows[index + 1 :]:
+            shorter, longer = (left, right) if len(left) <= len(right) else (right, left)
+            shares_prefix = shorter and longer[: len(shorter)] == shorter
+            if shares_prefix and set(longer[len(shorter) :]) <= filler:
+                return True
+    return False
 
 
 def sanitize_text(value: str, max_chars: int) -> str:

@@ -92,7 +92,7 @@ catalog is no slower than 50ms.
 
 `POST /api/v1/suggest` always returns at most five results. The service scores the full verified
 catalog locally, diversifies a 12-template shortlist, and makes at most one joint OpenRouter request
-to select and caption the user-visible results. That request has a 2.5-second deadline; failure opens
+to select and caption the user-visible results. That request has a 4.5-second deadline; failure opens
 a short per-process cooldown and returns deterministic selection/captions without a retry. Candidate
 and feedback reads run in parallel when cold, caches avoid repeat reads, and singleflight merges
 concurrent identical requests. `Server-Timing` reports non-sensitive stage durations; clients should

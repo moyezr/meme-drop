@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-06T20:15:52.924Z",
+  "generated_at": "2026-08-09T09:18:04.498Z",
   "sources": {
     "curated": 45,
     "promoted": 4,
@@ -3587,12 +3587,14 @@
         "version": 1,
         "joke_shapes": [
           "past versus present",
-          "strong versus weak"
+          "strong versus weak",
+          "unexpected scale comparison"
         ],
         "positive_hints": [
           "ideal powerful version compared with anxious weak version",
           "then versus now decline",
-          "expectation compared with diminished reality"
+          "expectation compared with diminished reality",
+          "one side unexpectedly outperforms a familiar benchmark by a surprising amount"
         ],
         "anti_hints": [
           "equal alternatives",
@@ -5368,12 +5370,14 @@
         "version": 1,
         "joke_shapes": [
           "past versus present",
-          "strong versus weak"
+          "strong versus weak",
+          "unexpected scale comparison"
         ],
         "positive_hints": [
           "ideal powerful version compared with anxious weak version",
           "then versus now decline",
-          "expectation compared with diminished reality"
+          "expectation compared with diminished reality",
+          "one side unexpectedly outperforms a familiar benchmark by a surprising amount"
         ],
         "anti_hints": [
           "equal alternatives",

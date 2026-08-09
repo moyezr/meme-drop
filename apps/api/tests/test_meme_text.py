@@ -89,16 +89,31 @@ def test_special_fallbacks_preserve_template_grammar() -> None:
     }
 
 
-def test_generic_fallbacks_are_nonempty_distinct_and_fit_regions() -> None:
-    meme_template = template("the-rock-driving")
+def test_fallbacks_refuse_unreviewed_generic_region_filling() -> None:
     captions = build_fallback_caption_set(
-        "We skipped tests and the payment flow exploded.", context(), meme_template
+        "Google hired 33 students. Even TCS does not hire that many.",
+        context(),
+        template("one-does-not-simply"),
     )
 
-    assert captions is not None
-    assert captions["top_speech_bubble"] != captions["middle_speech_bubble"]
-    for region in meme_template.regions:
-        assert len(captions[region.id]) <= region.max_chars
+    assert captions is None
+
+
+def test_quantity_comparison_has_a_reviewed_template_specific_fallback() -> None:
+    tweet = "Google hired 33 students from IIT Patna. Even TCS does not hire that many."
+    captions = build_fallback_caption_set(
+        tweet,
+        context(
+            joke_target="TCS",
+            humor_angle="the surprising quantity makes the familiar benchmark look small",
+        ),
+        template("buff-doge-vs-cheems"),
+    )
+
+    assert captions == {
+        "buff_doge_label": "Google: 33 hires",
+        "cheems_label": "TCS sweating",
+    }
 
 
 def test_generated_regions_are_sanitized_and_overlay_preserves_layout() -> None:
@@ -128,6 +143,17 @@ def test_strict_generated_region_hygiene_rejects_incomplete_or_clipped_jokes() -
     assert (
         clean_generated_regions(
             {meme_template.regions[0].id: "only the setup"},
+            meme_template,
+            require_complete=True,
+        )
+        == {}
+    )
+    assert (
+        clean_generated_regions(
+            {
+                meme_template.regions[0].id: "IIT Patna bro",
+                meme_template.regions[1].id: "IIT Patna bro again",
+            },
             meme_template,
             require_complete=True,
         )

@@ -204,8 +204,8 @@ export const MEME_TEMPLATE_RETRIEVAL: Record<string, MemeRetrievalMetadata> = {
     ["pleasant surprise", "marketing celebration", "uncertain rumor"]
   ),
   "buff-doge-vs-cheems": retrieval(
-    ["past versus present", "strong versus weak"],
-    ["ideal powerful version compared with anxious weak version", "then versus now decline", "expectation compared with diminished reality"],
+    ["past versus present", "strong versus weak", "unexpected scale comparison"],
+    ["ideal powerful version compared with anxious weak version", "then versus now decline", "expectation compared with diminished reality", "one side unexpectedly outperforms a familiar benchmark by a surprising amount"],
     ["equal alternatives", "hidden identity", "one-time victory"]
   ),
   "inhaling-seagull": retrieval(

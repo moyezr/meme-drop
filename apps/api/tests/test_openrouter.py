@@ -221,8 +221,8 @@ async def test_joint_suggestion_failure_opens_a_cooldown_and_skips_repeat_provid
 def test_joint_suggestion_uses_a_short_dedicated_provider_budget() -> None:
     configured = Settings(database_url="postgresql://localhost/test")
 
-    assert configured.joint_suggestion_timeout_ms == 2_500
-    assert configured.joint_suggestion_cooldown_ms == 30_000
+    assert configured.joint_suggestion_timeout_ms == 4_500
+    assert configured.joint_suggestion_cooldown_ms == 5_000
 
 
 async def test_joint_suggestion_passes_its_dedicated_deadline_to_the_provider() -> None:

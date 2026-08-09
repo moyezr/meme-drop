@@ -93,7 +93,11 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
         TemplateSelection("this-is-fine", "calm chaos", 0.9),
     ]
     gateway.captions = {
-        "surprised-pikachu": {"top_reaction_caption": "Skipped tests + Friday deploy"}
+        "surprised-pikachu": {"top_reaction_caption": "Skipped tests + Friday deploy"},
+        "this-is-fine": {
+            "speech_bubble_text": "This is fine",
+            "bottom_caption": "Friday deploy on vibes",
+        },
     }
 
     result = await service.get_suggestions(
@@ -129,7 +133,13 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
 
 async def test_feedback_context_excludes_source_derived_terms_for_a_max_length_post() -> None:
     service, _, gateway = service_with_templates("this-is-fine")
-    gateway.fail_joint = True
+    gateway.selections = [TemplateSelection("this-is-fine", "test selection", 0.9)]
+    gateway.captions = {
+        "this-is-fine": {
+            "speech_bubble_text": "This is fine",
+            "bottom_caption": "Ordinary words everywhere",
+        }
+    }
     raw_token = "ultravioletpineapple"
     tweet = f"{raw_token} " + "ordinary words " * 18
     tweet = tweet[:280]
@@ -194,6 +204,13 @@ async def test_service_bounds_joint_shortlist_and_returns_at_most_five() -> None
         TemplateSelection(template.template_id, "fit", 0.9)
         for template in catalog.verified_templates[:6]
     ]
+    gateway.captions = {
+        template.template_id: {
+            region.id: f"beat {region_index + 1}"
+            for region_index, region in enumerate(template.regions)
+        }
+        for template in catalog.verified_templates[:5]
+    }
 
     result = await service.get_suggestions("A generic post", user_id=INSTALL_ID, limit=99)
 
@@ -202,7 +219,7 @@ async def test_service_bounds_joint_shortlist_and_returns_at_most_five() -> None
     assert gateway.seen_template_counts == [min(12, len(template_ids))]
 
 
-async def test_service_fills_missing_joint_results_from_local_ranking() -> None:
+async def test_service_respects_model_omissions_instead_of_filling_weak_results() -> None:
     service, _, gateway = service_with_templates(
         "this-is-fine", "oprah-you-get-a", "surprised-pikachu"
     )
@@ -213,12 +230,30 @@ async def test_service_fills_missing_joint_results_from_local_ranking() -> None:
     )
 
     assert result[0]["name"] == "Surprised Pikachu"
-    assert len(result) == 3
-    assert {item["name"] for item in result} == {
-        "Surprised Pikachu",
-        "This Is Fine",
-        "Oprah You Get A",
-    }
+    assert len(result) == 1
+
+
+async def test_reported_quantity_comparison_never_uses_repeated_again_fallback() -> None:
+    service, _, gateway = service_with_templates(
+        "one-does-not-simply",
+        "buff-doge-vs-cheems",
+        "laughing-leo",
+        "megamind-peeking",
+    )
+    gateway.fail_joint = True
+
+    result = await service.get_suggestions(
+        "Google hired 33 students from IIT Patna 💀 Bro even TCS does not hire that many from clg",
+        user_id=INSTALL_ID,
+        limit=5,
+    )
+
+    assert [item["name"] for item in result] == ["Buff Doge vs Cheems"]
+    overlay_text = [
+        region["text"] for region in result[0]["tailored_overlay"]["regions"]
+    ]
+    assert overlay_text == ["Google: 33 hires", "TCS sweating"]
+    assert all("again" not in text.lower() for text in overlay_text)
 
 
 async def test_service_cache_avoids_repeating_model_work_and_refresh_bypasses() -> None:
@@ -325,7 +360,13 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
 
 async def test_service_loads_global_catalog_once_and_applies_feedback_per_user() -> None:
     service, store, gateway = service_with_templates("change-my-mind", "disaster-girl")
-    gateway.fail_joint = True
+    gateway.captions = {
+        "change-my-mind": {"sign": "Generic reactions are content"},
+        "disaster-girl": {
+            "top_caption": "A generic reaction",
+            "bottom_caption": "Engagement acquired",
+        },
+    }
     preferred = next(row for row in store.memes if row["name"] == "Disaster Girl")
     another_user = uuid4()
     store.feedback_scores_by_user[INSTALL_ID] = {preferred["id"]: 0.12}
@@ -485,7 +526,13 @@ async def test_service_falls_back_when_joint_model_fails_without_a_second_provid
 
 async def test_local_ranking_uses_bounded_personal_feedback() -> None:
     service, store, gateway = service_with_templates("change-my-mind", "disaster-girl")
-    gateway.fail_joint = True
+    gateway.captions = {
+        "change-my-mind": {"sign": "Generic reactions are content"},
+        "disaster-girl": {
+            "top_caption": "A generic reaction",
+            "bottom_caption": "Engagement acquired",
+        },
+    }
     preferred = next(row for row in store.memes if row["name"] == "Disaster Girl")
     store.feedback_scores[preferred["id"]] = 0.12
 

@@ -81,10 +81,22 @@ pass mechanical checks, human taste review, rendered QA, benchmark coverage, and
 For every template:
 
 - place overlay regions on canonical text/empty space, away from faces and the visual punchline;
+- record the reviewed font, stroke, alignment, normalized coordinates, line count, and rendered
+  character capacity for every region;
 - set `max_chars` to actual rendered capacity;
 - write realistic good examples that fit and bad examples that identify common failures;
-- document use cases, anti-use cases, aliases, and semantic tags;
+- document reusable joke shapes, use cases, anti-use cases, aliases, and semantic tags;
 - visually inspect the rendered meme rather than approving JSON alone.
+
+This reviewed catalog is product data, not incidental configuration. It is the reusable layer that
+lets the same caption model understand how each image communicates and lets new templates improve
+without extension releases. Prefer adding a general joke shape and labeling templates that enact it
+over adding a template-ID special case to the ranker.
+
+Quality is allowed to reduce result count. The model may omit weak templates, and the service must
+not refill those slots merely to reach five. When the provider is unavailable, return only captions
+from reviewed, template-specific fallback strategies; never populate arbitrary regions with generic
+post fragments. A caption that repeats a region with a filler suffix such as `again` is invalid.
 
 Normal review loop:
 
@@ -124,7 +136,7 @@ pipeline ordered around that fact:
 2. cache catalog candidates and short-lived feedback scores, and share concurrent identical work;
 3. perform independent candidate and feedback reads in parallel on a cold request;
 4. send a diversified shortlist of no more than 12 templates to one joint select-and-caption call;
-5. return no more than five results, with a 2.5-second provider deadline and local fallback/cooldown;
+5. return no more than five results, with a 4.5-second provider deadline and local fallback/cooldown;
 6. render thumbnail previews while prefetching original assets for attachment in parallel;
 7. inspect API `Server-Timing` and local extension ready-to-attach timings before changing
    infrastructure.

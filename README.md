@@ -101,7 +101,7 @@ reranking is enabled.
 Each X post yields **at most five** user-visible, ready-to-attach replies. The API scores every
 verified catalog candidate locally, sends no more than 12 strong and varied candidates to one joint
 model call, then asks that call to select up to five and write their captions together. This avoids
-paying to caption templates the user will never see. A 2.5-second model budget, short provider
+paying to caption templates the user will never see. A 4.5-second model budget, short provider
 cooldown after a failure, and deterministic selection/caption fallback keep a provider outage from
 blocking the strip.
 

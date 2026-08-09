@@ -29,3 +29,17 @@ def test_context_has_safe_fallback_keywords_for_empty_semantics() -> None:
 
     assert context.keywords == ["tweet", "reaction"]
     assert context.joke_target == "the situation"
+
+
+def test_quantity_comparison_extracts_the_actual_target_and_caption_anchors() -> None:
+    context = heuristic_tweet_context(
+        "Google hired 33 students from IIT Patna 💀 Bro even TCS does not hire that many."
+    )
+
+    assert context.tone == "sarcastic"
+    assert context.intent == "dunking"
+    assert context.joke_target == "TCS"
+    assert context.comedic_tension == (
+        "an unexpectedly large result vs the supposedly stronger benchmark"
+    )
+    assert "hired 33 students" in context.caption_anchors

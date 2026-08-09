@@ -56,6 +56,8 @@ RETRIEVAL_STOP_WORDS = {
     "is",
     "it",
     "its",
+    "many",
+    "not",
     "of",
     "on",
     "one",
@@ -424,6 +426,12 @@ HUMOR_CONCEPT_WORDS: dict[str, frozenset[str]] = {
             "confirmed",
         }
     ),
+    "quantity": frozenset(
+        {"amount", "count", "dozen", "hundred", "many", "million", "number", "thousand"}
+    ),
+    "comparison": frozenset(
+        {"compared", "even", "fewer", "less", "more", "than", "versus", "vs"}
+    ),
 }
 
 USAGE_FEEDBACK_CONTEXT_FIELDS = (
@@ -781,6 +789,10 @@ class SuggestionService:
             )
             if not regions and self.settings.contextual_caption_fallback:
                 regions = build_fallback_caption_set(tweet_text, context, candidate.template) or {}
+            if not regions:
+                # Returning fewer useful suggestions is better than rendering an
+                # uncaptioned template or fabricating a structurally meaningless joke.
+                continue
             result.append(
                 {
                     "meme_id": candidate.meme_id,
@@ -1334,6 +1346,12 @@ MECHANIC_SHAPE_BOOSTS: dict[str, tuple[tuple[str, float], ...]] = {
         ("hard constraint", 0.40),
         ("overengineering", 0.36),
     ),
+    "unexpected_scale_comparison": (
+        ("unexpected scale comparison", 0.48),
+        ("strong versus weak", 0.42),
+        ("watching a mistake", 0.30),
+        ("awkward observation", 0.26),
+    ),
 }
 
 
@@ -1416,6 +1434,11 @@ def infer_humor_mechanics(text: str) -> set[str]:
         mechanics.add("self_taught_confidence_fails")
     if has("prerequisite") and any(count >= 2 for count in repeated_content.values()):
         mechanics.add("recursive_prerequisite")
+    if (
+        (has("quantity") or bool(re.search(r"\b\d[\d,.]*\b", text)))
+        and has("comparison")
+    ):
+        mechanics.add("unexpected_scale_comparison")
     return mechanics
 
 
@@ -1449,9 +1472,13 @@ def candidate_joke_shape_boost(
 def fill_selections(
     primary: list[TemplateSelection], fallback: list[TemplateSelection], limit: int
 ) -> list[TemplateSelection]:
+    # The model is explicitly allowed to omit weak options. Do not undo that quality
+    # decision merely to fill five slots. Local ranking is used only when the joint
+    # model produced no usable selection at all.
+    source = primary if primary else fallback
     result = []
     seen = set()
-    for item in [*primary, *fallback]:
+    for item in source:
         if item.template_id in seen:
             continue
         seen.add(item.template_id)

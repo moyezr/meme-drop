@@ -90,7 +90,7 @@ class Settings(BaseSettings):
         default=20_000, validation_alias="MEMEDROP_CAPTION_TIMEOUT_MS", gt=0
     )
     joint_suggestion_timeout_ms: int = Field(
-        default=2_500,
+        default=4_500,
         validation_alias="MEMEDROP_JOINT_SUGGESTION_TIMEOUT_MS",
         gt=0,
     )
@@ -105,7 +105,7 @@ class Settings(BaseSettings):
         le=30,
     )
     joint_suggestion_cooldown_ms: int = Field(
-        default=30_000,
+        default=5_000,
         validation_alias="MEMEDROP_JOINT_SUGGESTION_COOLDOWN_MS",
         ge=0,
     )

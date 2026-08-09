@@ -823,6 +823,14 @@
       "expected_memes": ["Epic Handshake", "Inhaling Seagull", "Squidward window"],
       "keywords": ["hardware store", "paint display", "commentary"],
       "rejected_memes": [{ "name": "Pawn Stars Best I Can Do", "reason": "a lowball negotiation is unrelated to strangers sharing one loud complaint" }]
+    },
+    {
+      "id": "campus-hiring-scale-comparison",
+      "category": "unexpected quantity comparison",
+      "tweet": "A research lab hired 33 graduates from the regional college; even the giant outsourcing firm does not hire that many from one campus.",
+      "expected_memes": ["Buff Doge vs. Cheems", "Laughing Leo", "Megamind Peeking"],
+      "keywords": ["33 graduates", "outsourcing firm", "one campus"],
+      "rejected_memes": [{ "name": "One Does Not Simply", "reason": "ordinary negation does not imply that a supposedly simple task hides a hard constraint" }]
     }
   ]
 }

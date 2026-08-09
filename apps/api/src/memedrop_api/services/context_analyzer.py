@@ -100,7 +100,11 @@ def heuristic_tweet_context(tweet_text: str) -> TweetContext:
             r"\b(good|great|love|best|win|won|happy|amazing|finished|shipped|launched)\b", text
         )
     )
-    sarcastic = bool(re.search(r"\b(sure|totally|obviously|of course|yeah right|lol|lmao)\b", text))
+    quantity_comparison = is_quantity_comparison(text)
+    sarcastic = bool(
+        re.search(r"\b(sure|totally|obviously|of course|yeah right|lol|lmao)\b", text)
+        or "💀" in tweet_text
+    )
     question = "?" in tweet_text
     rhetorical = question and bool(
         re.search(
@@ -125,7 +129,7 @@ def heuristic_tweet_context(tweet_text: str) -> TweetContext:
     )
     intent: Intent = (
         "dunking"
-        if rhetorical or (negative and (sarcastic or rant))
+        if rhetorical or quantity_comparison or (negative and (sarcastic or rant))
         else "asking"
         if question
         else "venting"
@@ -135,7 +139,10 @@ def heuristic_tweet_context(tweet_text: str) -> TweetContext:
         else "sharing-opinion"
     )
     anchors = build_caption_anchors(text, keywords)
-    target = next((keyword for keyword in keywords if len(keyword) >= 4), "the situation")
+    comparison_target = extract_comparison_target(tweet_text) if quantity_comparison else None
+    target = comparison_target or next(
+        (keyword for keyword in keywords if len(keyword) >= 4), "the situation"
+    )
     return TweetContext(
         sentiment="negative" if negative else "positive" if positive else "neutral",
         tone=tone,
@@ -153,19 +160,27 @@ def heuristic_tweet_context(tweet_text: str) -> TweetContext:
         if intent == "venting"
         else "clear reaction image energy",
         joke_target=target,
-        social_dynamic="mocking a predictable self-own"
+        social_dynamic="mocking the familiar benchmark through an unexpected scale comparison"
+        if quantity_comparison
+        else "mocking a predictable self-own"
         if intent == "dunking"
         else "joining the complaint"
         if intent == "venting"
         else "reacting to the absurdity",
-        humor_angle="the predictable consequence is the joke"
+        humor_angle="the surprising quantity makes the familiar benchmark look small"
+        if quantity_comparison
+        else "the predictable consequence is the joke"
         if intent == "dunking"
         else "everyone is pretending this is normal"
         if intent == "venting"
         else "the unstated contrast is the joke",
         core_claim=re.sub(r"\s+", " ", tweet_text.strip()),
-        implied_context="the audience recognizes the unstated consequence",
-        comedic_tension="what they expected vs the predictable consequence"
+        implied_context="the audience recognizes why the comparison is unexpectedly lopsided"
+        if quantity_comparison
+        else "the audience recognizes the unstated consequence",
+        comedic_tension="an unexpectedly large result vs the supposedly stronger benchmark"
+        if quantity_comparison
+        else "what they expected vs the predictable consequence"
         if intent == "dunking"
         else "what should be normal vs what happened",
         caption_anchors=anchors,
@@ -179,7 +194,10 @@ def build_caption_anchors(text: str, keywords: list[str]) -> list[str]:
     for size in (3, 2, 1):
         for index in range(len(words) - size + 1):
             phrase_words = words[index : index + size]
-            if any(len(word) < 3 or word in COMMON_WORDS for word in phrase_words):
+            if any(
+                (len(word) < 3 and not word.isdigit()) or word in COMMON_WORDS
+                for word in phrase_words
+            ):
                 continue
             phrase = " ".join(phrase_words)
             score = sum(term_specificity(word) for word in phrase_words)
@@ -194,13 +212,33 @@ def build_caption_anchors(text: str, keywords: list[str]) -> list[str]:
 
 
 def term_specificity(term: str) -> int:
-    score = 2 if len(term) >= 7 else 1
+    score = 4 if term.isdigit() else 2 if len(term) >= 7 else 1
     if re.search(
         r"prod|dashboard|launch|test|deploy|payment|rewrite|framework|bug|spreadsheet|macro|platform|meeting|calendar|slack|roadmap|deck|migration|agent",
         term,
     ):
         score += 4
     return score
+
+
+def is_quantity_comparison(text: str) -> bool:
+    has_quantity = bool(re.search(r"\b\d[\d,.]*\b|\b(?:dozen|hundred|thousand|million)\b", text))
+    has_comparison = bool(
+        re.search(
+            r"\b(?:even|versus|vs|compared|than|more|less|fewer|that many|as many)\b",
+            text,
+        )
+    )
+    return has_quantity and has_comparison
+
+
+def extract_comparison_target(tweet_text: str) -> str | None:
+    match = re.search(
+        r"\beven\s+(?:the\s+)?(.{2,40}?)\s+(?:does|did|has|hires?|would|could)\b",
+        tweet_text,
+        re.I,
+    )
+    return re.sub(r"\s+", " ", match.group(1)).strip() if match else None
 
 
 def infer_topic(text: str) -> Topic:

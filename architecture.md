@@ -71,7 +71,7 @@ tweet context
   -> diversified shortlist of at most 12 templates
   -> bounded comedy brief + catalog-owned visual grammar for each shortlisted template
   -> one bounded OpenRouter selection + caption call for at most five results
-  -> deterministic contextual caption fallback
+  -> reviewed template-specific fallback when available
   -> five-or-fewer overlays + feedback context + timings
 ```
 
@@ -80,9 +80,17 @@ TypeScript source manifests. It contains aliases, semantic tags, use/anti-use ca
 and overlay regions. Generated drafts remain excluded until human review, visual QA, benchmark
 coverage, and promotion succeed.
 
-The API returns at most five user-visible suggestions. The model call has a dedicated 2.5-second
+The catalog is the durable quality layer: each template owns its font and stroke treatment,
+normalized overlay coordinates, physical text limits, visual joke grammar, reusable joke shapes,
+positive and anti-use cases, and contrastive examples. Caption or retrieval behavior should normally
+improve through these reviewed labels so catalog additions remain server-side data changes rather
+than extension releases.
+
+The API returns at most five user-visible suggestions. The model call has a dedicated 4.5-second
 deadline. A failed call opens a short, process-local provider cooldown and immediately uses the local
-selection and contextual captions, rather than retrying on the user-visible path. Catalog candidates
+selection and a reviewed template-specific caption when one exists, rather than retrying on the
+user-visible path. The API may return fewer than five results instead of filling model omissions or
+fabricating generic fallback text. Catalog candidates
 and short-lived per-install feedback scores are cached; concurrent identical requests use
 singleflight so one calculation serves all waiters. Raw post text is never logged in production;
 request and cache identifiers are logged only as short hashes.
