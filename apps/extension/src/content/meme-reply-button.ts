@@ -5,13 +5,14 @@ import { tweetIdFromStatusHref } from "../shared/meme-reply-intent";
 const BUTTON_ATTRIBUTE = "data-memedrop-reply";
 const STYLE_ID = "memedrop-reply-button-styles";
 
-const BUTTON_STYLES = `
+export const MEME_REPLY_BUTTON_STYLES = `
 [${BUTTON_ATTRIBUTE}] {
   align-items: center;
-  background: transparent;
-  border: 0;
+  background: rgba(249, 24, 128, 0.13);
+  border: 1px solid rgba(249, 24, 128, 0.38);
   border-radius: 9999px;
-  color: rgb(113, 118, 123);
+  box-shadow: 0 1px 4px rgba(249, 24, 128, 0.12);
+  color: rgb(249, 24, 128);
   cursor: pointer;
   display: inline-flex;
   font: inherit;
@@ -20,11 +21,12 @@ const BUTTON_STYLES = `
   min-height: 34px;
   min-width: 34px;
   padding: 0 8px;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 [${BUTTON_ATTRIBUTE}]:hover {
-  background: rgba(249, 24, 128, 0.1);
-  color: rgb(249, 24, 128);
+  background: rgba(249, 24, 128, 0.22);
+  border-color: rgba(249, 24, 128, 0.7);
+  transform: translateY(-1px);
 }
 [${BUTTON_ATTRIBUTE}]:focus-visible {
   outline: 2px solid rgb(249, 24, 128);
@@ -34,8 +36,13 @@ const BUTTON_STYLES = `
   height: 18px;
   width: 18px;
 }
-@media (prefers-color-scheme: light) {
-  [${BUTTON_ATTRIBUTE}] { color: rgb(83, 100, 113); }
+[${BUTTON_ATTRIBUTE}] .memedrop-reply-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+@media (max-width: 620px) {
+  [${BUTTON_ATTRIBUTE}] .memedrop-reply-label { display: none; }
 }
 `;
 
@@ -90,6 +97,7 @@ export function initMemeReplyButtons(
         <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h8A2.5 2.5 0 0 1 17 5.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-4.5 3v-5.5A2.5 2.5 0 0 1 4 11z"/>
         <path d="m17.5 2 .65 1.85L20 4.5l-1.85.65L17.5 7l-.65-1.85L15 4.5l1.85-.65z"/>
       </svg>
+      <span class="memedrop-reply-label">Meme</span>
     `;
     button.addEventListener("click", (event) => {
       event.preventDefault();
@@ -145,6 +153,6 @@ function ensureStyles(): void {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement("style");
   style.id = STYLE_ID;
-  style.textContent = BUTTON_STYLES;
+  style.textContent = MEME_REPLY_BUTTON_STYLES;
   document.head.appendChild(style);
 }
