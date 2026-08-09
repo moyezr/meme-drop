@@ -755,16 +755,24 @@ class SuggestionService:
         ]
         joint_model_started = time.perf_counter()
         joint_outcome = "model"
+        model_selections: list[TemplateSelection] = []
+        generated: dict[str, dict[str, str]] = {}
         try:
             model = await self.gateway.select_and_caption(
                 tweet_text, shortlist_templates, limit, context=context
             )
+        except TimeoutError:
+            # A bounded provider miss is an expected availability condition, not an
+            # application crash. Keep logs actionable without emitting a cancellation stack.
+            LOGGER.warning(
+                "Joint suggestion generation timed out after %dms; using reviewed local fallback",
+                self.settings.joint_suggestion_timeout_ms,
+            )
+            joint_outcome = "timeout"
         except Exception:
             # Do not retry captioning through the provider: a provider-level failure must
             # immediately take the deterministic local path.
             LOGGER.exception("Joint suggestion generation failed; using local ranking")
-            model_selections: list[TemplateSelection] = []
-            generated: dict[str, dict[str, str]] = {}
             joint_outcome = "fallback"
         else:
             model_selections = model.selections

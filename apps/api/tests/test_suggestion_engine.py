@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -35,6 +36,7 @@ class FakeGateway:
         self.joint_calls = 0
         self.caption_calls = 0
         self.fail_joint = False
+        self.joint_error: Exception | None = None
         self.seen_template_counts: list[int] = []
         self.seen_contexts: list[TweetContext | None] = []
 
@@ -44,6 +46,8 @@ class FakeGateway:
         self.joint_calls += 1
         self.seen_template_counts.append(len(templates))
         self.seen_contexts.append(context)
+        if self.joint_error is not None:
+            raise self.joint_error
         if self.fail_joint:
             raise RuntimeError("model unavailable")
         return JointSuggestionResult(self.selections[:limit], self.captions)
@@ -519,6 +523,28 @@ async def test_service_falls_back_when_joint_model_fails_without_a_second_provid
         "Prod is down and the dashboard is red", user_id=INSTALL_ID, limit=1
     )
 
+    assert result[0]["name"] == "This Is Fine"
+    assert gateway.joint_calls == 1
+    assert gateway.caption_calls == 0
+
+
+async def test_service_treats_joint_timeout_as_expected_fallback_without_traceback(
+    caplog,  # type: ignore[no-untyped-def]
+) -> None:
+    service, _, gateway = service_with_templates("this-is-fine", "surprised-pikachu")
+    gateway.joint_error = TimeoutError()
+
+    with caplog.at_level(logging.WARNING, logger="memedrop.suggestions"):
+        result = await service.get_suggestions(
+            "Prod is down and the dashboard is red",
+            user_id=INSTALL_ID,
+            limit=1,
+        )
+
+    timeout_record = next(
+        record for record in caplog.records if "timed out after 4500ms" in record.message
+    )
+    assert timeout_record.exc_info is None
     assert result[0]["name"] == "This Is Fine"
     assert gateway.joint_calls == 1
     assert gateway.caption_calls == 0

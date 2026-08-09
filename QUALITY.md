@@ -148,6 +148,12 @@ and one contrastive good/bad example. These are hints rather than facts; the raw
 canonical. Captions must enact the post's comic turn through every required visual region, not
 paraphrase the post or copy an example. This adds no model call or network hop.
 
+The interactive joint call uses a small general model with reasoning disabled, a 600-token output
+ceiling, and latency-first provider routing. Large long-horizon reasoning models are intentionally
+excluded from this path: their extra deliberation does not improve this bounded creative task enough
+to justify regularly exhausting the request deadline. Record live taste and latency samples before
+changing `OPENROUTER_MEME_MODEL`; deterministic tests alone cannot qualify a hosted model.
+
 The catalog seeder produces the thumbnail path for new rows and backfills missing ones on rerun. Run
 `npm run db:seed-memes` as a controlled release operation after deploying this pipeline; never seed
 inside a serverless build.

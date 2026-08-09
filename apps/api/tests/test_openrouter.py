@@ -69,7 +69,7 @@ async def test_gateway_parses_batched_caption_response() -> None:
     assert result == {template.template_id: {template.regions[0].id: "caption"}}
 
 
-async def test_joint_request_uses_throughput_routing_with_p90_latency_preference() -> None:
+async def test_joint_request_uses_latency_routing_and_disables_reasoning() -> None:
     template = MemeCatalog.load().verified_templates[0]
     captured: dict[str, object] = {}
 
@@ -84,17 +84,18 @@ async def test_joint_request_uses_throughput_routing_with_p90_latency_preference
     configured = Settings(
         database_url="postgresql://localhost/test",
         openrouter_api_key="secret",
-        joint_provider_sort="throughput",
+        joint_provider_sort="latency",
         joint_provider_preferred_p90_latency_seconds=2.5,
     )
     async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
         gateway = OpenRouterSuggestionGateway(configured, client)
         await gateway.select_and_caption("tweet", [template], 1)
 
-    assert captured["max_tokens"] == 1000
+    assert captured["max_tokens"] == 600
     assert captured["temperature"] == 0.7
+    assert captured["reasoning"] == {"effort": "none", "exclude": True}
     assert captured["provider"] == {
-        "sort": "throughput",
+        "sort": "latency",
         "preferred_max_latency": {"p90": 2.5},
         "allow_fallbacks": True,
     }
@@ -117,6 +118,7 @@ async def test_standalone_caption_request_does_not_apply_joint_provider_routing(
         await gateway.generate_captions("tweet", [template])
 
     assert captured["max_tokens"] == 1800
+    assert captured["reasoning"] == {"effort": "low", "exclude": True}
     assert "provider" not in captured
 
 
@@ -241,9 +243,10 @@ async def test_joint_suggestion_passes_its_dedicated_deadline_to_the_provider() 
     await_args = chat_json.await_args
     assert await_args is not None
     assert await_args.kwargs["timeout_ms"] == 1_234
-    assert await_args.kwargs["max_tokens"] == 1000
+    assert await_args.kwargs["max_tokens"] == 600
+    assert await_args.kwargs["reasoning_effort"] == "none"
     assert await_args.kwargs["provider"] == {
-        "sort": "throughput",
+        "sort": "latency",
         "preferred_max_latency": {"p90": 2.5},
         "allow_fallbacks": True,
     }

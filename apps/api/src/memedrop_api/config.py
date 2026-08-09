@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     )
     openrouter_app_name: str = Field(default="MemeDrop", validation_alias="OPENROUTER_APP_NAME")
     openrouter_meme_model: str = Field(
-        default="z-ai/glm-5.2", validation_alias="OPENROUTER_MEME_MODEL"
+        default="openai/gpt-5.4-mini", validation_alias="OPENROUTER_MEME_MODEL"
     )
     cors_origins_value: str = Field(default="", validation_alias="MEMEDROP_CORS_ORIGINS")
     rate_limit_store: Literal["memory", "database", "redis"] = Field(
@@ -95,7 +95,7 @@ class Settings(BaseSettings):
         gt=0,
     )
     joint_provider_sort: Literal["throughput", "latency", "price"] = Field(
-        default="throughput",
+        default="latency",
         validation_alias="MEMEDROP_JOINT_PROVIDER_SORT",
     )
     joint_provider_preferred_p90_latency_seconds: float = Field(

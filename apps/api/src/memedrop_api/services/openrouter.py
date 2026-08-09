@@ -102,7 +102,12 @@ class OpenRouterSuggestionGateway:
                 # JSON mode preserves structure while this allows more comic reframing than the
                 # previous conservative setting, which favored literal paraphrases.
                 temperature=0.7,
-                max_tokens=1000,
+                # Five short region maps fit comfortably inside this bound. Keeping it small
+                # prevents a creative reply request from drifting into a long completion.
+                max_tokens=600,
+                # This task needs taste and constraint-following, not hidden multi-step work.
+                # Disabling reasoning materially improves time-to-last-token on the hot path.
+                reasoning_effort="none",
                 # The joint request is on the user-visible critical path. Its total provider
                 # budget must stay independent of the legacy standalone caption endpoint.
                 timeout_ms=self.settings.joint_suggestion_timeout_ms,
@@ -210,6 +215,7 @@ class OpenRouterSuggestionGateway:
         temperature: float,
         max_tokens: int,
         timeout_ms: int,
+        reasoning_effort: str = "low",
         provider: dict[str, object] | None = None,
     ) -> dict[str, Any]:
         client = await self._get_client()
@@ -218,7 +224,7 @@ class OpenRouterSuggestionGateway:
                 "model": self.settings.openrouter_meme_model,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                "reasoning": {"effort": "low", "exclude": True},
+                "reasoning": {"effort": reasoning_effort, "exclude": True},
                 "response_format": {"type": "json_object"},
                 "messages": messages,
             }
