@@ -70,8 +70,9 @@ Meme assets use Supabase's S3-compatible API in hosted environments:
 - development: `meme-drop-dev`
 - production: `meme-drop-prod`
 
-Configuration rejects the wrong bucket for the active environment, and production rejects local
-storage. Never auto-create, empty, or delete either bucket. Never expose S3 access keys to the
+`S3_BUCKET_NAME` is explicit, configuration rejects a missing or wrong bucket for the active
+environment, and production rejects local storage. Never auto-create, empty, or delete either
+bucket. Never expose S3 access keys to the
 extension or landing page. Validate access with `npm run storage:check`; use
 `npm run storage:latency` only when a temporary write/read/delete probe is intended.
 

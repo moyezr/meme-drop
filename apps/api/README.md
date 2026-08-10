@@ -51,8 +51,9 @@ rows and existing thumbnails. It validates every referenced legacy file before t
 missing data cannot be silently ignored. Rerun this command as a controlled production release step
 to backfill existing catalog previews.
 
-Meme files use Supabase's S3-compatible API. Development is pinned to `meme-drop-dev` and
-production to `meme-drop-prod`; configuration rejects a bucket from the wrong environment. Keep
+Meme files use Supabase's S3-compatible API. Set `S3_BUCKET_NAME` explicitly to `meme-drop-dev` in
+development and `meme-drop-prod` in production; configuration rejects a missing S3 bucket or a
+bucket from the wrong environment. Keep
 S3 credentials server-side. Validate access without writing, or measure the full object round trip:
 
 ```sh

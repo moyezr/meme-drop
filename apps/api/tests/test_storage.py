@@ -59,6 +59,7 @@ def s3_settings() -> Settings:
     return Settings(
         database_url="postgresql://localhost/test",
         storage_backend="s3",
+        s3_bucket_name="meme-drop-dev",
         s3_endpoint="https://project.storage.supabase.co/storage/v1/s3",
         s3_region="ap-south-1",
         s3_access_key_id="access-key",

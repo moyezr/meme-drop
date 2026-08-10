@@ -17,7 +17,7 @@ from alembic.config import Config
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from memedrop_api.config import Settings
+from memedrop_api.config import PRODUCTION_BUCKET, Settings
 from memedrop_api.db import Database, Meme, User
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.storage import (
@@ -394,8 +394,10 @@ def production_env_findings(
     reject_placeholder("S3_REGION", storage_region)
     reject_placeholder("S3_ACCESS_KEY_ID", storage_access_key)
     reject_placeholder("S3_SECRET_ACCESS_KEY", storage_secret_key)
-    if value("MEMEDROP_STORAGE_BUCKET") != "meme-drop-prod":
-        errors.append("MEMEDROP_STORAGE_BUCKET must be meme-drop-prod.")
+    if value("S3_BUCKET_NAME") != PRODUCTION_BUCKET:
+        errors.append(f"S3_BUCKET_NAME must be {PRODUCTION_BUCKET}.")
+    if environment.get("MEMEDROP_STORAGE_BUCKET", "").strip():
+        errors.append("MEMEDROP_STORAGE_BUCKET was removed; use S3_BUCKET_NAME.")
     for name in (
         "MEMEDROP_RATE_LIMIT_WINDOW_MS",
         "MEMEDROP_RATE_LIMIT_MAX",

@@ -34,8 +34,8 @@ controls and must never be put in `VITE_*`, Next.js public variables, extension 
 Validate development access:
 
 ```sh
-MEMEDROP_ENV=development MEMEDROP_STORAGE_BUCKET=meme-drop-dev npm run storage:check
-MEMEDROP_ENV=development MEMEDROP_STORAGE_BUCKET=meme-drop-dev npm run storage:latency
+MEMEDROP_ENV=development S3_BUCKET_NAME=meme-drop-dev npm run storage:check
+MEMEDROP_ENV=development S3_BUCKET_NAME=meme-drop-dev npm run storage:latency
 ```
 
 Run the same commands with the production environment loaded and `meme-drop-prod`. The latency probe
@@ -79,7 +79,7 @@ API project:
 At minimum the API needs the managed PostgreSQL and Redis URLs, OpenRouter key/model settings, final
 Chrome extension CORS origin, Redis rate limiting, required install IDs, compact/redacted logs, and
 the production Supabase S3 endpoint/region/key pair with
-`MEMEDROP_STORAGE_BUCKET=meme-drop-prod`.
+`S3_BUCKET_NAME=meme-drop-prod`.
 
 Before deploying with those values loaded:
 

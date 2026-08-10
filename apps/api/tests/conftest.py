@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,11 +9,15 @@ from uuid import UUID
 import httpx
 import pytest
 
-from memedrop_api.app import create_app
-from memedrop_api.config import Settings
-from memedrop_api.schemas import AutoTagResult
-from memedrop_api.services.storage import LocalMemeStorage
-from tests.fakes import FakeStore
+# Test collection imports the deployment entrypoint, which constructs Settings immediately.
+# Keep that import hermetic instead of relying on a developer's ignored apps/api/.env file.
+os.environ.setdefault("DATABASE_URL", "postgresql://test:test@127.0.0.1:5432/test")
+
+from memedrop_api.app import create_app  # noqa: E402
+from memedrop_api.config import Settings  # noqa: E402
+from memedrop_api.schemas import AutoTagResult  # noqa: E402
+from memedrop_api.services.storage import LocalMemeStorage  # noqa: E402
+from tests.fakes import FakeStore  # noqa: E402
 
 INSTALL_ID = UUID("11111111-1111-4111-8111-111111111111")
 

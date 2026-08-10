@@ -91,8 +91,12 @@ class Settings(BaseSettings):
     s3_secret_access_key: str | None = Field(
         default=None, validation_alias="S3_SECRET_ACCESS_KEY"
     )
-    storage_bucket_override: str | None = Field(
-        default=None, validation_alias="MEMEDROP_STORAGE_BUCKET"
+    s3_bucket_name: str | None = Field(default=None, validation_alias="S3_BUCKET_NAME")
+    legacy_storage_bucket: str | None = Field(
+        default=None,
+        validation_alias="MEMEDROP_STORAGE_BUCKET",
+        exclude=True,
+        repr=False,
     )
     require_install_id: bool = Field(default=False, validation_alias="MEMEDROP_REQUIRE_INSTALL_ID")
     use_draft_templates: bool = Field(
@@ -137,9 +141,9 @@ class Settings(BaseSettings):
 
     @property
     def storage_bucket(self) -> str:
-        return self.storage_bucket_override or (
-            PRODUCTION_BUCKET if self.is_production else DEVELOPMENT_BUCKET
-        )
+        if not self.s3_bucket_name:
+            raise RuntimeError("S3_BUCKET_NAME is required for S3 storage")
+        return self.s3_bucket_name
 
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:
@@ -149,14 +153,17 @@ class Settings(BaseSettings):
                 "OPENROUTER_CAPTION_MODEL"
             )
         expected_bucket = PRODUCTION_BUCKET if self.is_production else DEVELOPMENT_BUCKET
-        if self.storage_bucket != expected_bucket:
+        if self.legacy_storage_bucket:
+            raise ValueError("MEMEDROP_STORAGE_BUCKET was removed; use S3_BUCKET_NAME")
+        if self.s3_bucket_name and self.s3_bucket_name != expected_bucket:
             raise ValueError(
-                f"MEMEDROP_STORAGE_BUCKET must be {expected_bucket} in {self.node_env}"
+                f"S3_BUCKET_NAME must be {expected_bucket} in {self.node_env}"
             )
         if self.storage_backend == "s3":
             missing = [
                 name
                 for name, value in (
+                    ("S3_BUCKET_NAME", self.s3_bucket_name),
                     ("S3_ENDPOINT", self.s3_endpoint),
                     ("S3_REGION", self.s3_region),
                     ("S3_ACCESS_KEY_ID", self.s3_access_key_id),

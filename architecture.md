@@ -57,7 +57,8 @@ FastAPI preserves camelCase `/api/v1` responses for the extension:
 
 Saving an image rejects local/private network targets and unsafe redirects, streams within time and
 size limits, validates decoded image content, then stores the asset and database row. Hosted assets
-live in Supabase S3: `meme-drop-dev` for development and `meme-drop-prod` for production. The API
+live in Supabase S3: `meme-drop-dev` for development and `meme-drop-prod` for production. The active
+name comes from the required server-side `S3_BUCKET_NAME` variable; the API
 proxies `/memes/...` responses with cache headers, so object credentials and bucket topology never
 enter the extension.
 

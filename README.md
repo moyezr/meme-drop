@@ -121,7 +121,8 @@ isolated:
 | development | `meme-drop-dev` |
 | production | `meme-drop-prod` |
 
-FastAPI validates this pairing on startup. It stores object keys in PostgreSQL and serves media
+Set the active bucket explicitly with `S3_BUCKET_NAME`; FastAPI rejects a missing S3 bucket or the
+wrong environment pairing on startup. It stores object keys in PostgreSQL and serves media
 through `/memes/...`, keeping S3 credentials server-side and the extension's API contract stable.
 The API response applies shared-cache headers. `storage:latency` measures a real temporary
 upload/read/delete round trip and cleans up the probe object.

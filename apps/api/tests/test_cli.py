@@ -44,7 +44,7 @@ def valid_environment() -> dict[str, str]:
         "MEMEDROP_IMAGE_DOWNLOAD_TIMEOUT_MS": "10000",
         "MEMEDROP_MAX_IMAGE_BYTES": "8388608",
         "MEMEDROP_STORAGE_BACKEND": "s3",
-        "MEMEDROP_STORAGE_BUCKET": "meme-drop-prod",
+        "S3_BUCKET_NAME": "meme-drop-prod",
         "S3_ENDPOINT": "https://project.storage.supabase.co/storage/v1/s3",
         "S3_REGION": "ap-south-1",
         "S3_ACCESS_KEY_ID": "access-key",
@@ -54,6 +54,17 @@ def valid_environment() -> dict[str, str]:
 
 def test_valid_production_environment_has_no_findings() -> None:
     assert production_env_findings(valid_environment()) == ([], [])
+
+
+def test_production_environment_rejects_removed_shared_variables() -> None:
+    environment = valid_environment()
+    environment["OPENROUTER_MEME_MODEL"] = "old/shared-model"
+    environment["MEMEDROP_STORAGE_BUCKET"] = "meme-drop-prod"
+
+    errors, _ = production_env_findings(environment)
+
+    assert any("OPENROUTER_MEME_MODEL was removed" in error for error in errors)
+    assert any("MEMEDROP_STORAGE_BUCKET was removed" in error for error in errors)
 
 
 def test_production_environment_rejects_unsafe_deployment_values() -> None:
@@ -70,7 +81,7 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
             "MEMEDROP_USE_DRAFT_TEMPLATES": "true",
             "MEMEDROP_RATE_LIMIT_MAX": "zero",
             "MEMEDROP_STORAGE_BACKEND": "local",
-            "MEMEDROP_STORAGE_BUCKET": "meme-drop-dev",
+            "S3_BUCKET_NAME": "meme-drop-dev",
             "S3_ENDPOINT": "http://localhost:9000",
         }
     )
@@ -80,7 +91,7 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
     assert len(errors) >= 10
     assert any("must be production" in error for error in errors)
     assert any("placeholder" in error for error in errors)
-    assert any("MEMEDROP_STORAGE_BUCKET must be meme-drop-prod" in error for error in errors)
+    assert any("S3_BUCKET_NAME must be meme-drop-prod" in error for error in errors)
 
 
 def test_production_environment_rejects_example_credentials() -> None:
