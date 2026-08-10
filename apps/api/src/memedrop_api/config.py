@@ -38,8 +38,20 @@ class Settings(BaseSettings):
         default="http://localhost:3001", validation_alias="OPENROUTER_SITE_URL"
     )
     openrouter_app_name: str = Field(default="MemeDrop", validation_alias="OPENROUTER_APP_NAME")
-    openrouter_meme_model: str = Field(
-        default="openai/gpt-5.4-mini", validation_alias="OPENROUTER_MEME_MODEL"
+    openrouter_suggestion_model: str = Field(
+        default="openai/gpt-5.4-mini", validation_alias="OPENROUTER_SUGGESTION_MODEL"
+    )
+    openrouter_caption_model: str = Field(
+        default="openai/gpt-5.4-mini", validation_alias="OPENROUTER_CAPTION_MODEL"
+    )
+    openrouter_auto_tag_model: str = Field(
+        default="qwen/qwen3.6-plus", validation_alias="OPENROUTER_AUTO_TAG_MODEL"
+    )
+    legacy_openrouter_meme_model: str | None = Field(
+        default=None,
+        validation_alias="OPENROUTER_MEME_MODEL",
+        exclude=True,
+        repr=False,
     )
     cors_origins_value: str = Field(default="", validation_alias="MEMEDROP_CORS_ORIGINS")
     rate_limit_store: Literal["memory", "database", "redis"] = Field(
@@ -131,6 +143,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:
+        if self.legacy_openrouter_meme_model:
+            raise ValueError(
+                "OPENROUTER_MEME_MODEL was removed; use OPENROUTER_SUGGESTION_MODEL and "
+                "OPENROUTER_CAPTION_MODEL"
+            )
         expected_bucket = PRODUCTION_BUCKET if self.is_production else DEVELOPMENT_BUCKET
         if self.storage_bucket != expected_bucket:
             raise ValueError(

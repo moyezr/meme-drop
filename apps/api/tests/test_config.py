@@ -13,9 +13,19 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.port == 3001
     assert settings.cors_origins == list(DEFAULT_ALLOWED_ORIGINS)
     assert settings.require_install_id is False
-    assert settings.openrouter_meme_model == "openai/gpt-5.4-mini"
+    assert settings.openrouter_suggestion_model == "openai/gpt-5.4-mini"
+    assert settings.openrouter_caption_model == "openai/gpt-5.4-mini"
+    assert settings.openrouter_auto_tag_model == "qwen/qwen3.6-plus"
     assert settings.joint_provider_sort == "latency"
     assert settings.joint_provider_preferred_p90_latency_seconds == 2.5
+
+
+def test_legacy_shared_model_variable_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="OPENROUTER_MEME_MODEL was removed"):
+        Settings(
+            database_url="postgresql://localhost/memedrop",
+            legacy_openrouter_meme_model="old-shared-model",
+        )
 
 
 def test_joint_provider_latency_preference_has_a_bounded_positive_value() -> None:

@@ -33,18 +33,25 @@ async def test_auto_tagger_parses_structured_model_response(tmp_path: Path) -> N
         "vibes": ["calm cope"],
         "is_evergreen": True,
     }
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(
+    requested_model = "vision/model-for-tags"
+    settings = settings.model_copy(update={"openrouter_auto_tag_model": requested_model})
+    captured: dict[str, object] = {}
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(
             200,
             json={"choices": [{"message": {"content": json.dumps(tags)}}]},
             request=request,
         )
-    )
+
+    transport = httpx.MockTransport(respond)
     async with httpx.AsyncClient(transport=transport) as client:
         result = await auto_tag_meme(image, settings, client=client)
 
     assert result.name == "This Is Fine"
     assert result.vibes == ["calm cope"]
+    assert captured["model"] == requested_model
 
 
 async def test_auto_tagger_falls_back_on_invalid_response(tmp_path: Path) -> None:

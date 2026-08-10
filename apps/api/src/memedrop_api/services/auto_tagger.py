@@ -12,7 +12,6 @@ from memedrop_api.config import Settings
 from memedrop_api.schemas import AutoTagResult
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-VISION_MODEL = "qwen/qwen3.6-plus"
 FALLBACK_TAGS = AutoTagResult(
     name="Unnamed Meme",
     emotion="confused",
@@ -36,7 +35,7 @@ async def auto_tag_meme(
     mime_type = mimetypes.guess_type(image_path.name)[0] or "image/jpeg"
     encoded = base64.b64encode(image_bytes).decode("ascii")
     payload = {
-        "model": VISION_MODEL,
+        "model": settings.openrouter_auto_tag_model,
         "temperature": 0.3,
         "max_tokens": 900,
         "response_format": {"type": "json_object"},

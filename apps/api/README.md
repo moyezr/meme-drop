@@ -22,6 +22,11 @@ columns, install identity semantics, and extension-facing error contract.
 FastAPI has route parity and is the runtime used by root development, build, database, container,
 and deployment commands.
 
+Runtime OpenRouter models are independently configurable: `OPENROUTER_SUGGESTION_MODEL` for the
+interactive joint call, `OPENROUTER_CAPTION_MODEL` for the explicit caption endpoint, and
+`OPENROUTER_AUTO_TAG_MODEL` for saved-image vision tagging. Offline catalog generation separately
+uses `OPENROUTER_TEMPLATE_MODEL`; the API runtime does not read it.
+
 ## Development
 
 From the repository root:

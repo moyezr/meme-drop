@@ -152,7 +152,13 @@ The interactive joint call uses a small general model with reasoning disabled, a
 ceiling, and latency-first provider routing. Large long-horizon reasoning models are intentionally
 excluded from this path: their extra deliberation does not improve this bounded creative task enough
 to justify regularly exhausting the request deadline. Record live taste and latency samples before
-changing `OPENROUTER_MEME_MODEL`; deterministic tests alone cannot qualify a hosted model.
+changing `OPENROUTER_SUGGESTION_MODEL`; deterministic tests alone cannot qualify a hosted model.
+
+Model configuration is purpose-specific. `OPENROUTER_SUGGESTION_MODEL` owns the hot joint
+selection-and-caption request, `OPENROUTER_CAPTION_MODEL` owns the explicit caption endpoint,
+`OPENROUTER_AUTO_TAG_MODEL` owns saved-image vision tagging, and `OPENROUTER_TEMPLATE_MODEL` is
+loaded only by offline template-generation tools. Do not reintroduce one shared model variable: the
+latency, vision, and quality requirements of these paths are different.
 
 The catalog seeder produces the thumbnail path for new rows and backfills missing ones on rerun. Run
 `npm run db:seed-memes` as a controlled release operation after deploying this pipeline; never seed

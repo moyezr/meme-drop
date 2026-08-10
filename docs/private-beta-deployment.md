@@ -86,7 +86,9 @@ DATABASE_URL=<supabase-transaction-pooler-url>
 OPENROUTER_API_KEY=<production-key>
 OPENROUTER_SITE_URL=https://<production-api-origin>
 OPENROUTER_APP_NAME=MemeDrop
-OPENROUTER_MEME_MODEL=z-ai/glm-5.2
+OPENROUTER_SUGGESTION_MODEL=openai/gpt-5.4-mini
+OPENROUTER_CAPTION_MODEL=openai/gpt-5.4-mini
+OPENROUTER_AUTO_TAG_MODEL=qwen/qwen3.6-plus
 
 MEMEDROP_CORS_ORIGINS=chrome-extension://<final-extension-id>
 MEMEDROP_RATE_LIMIT_STORE=redis

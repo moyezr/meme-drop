@@ -347,6 +347,17 @@ def production_env_findings(
         warnings.append("OPENROUTER_API_KEY looks unusually short.")
 
     value("OPENROUTER_APP_NAME")
+    for name in (
+        "OPENROUTER_SUGGESTION_MODEL",
+        "OPENROUTER_CAPTION_MODEL",
+        "OPENROUTER_AUTO_TAG_MODEL",
+    ):
+        reject_placeholder(name, value(name))
+    if environment.get("OPENROUTER_MEME_MODEL", "").strip():
+        errors.append(
+            "OPENROUTER_MEME_MODEL was removed; set OPENROUTER_SUGGESTION_MODEL and "
+            "OPENROUTER_CAPTION_MODEL."
+        )
     origins = [item.strip() for item in value("MEMEDROP_CORS_ORIGINS").split(",") if item.strip()]
     if "*" in origins:
         errors.append("MEMEDROP_CORS_ORIGINS must not include *.")
