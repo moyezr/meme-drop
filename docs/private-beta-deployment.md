@@ -62,8 +62,13 @@ API project:
 - Python: 3.13 from `.python-version`
 - Environment: production secrets from the ignored `.env.prod`
 
-Attach the final domains before packaging the extension. A conventional pairing is a public site at
-`https://memedrop.example` and an API at `https://api.memedrop.example`.
+Attach the final domains before packaging the extension. The current public site is
+`https://memedrop.moyezrabbani.dev`; deploy the API on a separate origin such as
+`https://api.memedrop.moyezrabbani.dev` or its Vercel production URL.
+
+`VITE_API_BASE_URL` must use that API origin. Do not set it to the landing-page origin unless the
+landing project is explicitly configured to proxy every API route to FastAPI; the two projects in
+this repository do not do that.
 
 ## 4. Bootstrap the Chrome extension ID
 

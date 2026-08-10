@@ -3,7 +3,7 @@ import { Mouse_Memoirs, TikTok_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-const siteUrl = "https://memedrop.moyezrabani.dev";
+const siteUrl = "https://memedrop.moyezrabbani.dev";
 const title = "MemeDrop - Context-aware meme replies for X";
 const description =
   "MemeDrop is a Chrome extension that ranks your meme library, prepares captions, and lets you drop the right meme into X replies.";
