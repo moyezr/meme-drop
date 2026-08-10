@@ -44,8 +44,15 @@ Landing project:
 
 - Root Directory: `apps/landing`
 - Framework: Next.js
-- Output: static export from `out/`
+- Build Command: leave at the Next.js default (`npm run build`)
+- Output Directory: leave unset/default; `next.config.ts` enables static export and Vercel detects
+  `out/` automatically
 - Backend secrets: none
+
+Do not set the Vercel Output Directory to `out`. With the Next.js framework preset, that override
+causes Vercel to look for `out/routes-manifest.json`, even though Next.js correctly writes the
+framework manifest to `.next/routes-manifest.json`. The repository's `apps/landing/vercel.json`
+keeps automatic output detection enabled.
 
 API project:
 

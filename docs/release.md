@@ -65,8 +65,14 @@ Landing project:
 
 - Root Directory: `apps/landing`
 - Framework: Next.js
-- Output: static export from `out/`
+- Build Command: leave at the Next.js default (`npm run build`)
+- Output Directory: leave unset/default; `next.config.ts` enables static export and Vercel detects
+  `out/` automatically
 - Secrets: none from the backend; never copy API/S3 credentials here
+
+Do not override the Output Directory with `out`. The Next.js preset needs its build metadata from
+`.next/` and publishes the static `out/` export automatically. The checked-in landing
+`vercel.json` explicitly keeps automatic output detection enabled.
 
 API project:
 
