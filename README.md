@@ -43,10 +43,12 @@ rerun; existing catalog objects, rows, and thumbnails are skipped. Migration sto
 if any referenced legacy file is missing. Run `npm run db:seed-memes` as a controlled production
 release step after this change to backfill thumbnails for the deployed catalog.
 
-The default `.env.example` connects to PostgreSQL and Redis in Docker while using the
-`meme-drop-dev` Supabase S3 bucket. For fully offline work,
-change `MEMEDROP_STORAGE_BACKEND` to `local`; generated files then live under
-`apps/api/data/memes` and stay ignored by Git.
+The intentionally small `.env.example` contains only service credentials and deliberate model,
+rate-limit-store, and storage selections. Runtime tuning uses safe code defaults and does not need
+to be copied into every environment. The example connects to PostgreSQL and Redis in Docker while
+using the `meme-drop-dev` Supabase S3 bucket. For fully offline work, change
+`MEMEDROP_STORAGE_BACKEND` to `local`; set `MEME_STORAGE_PATH` only if the default temporary storage
+directory is not suitable.
 
 Run the applications in separate terminals:
 
