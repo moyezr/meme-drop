@@ -43,6 +43,46 @@ def test_purpose_specific_models_are_loaded_independently(monkeypatch) -> None: 
     assert settings.openrouter_auto_tag_model == "provider/vision"
 
 
+def test_vercel_environment_selects_production_when_explicit_override_is_absent(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("VERCEL_ENV", "production")
+
+    settings = Settings(  # type: ignore[call-arg]
+        database_url="postgresql://localhost/memedrop",
+        openrouter_api_key="secret",
+        cors_origins_value="chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+        require_install_id=True,
+        rate_limit_store="redis",
+        redis_url="rediss://default:secret@redis.internal:6379/0",
+        storage_backend="s3",
+        s3_bucket_name="meme-drop-prod",
+        s3_endpoint="https://project.storage.supabase.co/storage/v1/s3",
+        s3_region="ap-south-1",
+        s3_access_key_id="access-key",
+        s3_secret_access_key="secret-key",
+        _env_file=None,
+    )
+
+    assert settings.is_production is True
+
+
+def test_configuration_errors_do_not_echo_secret_inputs() -> None:
+    with pytest.raises(ValidationError) as captured:
+        Settings(
+            node_env="production",
+            database_url="postgresql://user:database-secret@localhost/memedrop",
+            openrouter_api_key="openrouter-secret",
+            cors_origins_value="chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+            storage_backend="s3",
+            s3_bucket_name="meme-drop-dev",
+        )
+
+    message = str(captured.value)
+    assert "database-secret" not in message
+    assert "openrouter-secret" not in message
+
+
 def test_joint_provider_latency_preference_has_a_bounded_positive_value() -> None:
     with pytest.raises(ValidationError):
         Settings(

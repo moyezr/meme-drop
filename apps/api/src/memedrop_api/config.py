@@ -24,12 +24,13 @@ class Settings(BaseSettings):
         env_file=(".env", "apps/api/.env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
         populate_by_name=True,
     )
 
     node_env: str = Field(
         default="development",
-        validation_alias=AliasChoices("MEMEDROP_ENV", "NODE_ENV"),
+        validation_alias=AliasChoices("MEMEDROP_ENV", "VERCEL_ENV", "NODE_ENV"),
     )
     port: int = Field(default=3001, validation_alias="PORT", gt=0, le=65535)
     database_url: str = Field(validation_alias="DATABASE_URL", min_length=1)

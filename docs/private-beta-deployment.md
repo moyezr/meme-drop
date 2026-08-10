@@ -123,6 +123,11 @@ MEMEDROP_IMAGE_DOWNLOAD_TIMEOUT_MS=10000
 MEMEDROP_MAX_IMAGE_BYTES=8388608
 ```
 
+The API also recognizes Vercel's system-provided `VERCEL_ENV=production` when `MEMEDROP_ENV` is
+absent, but setting `MEMEDROP_ENV=production` explicitly keeps local preflight and hosted runtime
+configuration identical. Ensure **Automatically expose System Environment Variables** remains
+enabled in the Vercel project.
+
 With those variables loaded into an operator shell:
 
 ```sh
