@@ -29,3 +29,9 @@ test("suggestion panel respects reduced motion preferences", () => {
   assert.match(PANEL_STYLES, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(PANEL_STYLES, /\.meme-strip \{ scroll-behavior: auto; \}/);
 });
+
+test("suggestion panel styles keep the optional steering editor compact and focusable", () => {
+  assert.match(PANEL_STYLES, /\.steering-control\[hidden\] \{ display: none; \}/);
+  assert.match(PANEL_STYLES, /\.steering-input:focus-visible/);
+  assert.match(PANEL_STYLES, /\.steering-btn\.active/);
+});

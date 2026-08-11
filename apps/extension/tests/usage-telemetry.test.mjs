@@ -59,11 +59,13 @@ test("usage telemetry projects only feedback context into the API context field"
     action: "used",
     source: "global",
     feedback_context: {
+      suggestion_mode: "steered",
       topic: "work",
       humor_angle: "deadline pressure",
       joke_target: "do not transmit source-derived targets",
       keywords: ["do", "not", "transmit"],
       core_claim: "do not transmit this either",
+      steering_instruction: "do not transmit raw user guidance",
     },
     // Runtime messages are untyped; prove an accidental raw field is ignored.
     tweet_context: { raw_post_text: "do not transmit this" },
@@ -74,6 +76,7 @@ test("usage telemetry projects only feedback context into the API context field"
     action: "used",
     source: "global",
     tweet_context: {
+      suggestion_mode: "steered",
       topic: "work",
       humor_angle: "deadline pressure",
     },

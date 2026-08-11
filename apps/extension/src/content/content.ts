@@ -10,12 +10,15 @@ import {
   insertMemeByUrl,
   hidePanel,
   isPanelVisible,
+  setSuggestionSteeringInstruction,
 } from "./suggestion-panel";
 import {
   buildSuggestionCacheKey,
   createSuggestionRequestId,
+  hasSteeringInstructionChanged,
   isCurrentSuggestionGeneration,
   isCurrentSuggestionMessage,
+  normalizeSteeringInstruction,
 } from "../shared/suggestion-request";
 import {
   MemeReplyIntent,
@@ -345,6 +348,9 @@ let activeSuggestionRequestId: string | null = null;
 // Set only when the composer was opened through MemeDrop's explicit tweet-card button.
 // The source is in-memory for the lifetime of this composer and powers refreshes.
 let activeMemeReplySource: MemeReplySource | null = null;
+// Optional guidance stays in memory only for the active compose. Request and
+// cache identity use a hash so it never appears in diagnostics or telemetry.
+let activeSteeringInstruction: string | undefined;
 // Token used to abandon stale waitForTweetText() loops when the URL changes
 // again before tweet text appears.
 let waitToken = 0;
@@ -386,7 +392,8 @@ function getCanonicalTweetId(): string | null {
 
 async function requestSuggestionsForCurrentCompose(
   refresh = false,
-  source = activeMemeReplySource
+  source = activeMemeReplySource,
+  steeringInstruction = activeSteeringInstruction
 ) {
   if (!isComposeRoute()) {
     logDebug(
@@ -448,9 +455,11 @@ async function requestSuggestionsForCurrentCompose(
   }
 
   const suggestionText = text;
+  const normalizedSteering = normalizeSteeringInstruction(steeringInstruction);
   const cacheKey = await buildSuggestionCacheKey(
     suggestionText,
-    source?.tweetId || getCanonicalTweetId()
+    source?.tweetId || getCanonicalTweetId(),
+    normalizedSteering
   );
   if (!isCurrentSuggestionGeneration(token, waitToken)) return;
 
@@ -484,7 +493,8 @@ async function requestSuggestionsForCurrentCompose(
   logDebug(
     "Sending suggestions request",
     `- cache key: ${cacheKey}
-- text length: ${suggestionText.length}`
+- text length: ${suggestionText.length}
+- steered: ${Boolean(normalizedSteering)}`
   );
 
   chrome.runtime.sendMessage({
@@ -495,9 +505,28 @@ async function requestSuggestionsForCurrentCompose(
       refresh,
       cache_key: cacheKey,
       request_id: requestId,
+      ...(normalizedSteering
+        ? { steering_instruction: normalizedSteering }
+        : {}),
     },
   });
 }
+
+window.addEventListener("memedrop:steer-suggestions", (event) => {
+  if (!isComposeRoute()) return;
+  const detail = (event as CustomEvent<{ instruction?: unknown }>).detail;
+  if (!hasSteeringInstructionChanged(activeSteeringInstruction, detail?.instruction)) return;
+  const nextSteeringInstruction = normalizeSteeringInstruction(detail?.instruction);
+  activeSteeringInstruction = nextSteeringInstruction;
+  setSuggestionSteeringInstruction(activeSteeringInstruction);
+  requestSuggestionsForCurrentCompose(
+    false,
+    activeMemeReplySource,
+    activeSteeringInstruction
+  ).catch((err) => {
+    console.error("[MemeDrop] Steered suggestions failed:", err);
+  });
+});
 
 window.addEventListener("memedrop:refresh-suggestions", () => {
   if (!isComposeRoute()) {
@@ -542,6 +571,8 @@ function onUrlChanged(url = window.location.href) {
     if (!source) {
       // X's own Reply button and direct compose routes remain completely native.
       activeMemeReplySource = null;
+      activeSteeringInstruction = undefined;
+      setSuggestionSteeringInstruction(undefined);
       lastSuggestionCacheKey = null;
       dismissedSuggestionCacheKey = null;
       currentComposeDismissed = false;
@@ -552,6 +583,8 @@ function onUrlChanged(url = window.location.href) {
       return;
     }
     activeMemeReplySource = source;
+    activeSteeringInstruction = undefined;
+    setSuggestionSteeringInstruction(undefined);
     currentComposeDismissed = false;
     requestSuggestionsForCurrentCompose(false, source);
     return;
@@ -559,6 +592,8 @@ function onUrlChanged(url = window.location.href) {
 
   memeReplyIntent.clear();
   activeMemeReplySource = null;
+  activeSteeringInstruction = undefined;
+  setSuggestionSteeringInstruction(undefined);
   lastSuggestionCacheKey = null;
   dismissedSuggestionCacheKey = null;
   currentComposeDismissed = false;

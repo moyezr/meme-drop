@@ -1,7 +1,8 @@
 # MemeDrop
 
 MemeDrop is a Chrome extension that suggests relevant meme replies for X, generates concise overlay
-text, and learns from which suggestions people use or dismiss.
+text, accepts optional guidance about the joke direction, and learns from which suggestions people
+use or dismiss.
 
 This is a Turborepo monorepo, but its applications deploy independently:
 

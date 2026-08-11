@@ -38,6 +38,12 @@ each timeline post; it transiently captures that post's text/id, forwards to X's
 and arms exactly one suggestion request when the composer route opens. Abandoned intent expires and
 post text is never persisted by the extension.
 
+The suggestion panel also offers an optional, bounded instruction for users who already have a joke
+angle, tone, or template in mind. Automatic suggestions remain the default. The instruction lives
+only for the active composer, is hashed into client and server cache identity, and is never included
+in logs or usage telemetry. Clearing it creates a distinct automatic request generation so stale
+steered media or results cannot replace the automatic response.
+
 FastAPI preserves camelCase `/api/v1` responses for the extension:
 
 | Endpoint | Purpose |
@@ -67,6 +73,7 @@ enter the extension.
 ```text
 tweet context
   -> deterministic context analysis
+  -> optional user direction applied as an untrusted creative preference
   -> cached verified catalog/database candidates + cached feedback (parallel on a cold request)
   -> deterministic rank across the whole catalog
   -> diversified shortlist of at most 12 templates
@@ -95,6 +102,13 @@ fabricating generic fallback text. Catalog candidates
 and short-lived per-install feedback scores are cached; concurrent identical requests use
 singleflight so one calculation serves all waiters. Raw post text is never logged in production;
 request and cache identifiers are logged only as short hashes.
+
+`POST /api/v1/suggest` accepts an optional `steering_instruction` of at most 280 characters. The
+original post remains the source of truth for context analysis; steering may influence retrieval,
+selection, and captions but cannot change verified-template eligibility, output structure, overlay
+regions, or text limits. OpenRouter receives it as JSON-encoded untrusted data. Suggestion feedback
+contains only `suggestion_mode: automatic|steered`, which permits outcome comparison without
+retaining the instruction.
 
 ### Local ranker and scale boundary
 

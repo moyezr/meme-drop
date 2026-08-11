@@ -21,6 +21,7 @@ export interface UsageEvent {
 }
 
 const SAFE_FEEDBACK_CONTEXT_KEYS = new Set([
+  "suggestion_mode",
   "sentiment",
   "tone",
   "topic",

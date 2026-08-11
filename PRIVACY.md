@@ -1,6 +1,6 @@
 # MemeDrop privacy policy draft
 
-Last updated: 2026-08-04
+Last updated: 2026-08-11
 
 This document describes the current MemeDrop implementation. It is not ready to publish until the
 contact placeholder is replaced and the final infrastructure retention settings are verified.
@@ -16,6 +16,7 @@ unrelated browsing activity.
 MemeDrop processes:
 
 - tweet or compose text used to request a suggestion or caption;
+- optional guidance the user enters about a preferred joke direction, tone, or meme format;
 - a random anonymous install ID stored by the extension;
 - suggested meme IDs, captions, scores, and structured context such as intent, topic, or tone;
 - outcome events such as shown, clicked, inserted/used, saved, and dismissed;
@@ -38,10 +39,11 @@ MemeDrop does not sell personal data or use it for unrelated advertising.
 
 ## Processing and storage
 
-Tweet text is processed by the extension and FastAPI service and may be sent to OpenRouter's model
-APIs for template selection and caption generation. It can remain in bounded in-memory suggestion
-caches for up to five minutes. The application does not write raw tweet text to its database, and
-production logs redact it.
+Tweet text and optional user guidance are processed by the extension and FastAPI service and may be
+sent to OpenRouter's model APIs for template selection and caption generation. Tweet text can remain
+in bounded in-memory suggestion caches for up to five minutes. Optional guidance remains in memory
+for the active composer and request; cache identity contains only a one-way hash. The application
+does not write raw tweet text or user guidance to its database, usage events, or production logs.
 
 PostgreSQL stores the anonymous install ID, saved-library records, and usage events with structured
 tweet context. The input schema rejects raw tweet-text fields inside usage context. Saved image files
@@ -51,6 +53,7 @@ as separate Vercel projects.
 Current application retention is deletion-based:
 
 - in-memory suggestion caches expire after five minutes or process termination;
+- optional guidance is cleared when the active composer closes or changes;
 - saved images and library records remain until the user deletes the item or installation data;
 - structured usage events remain until the user deletes installation data;
 - the anonymous install ID remains in Chrome storage until extension data is cleared;

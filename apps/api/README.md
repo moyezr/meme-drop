@@ -14,6 +14,7 @@ columns, install identity semantics, and extension-facing error contract.
 - usage feedback validation and persistence
 - account data export and deletion
 - catalog-owned, benchmarked ranking across every verified template
+- optional, bounded user guidance for the joke direction, tone, or template
 - one optional OpenRouter selection-and-caption call over a 12-template shortlist
 - deterministic contextual overlays for model outages
 - five-result response cap, cached candidates/feedback, and singleflight request sharing
@@ -103,6 +104,11 @@ a short per-process cooldown and returns deterministic selection/captions withou
 and feedback reads run in parallel when cold, caches avoid repeat reads, and singleflight merges
 concurrent identical requests. `Server-Timing` reports non-sensitive stage durations; clients should
 use thumbnail URLs for fast card rendering and prefetch the original image for attachment.
+
+The request may include `steering_instruction` as a trimmed 1-280 character creative preference.
+The service keeps source-post context analysis separate, hashes steering into cache identity, and
+passes it to OpenRouter as untrusted JSON data. It is not returned, persisted, or logged. Safe
+feedback contains only `suggestion_mode` so automatic and steered outcome rates can be compared.
 
 The same request includes the already-computed comedy brief plus each template's visual grammar,
 joke shapes, ordered region roles, physical text limits, and contrastive examples. It asks the model

@@ -51,6 +51,7 @@ class UpdateMemeRequest(StrictModel):
 class FeedbackContextInput(StrictModel):
     """Safe, source-text-free feedback fields accepted by usage endpoints."""
 
+    suggestion_mode: Literal["automatic", "steered"] | None = None
     sentiment: Literal["positive", "negative", "neutral"] | None = None
     tone: (
         Literal[
@@ -204,9 +205,21 @@ TweetText = Annotated[
     ),
 ]
 
+SteeringInstruction = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=280,
+    ),
+]
+
 
 class SuggestRequest(StrictModel):
     tweet_text: TweetText
+    # An optional preference for the joke direction or meme format. It is used only
+    # while generating this response and is never included in feedback or storage.
+    steering_instruction: SteeringInstruction | None = None
     # The UI presents a deliberately small, decision-ready set. The service uses
     # a larger internal shortlist before this response limit is applied.
     limit: int | None = Field(default=None, ge=1, le=5)

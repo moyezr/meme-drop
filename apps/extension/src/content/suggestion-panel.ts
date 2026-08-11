@@ -7,6 +7,10 @@ import { SELECTORS } from "./selectors";
 import { showToast } from "./toast";
 import { API_BASE_URL } from "../shared/config";
 import { limitSuggestions } from "../shared/suggestion-limits";
+import {
+  MAX_STEERING_INSTRUCTION_LENGTH,
+  normalizeSteeringInstruction,
+} from "../shared/suggestion-request";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const IMAGE_PLACEHOLDER =
@@ -82,6 +86,8 @@ let currentSuggestions: Suggestion[] = [];
 let usedSuggestionIds = new Set<string>();
 let shownSuggestionIds = new Set<string>();
 let insertingSuggestionId: string | null = null;
+let currentSteeringInstruction = "";
+let steeringEditorOpen = false;
 
 export const PANEL_STYLES = `
   :host {
@@ -151,7 +157,8 @@ export const PANEL_STYLES = `
     font-weight: 400;
   }
   .close-btn,
-  .refresh-btn {
+  .refresh-btn,
+  .steering-btn {
     display: grid;
     width: 28px;
     height: 28px;
@@ -168,13 +175,19 @@ export const PANEL_STYLES = `
     transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
   }
   .close-btn:hover,
-  .refresh-btn:hover {
+  .refresh-btn:hover,
+  .steering-btn:hover,
+  .steering-btn.active {
     border-color: rgba(240, 246, 252, 0.1);
     background: rgba(240, 246, 252, 0.06);
     color: #f1f3f4;
   }
   .close-btn:focus-visible,
   .refresh-btn:focus-visible,
+  .steering-btn:focus-visible,
+  .steering-input:focus-visible,
+  .steering-submit:focus-visible,
+  .steering-clear:focus-visible,
   .meme-card:focus-visible {
     outline: 2px solid #8ab4f8;
     outline-offset: 2px;
@@ -183,6 +196,62 @@ export const PANEL_STYLES = `
     display: flex;
     align-items: center;
     gap: 4px;
+  }
+  .steering-btn {
+    width: auto;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+  .steering-control {
+    margin: -2px 2px 10px;
+    padding: 9px;
+    border: 1px solid rgba(240, 246, 252, 0.1);
+    border-radius: 11px;
+    background: rgba(240, 246, 252, 0.035);
+  }
+  .steering-control[hidden] { display: none; }
+  .steering-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #b1bac4;
+    font-size: 10.5px;
+    line-height: 1.3;
+  }
+  .steering-form {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .steering-input {
+    min-width: 0;
+    flex: 1;
+    height: 30px;
+    padding: 0 9px;
+    border: 1px solid #3d444d;
+    border-radius: 8px;
+    background: #161b22;
+    color: #f1f3f4;
+    font: inherit;
+    font-size: 11px;
+    user-select: text;
+  }
+  .steering-input::placeholder { color: #6e7681; }
+  .steering-submit,
+  .steering-clear {
+    height: 30px;
+    padding: 0 9px;
+    border: 1px solid #3d444d;
+    border-radius: 8px;
+    background: #21262d;
+    color: #d0d7de;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10.5px;
+  }
+  .steering-submit:hover,
+  .steering-clear:hover {
+    border-color: #6e7681;
+    color: #f1f3f4;
   }
   .meme-strip {
     display: flex;
@@ -413,6 +482,75 @@ function createPanel(): { host: HTMLDivElement; shadow: ShadowRoot } {
   return { host, shadow };
 }
 
+function steeringControlMarkup(): string {
+  return `
+    <div class="steering-control" id="memedrop-steering-control" hidden>
+      <span class="steering-label" id="memedrop-steering-label">Optional: guide the joke, tone, or template</span>
+      <form class="steering-form">
+        <input
+          class="steering-input"
+          type="text"
+          maxlength="${MAX_STEERING_INSTRUCTION_LENGTH}"
+          aria-labelledby="memedrop-steering-label"
+          placeholder="e.g. make it about too many meetings"
+          autocomplete="off"
+        />
+        <button type="submit" class="steering-submit">Apply</button>
+        <button type="button" class="steering-clear" aria-label="Clear guidance">Clear</button>
+      </form>
+    </div>
+  `;
+}
+
+function setupSteeringControl(panel: HTMLElement) {
+  const toggle = panel.querySelector<HTMLButtonElement>(".steering-btn");
+  const control = panel.querySelector<HTMLElement>(".steering-control");
+  const form = panel.querySelector<HTMLFormElement>(".steering-form");
+  const input = panel.querySelector<HTMLInputElement>(".steering-input");
+  const clear = panel.querySelector<HTMLButtonElement>(".steering-clear");
+  if (!toggle || !control || !form || !input || !clear) return;
+
+  input.value = currentSteeringInstruction;
+  const syncState = () => {
+    control.hidden = !steeringEditorOpen;
+    toggle.setAttribute("aria-expanded", String(steeringEditorOpen));
+    toggle.classList.toggle("active", Boolean(currentSteeringInstruction));
+    clear.hidden = !currentSteeringInstruction;
+  };
+  syncState();
+
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    steeringEditorOpen = !steeringEditorOpen;
+    syncState();
+    if (steeringEditorOpen) input.focus();
+  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    currentSteeringInstruction = normalizeSteeringInstruction(input.value) || "";
+    input.value = currentSteeringInstruction;
+    syncState();
+    window.dispatchEvent(
+      new CustomEvent("memedrop:steer-suggestions", {
+        detail: { instruction: currentSteeringInstruction },
+      })
+    );
+  });
+  clear.addEventListener("click", (event) => {
+    event.stopPropagation();
+    currentSteeringInstruction = "";
+    input.value = "";
+    syncState();
+    window.dispatchEvent(
+      new CustomEvent("memedrop:steer-suggestions", {
+        detail: { instruction: "" },
+      })
+    );
+    input.focus();
+  });
+}
+
 function renderLoading() {
   if (!shadowRoot) return;
   const existing = shadowRoot.querySelector(".panel");
@@ -430,10 +568,12 @@ function renderLoading() {
         <span>MemeDrop<span class="subtitle">ranking visual matches first</span></span>
       </span>
       <div class="header-actions">
+        <button type="button" class="steering-btn" aria-expanded="false" aria-controls="memedrop-steering-control">Guide</button>
         <button type="button" class="refresh-btn" title="Refresh suggestions" aria-label="Refresh suggestions">↻</button>
         <button type="button" class="close-btn" title="Close" aria-label="Close suggestions">&times;</button>
       </div>
     </div>
+    ${steeringControlMarkup()}
     <div class="loading">
       <div class="loading-copy">
         <span class="loading-title">Finding the right meme...</span>
@@ -457,6 +597,7 @@ function renderLoading() {
 
   panel.querySelector(".close-btn")!.addEventListener("click", dismissPanel);
   panel.querySelector(".refresh-btn")!.addEventListener("click", requestRefresh);
+  setupSteeringControl(panel);
   setupDrag(panel);
   shadowRoot.appendChild(panel);
 }
@@ -484,10 +625,12 @@ function renderSuggestions(suggestions: Suggestion[]) {
           <span>MemeDrop<span class="subtitle">no strong match yet</span></span>
         </span>
         <div class="header-actions">
+          <button type="button" class="steering-btn" aria-expanded="false" aria-controls="memedrop-steering-control">Guide</button>
           <button type="button" class="refresh-btn" title="Refresh suggestions" aria-label="Refresh suggestions">↻</button>
           <button type="button" class="close-btn" title="Close" aria-label="Close suggestions">&times;</button>
         </div>
       </div>
+      ${steeringControlMarkup()}
       <div class="empty">No meme suggestions yet. Try refreshing.</div>
     `;
   } else {
@@ -499,6 +642,7 @@ function renderSuggestions(suggestions: Suggestion[]) {
         <span>MemeDrop<span class="subtitle">click or drag into the reply</span></span>
       </span>
       <div class="header-actions">
+        <button type="button" class="steering-btn" aria-expanded="false" aria-controls="memedrop-steering-control">Guide</button>
         <button type="button" class="refresh-btn" title="Refresh suggestions" aria-label="Refresh suggestions">↻</button>
         <button type="button" class="close-btn" title="Close" aria-label="Close suggestions">&times;</button>
       </div>
@@ -616,12 +760,14 @@ function renderSuggestions(suggestions: Suggestion[]) {
     }
 
     panel.appendChild(header);
+    header.insertAdjacentHTML("afterend", steeringControlMarkup());
     panel.appendChild(strip);
 
   }
 
   panel.querySelector(".close-btn")!.addEventListener("click", dismissPanel);
   panel.querySelector(".refresh-btn")!.addEventListener("click", requestRefresh);
+  setupSteeringControl(panel);
   setupDrag(panel);
   shadowRoot.appendChild(panel);
 }
@@ -629,8 +775,8 @@ function renderSuggestions(suggestions: Suggestion[]) {
 function setupDrag(panel: HTMLElement) {
   panel.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
-    // Don't drag when clicking cards or close button
-    if (target.closest(".meme-card") || target.closest(".close-btn") || target.closest(".refresh-btn")) return;
+    // Interactive controls must keep their native click, selection, and focus behavior.
+    if (target.closest(".meme-card, button, input, form")) return;
 
     isDragging = true;
     panel.classList.add("dragging");
@@ -1349,6 +1495,11 @@ export function showSuggestionPanel() {
 
   renderLoading();
   panelHost.style.display = "block";
+}
+
+export function setSuggestionSteeringInstruction(instruction?: string) {
+  currentSteeringInstruction = normalizeSteeringInstruction(instruction) || "";
+  if (!currentSteeringInstruction) steeringEditorOpen = false;
 }
 
 export function showSuggestionError(message: string) {

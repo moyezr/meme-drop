@@ -23,6 +23,7 @@ from memedrop_api.services.suggestion_engine import (
     inferred_joke_shape_boosts,
     safe_log_cache_key,
     semantic_template_signals,
+    suggestion_request_key,
     tokenize_sequence,
 )
 from tests.conftest import INSTALL_ID, ApiHarness
@@ -38,14 +39,18 @@ class FakeGateway:
         self.fail_joint = False
         self.joint_error: Exception | None = None
         self.seen_template_counts: list[int] = []
+        self.seen_template_ids: list[list[str]] = []
         self.seen_contexts: list[TweetContext | None] = []
+        self.seen_steering_instructions: list[str | None] = []
 
     async def select_and_caption(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, limit, *, context=None
+        self, tweet_text, templates, limit, *, context=None, steering_instruction=None
     ):
         self.joint_calls += 1
         self.seen_template_counts.append(len(templates))
+        self.seen_template_ids.append([template.template_id for template in templates])
         self.seen_contexts.append(context)
+        self.seen_steering_instructions.append(steering_instruction)
         if self.joint_error is not None:
             raise self.joint_error
         if self.fail_joint:
@@ -114,6 +119,7 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
     assert result[0]["score"] == 0.96
     assert result[0]["use_case_label"] == "predictable consequence"
     assert result[0]["feedback_context"]["intent"] == "dunking"
+    assert result[0]["feedback_context"]["suggestion_mode"] == "automatic"
     assert gateway.seen_contexts[0] is not None
     assert gateway.seen_contexts[0].comedic_tension == (
         "what they expected vs the predictable consequence"
@@ -133,6 +139,49 @@ async def test_service_uses_one_joint_model_call_and_context() -> None:
     assert result[1]["tailored_overlay"] is not None
     assert gateway.joint_calls == 1
     assert gateway.caption_calls == 0
+
+
+async def test_service_uses_steering_for_retrieval_and_joint_generation() -> None:
+    service, _, gateway = service_with_templates("distracted-boyfriend", "this-is-fine")
+    gateway.selections = [TemplateSelection("distracted-boyfriend", "requested format", 0.9)]
+    gateway.captions = {
+        "distracted-boyfriend": {
+            "girlfriend": "the stable plan",
+            "boyfriend": "the team",
+            "temptation": "the new framework",
+        }
+    }
+
+    result = await service.get_suggestions(
+        "The migration is going smoothly.",
+        user_id=INSTALL_ID,
+        limit=1,
+        steering_instruction="Use the distracted boyfriend format.",
+    )
+
+    assert gateway.seen_steering_instructions == ["Use the distracted boyfriend format."]
+    assert gateway.seen_contexts[0] is not None
+    assert "distracted boyfriend" not in gateway.seen_contexts[0].core_claim.lower()
+    assert result[0]["name"] == "Distracted Boyfriend"
+    assert result[0]["feedback_context"]["suggestion_mode"] == "steered"
+
+
+async def test_steering_changes_the_local_retrieval_query_without_changing_automatic_ranking() -> (
+    None
+):
+    service, _, gateway = service_with_templates("change-my-mind", "this-is-fine")
+    gateway.fail_joint = True
+
+    await service.get_suggestions("A generic update.", user_id=INSTALL_ID, limit=1)
+    await service.get_suggestions(
+        "A generic update.",
+        user_id=INSTALL_ID,
+        limit=1,
+        steering_instruction="this is fine",
+    )
+
+    assert gateway.seen_template_ids[0][0] == "change-my-mind"
+    assert gateway.seen_template_ids[1][0] == "this-is-fine"
 
 
 async def test_feedback_context_excludes_source_derived_terms_for_a_max_length_post() -> None:
@@ -253,9 +302,7 @@ async def test_reported_quantity_comparison_never_uses_repeated_again_fallback()
     )
 
     assert [item["name"] for item in result] == ["Buff Doge vs Cheems"]
-    overlay_text = [
-        region["text"] for region in result[0]["tailored_overlay"]["regions"]
-    ]
+    overlay_text = [region["text"] for region in result[0]["tailored_overlay"]["regions"]]
     assert overlay_text == ["Google: 33 hires", "TCS sweating"]
     assert all("again" not in text.lower() for text in overlay_text)
 
@@ -279,11 +326,17 @@ async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None
+        tweet_text, templates, limit, *, context=None, steering_instruction=None
     ):
         model_started.set()
         await allow_model.wait()
-        return await original_select(tweet_text, templates, limit, context=context)
+        return await original_select(
+            tweet_text,
+            templates,
+            limit,
+            context=context,
+            steering_instruction=steering_instruction,
+        )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
     first = asyncio.create_task(service.get_suggestions("Prod is down", user_id=INSTALL_ID))
@@ -306,11 +359,17 @@ async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None
+        tweet_text, templates, limit, *, context=None, steering_instruction=None
     ):
         model_started.set()
         await allow_model.wait()
-        return await original_select(tweet_text, templates, limit, context=context)
+        return await original_select(
+            tweet_text,
+            templates,
+            limit,
+            context=context,
+            steering_instruction=steering_instruction,
+        )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
     first = asyncio.create_task(
@@ -336,11 +395,17 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None
+        tweet_text, templates, limit, *, context=None, steering_instruction=None
     ):
         model_started.set()
         await allow_model.wait()
-        return await original_select(tweet_text, templates, limit, context=context)
+        return await original_select(
+            tweet_text,
+            templates,
+            limit,
+            context=context,
+            steering_instruction=steering_instruction,
+        )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
     first = asyncio.create_task(
@@ -597,6 +662,7 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
     assert suggestion["name"] == "This Is Fine"
     assert "tweet_context" not in suggestion
     assert suggestion["feedback_context"]
+    assert suggestion["feedback_context"]["suggestion_mode"] == "automatic"
     feedback_context = suggestion["feedback_context"]
     assert set(feedback_context).isdisjoint(
         {
@@ -628,6 +694,18 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
 
     assert feedback.status_code == 200
     assert feedback.json() == {"logged": 1}
+
+
+async def test_suggestion_route_rejects_blank_and_overlong_steering_instruction(
+    api_harness: ApiHarness,
+) -> None:
+    request = {"tweet_text": "Prod is down", "steering_instruction": " "}
+    headers = {"x-memedrop-install-id": str(INSTALL_ID)}
+    blank = await api_harness.client.post("/api/v1/suggest", headers=headers, json=request)
+    request["steering_instruction"] = "x" * 281
+    overlong = await api_harness.client.post("/api/v1/suggest", headers=headers, json=request)
+
+    assert blank.status_code == overlong.status_code == 400
 
 
 async def test_suggestion_route_exposes_non_sensitive_server_timing(
@@ -682,6 +760,26 @@ async def test_caption_route_returns_overlay_and_null_for_missing_meme(
 def test_safe_suggestion_logs_hash_cache_keys() -> None:
     assert safe_log_cache_key("tweet text").startswith("sha256:")
     assert "tweet text" not in safe_log_cache_key("tweet text")
+
+
+def test_suggestion_cache_key_hashes_and_separates_steering_instruction() -> None:
+    instruction = "Use the distracted boyfriend format"
+    automatic = suggestion_request_key(
+        "A migration update",
+        user_id=INSTALL_ID,
+        limit=1,
+        cache_key=None,
+    )
+    steered = suggestion_request_key(
+        "A migration update",
+        user_id=INSTALL_ID,
+        limit=1,
+        cache_key=None,
+        steering_instruction=instruction,
+    )
+
+    assert automatic != steered
+    assert instruction not in steered
 
 
 def test_local_ranker_meets_benchmark_retrieval_gates() -> None:

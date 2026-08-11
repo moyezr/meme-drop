@@ -32,6 +32,7 @@ async def suggest(
             limit=body.limit,
             refresh=body.refresh,
             cache_key=body.cache_key,
+            steering_instruction=body.steering_instruction,
         )
         return JSONResponse(
             content={"suggestions": run.suggestions},

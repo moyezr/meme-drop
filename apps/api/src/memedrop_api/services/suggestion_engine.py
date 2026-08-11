@@ -429,12 +429,11 @@ HUMOR_CONCEPT_WORDS: dict[str, frozenset[str]] = {
     "quantity": frozenset(
         {"amount", "count", "dozen", "hundred", "many", "million", "number", "thousand"}
     ),
-    "comparison": frozenset(
-        {"compared", "even", "fewer", "less", "more", "than", "versus", "vs"}
-    ),
+    "comparison": frozenset({"compared", "even", "fewer", "less", "more", "than", "versus", "vs"}),
 }
 
 USAGE_FEEDBACK_CONTEXT_FIELDS = (
+    "suggestion_mode",
     "sentiment",
     "tone",
     "topic",
@@ -614,10 +613,13 @@ def score_bm25_corpus(
     return dict(scores)
 
 
-def usage_feedback_context(context: TweetContext) -> dict[str, Any]:
+def usage_feedback_context(context: TweetContext, *, suggestion_mode: str) -> dict[str, Any]:
     """Project analysis onto the strictly structured, non-text feedback schema."""
     values = context.model_dump()
-    return {field: values[field] for field in USAGE_FEEDBACK_CONTEXT_FIELDS}
+    return {
+        "suggestion_mode": suggestion_mode,
+        **{field: values[field] for field in USAGE_FEEDBACK_CONTEXT_FIELDS[1:]},
+    }
 
 
 class SuggestionService:
@@ -659,6 +661,7 @@ class SuggestionService:
         limit: int | None = None,
         refresh: bool = False,
         cache_key: str | None = None,
+        steering_instruction: str | None = None,
     ) -> list[dict[str, Any]]:
         run = await self.get_suggestion_run(
             tweet_text,
@@ -666,6 +669,7 @@ class SuggestionService:
             limit=limit,
             refresh=refresh,
             cache_key=cache_key,
+            steering_instruction=steering_instruction,
         )
         return run.suggestions
 
@@ -677,6 +681,7 @@ class SuggestionService:
         limit: int | None = None,
         refresh: bool = False,
         cache_key: str | None = None,
+        steering_instruction: str | None = None,
     ) -> SuggestionRun:
         normalized_limit = max(1, min(5, int(limit or 5)))
         key = suggestion_request_key(
@@ -684,6 +689,7 @@ class SuggestionService:
             user_id=user_id,
             limit=normalized_limit,
             cache_key=cache_key,
+            steering_instruction=steering_instruction,
         )
         if not refresh and (cached := self._read_cache(key)) is not None:
             return SuggestionRun(cached, SuggestionTiming.cached())
@@ -700,6 +706,7 @@ class SuggestionService:
                     limit=normalized_limit,
                     key=key,
                     refresh_feedback=refresh,
+                    steering_instruction=steering_instruction,
                 )
             )
             self._inflight_suggestions[flight_key] = task
@@ -722,6 +729,7 @@ class SuggestionService:
         limit: int,
         key: str,
         refresh_feedback: bool,
+        steering_instruction: str | None,
     ) -> SuggestionRun:
         started = time.perf_counter()
         context = heuristic_tweet_context(tweet_text)
@@ -739,8 +747,11 @@ class SuggestionService:
         # Rank every candidate locally, but bound model input independently from the number
         # returned to the user. This keeps inference cost fixed as the catalog grows.
         local_rank_started = time.perf_counter()
+        ranking_text = (
+            f"{tweet_text}\n{steering_instruction}" if steering_instruction else tweet_text
+        )
         ranked = fallback_template_selections(
-            tweet_text,
+            ranking_text,
             candidates,
             min(12, len(candidates)),
             lexical_index=self._global_lexical_index,
@@ -759,7 +770,11 @@ class SuggestionService:
         generated: dict[str, dict[str, str]] = {}
         try:
             model = await self.gateway.select_and_caption(
-                tweet_text, shortlist_templates, limit, context=context
+                tweet_text,
+                shortlist_templates,
+                limit,
+                context=context,
+                steering_instruction=steering_instruction,
             )
         except TimeoutError:
             # A bounded provider miss is an expected availability condition, not an
@@ -821,7 +836,10 @@ class SuggestionService:
                     "source": "global",
                     # This is deliberately the only analysis exposed to clients: it is
                     # structured for usage feedback and contains no source post text.
-                    "feedback_context": usage_feedback_context(context),
+                    "feedback_context": usage_feedback_context(
+                        context,
+                        suggestion_mode="steered" if steering_instruction else "automatic",
+                    ),
                 }
             )
         self._write_cache(key, result)
@@ -1442,10 +1460,7 @@ def infer_humor_mechanics(text: str) -> set[str]:
         mechanics.add("self_taught_confidence_fails")
     if has("prerequisite") and any(count >= 2 for count in repeated_content.values()):
         mechanics.add("recursive_prerequisite")
-    if (
-        (has("quantity") or bool(re.search(r"\b\d[\d,.]*\b", text)))
-        and has("comparison")
-    ):
+    if (has("quantity") or bool(re.search(r"\b\d[\d,.]*\b", text))) and has("comparison"):
         mechanics.add("unexpected_scale_comparison")
     return mechanics
 
@@ -1641,6 +1656,7 @@ def suggestion_request_key(
     user_id: UUID,
     limit: int,
     cache_key: str | None,
+    steering_instruction: str | None = None,
 ) -> str:
     """Build a complete, per-user key for cached and in-flight suggestions.
 
@@ -1649,9 +1665,14 @@ def suggestion_request_key(
     stale or colliding client key from reusing another request's suggestions.
     """
     normalized_cache_key = normalize_text(cache_key) if cache_key else ""
+    steering_hash = (
+        hashlib.sha256(normalize_text(steering_instruction).encode()).hexdigest()[:16]
+        if steering_instruction
+        else ""
+    )
     return (
         f"user:{user_id}|tweet:{normalize_text(tweet_text)}|client:{normalized_cache_key}"
-        f"|limit:{limit}|fastapi:v1"
+        f"|steering:{steering_hash}|limit:{limit}|fastapi:v1"
     )
 
 

@@ -10,7 +10,10 @@ import {
   type SuggestionRequestObserver,
 } from "../shared/suggestion-observers";
 import { createSingleFlight } from "../shared/single-flight";
-import { buildSuggestionCacheKey } from "../shared/suggestion-request";
+import {
+  buildSuggestionCacheKey,
+  normalizeSteeringInstruction,
+} from "../shared/suggestion-request";
 import { fetchMediaWithTimeout } from "../shared/media-fetch";
 import {
   UsageTelemetryQueue,
@@ -111,6 +114,9 @@ function writeCachedSuggestions(key: string, suggestions: Suggestion[]) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_SUGGESTIONS") {
+    const steeringInstruction = normalizeSteeringInstruction(
+      message.payload.steering_instruction
+    );
     let sentInitialSuggestions = false;
     const performance = new SuggestionPerformanceTracker();
     const requestId = message.payload.request_id;
@@ -127,6 +133,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       refresh: message.payload.refresh,
       limit: message.payload.limit,
       cacheKey: message.payload.cache_key,
+      steeringInstruction,
       onInitial: (suggestions, cacheHit) => {
         sentInitialSuggestions = true;
         performance.setSuggestions(suggestions.length, cacheHit);
@@ -257,7 +264,11 @@ async function fetchSuggestions(
 ): Promise<Suggestion[]> {
   const limit = clampSuggestionLimit(options.limit);
   const requestOptions = { ...options, limit };
-  const baseCacheKey = options.cacheKey || await buildSuggestionCacheKey(tweetText);
+  const baseCacheKey = options.cacheKey || await buildSuggestionCacheKey(
+    tweetText,
+    undefined,
+    options.steeringInstruction
+  );
   const cacheKey = `${baseCacheKey}|limit:${limit}|quality:v1`;
   if (!options.refresh) {
     const inflight = suggestionInflight.get(cacheKey);
@@ -311,6 +322,7 @@ type SuggestionOptions = SuggestionRequestObserver<Suggestion> & {
   refresh?: boolean;
   limit?: number;
   cacheKey?: string;
+  steeringInstruction?: string;
   onMediaSettled?: () => void;
 };
 
@@ -333,6 +345,9 @@ async function fetchFreshSuggestions(
         limit: options.limit,
         refresh: options.refresh,
         cache_key: options.cacheKey,
+        ...(options.steeringInstruction
+          ? { steering_instruction: options.steeringInstruction }
+          : {}),
       }),
     });
     if (!res.ok) {
