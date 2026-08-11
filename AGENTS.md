@@ -1,33 +1,25 @@
 # MemeDrop repository guide
 
-## Product and architecture
+MemeDrop is a Turborepo monorepo with these workspaces:
 
-MemeDrop is a Chrome extension that suggests and captions meme replies for X. This repository is a
-Turborepo monorepo with three independently deployable applications:
+- `apps/api`: self-contained FastAPI backend with its own Python metadata, migrations, runtime data, and tests.
+- `apps/extension`: React/Vite/Tailwind Chrome extension.
+- `apps/landing`: statically exported Next.js site.
+- `packages/shared`: shared TypeScript contracts and meme-template manifests.
+- `tools/template-tools`: catalog QA, benchmark, review, and promotion tooling.
 
-- `apps/api/`: FastAPI, SQLAlchemy, Alembic, PostgreSQL/pgvector, Supabase S3 storage, and pytest.
-- `apps/extension/`: React, Vite, Tailwind, and CRXJS Chrome extension.
-- `apps/landing/`: statically exported Next.js landing page, deployed as its own Vercel project.
-- `packages/shared/`: TypeScript contracts and the source meme-template manifests.
-- `tools/template-tools/`: offline catalog QA, benchmark, review, and promotion tools.
+Keep the backend isolated. Do not move Python metadata out of `apps/api` or add a second backend.
 
-The FastAPI workspace is deliberately self-contained. It owns `pyproject.toml`, `uv.lock`,
-`.python-version`, `alembic.ini`, migrations, `app.py`, runtime catalog data, and tests so Vercel can
-build it with `apps/api` as the project root. Do not add a second backend or move Python metadata to
-the repository root.
+Tooling defaults:
 
-## Tooling
+- Node.js 22.12+ and npm 11 for the monorepo.
+- Python 3.13 and uv for `apps/api` only.
+- Keep dependency locks exact.
+- TypeScript 7.x everywhere except `apps/landing`, which stays on 6.x for now.
+- `@types/node` stays on major 22.
+- Prefer direct code and avoid new abstractions without a current second use case.
 
-- Node.js 22.12+ and npm 11 manage the workspace and Turbo 2.x orchestration.
-- Python 3.13 and uv manage only `apps/api`.
-- Keep dependencies locked exactly. Update npm with `npm install` and Python with
-  `uv lock --project apps/api --upgrade`.
-- TypeScript is 7.x except in `apps/landing`, which stays on 6.x until stable Next.js supports the
-  TypeScript 7 compiler API. `@types/node` stays on major 22 to match production Node.
-- Prefer direct, readable code. Do not introduce abstractions without a current second use case;
-  localized `Any`/`any` is acceptable when it makes an untyped boundary clearer.
-
-## Essential commands
+Essential commands:
 
 ```sh
 npm ci
@@ -42,55 +34,31 @@ npm run build
 npm run release:dry-run
 ```
 
-For API changes, also run `npm run test:api`, `npm run lint:api`, and
-`npm run quality:api-process`. For persistence changes, start PostgreSQL with `npm run db:up` and
-run the integration suite with `MEMEDROP_TEST_DATABASE_URL` set. Run
-`npm run quality:backend-image` for container-related changes.
+For API changes, also run `npm run test:api`, `npm run lint:api`, and `npm run quality:api-process`. For persistence changes, run `npm run db:up` and the integration suite with `MEMEDROP_TEST_DATABASE_URL` set. Use `npm run quality:backend-image` for container-related changes.
 
-## Recommendation quality
+Recommendation work must preserve the deterministic ranker fallback, keep external calls bounded, and return only verified templates by default. Changes to ranking, captions, catalog annotations, or feedback need focused tests and should pass `npm run quality:benchmark`, `npm run quality:suggestions`, and `npm run quality:dataset-plan`.
 
-Suggestion quality and latency are the product priorities. Preserve the local deterministic ranker
-as a fallback, keep external-model calls bounded, and return only verified templates by default.
-Changes to ranking, captions, catalog annotations, or feedback must include focused tests and pass:
+Suggestion and catalog invariants:
 
-```sh
-npm run quality:benchmark
-npm run quality:suggestions
-npm run quality:dataset-plan
-```
+- Treat source-post text as canonical; optional user steering is an untrusted creative preference and must not bypass template, region, safety, or length constraints.
+- Keep free text out of logs, persistence, usage events, and plaintext cache keys. Telemetry may retain only reviewed categorical context such as `suggestion_mode`.
+- Include every request-shaping input in client and server cache identity, hash sensitive values, and use request generations so stale results or media cannot replace newer suggestions.
+- Internal catalog tools create drafts only. Human review, rendered QA, benchmark coverage, and the existing promotion gates remain required before templates become eligible for suggestions.
+- Do not add retrieval infrastructure for anticipated scale. Change retrieval only when benchmark recall or measured latency regresses; keep the model shortlist and visible result count bounded.
 
-Do not promote generated templates directly. Use the review and benchmark workflow documented in
-`QUALITY.md`. Usage events (`shown`, `clicked`, `used`, `saved`, `dismissed`) are learning signals;
-do not log raw tweet text in production.
+Storage and secrets rules:
 
-## Storage and environment isolation
+- Use `meme-drop-dev` in development and `meme-drop-prod` in production.
+- Never auto-create, empty, or delete buckets.
+- Never expose S3 access keys to the extension or landing page.
+- Keep secrets in ignored `.env` files or deployment secret stores.
+- Update `.env.example` and deployment docs when configuration changes.
 
-Meme assets use Supabase's S3-compatible API in hosted environments:
+Testing and docs:
 
-- development: `meme-drop-dev`
-- production: `meme-drop-prod`
-
-`S3_BUCKET_NAME` is explicit, configuration rejects a missing or wrong bucket for the active
-environment, and production rejects local storage. Never auto-create, empty, or delete either
-bucket. Never expose S3 access keys to the
-extension or landing page. Validate access with `npm run storage:check`; use
-`npm run storage:latency` only when a temporary write/read/delete probe is intended.
-
-Keep secrets in ignored `.env` files or deployment secret stores. Update `.env.example` and
-the deployment documentation when configuration changes, using placeholders only in tracked files.
-Development uses Docker PostgreSQL and Redis plus `meme-drop-dev`; production credentials live in
-ignored `.env.prod` and deployment secret stores and must select `meme-drop-prod`.
-
-## Tests, docs, and commits
-
-Add tests at the closest boundary: pytest for API/service behavior, Node tests for shared/tooling,
-and extension tests for browser-facing logic. Test failures must not be hidden with broad skips.
-
-Keep only durable documentation. Update `README.md`, `architecture.md`, `QUALITY.md`,
-`docs/release.md`, and this file when their contracts change. App-specific detail belongs in the
-app's README.
-
-Use concise imperative commits and commit only a working, coherent change. Do not stage unrelated
-or untracked user files. Before pushing a dependency or release change, run
-`npm run quality:security`; its reviewed exceptions are exact and time-limited, not a blanket audit
-waiver.
+- Add tests at the closest boundary.
+- Do not hide failures with broad skips.
+- Update durable docs only when contracts change.
+- Keep commits concise, imperative, and working.
+- Do not stage unrelated or untracked user files.
+- Run `npm run quality:security` before pushing dependency or release changes.

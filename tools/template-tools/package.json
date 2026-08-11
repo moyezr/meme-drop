@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
     "manifest:generate": "tsx scripts/generate-template-manifest.ts --out packages/shared/src/data/meme-template-manifest.generated.json",
+    "manifest:annotate": "tsx scripts/render-annotation-workbench.ts",
     "manifest:dry-run": "tsx scripts/generate-template-manifest.ts --dry-run --files-only --out /tmp/memedrop-template-manifest-dry-run.json",
     "manifest:qa": "tsx scripts/render-template-qa.ts",
     "manifest:taste-review": "tsx scripts/render-taste-review.ts",

@@ -1,0 +1,79 @@
+# MemeDrop roadmap
+
+This roadmap grows the existing extension without assuming agency or agent-platform PMF. The order
+prioritizes improvements that make current suggestions more useful and produce evidence for later
+surfaces.
+
+## Product constraints
+
+- Suggestion quality and ready-to-attach latency are the primary product metrics.
+- Automatic suggestions remain the default; user steering is optional.
+- Only human-reviewed templates become eligible for normal suggestions.
+- New platforms reuse the existing API and catalog instead of creating separate recommendation
+  systems.
+- Retrieval changes follow measured benchmark or latency regressions, not anticipated scale.
+
+## 1. Visual catalog annotation workbench — in progress
+
+Build the smallest internal tool that removes repeated manual work when reviewing a template.
+
+- Load one draft template and its source image.
+- Draw, move, resize, and inspect normalized caption regions.
+- Edit region role, alignment, line count, character limit, and font bounds with a live preview.
+- Export a draft annotation file under `.memedrop/`; never write or promote runtime catalog data
+  automatically.
+- Feed the export through the existing audit, rendered QA, review, benchmark, and promotion gates.
+
+Success means a reviewer can annotate a template without manually calculating coordinates, while
+the exported data passes mechanical validation. The first slice is a browser-local workbench and
+JSON export; automated source-manifest import remains a later, separately reviewed step.
+
+## 2. Quality-led catalog expansion
+
+- Add small, attributable batches of current and evergreen templates.
+- Record visual grammar, use cases, anti-use cases, joke shapes, and realistic contrastive examples.
+- Track emerging, established, saturated, and retired status once real freshness decisions repeat.
+- Expand the golden benchmark before promoting a new meme family.
+
+Gates: no verified-template audit errors, suggestion benchmark pass, no material p95 regression,
+and visual approval for every promoted template.
+
+## 3. LinkedIn extension support
+
+- Reuse the existing explicit-trigger, suggestion, steering, rendering, and feedback flows.
+- Keep platform-specific DOM extraction and attachment behind a small adapter boundary.
+- Validate with founder-led and B2B marketing posts before adding agency workflows.
+
+Proceed when the X experience has repeat usage and the catalog covers common professional contexts.
+
+## 4. Retrieval validation at real catalog scale
+
+- Measure top-12 recall and p95 latency at 100, 250, 500, and 1,000 verified templates.
+- Improve annotations and benchmark coverage before adding infrastructure.
+- Add hybrid lexical/embedding retrieval only if measured recall degrades and an offline experiment
+  improves it without compromising the deterministic fallback or latency budget.
+
+The model continues to see a bounded shortlist rather than the whole catalog.
+
+## 5. Reddit experiment
+
+- Test opt-in meme replies in a small set of suitable communities.
+- Respect subreddit norms and avoid assuming that brand participation is welcome everywhere.
+- Treat Reddit as a distribution and learning experiment until willingness to pay is demonstrated.
+
+## 6. GIF and post-copy formats
+
+- Add GIF storage, preview, rendering, file-size, and platform-export constraints.
+- Support media with no overlay plus separate post copy.
+- Add text-only humorous treatments only after the media-led workflow shows repeat value.
+
+Each format requires its own quality benchmark and must not slow static-image suggestions.
+
+## 7. Agency and agent integrations
+
+- Introduce multi-brand profiles, API authentication, usage limits, and outcome ingestion after
+  repeated agency demand appears.
+- Keep posting, scheduling, account access, and calendars outside MemeDrop.
+- Return publish-ready media, post copy, alt text, and safety metadata through a bounded API.
+
+The extension remains the first-party product and proving ground for the shared humor engine.

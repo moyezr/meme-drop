@@ -51,6 +51,7 @@
     "release:dry-run": "node scripts/release-candidate.mjs",
     "release:candidate": "node scripts/release-candidate.mjs --strict --with-suggestion-eval",
     "dataset:expansion-report": "npm run manifest:expansion-report --workspace=@memedrop/template-tools -- --out .memedrop/template-expansion-report.json",
+    "dataset:annotate-template": "npm run manifest:annotate --workspace=@memedrop/template-tools --",
     "dataset:qa-expansion": "npm run dataset:expansion-report && npm run manifest:qa:expansion --workspace=@memedrop/template-tools",
     "dataset:taste-review": "npm run manifest:taste-review --workspace=@memedrop/template-tools",
     "dataset:review-decisions:init": "npm run manifest:review-decisions:init --workspace=@memedrop/template-tools --",
