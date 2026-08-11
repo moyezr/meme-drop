@@ -88,16 +88,30 @@ For every template:
 - document reusable joke shapes, use cases, anti-use cases, aliases, and semantic tags;
 - visually inspect the rendered meme rather than approving JSON alone.
 
-To adjust a generated draft visually, create a browser-local workbench:
+The durable internal catalog workbench uses local PostgreSQL for draft metadata and the configured
+development storage backend for media. Start it with:
+
+```sh
+npm run db:up
+npm run db:migrate
+npm run dev:api
+```
+
+Open `http://localhost:3001/internal/catalog`. The internal routes are not mounted in production.
+Set `MEMEDROP_STORAGE_BACKEND=s3` and `S3_BUCKET_NAME=meme-drop-dev` in the ignored development
+environment when source media should live in Supabase Storage. A draft may copy an existing
+template's annotations, but local `approved` state still does not alter the runtime catalog.
+
+For a disposable, database-free annotation page, generate the older browser-local workbench:
 
 ```sh
 npm run dataset:annotate-template -- --template <template-id>
 ```
 
 Open the generated `.memedrop/template-annotation-<template-id>.html` file while the backend is
-running. The workbench can move, resize, add, and edit regions, but it exports draft JSON only. Move
-the export under `.memedrop/` and continue through the normal audit, rendered QA, review, benchmark,
-and promotion steps; never copy it directly into the verified runtime catalog.
+running. Both workbenches create drafts only. Continue through the normal audit, rendered QA,
+review, benchmark, and promotion steps; never copy an editor result directly into the verified
+runtime catalog.
 
 This reviewed catalog is product data, not incidental configuration. It is the reusable layer that
 lets the same caption model understand how each image communicates and lets new templates improve

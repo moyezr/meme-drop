@@ -16,10 +16,12 @@ from starlette.responses import Response
 from memedrop_api.api.account import router as account_router
 from memedrop_api.api.health import ReadinessCheck
 from memedrop_api.api.health import router as health_router
+from memedrop_api.api.internal_catalog import router as internal_catalog_router
 from memedrop_api.api.library import router as library_router
 from memedrop_api.api.memes import router as memes_router
 from memedrop_api.api.suggest import router as suggest_router
 from memedrop_api.api.usage import router as usage_router
+from memedrop_api.catalog_workbench import CatalogDraftStore, SqlAlchemyCatalogDraftStore
 from memedrop_api.config import Settings
 from memedrop_api.db import Database
 from memedrop_api.rate_limit import (
@@ -53,17 +55,20 @@ def create_app(
     auto_tag_service=None,  # type: ignore[no-untyped-def]
     suggestion_service: SuggestionService | None = None,
     storage: MemeStorage | None = None,
+    catalog_draft_store: CatalogDraftStore | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings()  # type: ignore[call-arg]
     meme_storage = storage or create_meme_storage(app_settings)
     database = Database(app_settings.database_url)
     backend_store = store or SqlAlchemyStore(database)
+    catalog_store = catalog_draft_store or SqlAlchemyCatalogDraftStore(database)
+    catalog = MemeCatalog.load()
     default_gateway: OpenRouterSuggestionGateway | None = None
     if suggestion_service is None:
         default_gateway = OpenRouterSuggestionGateway(app_settings)
         suggestions = SuggestionService(
             backend_store,
-            MemeCatalog.load(),
+            catalog,
             default_gateway,
             app_settings,
         )
@@ -99,12 +104,14 @@ def create_app(
     app.state.settings = app_settings
     app.state.database = database
     app.state.store = backend_store
+    app.state.catalog_draft_store = catalog_store
     app.state.rate_limiter = limiter
     app.state.readiness_check = readiness_check or database.is_ready
     app.state.download_image = download_image_service or download_image
     app.state.auto_tag_meme = auto_tag_service or auto_tag_meme
     app.state.meme_storage = meme_storage
     app.state.suggestion_service = suggestions
+    app.state.meme_catalog = catalog
 
     app.add_middleware(
         CORSMiddleware,
@@ -184,6 +191,8 @@ def create_app(
     app.include_router(memes_router)
     app.include_router(suggest_router)
     app.include_router(usage_router)
+    if not app_settings.is_production:
+        app.include_router(internal_catalog_router)
 
     @app.get("/memes/{object_key:path}", include_in_schema=False)
     async def serve_meme(object_key: str) -> Response:

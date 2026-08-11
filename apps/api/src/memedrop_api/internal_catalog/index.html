@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MemeDrop Catalog Workbench</title>
+    <link rel="stylesheet" href="/internal/catalog/catalog.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <span class="eyebrow">MemeDrop internal</span>
+        <h1>Catalog workbench</h1>
+      </div>
+      <div class="top-actions">
+        <span id="save-state" class="muted">Select a draft</span>
+        <button id="save" class="primary" disabled>Save draft</button>
+      </div>
+    </header>
+
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="sidebar-tools">
+          <button id="new-template" class="primary">Add meme</button>
+          <input id="search" type="search" placeholder="Search drafts" aria-label="Search drafts" />
+          <select id="status-filter" aria-label="Filter by review status">
+            <option value="">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="in_review">In review</option>
+            <option value="needs_work">Needs work</option>
+            <option value="approved">Approved locally</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div id="draft-list" class="draft-list" aria-live="polite"></div>
+      </aside>
+
+      <main id="empty-state" class="empty-state">
+        <div>
+          <h2>Build the catalog deliberately</h2>
+          <p>Add a source image or open a draft. AI assistance may propose labels later; a human always owns the final annotation and review decision.</p>
+        </div>
+      </main>
+
+      <main id="editor" class="editor hidden">
+        <section class="canvas-panel panel">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Visual grammar</span>
+              <h2 id="editor-title"></h2>
+            </div>
+            <div class="inline-actions">
+              <button id="add-region">Add region</button>
+              <button id="remove-region" class="danger">Remove region</button>
+            </div>
+          </div>
+          <div class="stage-wrap">
+            <div id="stage" class="stage">
+              <img id="source-image" alt="" />
+              <div id="region-layer"></div>
+            </div>
+          </div>
+          <p class="canvas-help">Drag boxes to move them and use the lower-right handle to resize. Coordinates remain normalized across image sizes.</p>
+        </section>
+
+        <section class="annotation-panel">
+          <div class="panel form-section">
+            <div class="section-heading compact">
+              <div><span class="eyebrow">Workflow</span><h3>Review state</h3></div>
+              <span id="revision" class="pill"></span>
+            </div>
+            <label>Status
+              <select id="draft-status">
+                <option value="draft">Draft</option>
+                <option value="in_review">In review</option>
+                <option value="needs_work">Needs work</option>
+                <option value="approved">Approved locally</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <p class="help">Local approval is still a draft. Production promotion remains a separate audited script.</p>
+          </div>
+
+          <div class="panel form-section">
+            <div class="section-heading compact"><div><span class="eyebrow">Identity</span><h3>Template basics</h3></div></div>
+            <label>Name<input id="name" maxlength="120" /></label>
+            <label>Aliases <span>one per line</span><textarea id="aliases" rows="3"></textarea></label>
+            <label>Visual description<textarea id="description" rows="4" maxlength="800" placeholder="What is visibly happening, who or what each subject represents, and what emotional beat the image communicates."></textarea></label>
+          </div>
+
+          <div class="panel form-section">
+            <div class="section-heading compact"><div><span class="eyebrow">Retrieval quality</span><h3>When this meme fits</h3></div></div>
+            <label>Use cases <span>one per line</span><textarea id="use-cases" rows="4"></textarea></label>
+            <label>Anti-use cases <span>one per line</span><textarea id="anti-use-cases" rows="4"></textarea></label>
+            <label>Joke shapes <span>one per line</span><textarea id="joke-shapes" rows="3"></textarea></label>
+            <label>Positive retrieval hints <span>one per line</span><textarea id="positive-hints" rows="5"></textarea></label>
+            <label>Negative retrieval hints <span>one per line</span><textarea id="anti-hints" rows="5"></textarea></label>
+          </div>
+
+          <div class="panel form-section">
+            <div class="section-heading compact"><div><span class="eyebrow">Caption quality</span><h3>Joke construction</h3></div></div>
+            <label>Caption pattern<textarea id="caption-pattern" rows="4" maxlength="500"></textarea></label>
+            <label>Good examples <span>JSON array using region ids</span><textarea id="good-examples" rows="5" spellcheck="false"></textarea></label>
+            <label>Bad examples <span>JSON array using region ids</span><textarea id="bad-examples" rows="5" spellcheck="false"></textarea></label>
+          </div>
+
+          <div class="panel form-section" id="region-editor">
+            <div class="section-heading compact"><div><span class="eyebrow">Selected box</span><h3>Caption region</h3></div></div>
+            <div id="region-tabs" class="region-tabs"></div>
+            <label>Region id<input id="region-id" disabled /></label>
+            <label>Role<textarea id="region-role" rows="3" maxlength="180"></textarea></label>
+            <div class="field-grid four">
+              <label>X<input id="region-x" type="number" min="0" max="1" step="0.001" /></label>
+              <label>Y<input id="region-y" type="number" min="0" max="1" step="0.001" /></label>
+              <label>Width<input id="region-width" type="number" min="0.04" max="1" step="0.001" /></label>
+              <label>Height<input id="region-height" type="number" min="0.04" max="1" step="0.001" /></label>
+            </div>
+            <div class="field-grid">
+              <label>Align<select id="region-align"><option>left</option><option>center</option><option>right</option></select></label>
+              <label>Vertical<select id="region-valign"><option>top</option><option>middle</option><option>bottom</option></select></label>
+              <label>Max lines<input id="region-lines" type="number" min="1" max="4" /></label>
+              <label>Max characters<input id="region-chars" type="number" min="8" max="90" /></label>
+              <label>Min font<input id="font-min" type="number" min="10" max="96" /></label>
+              <label>Max font<input id="font-max" type="number" min="10" max="120" /></label>
+              <label>Stroke ratio<input id="font-stroke" type="number" min="0.06" max="0.2" step="0.01" /></label>
+            </div>
+            <label>Placement notes<textarea id="region-notes" rows="3" maxlength="240"></textarea></label>
+            <label>Preview text<input id="preview-text" maxlength="120" placeholder="Preview only; not saved as an example" /></label>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="create-dialog">
+      <form id="create-form" method="dialog">
+        <div class="section-heading"><div><span class="eyebrow">New catalog draft</span><h2>Add a meme</h2></div><button id="close-dialog" type="button" aria-label="Close">×</button></div>
+        <label>Name<input name="name" required maxlength="120" /></label>
+        <label>Template id <span>optional; generated from name</span><input name="template_id" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
+        <label>Copy annotations from <span>optional existing template id</span><input name="base_template_id" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
+        <label>Source image URL<input name="source_image_url" type="url" required placeholder="https://…" /></label>
+        <label>Aliases <span>one per line</span><textarea name="aliases" rows="3"></textarea></label>
+        <p class="help">The source is validated, copied into the configured development bucket, and stored as a draft. It is never promoted automatically.</p>
+        <div id="create-error" class="error" role="alert"></div>
+        <div class="dialog-actions"><button id="cancel-create" type="button">Cancel</button><button class="primary" type="submit">Ingest meme</button></div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status"></div>
+    <script type="module" src="/internal/catalog/catalog.js"></script>
+  </body>
+</html>

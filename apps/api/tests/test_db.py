@@ -12,7 +12,13 @@ def test_postgres_urls_use_async_psycopg_driver() -> None:
 
 
 def test_database_models_preserve_existing_table_names() -> None:
-    assert set(Base.metadata.tables) == {"users", "memes", "user_memes", "usage_events"}
+    assert set(Base.metadata.tables) == {
+        "users",
+        "memes",
+        "user_memes",
+        "usage_events",
+        "catalog_drafts",
+    }
 
 
 def test_transaction_pooler_disables_psycopg_prepared_statements() -> None:

@@ -13,20 +13,26 @@ surfaces.
   systems.
 - Retrieval changes follow measured benchmark or latency regressions, not anticipated scale.
 
-## 1. Visual catalog annotation workbench — in progress
+## 1. Catalog annotation workbench — in progress
 
 Build the smallest internal tool that removes repeated manual work when reviewing a template.
 
-- Load one draft template and its source image.
+- Ingest a source URL into the configured development object store, or copy an existing template's
+  annotations as the starting point for an improvement.
+- Store drafts, structured annotations, workflow state, and optimistic revisions in local
+  PostgreSQL, separately from runtime memes.
 - Draw, move, resize, and inspect normalized caption regions.
-- Edit region role, alignment, line count, character limit, and font bounds with a live preview.
-- Export a draft annotation file under `.memedrop/`; never write or promote runtime catalog data
-  automatically.
-- Feed the export through the existing audit, rendered QA, review, benchmark, and promotion gates.
+- Edit visual description, use cases, anti-use cases, retrieval hints, caption grammar, examples,
+  region roles, alignment, limits, and font treatment with a live preview.
+- Keep the workbench development-only. A local approval never changes runtime suggestion data.
+- Next: export a deterministic, checksummed release bundle from approved local drafts, then apply
+  that bundle to production storage and PostgreSQL through a separately authorized script.
+- After the manual workflow is stable, add bounded AI assists for descriptions and retrieval-label
+  proposals. AI output always lands as an editable suggestion and never changes review state.
 
-Success means a reviewer can annotate a template without manually calculating coordinates, while
-the exported data passes mechanical validation. The first slice is a browser-local workbench and
-JSON export; automated source-manifest import remains a later, separately reviewed step.
+Success means a reviewer can add or improve a template without manually calculating coordinates,
+while every change is durable, reviewable, and exportable through the existing mechanical,
+rendered-QA, benchmark, and promotion gates.
 
 ## 2. Quality-led catalog expansion
 

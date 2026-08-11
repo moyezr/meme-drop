@@ -44,6 +44,12 @@ npm run db:seed-memes
 npm run quality:api-process
 ```
 
+For human catalog authoring, apply migrations, start the API, and visit
+`http://localhost:3001/internal/catalog`. Draft annotations live in local PostgreSQL; source images
+and thumbnails use the configured storage backend. Configure the Supabase S3 API with the
+`meme-drop-dev` bucket for the normal shared development workflow. Workbench approval is not a
+runtime or production promotion.
+
 `db:seed-memes` first migrates legacy local `/memes/...` files into the active S3 bucket under
 `catalog/legacy/`, then inserts any missing verified catalog templates. It creates a 480px WebP
 thumbnail under `catalog/thumbnails/` and backfills rows lacking `thumbnail_path` on rerun. Database

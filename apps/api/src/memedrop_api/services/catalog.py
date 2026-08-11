@@ -34,6 +34,7 @@ class TemplateRegion(BaseModel):
     max_lines: int
     max_chars: int
     font: FontSpec
+    notes: str | None = None
 
 
 class CaptionGuidance(BaseModel):

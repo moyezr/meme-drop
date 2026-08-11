@@ -8,7 +8,8 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import delete, text
 
-from memedrop_api.db import Base, Database, Meme
+from memedrop_api.catalog_workbench import CatalogDraftConflict, SqlAlchemyCatalogDraftStore
+from memedrop_api.db import Base, CatalogDraft, Database, Meme
 from memedrop_api.repositories import SqlAlchemyStore
 
 pytestmark = pytest.mark.integration
@@ -131,3 +132,59 @@ async def test_sqlalchemy_store_exercises_every_data_feature(database: Database)
     finally:
         async with database.session() as session, session.begin():
             await session.execute(delete(Meme).where(Meme.id == global_id))
+
+
+async def test_catalog_drafts_use_postgres_revision_guards(database: Database) -> None:
+    store = SqlAlchemyCatalogDraftStore(database)
+    template_id = f"integration-catalog-{uuid4()}"
+    asset_path = f"/memes/catalog/drafts/{template_id}/source.png"
+    annotation = {
+        "template_id": template_id,
+        "name": "Integration Catalog Draft",
+        "aliases": [],
+        "source_image": asset_path,
+        "supports_overlay": True,
+        "quality": "draft",
+        "regions": [],
+        "caption_guidance": {"pattern": "", "good_examples": [], "bad_examples": []},
+        "retrieval": {
+            "version": 1,
+            "joke_shapes": [],
+            "positive_hints": [],
+            "anti_hints": [],
+        },
+        "editorial": {"description": "", "use_cases": [], "anti_use_cases": []},
+    }
+    created = await store.create_draft(
+        template_id=template_id,
+        name="Integration Catalog Draft",
+        asset_path=asset_path,
+        thumbnail_path=None,
+        source_url="https://example.test/source.png",
+        annotation=annotation,
+    )
+    draft_id = UUID(created["id"])
+    try:
+        assert [
+            row["id"] for row in await store.list_drafts(status="draft", search=template_id)
+        ] == [created["id"]]
+        annotation["name"] = "Updated Integration Catalog Draft"
+        updated = await store.update_draft(
+            draft_id,
+            expected_revision=1,
+            status="needs_work",
+            annotation=annotation,
+        )
+        assert updated is not None
+        assert updated["revision"] == 2
+        assert updated["status"] == "needs_work"
+        with pytest.raises(CatalogDraftConflict, match="another tab"):
+            await store.update_draft(
+                draft_id,
+                expected_revision=1,
+                status="draft",
+                annotation=annotation,
+            )
+    finally:
+        async with database.session() as session, session.begin():
+            await session.execute(delete(CatalogDraft).where(CatalogDraft.id == draft_id))

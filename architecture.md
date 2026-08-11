@@ -23,6 +23,24 @@ apps/landing (static Next.js)        apps/extension (Chrome/React)
 | `packages/shared` | TypeScript contracts and source template manifests |
 | `tools/template-tools` | Offline dataset QA, review, benchmarks, and promotion |
 
+### Internal catalog workbench
+
+Development exposes `/internal/catalog`, a same-origin human annotation tool backed by the
+`catalog_drafts` PostgreSQL table. It ingests validated remote images into the active development
+storage backend under `catalog/drafts/`, creates thumbnails, and keeps the full annotation plus an
+optimistic revision counter. Draft workflow state is separate from the global `memes` table and the
+packaged verified catalog, so even a locally approved draft cannot enter suggestions.
+
+The workbench records visual description, use and anti-use cases, retrieval hints, caption grammar,
+examples, and normalized rendering regions. These labels remain human-owned. Future AI helpers may
+propose bounded field values, but they must not save, approve, or promote a template. Internal
+routes are not mounted when `MEMEDROP_ENV=production`.
+
+Production catalog transfer is intentionally a release operation: an approved local batch will be
+exported as a deterministic, checksummed bundle, verified against QA and suggestion benchmarks,
+then applied by a separately authorized script to `meme-drop-prod` and Supabase PostgreSQL. The
+runtime never copies development drafts or buckets during startup.
+
 `apps/api` is a standalone uv project so it can be deployed from that directory. The production
 backend is FastAPI only; no Fastify runtime remains.
 
