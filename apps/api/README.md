@@ -44,9 +44,9 @@ npm run db:seed-memes
 npm run quality:api-process
 ```
 
-For human catalog authoring, apply migrations, start the API, and visit
-`http://localhost:3001/internal/catalog`. Draft annotations live in local PostgreSQL; source images
-and thumbnails use the configured storage backend. Configure the Supabase S3 API with the
+For human catalog authoring, apply migrations, run `npm run dev:api` and `npm run dev:catalog` from
+the repository root, then visit `http://localhost:5174`. Draft annotations live in local PostgreSQL;
+source images and thumbnails use the configured storage backend. Configure the Supabase S3 API with the
 `meme-drop-dev` bucket for the normal shared development workflow. Workbench approval is not a
 runtime or production promotion.
 

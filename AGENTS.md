@@ -3,6 +3,7 @@
 MemeDrop is a Turborepo monorepo with these workspaces:
 
 - `apps/api`: self-contained FastAPI backend with its own Python metadata, migrations, runtime data, and tests.
+- `apps/catalog`: React/Vite local-only catalog annotation workbench; keep storage credentials and promotion actions server-side.
 - `apps/extension`: React/Vite/Tailwind Chrome extension.
 - `apps/landing`: statically exported Next.js site.
 - `packages/shared`: shared TypeScript contracts and meme-template manifests.
@@ -25,6 +26,7 @@ Essential commands:
 npm ci
 uv sync --project apps/api --frozen
 npm run dev:api
+npm run dev:catalog
 npm run dev:extension
 npm run dev:landing
 npm run typecheck

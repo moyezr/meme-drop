@@ -9,6 +9,7 @@ This is a Turborepo monorepo, but its applications deploy independently:
 | Path | Responsibility | Deployment |
 | --- | --- | --- |
 | `apps/api` | FastAPI, recommendation pipeline, PostgreSQL, object storage | Vercel project rooted at `apps/api` |
+| `apps/catalog` | React/Vite internal catalog annotation workbench | Local development only |
 | `apps/extension` | React/Vite Chrome extension for X | Chrome Web Store package |
 | `apps/landing` | Static Next.js marketing site | Vercel project rooted at `apps/landing` |
 | `packages/shared` | TypeScript API contracts and template manifests | workspace dependency |
@@ -55,11 +56,13 @@ Run the applications in separate terminals:
 
 ```sh
 npm run dev:api
+npm run dev:catalog
 npm run dev:extension
 npm run dev:landing
 ```
 
-FastAPI listens on `http://localhost:3001`. Load `apps/extension/dist` from
+FastAPI listens on `http://localhost:3001`; the catalog workbench opens at
+`http://localhost:5174`. Load `apps/extension/dist` from
 `chrome://extensions` after enabling Developer mode. Set `VITE_API_BASE_URL` in
 `apps/extension/.env.local` only when the API is not on the default origin.
 

@@ -2,8 +2,8 @@
 
 ## Boundaries
 
-MemeDrop is one source repository with three independent runtimes. Turborepo coordinates local and
-CI tasks; it does not couple their deployments.
+MemeDrop is one source repository with three deployable runtimes and one local-only internal app.
+Turborepo coordinates local and CI tasks; it does not couple their deployments.
 
 ```text
 apps/landing (static Next.js)        apps/extension (Chrome/React)
@@ -13,11 +13,14 @@ apps/landing (static Next.js)        apps/extension (Chrome/React)
                                    /        |       |        \
                            PostgreSQL    Redis  OpenRouter  Supabase S3
                             + pgvector
+
+apps/catalog (local React/Vite) -> development-only catalog API
 ```
 
 | Workspace | Owns |
 | --- | --- |
 | `apps/api` | HTTP contract, ranking/caption services, persistence, storage, Python tests |
+| `apps/catalog` | Local human annotation workflow, visual region editor, quality checklist |
 | `apps/extension` | X integration, service worker, suggestion UI, popup/library |
 | `apps/landing` | Public static marketing pages |
 | `packages/shared` | TypeScript contracts and source template manifests |
@@ -25,11 +28,13 @@ apps/landing (static Next.js)        apps/extension (Chrome/React)
 
 ### Internal catalog workbench
 
-Development exposes `/internal/catalog`, a same-origin human annotation tool backed by the
-`catalog_drafts` PostgreSQL table. It ingests validated remote images into the active development
-storage backend under `catalog/drafts/`, creates thumbnails, and keeps the full annotation plus an
-optimistic revision counter. Draft workflow state is separate from the global `memes` table and the
-packaged verified catalog, so even a locally approved draft cannot enter suggestions.
+`apps/catalog` is a dedicated React/Vite human annotation tool backed by the development-only API
+and the `catalog_drafts` PostgreSQL table. Its Vite server proxies API and media requests to FastAPI,
+so the browser never receives storage credentials. The API ingests validated remote images into the
+active development storage backend under `catalog/drafts/`, creates thumbnails, and keeps the full
+annotation plus an optimistic revision counter. Draft workflow state is separate from the global
+`memes` table and packaged verified catalog, so even a locally approved draft cannot enter
+suggestions.
 
 The workbench records visual description, use and anti-use cases, retrieval hints, caption grammar,
 examples, and normalized rendering regions. These labels remain human-owned. Future AI helpers may

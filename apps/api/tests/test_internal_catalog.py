@@ -110,17 +110,14 @@ async def ready() -> bool:
     return True
 
 
-async def test_workbench_assets_are_available_only_in_development(
+async def test_workbench_api_is_available_only_in_development(
     settings: Settings, tmp_path: Path
 ) -> None:
     client, _, _ = await make_harness(settings, tmp_path)
     async with client:
-        page = await client.get("/internal/catalog")
-        script = await client.get("/internal/catalog/catalog.js")
-    assert page.status_code == 200
-    assert "Catalog workbench" in page.text
-    assert script.status_code == 200
-    assert "Runtime catalog unchanged" in script.text
+        response = await client.get("/internal/api/catalog/templates")
+    assert response.status_code == 200
+    assert response.json() == {"drafts": [], "total": 0}
 
     production = settings.model_copy(
         update={
@@ -145,7 +142,7 @@ async def test_workbench_assets_are_available_only_in_development(
     )
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as prod_client:
-        response = await prod_client.get("/internal/catalog")
+        response = await prod_client.get("/internal/api/catalog/templates")
     assert response.status_code == 404
 
 
@@ -159,6 +156,17 @@ async def test_workbench_rejects_non_local_browser_origins(
         )
     assert response.status_code == 403
     assert response.json()["error"] == "Catalog workbench is local-only"
+
+
+async def test_workbench_accepts_the_local_react_development_origin(
+    settings: Settings, tmp_path: Path
+) -> None:
+    client, _, _ = await make_harness(settings, tmp_path)
+    async with client:
+        response = await client.get(
+            "/internal/api/catalog/templates", headers={"origin": "http://localhost:5174"}
+        )
+    assert response.status_code == 200
 
 
 async def test_create_draft_copies_media_and_can_clone_existing_annotations(

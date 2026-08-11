@@ -7,7 +7,6 @@ from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse
 
 from memedrop_api.catalog_schemas import (
     CatalogDraftCreate,
@@ -22,8 +21,8 @@ from memedrop_api.services.storage import MemeStorage
 from memedrop_api.services.thumbnails import THUMBNAIL_CONTENT_TYPE, make_thumbnail
 
 LOGGER = logging.getLogger("memedrop.internal_catalog")
-ASSET_ROOT = Path(__file__).resolve().parents[1] / "internal_catalog"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "test"}
+CATALOG_DEV_PORT = 5174
 
 
 def require_local_catalog_request(request: Request) -> None:
@@ -40,27 +39,12 @@ def require_local_catalog_request(request: Request) -> None:
     if (
         parsed.scheme != "http"
         or parsed.hostname not in LOCAL_HOSTS
-        or (parsed.port or 80) != settings.port
+        or (parsed.port or 80) not in {settings.port, CATALOG_DEV_PORT}
     ):
         raise HTTPException(status_code=403, detail="Catalog workbench is local-only")
 
 
 router = APIRouter(tags=["internal-catalog"], dependencies=[Depends(require_local_catalog_request)])
-
-
-@router.get("/internal/catalog", include_in_schema=False)
-async def catalog_workbench() -> FileResponse:
-    return FileResponse(ASSET_ROOT / "index.html")
-
-
-@router.get("/internal/catalog/catalog.css", include_in_schema=False)
-async def catalog_workbench_css() -> FileResponse:
-    return FileResponse(ASSET_ROOT / "catalog.css", media_type="text/css")
-
-
-@router.get("/internal/catalog/catalog.js", include_in_schema=False)
-async def catalog_workbench_js() -> FileResponse:
-    return FileResponse(ASSET_ROOT / "catalog.js", media_type="text/javascript")
 
 
 @router.get("/internal/api/catalog/templates")

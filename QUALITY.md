@@ -95,9 +95,10 @@ development storage backend for media. Start it with:
 npm run db:up
 npm run db:migrate
 npm run dev:api
+npm run dev:catalog
 ```
 
-Open `http://localhost:3001/internal/catalog`. The internal routes are not mounted in production.
+Open `http://localhost:5174`. The internal API routes are not mounted in production.
 Set `MEMEDROP_STORAGE_BACKEND=s3` and `S3_BUCKET_NAME=meme-drop-dev` in the ignored development
 environment when source media should live in Supabase Storage. A draft may copy an existing
 template's annotations, but local `approved` state still does not alter the runtime catalog.

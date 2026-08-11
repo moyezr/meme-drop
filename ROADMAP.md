@@ -13,7 +13,7 @@ surfaces.
   systems.
 - Retrieval changes follow measured benchmark or latency regressions, not anticipated scale.
 
-## 1. Catalog annotation workbench — in progress
+## 1. Catalog annotation workbench — usable foundation complete
 
 Build the smallest internal tool that removes repeated manual work when reviewing a template.
 
@@ -24,8 +24,11 @@ Build the smallest internal tool that removes repeated manual work when reviewin
 - Draw, move, resize, and inspect normalized caption regions.
 - Edit visual description, use cases, anti-use cases, retrieval hints, caption grammar, examples,
   region roles, alignment, limits, and font treatment with a live preview.
+- Use a dedicated React workspace with a searchable queue, tabbed inspector, quality score, dirty
+  state, keyboard save, and responsive layout rather than an API-served document editor.
 - Keep the workbench development-only. A local approval never changes runtime suggestion data.
-- Next: export a deterministic, checksummed release bundle from approved local drafts, then apply
+- Next: add rendered caption previews and draft validation that uses the same renderer constraints as
+  suggestions, then export a deterministic, checksummed release bundle and apply
   that bundle to production storage and PostgreSQL through a separately authorized script.
 - After the manual workflow is stable, add bounded AI assists for descriptions and retrieval-label
   proposals. AI output always lands as an editable suggestion and never changes review state.

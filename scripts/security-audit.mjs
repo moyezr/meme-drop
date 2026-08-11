@@ -18,22 +18,7 @@ const STATIC_LANDING_EXCEPTION = {
     "https://github.com/advisories/GHSA-f88m-g3jw-g9cj",
   ]),
 };
-const CRX_BUILD_TOOL_EXCEPTION = {
-  reviewBy: "2026-09-01",
-  packageVersions: {
-    "@crxjs/vite-plugin": "2.7.1",
-    esbuild: "0.21.5",
-    vite: "5.4.21",
-  },
-  vulnerabilityNames: new Set(["esbuild", "vite"]),
-  advisoryUrls: new Set([
-    "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
-    "https://github.com/advisories/GHSA-4w7w-66w2-5vf9",
-    "https://github.com/advisories/GHSA-v6wh-96g9-6wx3",
-    "https://github.com/advisories/GHSA-fx2h-pf6j-xcff",
-  ]),
-};
-const REVIEWED_EXCEPTIONS = [STATIC_LANDING_EXCEPTION, CRX_BUILD_TOOL_EXCEPTION];
+const REVIEWED_EXCEPTIONS = [STATIC_LANDING_EXCEPTION];
 
 auditNpmDependencies();
 auditPythonDependencies();
@@ -70,7 +55,7 @@ function auditNpmDependencies() {
 
   verifyReviewedExceptions();
   console.log(
-    "[MemeDrop] npm audit passed with reviewed static-landing and CRX build-tool exceptions"
+    "[MemeDrop] npm audit passed with the reviewed static-landing exception"
   );
 }
 
@@ -79,10 +64,7 @@ function verifyReviewedExceptions() {
   const installed = {
     "@vercel/analytics":
       lock.packages?.["apps/landing/node_modules/@vercel/analytics"]?.version,
-    "@crxjs/vite-plugin": lock.packages?.["node_modules/@crxjs/vite-plugin"]?.version,
-    esbuild: lock.packages?.["node_modules/vite/node_modules/esbuild"]?.version,
     next: lock.packages?.["node_modules/next"]?.version,
-    vite: lock.packages?.["node_modules/vite"]?.version,
   };
   for (const exception of REVIEWED_EXCEPTIONS) {
     if (new Date() > new Date(`${exception.reviewBy}T23:59:59Z`)) {

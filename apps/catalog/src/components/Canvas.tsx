@@ -1,0 +1,195 @@
+import { useRef, useState } from "react";
+
+import type { RegionAnnotation } from "../types";
+
+interface CanvasProps {
+  imageUrl: string;
+  name: string;
+  regions: RegionAnnotation[];
+  selectedRegionId: string | null;
+  onSelectRegion: (id: string) => void;
+  onChangeRegion: (region: RegionAnnotation) => void;
+  onAddRegion: () => void;
+}
+
+interface PointerInteraction {
+  pointerId: number;
+  mode: "move" | "resize";
+  startX: number;
+  startY: number;
+  region: RegionAnnotation;
+}
+
+export function Canvas({
+  imageUrl,
+  name,
+  regions,
+  selectedRegionId,
+  onSelectRegion,
+  onChangeRegion,
+  onAddRegion,
+}: CanvasProps) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const interactionRef = useRef<PointerInteraction | null>(null);
+  const [zoom, setZoom] = useState(100);
+  const [showBoxes, setShowBoxes] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+
+  function beginInteraction(
+    event: React.PointerEvent,
+    region: RegionAnnotation,
+    mode: "move" | "resize",
+  ) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelectRegion(region.id);
+    interactionRef.current = {
+      pointerId: event.pointerId,
+      mode,
+      startX: event.clientX,
+      startY: event.clientY,
+      region: structuredClone(region),
+    };
+    stageRef.current?.setPointerCapture(event.pointerId);
+  }
+
+  function moveInteraction(event: React.PointerEvent) {
+    const interaction = interactionRef.current;
+    const image = imageRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId || !image) return;
+    const dx = (event.clientX - interaction.startX) / image.clientWidth;
+    const dy = (event.clientY - interaction.startY) / image.clientHeight;
+    const next = structuredClone(interaction.region);
+    if (interaction.mode === "move") {
+      next.x = clamp(interaction.region.x + dx, 0, 1 - next.width);
+      next.y = clamp(interaction.region.y + dy, 0, 1 - next.height);
+    } else {
+      next.width = clamp(interaction.region.width + dx, 0.04, 1 - next.x);
+      next.height = clamp(interaction.region.height + dy, 0.04, 1 - next.y);
+    }
+    for (const key of ["x", "y", "width", "height"] as const) {
+      next[key] = Math.round(next[key] * 1000) / 1000;
+    }
+    onChangeRegion(next);
+  }
+
+  return (
+    <section className="canvas-shell">
+      <div className="canvas-toolbar">
+        <div className="canvas-toolbar-group">
+          <button
+            className={showBoxes ? "tool-toggle active" : "tool-toggle"}
+            onClick={() => setShowBoxes((value) => !value)}
+            type="button"
+          >
+            <span className="tool-icon">▣</span> Regions
+          </button>
+          <button
+            className={showGrid ? "tool-toggle active" : "tool-toggle"}
+            onClick={() => setShowGrid((value) => !value)}
+            type="button"
+          >
+            <span className="tool-icon">⌗</span> Grid
+          </button>
+        </div>
+        <div className="zoom-control">
+          <button aria-label="Zoom out" onClick={() => setZoom((value) => Math.max(60, value - 10))} type="button">−</button>
+          <input
+            aria-label="Canvas zoom"
+            max="140"
+            min="60"
+            onChange={(event) => setZoom(Number(event.target.value))}
+            type="range"
+            value={zoom}
+          />
+          <span>{zoom}%</span>
+          <button aria-label="Zoom in" onClick={() => setZoom((value) => Math.min(140, value + 10))} type="button">+</button>
+        </div>
+      </div>
+
+      <div className={`canvas-viewport ${showGrid ? "show-grid" : ""}`}>
+        <div
+          className="meme-stage"
+          onPointerCancel={() => (interactionRef.current = null)}
+          onPointerMove={moveInteraction}
+          onPointerUp={() => (interactionRef.current = null)}
+          ref={stageRef}
+          style={{ width: `${zoom}%` }}
+        >
+          <img alt={name} draggable={false} ref={imageRef} src={imageUrl} />
+          {showBoxes
+            ? regions.map((region, index) => (
+                <button
+                  className={`caption-region ${selectedRegionId === region.id ? "selected" : ""}`}
+                  key={region.id}
+                  onPointerDown={(event) => beginInteraction(event, region, "move")}
+                  onClick={() => onSelectRegion(region.id)}
+                  style={{
+                    left: `${region.x * 100}%`,
+                    top: `${region.y * 100}%`,
+                    width: `${region.width * 100}%`,
+                    height: `${region.height * 100}%`,
+                    alignItems: { top: "flex-start", middle: "center", bottom: "flex-end" }[
+                      region.valign
+                    ],
+                    justifyContent: { left: "flex-start", center: "center", right: "flex-end" }[
+                      region.align
+                    ],
+                    textAlign: region.align,
+                    fontSize: `${Math.max(12, Math.min(34, region.font.max_size * 0.48))}px`,
+                  }}
+                  type="button"
+                >
+                  <span className="region-number">{index + 1}</span>
+                  <span className="region-copy">{previews[region.id] || region.role}</span>
+                  <span
+                    aria-hidden="true"
+                    className="resize-handle"
+                    onPointerDown={(event) => beginInteraction(event, region, "resize")}
+                  />
+                </button>
+              ))
+            : null}
+        </div>
+      </div>
+
+      <div className="canvas-footer">
+        <div className="region-legend">
+          {regions.map((region, index) => (
+            <button
+              className={selectedRegionId === region.id ? "active" : ""}
+              key={region.id}
+              onClick={() => onSelectRegion(region.id)}
+              type="button"
+            >
+              <span>{index + 1}</span>
+              {region.id.replaceAll("_", " ")}
+            </button>
+          ))}
+          <button className="add-region-inline" disabled={regions.length >= 8} onClick={onAddRegion} type="button">
+            + Add region
+          </button>
+        </div>
+        {selectedRegionId ? (
+          <label className="preview-field">
+            <span>Preview copy</span>
+            <input
+              onChange={(event) =>
+                setPreviews((values) => ({ ...values, [selectedRegionId]: event.target.value }))
+              }
+              placeholder="Type sample caption text…"
+              value={previews[selectedRegionId] || ""}
+            />
+          </label>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
