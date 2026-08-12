@@ -18,6 +18,16 @@ export type {
   MemeTextRegion,
 } from "./types/suggestion.js";
 
+export {
+  drawMemeTextOverlay,
+  drawMemeTextRegion,
+  measureMemeTextRegion,
+} from "./overlay-renderer.js";
+export type {
+  MemeTextOverlayRenderDiagnostics,
+  MemeTextRegionRenderDiagnostics,
+} from "./overlay-renderer.js";
+
 export type {
   ManifestQuality,
   MemeTemplateManifest,

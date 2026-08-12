@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from memedrop_api.catalog_schemas import CatalogDraftUpdate, slugify_template_id
+from memedrop_api.catalog_schemas import (
+    CatalogDraftUpdate,
+    CatalogTemplateAnnotation,
+    slugify_template_id,
+)
+from memedrop_api.catalog_visual_qa import render_fingerprint
 
 
 def annotation(**overrides: object) -> dict[str, object]:
@@ -67,4 +72,121 @@ def test_regions_must_stay_inside_image_and_use_unique_ids() -> None:
                 "status": "draft",
                 "annotation": annotation(regions=[region]),
             }
+        )
+
+
+def complete_annotation(**overrides: object) -> dict[str, object]:
+    region = {
+        "id": "top_caption",
+        "role": "Setup",
+        "x": 0.05,
+        "y": 0.05,
+        "width": 0.9,
+        "height": 0.22,
+        "align": "center",
+        "valign": "middle",
+        "max_lines": 2,
+        "max_chars": 24,
+        "font": {"family": "Impact", "min_size": 18, "max_size": 48, "stroke_ratio": 0.1},
+    }
+    value = annotation(
+        regions=[region],
+        caption_guidance={
+            "pattern": "Setup then reaction",
+            "good_examples": [{"top_caption": "Me shipping on Friday"}],
+            "bad_examples": [{"top_caption": "An unfunny explanation"}],
+        },
+        retrieval={
+            "version": 1,
+            "joke_shapes": ["reaction"],
+            "positive_hints": ["deadline"],
+            "anti_hints": ["formal"],
+        },
+        editorial={
+            "description": "A person reacting to a deadline.",
+            "use_cases": ["deadline reaction"],
+            "anti_use_cases": ["formal announcement"],
+        },
+    )
+    value.update(overrides)
+    return value
+
+
+def visual_qa(value: dict[str, object]) -> dict[str, object]:
+    parsed = CatalogTemplateAnnotation.model_validate(value)
+    fingerprint = render_fingerprint(parsed.model_dump(mode="json"))
+    return {
+        "status": "passed",
+        "render_fingerprint": fingerprint,
+        "reviewed_region_ids": ["top_caption"],
+        "reviewed_example_indexes": [0],
+        "reviewed_at": "2026-08-12T12:00:00Z",
+    }
+
+
+def test_examples_reject_unknown_region_keys_even_for_drafts() -> None:
+    with pytest.raises(ValidationError, match="unknown regions"):
+        CatalogDraftUpdate.model_validate(
+            {
+                "revision": 1,
+                "status": "draft",
+                "annotation": complete_annotation(
+                    caption_guidance={
+                        "pattern": "Setup",
+                        "good_examples": [{"not_a_region": "Nope"}],
+                        "bad_examples": [],
+                    }
+                ),
+            }
+        )
+
+
+def test_approval_requires_current_visual_qa() -> None:
+    value = complete_annotation()
+    value["visual_qa"] = visual_qa(value)
+    approved = CatalogDraftUpdate.model_validate(
+        {"revision": 1, "status": "approved", "annotation": value}
+    )
+    assert approved.annotation.visual_qa is not None
+
+    changed = complete_annotation()
+    changed["visual_qa"] = visual_qa(value)
+    changed["caption_guidance"] = {
+        "pattern": "Setup then reaction",
+        "good_examples": [{"top_caption": "Me shipping on a Monday"}],
+        "bad_examples": [{"top_caption": "An unfunny explanation"}],
+    }
+    with pytest.raises(ValidationError, match="current visual QA"):
+        CatalogDraftUpdate.model_validate(
+            {"revision": 1, "status": "approved", "annotation": changed}
+        )
+
+
+def test_approval_rejects_overlong_good_example_captions() -> None:
+    value = complete_annotation()
+    value["caption_guidance"] = {
+        "pattern": "Setup then reaction",
+        "good_examples": [
+            {"top_caption": "This caption is substantially longer than twenty four characters"}
+        ],
+        "bad_examples": [{"top_caption": "An unfunny explanation"}],
+    }
+    value["visual_qa"] = visual_qa(value)
+    with pytest.raises(ValidationError, match="renderable good examples"):
+        CatalogDraftUpdate.model_validate(
+            {"revision": 1, "status": "approved", "annotation": value}
+        )
+
+
+def test_approval_rejects_incomplete_good_example_even_with_current_review() -> None:
+    value = complete_annotation()
+    value["caption_guidance"] = {
+        "pattern": "Setup then reaction",
+        "good_examples": [{}],
+        "bad_examples": [{"top_caption": "An unfunny explanation"}],
+    }
+    value["visual_qa"] = visual_qa(value)
+    with pytest.raises(ValidationError, match="renderable good examples"):
+        CatalogDraftUpdate.model_validate(
+            {"revision": 1, "status": "approved", "annotation": value}
         )

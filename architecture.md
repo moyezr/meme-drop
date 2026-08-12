@@ -37,9 +37,13 @@ annotation plus an optimistic revision counter. Draft workflow state is separate
 suggestions.
 
 The workbench records visual description, use and anti-use cases, retrieval hints, caption grammar,
-examples, and normalized rendering regions. These labels remain human-owned. Future AI helpers may
-propose bounded field values, but they must not save, approve, or promote a template. Internal
-routes are not mounted when `MEMEDROP_ENV=production`.
+examples, and normalized rendering regions. Its Render QA mode uses the same shared canvas renderer
+as the extension and reports the actual wrapping, font size, truncation, and overflow for every good
+example. Human sign-off stores a server-generated fingerprint of the image, regions, fonts, and
+examples; changing any render input makes that evidence stale, and the API rejects local approval
+until every region and good example has current visual QA. These labels remain human-owned. Future
+AI helpers may propose bounded field values, but they must not save, approve, or promote a template.
+Internal routes are not mounted when `MEMEDROP_ENV=production`.
 
 Production catalog transfer is intentionally a release operation: an approved local batch will be
 exported as a deterministic, checksummed bundle, verified against QA and suggestion benchmarks,

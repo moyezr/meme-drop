@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./overlay-renderer": {
+      "types": "./dist/overlay-renderer.d.ts",
+      "default": "./dist/overlay-renderer.js"
     }
   },
   "scripts": {

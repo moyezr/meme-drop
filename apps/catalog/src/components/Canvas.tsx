@@ -1,15 +1,18 @@
 import { useRef, useState } from "react";
 
-import type { RegionAnnotation } from "../types";
+import type { RegionAnnotation, TemplateAnnotation, VisualQaAnnotation } from "../types";
+import { CaptionPreview } from "./CaptionPreview";
 
 interface CanvasProps {
   imageUrl: string;
   name: string;
+  annotation: TemplateAnnotation;
   regions: RegionAnnotation[];
   selectedRegionId: string | null;
   onSelectRegion: (id: string) => void;
   onChangeRegion: (region: RegionAnnotation) => void;
   onAddRegion: () => void;
+  onVisualQaChange: (value: VisualQaAnnotation | null) => void;
 }
 
 interface PointerInteraction {
@@ -23,11 +26,13 @@ interface PointerInteraction {
 export function Canvas({
   imageUrl,
   name,
+  annotation,
   regions,
   selectedRegionId,
   onSelectRegion,
   onChangeRegion,
   onAddRegion,
+  onVisualQaChange,
 }: CanvasProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -36,6 +41,7 @@ export function Canvas({
   const [showBoxes, setShowBoxes] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [previews, setPreviews] = useState<Record<string, string>>({});
+  const [mode, setMode] = useState<"layout" | "render">("layout");
 
   function beginInteraction(
     event: React.PointerEvent,
@@ -81,6 +87,20 @@ export function Canvas({
       <div className="canvas-toolbar">
         <div className="canvas-toolbar-group">
           <button
+            className={mode === "layout" ? "tool-toggle active" : "tool-toggle"}
+            onClick={() => setMode("layout")}
+            type="button"
+          >
+            <span className="tool-icon">▣</span> Layout
+          </button>
+          <button
+            className={mode === "render" ? "tool-toggle active" : "tool-toggle"}
+            onClick={() => setMode("render")}
+            type="button"
+          >
+            <span className="tool-icon">◉</span> Render QA
+          </button>
+          <button
             className={showBoxes ? "tool-toggle active" : "tool-toggle"}
             onClick={() => setShowBoxes((value) => !value)}
             type="button"
@@ -110,7 +130,14 @@ export function Canvas({
         </div>
       </div>
 
-      <div className={`canvas-viewport ${showGrid ? "show-grid" : ""}`}>
+      <div className={`canvas-viewport ${showGrid ? "show-grid" : ""} ${mode === "render" ? "render-mode" : ""}`}>
+        {mode === "render" ? (
+          <CaptionPreview
+            annotation={annotation}
+            imageUrl={imageUrl}
+            onVisualQaChange={onVisualQaChange}
+          />
+        ) : (
         <div
           className="meme-stage"
           onPointerCancel={() => (interactionRef.current = null)}
@@ -154,10 +181,11 @@ export function Canvas({
               ))
             : null}
         </div>
+        )}
       </div>
 
       <div className="canvas-footer">
-        <div className="region-legend">
+        {mode === "layout" ? <><div className="region-legend">
           {regions.map((region, index) => (
             <button
               className={selectedRegionId === region.id ? "active" : ""}
@@ -185,6 +213,7 @@ export function Canvas({
             />
           </label>
         ) : null}
+        </> : <div className="render-footer-note"><span>◉</span> Render QA uses the production canvas renderer. A clean check is required before local approval.</div>}
       </div>
     </section>
   );

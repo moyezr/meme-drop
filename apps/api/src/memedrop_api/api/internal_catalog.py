@@ -12,8 +12,10 @@ from memedrop_api.catalog_schemas import (
     CatalogDraftCreate,
     CatalogDraftUpdate,
     CatalogStatus,
+    CatalogVisualQACheck,
     slugify_template_id,
 )
+from memedrop_api.catalog_visual_qa import render_fingerprint, render_validation_issues
 from memedrop_api.catalog_workbench import CatalogDraftConflict, CatalogDraftStore
 from memedrop_api.config import Settings
 from memedrop_api.services.catalog import MemeCatalog
@@ -45,6 +47,19 @@ def require_local_catalog_request(request: Request) -> None:
 
 
 router = APIRouter(tags=["internal-catalog"], dependencies=[Depends(require_local_catalog_request)])
+
+
+@router.post("/internal/api/catalog/visual-qa/check")
+async def check_catalog_visual_qa(
+    body: CatalogVisualQACheck,
+) -> dict[str, object]:
+    """Return the server-owned review fingerprint and deterministic render checks."""
+
+    render_inputs = body.annotation.model_dump(mode="json")
+    return {
+        "fingerprint": render_fingerprint(render_inputs),
+        "issues": render_validation_issues(render_inputs),
+    }
 
 
 @router.get("/internal/api/catalog/templates")
@@ -202,6 +217,7 @@ def initial_annotation(
                 "use_cases": [],
                 "anti_use_cases": [],
             },
+            "visual_qa": None,
         }
     )
     return annotation

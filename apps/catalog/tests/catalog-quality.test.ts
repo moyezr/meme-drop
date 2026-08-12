@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { qualityChecks, qualityScore, relativeUpdatedAt, statusLabel } from "../src/catalog-quality";
+import { qualityChecks, qualityScore, relativeUpdatedAt, renderInputsChanged, statusLabel } from "../src/catalog-quality";
 import type { TemplateAnnotation } from "../src/types";
 
 function annotation(): TemplateAnnotation {
@@ -49,8 +49,70 @@ test("quality score reflects human annotation completeness", () => {
       font: { family: "Impact", min_size: 18, max_size: 48, stroke_ratio: 0.1 },
     },
   ];
+  value.visual_qa = {
+    status: "passed",
+    render_fingerprint: "f".repeat(64),
+    reviewed_region_ids: ["top"],
+    reviewed_example_indexes: [0],
+    reviewed_at: "2026-08-12T12:00:00Z",
+  };
   assert.equal(qualityScore(value), 100);
   assert.ok(qualityChecks(value).every((check) => check.complete));
+});
+
+test("rendered QA becomes incomplete when a region or a good example has not been reviewed", () => {
+  const value = annotation();
+  value.regions = [
+    {
+      id: "top",
+      role: "Short setup caption",
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 0.2,
+      align: "center",
+      valign: "top",
+      max_lines: 2,
+      max_chars: 30,
+      font: { family: "Impact", min_size: 18, max_size: 42, stroke_ratio: 0.1 },
+    },
+  ];
+  value.caption_guidance.good_examples = [{ top: "A short caption" }, { top: "A second caption" }];
+  value.visual_qa = {
+    status: "passed",
+    render_fingerprint: "f".repeat(64),
+    reviewed_region_ids: ["top"],
+    reviewed_example_indexes: [0],
+    reviewed_at: "2026-08-12T12:00:00Z",
+  };
+  assert.equal(qualityChecks(value).find((check) => check.id === "rendered-qa")?.complete, false);
+});
+
+test("only rendering inputs invalidate a visual QA record", () => {
+  const previous = annotation();
+  previous.regions = [
+    {
+      id: "top",
+      role: "Setup copy",
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 0.2,
+      align: "center",
+      valign: "top",
+      max_lines: 2,
+      max_chars: 30,
+      font: { family: "Impact", min_size: 18, max_size: 42, stroke_ratio: 0.1 },
+    },
+  ];
+  previous.caption_guidance.good_examples = [{ top: "Short setup" }];
+  const retrievalEdit = structuredClone(previous);
+  retrievalEdit.editorial.description = "An unrelated retrieval description is not a render input.";
+  assert.equal(renderInputsChanged(previous, retrievalEdit), false);
+
+  const captionEdit = structuredClone(previous);
+  captionEdit.caption_guidance.good_examples[0].top = "A changed caption";
+  assert.equal(renderInputsChanged(previous, captionEdit), true);
 });
 
 test("workflow labels and relative dates are concise", () => {

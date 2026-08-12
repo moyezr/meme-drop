@@ -235,6 +235,94 @@ async def test_update_uses_revision_guard_and_keeps_asset_identity(
     assert replaced.json()["error"] == "source_image cannot be changed"
 
 
+async def test_visual_qa_check_returns_a_server_owned_fingerprint_and_issues(
+    settings: Settings, tmp_path: Path
+) -> None:
+    client, _, _ = await make_harness(settings, tmp_path)
+    async with client:
+        created = (
+            await client.post(
+                "/internal/api/catalog/templates",
+                json={
+                    "name": "Visual QA Draft",
+                    "source_image_url": "https://images.example.test/visual-qa.png",
+                },
+            )
+        ).json()["draft"]
+        annotation = created["annotation"]
+        response = await client.post(
+            "/internal/api/catalog/visual-qa/check", json={"annotation": annotation}
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["fingerprint"]) == 64
+    assert payload["issues"]
+    assert payload["issues"][0]["code"] == "missing_regions"
+
+
+async def test_api_rejects_approval_without_current_visual_qa(
+    settings: Settings, tmp_path: Path
+) -> None:
+    client, _, _ = await make_harness(settings, tmp_path)
+    async with client:
+        created = (
+            await client.post(
+                "/internal/api/catalog/templates",
+                json={
+                    "name": "Approval Gate Draft",
+                    "source_image_url": "https://images.example.test/approval-gate.png",
+                },
+            )
+        ).json()["draft"]
+        annotation = created["annotation"]
+        annotation.update(
+            {
+                "regions": [
+                    {
+                        "id": "top_caption",
+                        "role": "Setup",
+                        "x": 0.05,
+                        "y": 0.05,
+                        "width": 0.9,
+                        "height": 0.2,
+                        "align": "center",
+                        "valign": "middle",
+                        "max_lines": 2,
+                        "max_chars": 24,
+                        "font": {
+                            "family": "Impact",
+                            "min_size": 18,
+                            "max_size": 48,
+                            "stroke_ratio": 0.1,
+                        },
+                    }
+                ],
+                "caption_guidance": {
+                    "pattern": "Setup then reaction",
+                    "good_examples": [{"top_caption": "Me shipping on Friday"}],
+                    "bad_examples": [{"top_caption": "An unfunny explanation"}],
+                },
+                "retrieval": {
+                    "version": 1,
+                    "joke_shapes": ["reaction"],
+                    "positive_hints": ["deadline"],
+                    "anti_hints": ["formal"],
+                },
+                "editorial": {
+                    "description": "A person reacts to a deadline.",
+                    "use_cases": ["deadline reaction"],
+                    "anti_use_cases": ["formal announcement"],
+                },
+            }
+        )
+        response = await client.put(
+            f"/internal/api/catalog/templates/{created['id']}",
+            json={"revision": 1, "status": "approved", "annotation": annotation},
+        )
+    assert response.status_code == 400
+    assert "current visual QA" in response.text
+
+
 async def test_failed_database_create_removes_uploaded_assets(
     settings: Settings, tmp_path: Path
 ) -> None:

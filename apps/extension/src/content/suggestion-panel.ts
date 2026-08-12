@@ -11,6 +11,8 @@ import {
   MAX_STEERING_INSTRUCTION_LENGTH,
   normalizeSteeringInstruction,
 } from "../shared/suggestion-request";
+import type { MemeTextOverlay } from "@memedrop/shared";
+import { drawMemeTextOverlay } from "@memedrop/shared/overlay-renderer";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const IMAGE_PLACEHOLDER =
@@ -46,35 +48,6 @@ interface Suggestion {
   source: "user" | "global";
   tweet_text?: string;
   feedback_context?: Record<string, unknown>;
-}
-
-interface MemeTextOverlay {
-  enabled: boolean;
-  style: "impact";
-  template_id?: string;
-  alt_text: string;
-  regions: MemeTextRegion[];
-}
-
-interface MemeTextRegion {
-  id: string;
-  text: string;
-  text_transform?: "uppercase" | "mocking" | "none";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  align?: "left" | "center" | "right";
-  valign?: "top" | "middle" | "bottom";
-  font_scale?: number;
-  max_lines?: number;
-  max_chars?: number;
-  font?: {
-    family: "Impact";
-    min_size: number;
-    max_size: number;
-    stroke_ratio: number;
-  };
 }
 
 let panelHost: HTMLDivElement | null = null;
@@ -989,209 +962,12 @@ async function renderMemeWithOverlay(
 
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
-    for (const region of overlay.regions) {
-      drawImpactText(ctx, canvas.width, canvas.height, region);
-    }
+    drawMemeTextOverlay(ctx, canvas.width, canvas.height, overlay);
 
     return canvas.toDataURL("image/png");
   } finally {
     bitmap.close();
   }
-}
-
-function drawImpactText(
-  ctx: CanvasRenderingContext2D,
-  canvasWidth: number,
-  canvasHeight: number,
-  region: MemeTextRegion
-) {
-  const x = region.x * canvasWidth;
-  const y = region.y * canvasHeight;
-  const width = region.width * canvasWidth;
-  const height = region.height * canvasHeight;
-  const text = transformOverlayText(
-    region.text.trim().slice(0, region.max_chars || 120),
-    region.text_transform
-  );
-  if (!text) return;
-
-  const fontScale = region.font_scale ?? 1;
-  const manifestMax = region.font?.max_size || 52;
-  const manifestMin = region.font?.min_size || 12;
-  const padding = Math.max(4, Math.min(width, height) * 0.055);
-  const safeX = x + padding;
-  const safeY = y + padding;
-  const safeWidth = Math.max(8, width - padding * 2);
-  const safeHeight = Math.max(8, height - padding * 2);
-  const minFont = Math.max(10, manifestMin);
-  const maxFont = estimateImpactFontSize(ctx, text, safeWidth, safeHeight, {
-    minFont,
-    maxFont: manifestMax,
-    fontScale,
-  });
-  const maxLines = region.max_lines || 4;
-  let fontSize = maxFont;
-  let lines = wrapImpactLines(ctx, text, safeWidth, fontSize, maxLines);
-
-  while (
-    fontSize - 0.5 >= minFont &&
-    (lines.length * fontSize * 1.08 > safeHeight ||
-      lines.some((line) => measureImpactText(ctx, line, fontSize) > safeWidth))
-  ) {
-    fontSize -= 0.5;
-    lines = wrapImpactLines(ctx, text, safeWidth, fontSize, maxLines);
-  }
-
-  fontSize = Math.max(minFont, fontSize);
-  lines = wrapImpactLines(ctx, text, safeWidth, fontSize, maxLines);
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(safeX, safeY, safeWidth, safeHeight);
-  ctx.clip();
-  ctx.textAlign = region.align || "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.miterLimit = 2;
-
-  const lineHeight = fontSize * 1.08;
-  const totalHeight = Math.min(lineHeight * lines.length, safeHeight);
-  const startY =
-    region.valign === "top"
-      ? safeY + lineHeight / 2
-      : region.valign === "bottom"
-        ? safeY + safeHeight - totalHeight + lineHeight / 2
-        : safeY + safeHeight / 2 - totalHeight / 2 + lineHeight / 2;
-  const textX =
-    region.align === "left"
-      ? safeX
-      : region.align === "right"
-        ? safeX + safeWidth
-        : safeX + safeWidth / 2;
-
-  ctx.font = impactFont(fontSize);
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = Math.max(2, fontSize * (region.font?.stroke_ratio || 0.12));
-
-  for (let i = 0; i < lines.length; i++) {
-    const lineY = startY + i * lineHeight;
-    ctx.strokeText(lines[i], textX, lineY);
-    ctx.fillText(lines[i], textX, lineY);
-  }
-  ctx.restore();
-}
-
-function wrapImpactLines(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-  fontSize: number,
-  maxLines: number
-): string[] {
-  ctx.font = impactFont(fontSize);
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let current = "";
-
-  for (const word of words) {
-    const pieces = breakLongWord(ctx, word, maxWidth);
-    for (const piece of pieces) {
-      const test = current ? `${current} ${piece}` : piece;
-      if (ctx.measureText(test).width <= maxWidth) {
-        current = test;
-      } else {
-        if (current) lines.push(current);
-        current = piece;
-      }
-    }
-  }
-
-  if (current) lines.push(current);
-  if (lines.length <= maxLines) return lines;
-
-  const visible = lines.slice(0, Math.max(1, maxLines));
-  let last = visible[visible.length - 1];
-  while (last.length > 1 && ctx.measureText(`${last}...`).width > maxWidth) {
-    last = last.slice(0, -1).trim();
-  }
-  visible[visible.length - 1] = last ? `${last}...` : "...";
-  return visible;
-}
-
-function breakLongWord(ctx: CanvasRenderingContext2D, word: string, maxWidth: number): string[] {
-  if (ctx.measureText(word).width <= maxWidth) return [word];
-
-  const pieces: string[] = [];
-  let current = "";
-  for (const char of word) {
-    const test = `${current}${char}`;
-    if (!current || ctx.measureText(test).width <= maxWidth) {
-      current = test;
-    } else {
-      pieces.push(current);
-      current = char;
-    }
-  }
-  if (current) pieces.push(current);
-  return pieces;
-}
-
-function estimateImpactFontSize(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  width: number,
-  height: number,
-  options: { minFont: number; maxFont: number; fontScale: number }
-): number {
-  const words = text.split(/\s+/).filter(Boolean);
-  const longestWordLength = words.reduce((max, word) => Math.max(max, word.length), 1);
-  const targetLineCount = Math.max(1, Math.min(4, Math.ceil(text.length / 18)));
-  const roughByLength = width / Math.max(longestWordLength * 0.72, text.length * 0.24);
-  const roughByHeight = height / (targetLineCount * 1.08);
-  let size = Math.min(options.maxFont, Math.max(options.minFont, roughByLength, roughByHeight));
-  size *= options.fontScale;
-  size = Math.min(options.maxFont, Math.max(options.minFont, size));
-
-  ctx.font = impactFont(size);
-  if (ctx.measureText(text).width <= width) return size;
-
-  return Math.max(options.minFont, Math.min(size, width / Math.max(1, text.length * 0.54)));
-}
-
-function transformOverlayText(
-  text: string,
-  transform: MemeTextRegion["text_transform"] = "uppercase"
-): string {
-  if (transform === "none") return text;
-  if (transform === "mocking") return toMockingCase(text);
-  return text.toUpperCase();
-}
-
-function toMockingCase(text: string): string {
-  let upper = false;
-  return text
-    .toLowerCase()
-    .split("")
-    .map((char) => {
-      if (!/[a-z]/.test(char)) return char;
-      upper = !upper;
-      return upper ? char.toUpperCase() : char;
-    })
-    .join("");
-}
-
-function measureImpactText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  fontSize: number
-): number {
-  ctx.font = impactFont(fontSize);
-  return ctx.measureText(text).width;
-}
-
-function impactFont(fontSize: number): string {
-  return `${Math.floor(fontSize)}px Impact, Haettenschweiler, 'Arial Black', sans-serif`;
 }
 
 /**

@@ -54,6 +54,18 @@ export async function updateDraft(input: {
   ).draft;
 }
 
+export interface VisualQaCheck {
+  fingerprint: string;
+  issues: Array<{ region_id?: string; code?: string; message: string }>;
+}
+
+export async function checkVisualQa(annotation: TemplateAnnotation): Promise<VisualQaCheck> {
+  return request<VisualQaCheck>(`${API_BASE}/internal/api/catalog/visual-qa/check`, {
+    method: "POST",
+    body: JSON.stringify({ annotation }),
+  });
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,

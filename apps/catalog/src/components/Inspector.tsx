@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { qualityChecks, qualityScore, statusLabel } from "../catalog-quality";
+import { formatVisualQaTimestamp, qualityChecks, qualityScore, statusLabel, visualQaComplete } from "../catalog-quality";
 import type {
   CatalogDraft,
   CatalogStatus,
@@ -306,6 +306,8 @@ function ReviewPanel({
 }) {
   const checks = qualityChecks(draft.annotation);
   const score = qualityScore(draft.annotation);
+  const qaComplete = visualQaComplete(draft.annotation);
+  const visualQa = draft.annotation.visual_qa;
   return (
     <div className="inspector-section review-section">
       <div className="review-score-card">
@@ -325,13 +327,24 @@ function ReviewPanel({
           </button>
         ))}
       </div>
+      <div className={qaComplete ? "visual-qa-state passed" : "visual-qa-state"}>
+        <span className="visual-qa-icon">{qaComplete ? "✓" : "!"}</span>
+        <div>
+          <strong>{qaComplete ? "Rendered QA is current" : "Rendered QA still needs sign-off"}</strong>
+          <p>
+            {qaComplete
+              ? `Reviewed ${visualQa?.reviewed_example_indexes.length ?? 0} good example${(visualQa?.reviewed_example_indexes.length ?? 0) === 1 ? "" : "s"} · ${formatVisualQaTimestamp(visualQa?.reviewed_at)}`
+              : "Open Render QA in the canvas, inspect every good example, then record a clean server-verified check."}
+          </p>
+        </div>
+      </div>
       <div className="section-divider" />
       <Field label="Workflow state" hint={`Currently ${statusLabel(draft.status).toLowerCase()}`}>
         <select onChange={(event) => onStatusChange(event.target.value as CatalogStatus)} value={draft.status}>
           <option value="draft">Draft</option>
           <option value="in_review">In review</option>
           <option value="needs_work">Needs work</option>
-          <option value="approved">Approved locally</option>
+          <option disabled={!qaComplete} value="approved">Approved locally{qaComplete ? "" : " (requires rendered QA)"}</option>
           <option value="rejected">Rejected</option>
         </select>
       </Field>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ApiError, createDraft, getDraft, listDrafts, updateDraft } from "./api";
-import { qualityScore, statusLabel } from "./catalog-quality";
+import { qualityScore, renderInputsChanged, statusLabel } from "./catalog-quality";
 import { Canvas } from "./components/Canvas";
 import { CatalogSidebar } from "./components/CatalogSidebar";
 import { CreateDialog } from "./components/CreateDialog";
@@ -12,6 +12,7 @@ import type {
   CreateDraftInput,
   RegionAnnotation,
   TemplateAnnotation,
+  VisualQaAnnotation,
 } from "./types";
 
 export function App() {
@@ -118,8 +119,16 @@ export function App() {
 
   function changeAnnotation(annotation: TemplateAnnotation) {
     if (!current) return;
-    setCurrent({ ...current, name: annotation.name, annotation });
+    const visual_qa = renderInputsChanged(current.annotation, annotation)
+      ? null
+      : annotation.visual_qa;
+    setCurrent({ ...current, name: annotation.name, annotation: { ...annotation, visual_qa } });
     setDirty(true);
+  }
+
+  function changeVisualQa(visual_qa: VisualQaAnnotation | null) {
+    if (!current) return;
+    changeAnnotation({ ...current.annotation, visual_qa });
   }
 
   function changeStatus(nextStatus: CatalogStatus) {
@@ -239,11 +248,13 @@ export function App() {
             <Canvas
               imageUrl={current.asset_path}
               name={current.annotation.name}
+              annotation={current.annotation}
               onAddRegion={addRegion}
               onChangeRegion={changeRegion}
               onSelectRegion={setSelectedRegionId}
               regions={current.annotation.regions}
               selectedRegionId={selectedRegionId}
+              onVisualQaChange={changeVisualQa}
             />
             <Inspector
               draft={current}

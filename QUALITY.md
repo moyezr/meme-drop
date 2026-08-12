@@ -103,6 +103,12 @@ Set `MEMEDROP_STORAGE_BACKEND=s3` and `S3_BUCKET_NAME=meme-drop-dev` in the igno
 environment when source media should live in Supabase Storage. A draft may copy an existing
 template's annotations, but local `approved` state still does not alter the runtime catalog.
 
+Before local approval, open **Render QA**, inspect every good example with the production renderer,
+and resolve missing copy, truncation, or overflow. Recording a clean review stores a server-owned
+fingerprint. Any later edit to caption regions, font treatment, or good examples clears that review
+and requires another visual pass. Custom preview copy is exploratory and does not count as review
+evidence.
+
 For a disposable, database-free annotation page, generate the older browser-local workbench:
 
 ```sh

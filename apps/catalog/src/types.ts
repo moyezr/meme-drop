@@ -46,6 +46,16 @@ export interface TemplateAnnotation {
     use_cases: string[];
     anti_use_cases: string[];
   };
+  /** Local rendered review evidence. The API verifies its fingerprint before approval. */
+  visual_qa?: VisualQaAnnotation | null;
+}
+
+export interface VisualQaAnnotation {
+  status: "passed";
+  render_fingerprint: string;
+  reviewed_region_ids: string[];
+  reviewed_example_indexes: number[];
+  reviewed_at: string;
 }
 
 export interface CatalogDraft {

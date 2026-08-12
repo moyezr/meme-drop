@@ -1,10 +1,10 @@
-import type { CatalogDraft, TemplateAnnotation } from "./types";
+import type { CatalogDraft, TemplateAnnotation, VisualQaAnnotation } from "./types";
 
 export interface QualityCheck {
   id: string;
   label: string;
   complete: boolean;
-  section: "content" | "retrieval" | "layout";
+  section: "content" | "retrieval" | "layout" | "review";
 }
 
 export function qualityChecks(annotation: TemplateAnnotation): QualityCheck[] {
@@ -61,7 +61,45 @@ export function qualityChecks(annotation: TemplateAnnotation): QualityCheck[] {
         ),
       section: "layout",
     },
+    {
+      id: "rendered-qa",
+      label: "Rendered visual QA",
+      complete: visualQaComplete(annotation),
+      section: "review",
+    },
   ];
+}
+
+/** QA is deliberately complete only when every current region and good example was reviewed. */
+export function visualQaComplete(annotation: TemplateAnnotation): boolean {
+  const qa = annotation.visual_qa;
+  if (!qa || !qa.render_fingerprint) return false;
+  return (
+    annotation.regions.every((region) => qa.reviewed_region_ids.includes(region.id)) &&
+    annotation.caption_guidance.good_examples.every((_, index) =>
+      qa.reviewed_example_indexes.includes(index),
+    )
+  );
+}
+
+/** Only the visual output inputs invalidate a previously reviewed render. */
+export function renderInputsChanged(
+  previous: TemplateAnnotation,
+  next: TemplateAnnotation,
+): boolean {
+  return JSON.stringify({
+    regions: previous.regions,
+    examples: previous.caption_guidance.good_examples,
+  }) !== JSON.stringify({
+    regions: next.regions,
+    examples: next.caption_guidance.good_examples,
+  });
+}
+
+export function formatVisualQaTimestamp(value: VisualQaAnnotation["reviewed_at"] | undefined): string {
+  if (!value) return "Not reviewed";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Not reviewed" : date.toLocaleString();
 }
 
 export function qualityScore(annotation: TemplateAnnotation): number {

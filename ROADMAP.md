@@ -13,7 +13,7 @@ surfaces.
   systems.
 - Retrieval changes follow measured benchmark or latency regressions, not anticipated scale.
 
-## 1. Catalog annotation workbench — usable foundation complete
+## 1. Catalog annotation workbench — authoring and visual QA complete
 
 Build the smallest internal tool that removes repeated manual work when reviewing a template.
 
@@ -26,10 +26,11 @@ Build the smallest internal tool that removes repeated manual work when reviewin
   region roles, alignment, limits, and font treatment with a live preview.
 - Use a dedicated React workspace with a searchable queue, tabbed inspector, quality score, dirty
   state, keyboard save, and responsive layout rather than an API-served document editor.
+- Render every good example through the extension's shared production renderer, surface font size,
+  line count, truncation, and overflow, and invalidate human QA whenever render inputs change.
 - Keep the workbench development-only. A local approval never changes runtime suggestion data.
-- Next: add rendered caption previews and draft validation that uses the same renderer constraints as
-  suggestions, then export a deterministic, checksummed release bundle and apply
-  that bundle to production storage and PostgreSQL through a separately authorized script.
+- Next: export a deterministic, checksummed release bundle and apply that bundle to production
+  storage and PostgreSQL through a separately authorized script.
 - After the manual workflow is stable, add bounded AI assists for descriptions and retrieval-label
   proposals. AI output always lands as an editable suggestion and never changes review state.
 
