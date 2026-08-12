@@ -63,10 +63,10 @@ npm run dev:landing
 
 FastAPI listens on `http://localhost:3001`; the catalog workbench opens at
 `http://localhost:5174`. Load `apps/extension/dist` from
-`chrome://extensions` after enabling Developer mode. Set `VITE_API_BASE_URL` in
-`apps/extension/.env.local` only when the API is not on the default origin. Development accepts
-valid unpacked Chrome extension origins automatically; production still requires the exact
-published extension origin in `MEMEDROP_CORS_ORIGINS`.
+`chrome://extensions` after enabling Developer mode. Normal extension builds always target the
+local API, even if a shell has a production `VITE_API_BASE_URL`; only the explicit release build
+uses that variable. Development accepts valid unpacked Chrome extension origins automatically;
+production still requires the exact published extension origin in `MEMEDROP_CORS_ORIGINS`.
 
 ## Common commands
 

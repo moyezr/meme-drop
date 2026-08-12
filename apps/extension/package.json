@@ -10,7 +10,7 @@
     "validate:release-package": "node scripts/validate-release-package.mjs",
     "validate:store-readiness": "node scripts/validate-store-readiness.mjs --file apps/extension/store-listing.example.json",
     "init:store-listing": "node scripts/init-store-listing.mjs",
-    "build:release": "npm run validate:release-metadata && node scripts/validate-release-build.mjs --pre && tsc && vite build && node scripts/validate-release-build.mjs --post && npm run validate:release-metadata",
+    "build:release": "npm run validate:release-metadata && node scripts/validate-release-build.mjs --pre && tsc && vite build --mode release && node scripts/validate-release-build.mjs --post && npm run validate:release-metadata",
     "package:release": "node scripts/package-release.mjs",
     "test": "node --import tsx --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit"
