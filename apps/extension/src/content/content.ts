@@ -117,6 +117,12 @@ chrome.runtime.onMessage.addListener((message) => {
       `- cache key: ${message.cache_key || "(missing)"}
 - suggestions: ${(message.suggestions || []).length}`
     );
+    if (message.error) {
+      showSuggestionError(
+        "Could not reach the MemeDrop API. Check that the API is running, then try again."
+      );
+      return;
+    }
     updateSuggestions(message.suggestions || []);
   }
 

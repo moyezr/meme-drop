@@ -116,6 +116,7 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,
+        allow_origin_regex=app_settings.cors_origin_regex,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "x-memedrop-install-id", REQUEST_ID_HEADER],

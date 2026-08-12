@@ -210,6 +210,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             cache_key: message.payload.cache_key,
             request_id: requestId,
             suggestions: [],
+            error: "Suggestion request failed",
           });
         }
         sendResponse({ suggestions: [], error: err?.message });

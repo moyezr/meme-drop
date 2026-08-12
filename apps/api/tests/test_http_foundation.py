@@ -73,6 +73,38 @@ async def test_cors_preflight_allows_extension_headers(client: httpx.AsyncClient
     assert "x-memedrop-install-id" in allowed
 
 
+async def test_development_cors_allows_an_unpacked_chrome_extension(
+    client: httpx.AsyncClient,
+) -> None:
+    origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
+    response = await client.options(
+        "/api/v1/suggest",
+        headers={
+            "origin": origin,
+            "access-control-request-method": "POST",
+            "access-control-request-headers": "content-type,x-request-id,x-memedrop-install-id",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+
+
+async def test_development_cors_rejects_non_chrome_extension_origins(
+    client: httpx.AsyncClient,
+) -> None:
+    response = await client.options(
+        "/api/v1/suggest",
+        headers={
+            "origin": "browser-extension://abcdefghijklmnopabcdefghijklmnop",
+            "access-control-request-method": "POST",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
+
+
 async def test_cors_exposes_request_diagnostics_to_the_extension(
     client: httpx.AsyncClient,
 ) -> None:

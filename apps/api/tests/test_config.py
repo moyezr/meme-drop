@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from memedrop_api.config import DEFAULT_ALLOWED_ORIGINS, Settings
+from memedrop_api.config import (
+    DEFAULT_ALLOWED_ORIGINS,
+    DEVELOPMENT_EXTENSION_ORIGIN_REGEX,
+    Settings,
+)
 
 
 def test_development_defaults_are_safe_and_usable() -> None:
@@ -12,6 +16,7 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.is_production is False
     assert settings.port == 3001
     assert settings.cors_origins == list(DEFAULT_ALLOWED_ORIGINS)
+    assert settings.cors_origin_regex == DEVELOPMENT_EXTENSION_ORIGIN_REGEX
     assert settings.require_install_id is False
     assert settings.openrouter_suggestion_model == "openai/gpt-5.4-mini"
     assert settings.openrouter_caption_model == "openai/gpt-5.4-mini"
@@ -142,6 +147,7 @@ def test_production_configuration_is_accepted() -> None:
 
     assert settings.is_production is True
     assert settings.cors_origins == ["chrome-extension://abcdefghijklmnopabcdefghijklmnop"]
+    assert settings.cors_origin_regex is None
     assert settings.storage_bucket == "meme-drop-prod"
 
 

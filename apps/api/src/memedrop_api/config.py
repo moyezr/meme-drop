@@ -13,6 +13,7 @@ DEFAULT_ALLOWED_ORIGINS = (
     "https://x.com",
     "https://twitter.com",
 )
+DEVELOPMENT_EXTENSION_ORIGIN_REGEX = r"^chrome-extension://[a-p]{32}$"
 DEFAULT_STORAGE_PATH = Path("/tmp/memedrop-storage")
 DEFAULT_DOWNLOAD_PATH = Path("/tmp/memedrop-downloads")
 DEVELOPMENT_BUCKET = "meme-drop-dev"
@@ -139,6 +140,12 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         configured = [item.strip() for item in self.cors_origins_value.split(",") if item.strip()]
         return configured or list(DEFAULT_ALLOWED_ORIGINS)
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        """Allow unpacked Chrome extensions locally; production stays ID-specific."""
+
+        return None if self.is_production else DEVELOPMENT_EXTENSION_ORIGIN_REGEX
 
     @property
     def storage_bucket(self) -> str:
