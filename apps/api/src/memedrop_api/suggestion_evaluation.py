@@ -8,6 +8,7 @@ algorithm, and never makes a model or database request.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import time
@@ -18,6 +19,7 @@ from typing import Any
 
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.suggestion_engine import (
+    MODEL_SHORTLIST_SIZE,
     Candidate,
     LexicalCandidateIndex,
     fallback_template_selections,
@@ -26,7 +28,9 @@ from memedrop_api.services.suggestion_engine import (
 TOP_1_FLOOR = 0.70
 TOP_3_FLOOR = 0.80
 TOP_5_FLOOR = 0.90
+TOP_12_FLOOR = 0.98
 REJECTED_TOP_5_CEILING = 0.15
+REJECTED_TOP_12_CEILING = 0.25
 SCALE_CATALOG_SIZE = 5_000
 SCALE_WARM_RANKING_P95_CEILING_MS = 50.0
 SCALE_QUERIES = (
@@ -43,7 +47,9 @@ class EvaluationThresholds:
     top_1_floor: float = TOP_1_FLOOR
     top_3_floor: float = TOP_3_FLOOR
     top_5_floor: float = TOP_5_FLOOR
+    top_12_floor: float = TOP_12_FLOOR
     rejected_top_5_ceiling: float = REJECTED_TOP_5_CEILING
+    rejected_top_12_ceiling: float = REJECTED_TOP_12_CEILING
 
 
 DEFAULT_THRESHOLDS = EvaluationThresholds()
@@ -67,6 +73,7 @@ class CaseResult:
     selected_templates: tuple[str, ...]
     acceptable_rank: int | None
     rejected_templates_at_top_5: tuple[str, ...]
+    rejected_templates_at_top_12: tuple[str, ...]
     ranking_latency_ms: float
 
 
@@ -76,6 +83,16 @@ def repository_root() -> Path:
 
 def default_benchmark_path() -> Path:
     return repository_root() / "tools" / "template-tools" / "evals" / "suggestion-benchmark.json"
+
+
+def default_baseline_path() -> Path:
+    return (
+        repository_root()
+        / "tools"
+        / "template-tools"
+        / "evals"
+        / "suggestion-ranking-baseline.json"
+    )
 
 
 def production_candidates(catalog: MemeCatalog | None = None) -> list[Candidate]:
@@ -95,7 +112,10 @@ def production_candidates(catalog: MemeCatalog | None = None) -> list[Candidate]
 
 
 def evaluate_benchmark(
-    benchmark_path: Path, *, candidates: Sequence[Candidate] | None = None
+    benchmark_path: Path,
+    *,
+    candidates: Sequence[Candidate] | None = None,
+    baseline_path: Path | None = None,
 ) -> dict[str, object]:
     """Evaluate the production fallback ranker over a benchmark JSON file."""
     raw_benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
@@ -126,7 +146,7 @@ def evaluate_benchmark(
         selections = fallback_template_selections(
             tweet,
             ranking_candidates,
-            5,
+            MODEL_SHORTLIST_SIZE,
             lexical_index=lexical_index,
         )
         latency_ms = (time.perf_counter() - started) * 1000
@@ -148,6 +168,11 @@ def evaluate_benchmark(
             for template_name in selected[:5]
             if any(same_family(template_name, family) for family in rejected)
         )
+        rejected_at_top_12 = tuple(
+            template_name
+            for template_name in selected[:MODEL_SHORTLIST_SIZE]
+            if any(same_family(template_name, family) for family in rejected)
+        )
         results.append(
             CaseResult(
                 case_id=case_id,
@@ -157,14 +182,135 @@ def evaluate_benchmark(
                 selected_templates=selected,
                 acceptable_rank=acceptable_rank,
                 rejected_templates_at_top_5=rejected_at_top_5,
+                rejected_templates_at_top_12=rejected_at_top_12,
                 ranking_latency_ms=latency_ms,
             )
         )
     report = build_report(results, benchmark_path=benchmark_path)
+    if baseline_path is not None:
+        regression = compare_ranking_baseline(report, benchmark_path, baseline_path)
+        report["regression_baseline"] = regression
+        report["passed"] = bool(report["passed"]) and bool(regression["passed"])
     catalog_scale = evaluate_catalog_scale(ranking_candidates)
     report["catalog_scale"] = catalog_scale
     report["passed"] = bool(report["passed"]) and bool(catalog_scale["passed"])
     return report
+
+
+def build_ranking_baseline(report: dict[str, object], benchmark_path: Path) -> dict[str, object]:
+    """Capture deterministic case outcomes that future tuning must not silently worsen."""
+
+    cases = report.get("cases")
+    if not isinstance(cases, list):
+        raise ValueError("Suggestion report is missing case results.")
+    outcomes: dict[str, dict[str, object]] = {}
+    for item in cases:
+        if not isinstance(item, dict) or not isinstance(item.get("case_id"), str):
+            raise ValueError("Suggestion report contains an invalid case result.")
+        outcomes[item["case_id"]] = {
+            "acceptable_rank": item.get("acceptable_rank"),
+            "rejected_family_in_top_5": bool(item.get("rejected_templates_at_top_5")),
+            "rejected_family_in_top_12": bool(item.get("rejected_templates_at_top_12")),
+        }
+    return {
+        "version": 1,
+        "benchmark_sha256": file_sha256(benchmark_path),
+        "cases": outcomes,
+    }
+
+
+def compare_ranking_baseline(
+    report: dict[str, object], benchmark_path: Path, baseline_path: Path
+) -> dict[str, object]:
+    """Fail on per-case rank or rejection regressions, even when aggregates still pass."""
+
+    if not baseline_path.exists():
+        return {
+            "passed": False,
+            "error": f"ranking baseline does not exist: {baseline_path}",
+            "rank_regressions": [],
+            "new_rejected_top_5": [],
+            "new_rejected_top_12": [],
+            "improvements": [],
+        }
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    if not isinstance(baseline, dict) or baseline.get("version") != 1:
+        raise ValueError("Ranking baseline must be a version 1 object.")
+    expected_hash = baseline.get("benchmark_sha256")
+    actual_hash = file_sha256(benchmark_path)
+    if expected_hash != actual_hash:
+        return {
+            "passed": False,
+            "error": (
+                "benchmark changed; review it and intentionally regenerate the ranking baseline"
+            ),
+            "rank_regressions": [],
+            "new_rejected_top_5": [],
+            "new_rejected_top_12": [],
+            "improvements": [],
+        }
+    baseline_cases = baseline.get("cases")
+    report_cases = report.get("cases")
+    if not isinstance(baseline_cases, dict) or not isinstance(report_cases, list):
+        raise ValueError("Ranking baseline or suggestion report has invalid cases.")
+    current = {
+        str(item["case_id"]): item
+        for item in report_cases
+        if isinstance(item, dict) and isinstance(item.get("case_id"), str)
+    }
+    if set(current) != set(baseline_cases):
+        return {
+            "passed": False,
+            "error": "ranking baseline case IDs do not match the benchmark",
+            "rank_regressions": [],
+            "new_rejected_top_5": [],
+            "new_rejected_top_12": [],
+            "improvements": [],
+        }
+
+    rank_regressions: list[dict[str, object]] = []
+    new_rejected_top_5: list[str] = []
+    new_rejected_top_12: list[str] = []
+    improvements: list[dict[str, object]] = []
+    for case_id, baseline_item in baseline_cases.items():
+        if not isinstance(baseline_item, dict):
+            raise ValueError(f"Ranking baseline case {case_id!r} is invalid.")
+        previous_rank = optional_rank(baseline_item.get("acceptable_rank"))
+        current_rank = optional_rank(current[case_id].get("acceptable_rank"))
+        if previous_rank is not None and (current_rank is None or current_rank > previous_rank):
+            rank_regressions.append({"id": case_id, "before": previous_rank, "after": current_rank})
+        elif current_rank is not None and (previous_rank is None or current_rank < previous_rank):
+            improvements.append({"id": case_id, "before": previous_rank, "after": current_rank})
+
+        rejected_before = bool(baseline_item.get("rejected_family_in_top_5"))
+        rejected_now = bool(current[case_id].get("rejected_templates_at_top_5"))
+        if not rejected_before and rejected_now:
+            new_rejected_top_5.append(case_id)
+
+        rejected_shortlist_before = bool(baseline_item.get("rejected_family_in_top_12"))
+        rejected_shortlist_now = bool(current[case_id].get("rejected_templates_at_top_12"))
+        if not rejected_shortlist_before and rejected_shortlist_now:
+            new_rejected_top_12.append(case_id)
+
+    return {
+        "passed": not rank_regressions and not new_rejected_top_5 and not new_rejected_top_12,
+        "rank_regressions": rank_regressions,
+        "new_rejected_top_5": new_rejected_top_5,
+        "new_rejected_top_12": new_rejected_top_12,
+        "improvements": improvements,
+    }
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def optional_rank(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("Ranking baseline contains an invalid acceptable rank.")
+    return value
 
 
 def build_scale_candidates(
@@ -277,14 +423,21 @@ def build_report(
     top_5 = sum(
         result.acceptable_rank is not None and result.acceptable_rank <= 5 for result in results
     )
+    top_12 = sum(
+        result.acceptable_rank is not None and result.acceptable_rank <= MODEL_SHORTLIST_SIZE
+        for result in results
+    )
     rejected_top_5 = sum(bool(result.rejected_templates_at_top_5) for result in results)
+    rejected_top_12 = sum(bool(result.rejected_templates_at_top_12) for result in results)
     latency = [result.ranking_latency_ms for result in results]
     metrics = {
         "cases": total,
         "top_1_acceptable_rate": top_1 / total,
         "top_3_acceptable_rate": top_3 / total,
         "top_5_acceptable_rate": top_5 / total,
+        "top_12_acceptable_rate": top_12 / total,
         "rejected_family_intrusion_at_top_5_rate": rejected_top_5 / total,
+        "rejected_family_intrusion_at_top_12_rate": rejected_top_12 / total,
         "ranking_latency_ms": {
             "p50": percentile(latency, 0.50),
             "p95": percentile(latency, 0.95),
@@ -300,10 +453,18 @@ def build_report(
         "top_5_acceptable_rate": gate(
             metrics["top_5_acceptable_rate"], ">=", thresholds.top_5_floor
         ),
+        "top_12_acceptable_rate": gate(
+            metrics["top_12_acceptable_rate"], ">=", thresholds.top_12_floor
+        ),
         "rejected_family_intrusion_at_top_5_rate": gate(
             metrics["rejected_family_intrusion_at_top_5_rate"],
             "<=",
             thresholds.rejected_top_5_ceiling,
+        ),
+        "rejected_family_intrusion_at_top_12_rate": gate(
+            metrics["rejected_family_intrusion_at_top_12_rate"],
+            "<=",
+            thresholds.rejected_top_12_ceiling,
         ),
     }
     misses = [
@@ -314,6 +475,7 @@ def build_report(
             "acceptable_rank": result.acceptable_rank,
             "expected_memes": list(result.expected_memes),
             "rejected_memes_at_top_5": list(result.rejected_templates_at_top_5),
+            "rejected_memes_at_top_12": list(result.rejected_templates_at_top_12),
             "selected_templates": list(result.selected_templates),
         }
         for result in results
@@ -356,6 +518,8 @@ def miss_reason(result: CaseResult) -> str | None:
         reasons.append("no acceptable family in top 5")
     if result.rejected_templates_at_top_5:
         reasons.append("rejected family in top 5")
+    if result.acceptable_rank is None or result.acceptable_rank > MODEL_SHORTLIST_SIZE:
+        reasons.append("no acceptable family in model shortlist")
     return "; ".join(reasons) if reasons else None
 
 
@@ -405,8 +569,11 @@ def format_report(report: dict[str, object]) -> str:
         f"top-1 acceptable: {float(metrics['top_1_acceptable_rate']):.1%}",
         f"top-3 acceptable: {float(metrics['top_3_acceptable_rate']):.1%}",
         f"top-5 acceptable: {float(metrics['top_5_acceptable_rate']):.1%}",
+        f"top-12 model-shortlist recall: {float(metrics['top_12_acceptable_rate']):.1%}",
         "rejected-family intrusion at top 5: "
         f"{float(metrics['rejected_family_intrusion_at_top_5_rate']):.1%}",
+        "rejected-family intrusion in model shortlist: "
+        f"{float(metrics['rejected_family_intrusion_at_top_12_rate']):.1%}",
         "local ranking latency: "
         f"p50={float(latency['p50']):.3f}ms p95={float(latency['p95']):.3f}ms",
         f"gates: {'PASS' if report['passed'] else 'FAIL'}",
@@ -425,6 +592,24 @@ def format_report(report: dict[str, object]) -> str:
                 f"p95={float(scale_latency['p95']):.3f}ms",
             ]
         )
+    regression = report.get("regression_baseline")
+    if isinstance(regression, dict):
+        rank_regressions = regression.get("rank_regressions", [])
+        new_rejected = regression.get("new_rejected_top_5", [])
+        new_shortlist_rejected = regression.get("new_rejected_top_12", [])
+        improvements = regression.get("improvements", [])
+        lines.append(
+            "case-level ranking baseline: "
+            f"{'PASS' if regression.get('passed') else 'FAIL'} "
+            "rank-regressions="
+            f"{len(rank_regressions) if isinstance(rank_regressions, list) else 0} "
+            f"new-rejections={len(new_rejected) if isinstance(new_rejected, list) else 0} "
+            "new-shortlist-rejections="
+            f"{len(new_shortlist_rejected) if isinstance(new_shortlist_rejected, list) else 0} "
+            f"improvements={len(improvements) if isinstance(improvements, list) else 0}"
+        )
+        if isinstance(regression.get("error"), str):
+            lines.append(f"baseline error: {regression['error']}")
     misses = report["misses"]
     assert isinstance(misses, list)
     if misses:
@@ -438,10 +623,33 @@ def format_report(report: dict[str, object]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate MemeDrop's local suggestion ranker")
     parser.add_argument("--benchmark", type=Path, default=default_benchmark_path())
+    parser.add_argument("--baseline", type=Path, default=default_baseline_path())
+    parser.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help="skip case-level baseline comparison (intended only while regenerating it)",
+    )
+    parser.add_argument(
+        "--write-baseline",
+        action="store_true",
+        help="replace the case-level baseline with the current reviewed outcomes",
+    )
     parser.add_argument("--json", action="store_true", help="print the complete report as JSON")
     parser.add_argument("--out", type=Path, help="write the complete JSON report to this path")
     arguments = parser.parse_args()
-    report = evaluate_benchmark(arguments.benchmark)
+    baseline_path = (
+        None if arguments.no_baseline or arguments.write_baseline else arguments.baseline
+    )
+    report = evaluate_benchmark(arguments.benchmark, baseline_path=baseline_path)
+    if arguments.write_baseline:
+        if not report["passed"]:
+            raise SystemExit("[MemeDrop] refusing to write a baseline for a failing evaluation.")
+        baseline = build_ranking_baseline(report, arguments.benchmark)
+        arguments.baseline.parent.mkdir(parents=True, exist_ok=True)
+        arguments.baseline.write_text(
+            f"{json.dumps(baseline, indent=2, sort_keys=True)}\n",
+            encoding="utf-8",
+        )
     encoded = json.dumps(report, indent=2, sort_keys=True)
     if arguments.out:
         arguments.out.write_text(f"{encoded}\n", encoding="utf-8")

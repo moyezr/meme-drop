@@ -96,6 +96,7 @@ Recommendation and catalog quality:
 ```sh
 npm run quality:benchmark
 npm run quality:suggestions
+npm run quality:tuning
 npm run quality:dataset-plan
 npm run dataset:taste-review
 ```

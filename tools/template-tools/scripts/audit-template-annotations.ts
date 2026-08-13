@@ -78,7 +78,16 @@ function main() {
     printReport(result);
   }
 
-  if (result.errors > 0) {
+  const maxWarnings = args["max-warnings"] === undefined
+    ? Number.POSITIVE_INFINITY
+    : Number(args["max-warnings"]);
+  if (!Number.isFinite(maxWarnings) && args["max-warnings"] !== undefined) {
+    throw new Error("--max-warnings must be a non-negative number");
+  }
+  if (maxWarnings < 0) {
+    throw new Error("--max-warnings must be a non-negative number");
+  }
+  if (result.errors > 0 || result.warnings > maxWarnings) {
     process.exitCode = 1;
   }
 }
@@ -196,7 +205,33 @@ function auditGuidanceExamples(template: MemeTemplate, findings: Finding[]) {
     });
   }
 
+  if (template.caption_guidance.good_examples.length < 2) {
+    findings.push({
+      severity: "warn",
+      template_id: template.template_id,
+      message: `needs two reviewed good examples; found ${template.caption_guidance.good_examples.length}`,
+    });
+  }
+  if (template.caption_guidance.bad_examples.length < 1) {
+    findings.push({
+      severity: "warn",
+      template_id: template.template_id,
+      message: "needs a reviewed bad example for contrastive caption guidance",
+    });
+  }
+
   for (const [exampleIndex, example] of template.caption_guidance.good_examples.entries()) {
+    for (const regionId of regions.keys()) {
+      const value = example[regionId];
+      if (typeof value !== "string" || !value.trim()) {
+        findings.push({
+          severity: "warn",
+          template_id: template.template_id,
+          region_id: regionId,
+          message: `good example ${exampleIndex + 1} is missing required region copy`,
+        });
+      }
+    }
     for (const [regionId, text] of Object.entries(example)) {
       const region = regions.get(regionId);
       if (!region) {

@@ -39,6 +39,7 @@ npm run release:dry-run
 For API changes, also run `npm run test:api`, `npm run lint:api`, and `npm run quality:api-process`. For persistence changes, run `npm run db:up` and the integration suite with `MEMEDROP_TEST_DATABASE_URL` set. Use `npm run quality:backend-image` for container-related changes.
 
 Recommendation work must preserve the deterministic ranker fallback, keep external calls bounded, and return only verified templates by default. Changes to ranking, captions, catalog annotations, or feedback need focused tests and should pass `npm run quality:benchmark`, `npm run quality:suggestions`, and `npm run quality:dataset-plan`.
+Before accepting a quality-tuning change, run `npm run quality:tuning`; regenerate the checked-in ranking baseline only after reviewing every reported case-level regression.
 
 Suggestion and catalog invariants:
 

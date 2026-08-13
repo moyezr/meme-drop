@@ -42,13 +42,15 @@ tests, and do not make model-backed tests depend on a live provider.
 ```sh
 npm run quality:benchmark
 npm run quality:suggestions
+npm run quality:tuning
 ```
 
 The benchmark corpus covers reply intents and records several acceptable families plus explicit
 rejections. The deterministic API evaluation enforces:
 
-- acceptable-family retrieval of at least 70% at top 1, 80% at top 3, and 90% at top 5;
-- avoidance of explicitly wrong families;
+- acceptable-family retrieval of at least 70% at top 1, 80% at top 3, 90% at top 5, and 98% in
+  the 12-template model shortlist;
+- avoidance of explicitly wrong families in both the visible top five and model shortlist;
 - specific, short, non-generic captions;
 - text that fits verified overlay regions;
 - overlay availability for returned templates;
@@ -58,6 +60,38 @@ It also creates a synthetic 5,000-template catalog from the verified metadata an
 local ranking p95 exceeds 50ms. Keep the scale fixture separate from relevance evaluation: it guards
 algorithmic cost, not taste. Do not weaken benchmark cases or thresholds to accommodate a ranker
 change.
+
+`quality:tuning` is the pre-tuning acceptance gate. In addition to aggregate floors, it compares
+every deterministic benchmark result with `suggestion-ranking-baseline.json`. Any worse acceptable
+rank or newly introduced wrong-family result fails even when aggregate metrics still look healthy.
+If a reviewed trade-off is intentional, regenerate the baseline explicitly and review its diff:
+
+```sh
+cd apps/api
+uv run memedrop-suggestion-eval --write-baseline
+```
+
+The same gate runs shared production-renderer tests and the verified catalog audit. The catalog has
+25 recorded annotation warnings today (missing contrastive examples or incomplete region examples),
+so the gate permits at most that known debt and fails if tuning introduces more. Reduce this ceiling
+as those annotations are repaired; do not raise it to make a change pass.
+
+Deterministic tests cannot honestly grade whether a joke is funny. Before changing the joint prompt,
+post context, trend context, or hosted model, capture the same fixed 12-case live sample before and
+after the change:
+
+```sh
+npm run eval:captions -- --out .memedrop/caption-eval-before.json
+npm run eval:captions -- --model <candidate-model> \
+  --out .memedrop/caption-eval-candidate.json
+```
+
+The report records shortlist, selected template, raw region captions, strict contract validity, and
+provider latency. Score every suggestion from 1–5 for post fit, comic turn, template fit, and caption
+readability using the empty `human_review` fields. Compare the same case IDs; do not accept an
+average improvement that introduces a severe failure or materially worsens p95. Reports remain
+under ignored `.memedrop/` because they are experiment artifacts, while the fixed sample definition
+is reviewed in the repository.
 
 When changing ranking, record stage timings and compare results on the same corpus. Relevance,
 diversity, caption quality, fallback availability, and p95 latency are joint constraints; an average

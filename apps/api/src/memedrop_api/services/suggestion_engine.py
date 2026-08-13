@@ -30,6 +30,7 @@ SUGGESTION_CACHE_TTL_SECONDS = 5 * 60
 SUGGESTION_CACHE_MAX = 200
 FEEDBACK_SCORE_CACHE_TTL_SECONDS = 60
 FEEDBACK_SCORE_CACHE_MAX = 500
+MODEL_SHORTLIST_SIZE = 12
 RETRIEVAL_STOP_WORDS = {
     "a",
     "an",
@@ -753,7 +754,7 @@ class SuggestionService:
         ranked = fallback_template_selections(
             ranking_text,
             candidates,
-            min(12, len(candidates)),
+            min(MODEL_SHORTLIST_SIZE, len(candidates)),
             lexical_index=self._global_lexical_index,
         )
         local_rank_ms = elapsed_ms(local_rank_started)

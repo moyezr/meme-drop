@@ -1,0 +1,526 @@
+{
+  "benchmark_sha256": "0c0bb8f78a9ac5f7bc1dd59f43d25b9c52c4cdcc734256987704c51e1cd5147c",
+  "cases": {
+    "absolute-cinema-fit": {
+      "acceptable_rank": 3,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "airport-trail-mix": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "aquarium-cleaner-alliance": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "archery-club-gluten-question": {
+      "acceptable_rank": 3,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "awkward-side-eye": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "bad-label": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "bakery-dawn-celebration": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "bath-time-sofa-emergency": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "beekeeping-inspection-derailed": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "between-ideas-voice": {
+      "acceptable_rank": 5,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "bicycle-shop-membership-name": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "boat-ramp-shortcut": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "book-club-scheduling": {
+      "acceptable_rank": 5,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "cafe-vibe-rebuttal": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "campus-hiring-scale-comparison": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "celebrate-clean-ship": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "cereal-family-size-air": {
+      "acceptable_rank": 5,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "choir-fundraiser-roster": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "civic-bench-ribbon": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "cliffside-elevator-assurance": {
+      "acceptable_rank": 5,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "coffee-experience-markup": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "complaint-portal-rebrand": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "consulate-appointment-paradox": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "decaf-taboo": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "dentist-crown-choice": {
+      "acceptable_rank": 4,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "disaster-girl-fit": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "dog-plant-alibi": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "dojo-belt-announcement": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "driving-test-party": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "everyone-gets-ai": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "fake-wisdom": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "false-choice": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "family-recipe-voice-note": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "festival-ferry-lunch": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "fitness-watch-dessert-credit": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "football-referee-tribes": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "freezer-alarm-workaround": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "frozen-grape-charcuterie": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "funeral-home-exposure-rate": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "hand-dryer-consensus": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "hardware-store-expert-consensus": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "hot-take": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "hotel-ocean-view-angle": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "ice-core-radio-revival": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "knitting-circle-window-envy": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "landfill-recycling-discovery": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "library-kiosk-under-the-paint": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "lowball-client": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "luthier-exposure-offer": {
+      "acceptable_rank": 4,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "magic-show-cue-card": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "marathon-water-stop-optimization": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "market-bus-promise": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "masonry-shortcut-collapse": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "midnight-email-goblin": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "museum-empty-plinth": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "nail-salon-appointment-famine": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "new-framework-fomo": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "newsletter-blockchain-wellness": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "nutrition-podcast-corkboard": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "obvious-consequences": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "obvious-truth": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "optician-clipboard-rebrand": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "orchard-safety-contacts": {
+      "acceptable_rank": 5,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "planetarium-meeting-veto": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "post-office-label-loop": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "probate-portal-loop": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "prod-fire-calm": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "puppet-theater-silent-sponsor": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "record-store-genre-war": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "reef-team-algae-consensus": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "regatta-lightning-spin": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "relationship-no-gift-board": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "rent-poster-policy": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "resident-app-unmasking": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "same-thing-rebrand": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "say-the-line": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "school-detention-rebrand": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "school-pickup-gridlock": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "school-project-title-page": {
+      "acceptable_rank": 4,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "self-own-debugging": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "shortcut-locked-gate": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "silent-yoga-jackhammer": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "small-ask": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "snowplow-route-choice": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "soccer-kit-before-practice": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "soup-can-secret": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": false
+    },
+    "spa-cucumber-water-tariff": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "spider-man-triple-fit": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "squidward-window-fit": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "storm-drain-culvert-reveal": {
+      "acceptable_rank": 2,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "streaming-cancel-recommend": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "stubborn-refusal": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "suspicious-claim": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "tasting-menu-biography": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "taxidermy-catalog-upgrade": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "text-period-thesis": {
+      "acceptable_rank": 3,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "uncomfortable-truth": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "waiting-review": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "watchmaker-magnet-plan": {
+      "acceptable_rank": null,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "wedding-payment-tags": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "weekend-itinerary-pdf": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "wildlife-camera-culprit": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": true,
+      "rejected_family_in_top_5": true
+    },
+    "work-font-town-hall": {
+      "acceptable_rank": 1,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    },
+    "zipline-will-question": {
+      "acceptable_rank": 4,
+      "rejected_family_in_top_12": false,
+      "rejected_family_in_top_5": false
+    }
+  },
+  "version": 1
+}

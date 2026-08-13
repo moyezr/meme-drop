@@ -9,8 +9,10 @@ from memedrop_api.suggestion_evaluation import (
     CaseResult,
     CatalogScaleThresholds,
     EvaluationThresholds,
+    build_ranking_baseline,
     build_report,
     build_scale_candidates,
+    compare_ranking_baseline,
     evaluate_benchmark,
     evaluate_catalog_scale,
     percentile,
@@ -37,6 +39,7 @@ def case_result(
         selected_templates=("first choice", "second choice"),
         acceptable_rank=rank,
         rejected_templates_at_top_5=rejected,
+        rejected_templates_at_top_12=rejected,
         ranking_latency_ms=latency_ms,
     )
 
@@ -53,7 +56,9 @@ def test_report_calculates_retrieval_intrusion_and_latency_metrics() -> None:
             top_1_floor=0.25,
             top_3_floor=0.5,
             top_5_floor=0.75,
+            top_12_floor=0.75,
             rejected_top_5_ceiling=0.25,
+            rejected_top_12_ceiling=0.25,
         ),
     )
 
@@ -63,15 +68,69 @@ def test_report_calculates_retrieval_intrusion_and_latency_metrics() -> None:
         "top_1_acceptable_rate": 0.25,
         "top_3_acceptable_rate": 0.5,
         "top_5_acceptable_rate": 0.75,
+        "top_12_acceptable_rate": 0.75,
         "rejected_family_intrusion_at_top_5_rate": 0.25,
+        "rejected_family_intrusion_at_top_12_rate": 0.25,
         "ranking_latency_ms": {"p50": 0.2, "p95": 0.4},
     }
     misses = cast(list[dict[str, object]], report["misses"])
     assert [miss["id"] for miss in misses] == ["top-5", "miss"]
     assert misses[0]["reason"] == "rejected family in top 5"
-    assert misses[1]["reason"] == "no acceptable family in top 5"
+    assert misses[1]["reason"] == (
+        "no acceptable family in top 5; no acceptable family in model shortlist"
+    )
     gates = cast(dict[str, dict[str, object]], report["gates"])
     assert gates["top_1_acceptable_rate"]["passed"] is True
+
+
+def test_case_level_baseline_detects_regressions_hidden_by_aggregate_metrics(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    benchmark_path = tmp_path / "benchmark.json"
+    benchmark_path.write_text('{"cases": []}\n', encoding="utf-8")
+    baseline_report = build_report(
+        [
+            case_result("stable", 1),
+            case_result("rank-loss", 2),
+            case_result("new-rejection", 3),
+        ],
+        benchmark_path=benchmark_path,
+        thresholds=EvaluationThresholds(
+            top_1_floor=0.0,
+            top_3_floor=0.0,
+            top_5_floor=0.0,
+            top_12_floor=0.0,
+            rejected_top_5_ceiling=1.0,
+            rejected_top_12_ceiling=1.0,
+        ),
+    )
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(
+        json.dumps(build_ranking_baseline(baseline_report, benchmark_path)),
+        encoding="utf-8",
+    )
+    current_report = build_report(
+        [
+            case_result("stable", 1),
+            case_result("rank-loss", 4),
+            case_result("new-rejection", 3, rejected=("rejected meme",)),
+        ],
+        benchmark_path=benchmark_path,
+        thresholds=EvaluationThresholds(
+            top_1_floor=0.0,
+            top_3_floor=0.0,
+            top_5_floor=0.0,
+            top_12_floor=0.0,
+            rejected_top_5_ceiling=1.0,
+            rejected_top_12_ceiling=1.0,
+        ),
+    )
+
+    comparison = compare_ranking_baseline(current_report, benchmark_path, baseline_path)
+
+    assert current_report["passed"] is True
+    assert comparison["passed"] is False
+    assert comparison["rank_regressions"] == [{"id": "rank-loss", "before": 2, "after": 4}]
+    assert comparison["new_rejected_top_5"] == ["new-rejection"]
+    assert comparison["new_rejected_top_12"] == ["new-rejection"]
 
 
 def test_report_fails_the_honest_retrieval_quality_gates() -> None:
@@ -115,9 +174,7 @@ def test_scale_catalog_uses_distinct_template_ids_and_a_warmed_index() -> None:
     assert report["passed"] is True
 
 
-def test_benchmark_reuses_one_prebuilt_lexical_index(
-    tmp_path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+def test_benchmark_reuses_one_prebuilt_lexical_index(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     benchmark_path = tmp_path / "benchmark.json"
     benchmark_path.write_text(
         json.dumps(
