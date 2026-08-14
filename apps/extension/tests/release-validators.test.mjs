@@ -351,12 +351,13 @@ function releaseManifest() {
   return {
     manifest_version: 3,
     name: "MemeDrop",
-    description: "Instantly reply with the perfect meme on X",
+    description: "Instantly reply with the perfect meme on X and LinkedIn",
     version: "0.0.1",
     permissions: ["storage"],
     host_permissions: [
       "https://x.com/*",
       "https://twitter.com/*",
+      "https://www.linkedin.com/*",
       "https://api.memedrop.example/*",
     ],
     background: {

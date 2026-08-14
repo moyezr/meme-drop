@@ -1,21 +1,21 @@
 # MemeDrop privacy policy draft
 
-Last updated: 2026-08-11
+Last updated: 2026-08-15
 
 This document describes the current MemeDrop implementation. It is not ready to publish until the
 contact placeholder is replaced and the final infrastructure retention settings are verified.
 
 ## Purpose
 
-MemeDrop is a Chrome extension that helps users create and insert meme replies on X. It reads the
-tweet or compose context only when needed to provide that function. It is not designed to collect
-unrelated browsing activity.
+MemeDrop is a Chrome extension that helps users create and insert meme replies on X and LinkedIn. It
+reads source-post or compose context only after the user explicitly invokes MemeDrop for that post.
+It is not designed to collect unrelated browsing activity.
 
 ## Data processed
 
 MemeDrop processes:
 
-- tweet or compose text used to request a suggestion or caption;
+- source-post or compose text used to request a suggestion or caption;
 - optional guidance the user enters about a preferred joke direction, tone, or meme format;
 - a random anonymous install ID stored by the extension;
 - suggested meme IDs, captions, scores, and structured context such as intent, topic, or tone;
@@ -39,14 +39,14 @@ MemeDrop does not sell personal data or use it for unrelated advertising.
 
 ## Processing and storage
 
-Tweet text and optional user guidance are processed by the extension and FastAPI service and may be
-sent to OpenRouter's model APIs for template selection and caption generation. Tweet text can remain
+Source-post text and optional user guidance are processed by the extension and FastAPI service and
+may be sent to OpenRouter's model APIs for template selection and caption generation. Source text can remain
 in bounded in-memory suggestion caches for up to five minutes. Optional guidance remains in memory
 for the active composer and request; cache identity contains only a one-way hash. The application
-does not write raw tweet text or user guidance to its database, usage events, or production logs.
+does not write raw source-post text or user guidance to its database, usage events, or production logs.
 
 PostgreSQL stores the anonymous install ID, saved-library records, and usage events with structured
-tweet context. The input schema rejects raw tweet-text fields inside usage context. Saved image files
+post context. The input schema rejects raw post-text fields inside usage context. Saved image files
 are stored in Supabase Storage through its S3-compatible service. The landing page and API are hosted
 as separate Vercel projects.
 

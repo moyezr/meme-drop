@@ -62,7 +62,11 @@ function validateManifest(sourceManifest, output) {
     });
   }
 
-  const requiredHosts = ["https://x.com/*", "https://twitter.com/*"];
+  const requiredHosts = [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://www.linkedin.com/*",
+  ];
   for (const host of requiredHosts) {
     if (!hostPermissions.includes(host)) {
       output.push({ severity: "error", message: `missing host permission: ${host}` });
@@ -145,7 +149,13 @@ function validateListing(output) {
   }
 
   const justifications = listing.permission_justifications || {};
-  for (const key of ["storage", "https://x.com/*", "https://twitter.com/*", "api_host"]) {
+  for (const key of [
+    "storage",
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://www.linkedin.com/*",
+    "api_host",
+  ]) {
     if (!justifications[key] || String(justifications[key]).length < 20) {
       output.push({ severity: "error", message: `missing permission justification: ${key}` });
     }

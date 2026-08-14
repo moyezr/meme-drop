@@ -418,7 +418,7 @@ export default function Library() {
         {search || emotionFilter ? " found" : " saved"}
       </p>
       <p className="text-[11px] text-gray-500 mb-2">
-        Drag a meme onto the X composer to attach it.
+        Drag a meme onto a supported X or LinkedIn composer to attach it.
       </p>
       {actionError && (
         <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded px-2 py-1.5 mb-2">

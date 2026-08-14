@@ -1,6 +1,5 @@
-import { SELECTORS } from "./selectors";
 import type { MemeReplySource } from "../shared/meme-reply-intent";
-import { tweetIdFromStatusHref } from "../shared/meme-reply-intent";
+import type { PlatformAdapter } from "./platform-adapter";
 
 const BUTTON_ATTRIBUTE = "data-memedrop-reply";
 const STYLE_ID = "memedrop-reply-button-styles";
@@ -52,7 +51,8 @@ export interface MemeReplyButtonController {
 }
 
 export function initMemeReplyButtons(
-  onMemeReply: (source: MemeReplySource) => void
+  platform: PlatformAdapter,
+  onMemeReply: (source: MemeReplySource, post: HTMLElement) => void
 ): MemeReplyButtonController {
   let forwardingNativeReply = false;
   let scanQueued = false;
@@ -61,8 +61,8 @@ export function initMemeReplyButtons(
 
   const injectButtons = () => {
     scanQueued = false;
-    for (const tweet of document.querySelectorAll<HTMLElement>(SELECTORS.tweet)) {
-      injectButton(tweet);
+    for (const post of platform.findPosts()) {
+      injectButton(post);
     }
   };
 
@@ -72,10 +72,10 @@ export function initMemeReplyButtons(
     queueMicrotask(injectButtons);
   };
 
-  const injectButton = (tweet: HTMLElement) => {
-    if (tweet.closest(SELECTORS.composeDialog)) return;
-    const nativeReply = tweet.querySelector<HTMLElement>(SELECTORS.nativeReply);
-    const actionGroup = nativeReply?.closest<HTMLElement>(SELECTORS.tweetActions);
+  const injectButton = (post: HTMLElement) => {
+    if (platform.id === "x" && post.closest(platform.selectors.composeScope)) return;
+    const nativeReply = post.querySelector<HTMLElement>(platform.selectors.nativeReply);
+    const actionGroup = nativeReply ? platform.findActionGroup(nativeReply) : null;
     if (!nativeReply || !actionGroup || actionGroup.querySelector(`[${BUTTON_ATTRIBUTE}]`)) return;
 
     const actionUnit = directChildContaining(actionGroup, nativeReply);
@@ -103,14 +103,7 @@ export function initMemeReplyButtons(
       event.preventDefault();
       event.stopPropagation();
 
-      const tweetText = tweet.querySelector(SELECTORS.tweetText)?.textContent?.trim() || null;
-      const statusHref = Array.from(tweet.querySelectorAll<HTMLAnchorElement>('a[href*="/status/"]'))
-        .map((link) => link.href)
-        .find((href) => tweetIdFromStatusHref(href));
-      onMemeReply({
-        tweetText,
-        tweetId: tweetIdFromStatusHref(statusHref),
-      });
+      onMemeReply(platform.extractReplySource(post, nativeReply), post);
 
       forwardingNativeReply = true;
       try {

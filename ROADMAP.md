@@ -44,7 +44,20 @@ Success means a reviewer can add or improve a template without manually calculat
 while every change is durable, reviewable, and exportable through the existing mechanical,
 rendered-QA, benchmark, and promotion gates.
 
-## 2. Quality-led catalog expansion
+## 2. LinkedIn extension support — initial adapter complete
+
+- Reuse the existing explicit-trigger, suggestion, steering, rendering, attachment, and feedback
+  flows.
+- Keep LinkedIn post discovery, context extraction, inline composer lifecycle, and uploader discovery
+  behind the platform adapter.
+- Keep native LinkedIn Comment actions inference-free unless the user explicitly chooses MemeDrop.
+- Next: manually validate feed posts, post detail pages, text-only posts, posts with media, and the
+  clipboard fallback against the unpacked development extension.
+
+Proceed to broader rollout after the LinkedIn adapter passes the manual matrix without an X
+regression.
+
+## 3. Quality-led catalog expansion
 
 - Add small, attributable batches of current and evergreen templates.
 - Record visual grammar, use cases, anti-use cases, joke shapes, and realistic contrastive examples.
@@ -53,14 +66,6 @@ rendered-QA, benchmark, and promotion gates.
 
 Gates: no verified-template audit errors, suggestion benchmark pass, no material p95 regression,
 and visual approval for every promoted template.
-
-## 3. LinkedIn extension support
-
-- Reuse the existing explicit-trigger, suggestion, steering, rendering, and feedback flows.
-- Keep platform-specific DOM extraction and attachment behind a small adapter boundary.
-- Validate with founder-led and B2B marketing posts before adding agency workflows.
-
-Proceed when the X experience has repeat usage and the catalog covers common professional contexts.
 
 ## 4. Retrieval validation at real catalog scale
 

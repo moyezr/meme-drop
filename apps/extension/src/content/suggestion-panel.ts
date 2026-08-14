@@ -1,9 +1,9 @@
 /**
- * Suggestion panel — Shadow DOM component injected into X.com
+ * Suggestion panel — shared Shadow DOM component for supported platforms.
  * Shows meme suggestions after the user explicitly opens a reply through MemeDrop.
  */
 
-import { SELECTORS } from "./selectors";
+import { getPlatformAdapter, type PlatformAdapter } from "./platform-adapter";
 import { showToast } from "./toast";
 import { API_BASE_URL } from "../shared/config";
 import { limitSuggestions } from "../shared/suggestion-limits";
@@ -62,6 +62,11 @@ let shownSuggestionIds = new Set<string>();
 let insertingSuggestionId: string | null = null;
 let currentSteeringInstruction = "";
 let steeringEditorOpen = false;
+let preferredComposerTarget: Element | null = null;
+
+export function setSuggestionComposerTarget(target: Element | null) {
+  preferredComposerTarget = target;
+}
 
 export const PANEL_STYLES = `
   :host {
@@ -974,42 +979,63 @@ async function renderMemeWithOverlay(
   }
 }
 
-/**
- * Hand the file to X's real upload pipeline via its hidden file input.
- *
- * This is the only approach that consistently triggers X's image-attach
- * flow. Synthetic paste events don't — X reads `isTrusted` in a few places
- * and the React tree ignores un-trusted clipboard events in some layouts.
- */
+/** Hand the rendered file to the active platform's native upload pipeline. */
 async function attachViaFileInput(
   file: File,
   composerTarget?: Element | null
 ): Promise<boolean> {
-  const scope = findComposerScope(composerTarget);
-  const scopedInputs = scope
-    ? Array.from(scope.querySelectorAll<HTMLInputElement>(SELECTORS.composerFileInput))
-    : [];
-  const allInputs = Array.from(
-    document.querySelectorAll<HTMLInputElement>(SELECTORS.composerFileInput)
+  const platform = getPlatformAdapter();
+  if (!platform) return false;
+  const scope = findComposerScope(platform, composerTarget);
+  let scopedInputs = Array.from(
+    scope.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput)
   );
+  let allInputs = Array.from(
+    document.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput)
+  );
+
+  // LinkedIn mounts its hidden image input only after the user opens the
+  // comment photo control. The suggestion card click remains the explicit
+  // user action; activating the native control only prepares its uploader.
+  if (
+    scopedInputs.length === 0 &&
+    (allInputs.length === 0 || platform.id === "linkedin")
+  ) {
+    const activatorSelector = platform.selectors.fileInputActivator;
+    const activator = activatorSelector
+      ? scope.querySelector<HTMLButtonElement>(activatorSelector) ||
+        document.querySelector<HTMLButtonElement>(activatorSelector)
+      : null;
+    if (activator) {
+      activator.click();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      scopedInputs = Array.from(
+        scope.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput)
+      );
+      allInputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput)
+      );
+    }
+  }
 
   // Fallback lookup: any image-accepting file input nearby.
   const candidates =
     scopedInputs.length > 0
       ? scopedInputs
       : allInputs.length > 0
-        ? preferDialogElements(allInputs)
+        ? preferComposeScopeElements(platform, allInputs)
       : Array.from(
           document.querySelectorAll<HTMLInputElement>('input[type="file"]')
-        ).filter((i) => (i.accept || "").includes("image"));
+        ).filter((input) => (input.accept || "").includes("image"));
 
-  if (candidates.length === 0) return false;
+  const enabledCandidates = candidates.filter((input) => input.isConnected && !input.disabled);
+  if (enabledCandidates.length === 0) return false;
 
   // Prefer one that is currently in the DOM *and* not disabled. Most X
   // layouts only have one composer open at a time, but reply-from-feed
   // modals can coexist with an inline composer — pick the last one since
   // that's typically the most recently opened.
-  const input = candidates[candidates.length - 1];
+  const input = enabledCandidates[enabledCandidates.length - 1];
 
   const dt = new DataTransfer();
   dt.items.add(file);
@@ -1024,19 +1050,19 @@ async function attachViaFileInput(
 }
 
 /**
- * Fallback — synthetic paste event into the contentEditable composer. Works
- * on some X surface variants, and when it does it produces the same result
- * as a real paste (X auto-attaches the pasted image).
+ * Fallback — synthetic paste event into the active contentEditable composer.
  */
 function attachViaPasteEvent(
   file: File,
   composerTarget?: Element | null
 ): boolean {
-  const scope = findComposerScope(composerTarget);
+  const platform = getPlatformAdapter();
+  if (!platform) return false;
+  const scope = findComposerScope(platform, composerTarget);
   const composer =
-    scope.querySelector<HTMLElement>(SELECTORS.tweetTextarea) ||
-    findVisibleModalComposer() ||
-    document.querySelector<HTMLElement>(SELECTORS.tweetTextarea);
+    scope.querySelector<HTMLElement>(platform.selectors.composer) ||
+    findVisibleComposer(platform) ||
+    document.querySelector<HTMLElement>(platform.selectors.composer);
   if (!composer) return false;
 
   composer.focus();
@@ -1053,44 +1079,50 @@ function attachViaPasteEvent(
   return true;
 }
 
-function findComposerScope(preferredTarget?: Element | null): Element | Document {
-  const preferredDialog = preferredTarget?.closest(SELECTORS.composeDialog);
-  if (preferredDialog && preferredDialog.querySelector(SELECTORS.tweetTextarea)) {
-    return preferredDialog;
+function findComposerScope(
+  platform: PlatformAdapter,
+  preferredTarget?: Element | null
+): Element | Document {
+  const preferredScope = preferredTarget?.closest(platform.selectors.composeScope);
+  if (preferredScope && preferredScope.querySelector(platform.selectors.composer)) {
+    return preferredScope;
   }
 
-  const activeDialog = findVisibleComposeDialog();
-  if (activeDialog) return activeDialog;
+  const visibleScope = findVisibleComposeScope(platform);
+  if (visibleScope) return visibleScope;
 
-  const activeComposer = document.activeElement?.closest(SELECTORS.tweetTextarea);
-  const activeScope = activeComposer?.closest(SELECTORS.composeDialog);
+  const activeComposer = document.activeElement?.closest(platform.selectors.composer);
+  const activeScope = activeComposer?.closest(platform.selectors.composeScope);
   if (activeScope) return activeScope;
 
   return document;
 }
 
-function findVisibleComposeDialog(): HTMLElement | null {
-  const dialogs = Array.from(
-    document.querySelectorAll<HTMLElement>(SELECTORS.composeDialog)
-  ).filter((dialog) => {
-    if (!dialog.querySelector(SELECTORS.tweetTextarea)) return false;
-    const rect = dialog.getBoundingClientRect();
+function findVisibleComposeScope(platform: PlatformAdapter): HTMLElement | null {
+  const scopes = Array.from(
+    document.querySelectorAll<HTMLElement>(platform.selectors.composeScope)
+  ).filter((scope) => {
+    if (!scope.querySelector(platform.selectors.composer)) return false;
+    const rect = scope.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   });
 
-  return dialogs.at(-1) || null;
+  return scopes.at(-1) || null;
 }
 
-function findVisibleModalComposer(): HTMLElement | null {
-  return findVisibleComposeDialog()?.querySelector<HTMLElement>(
-    SELECTORS.tweetTextarea
+function findVisibleComposer(platform: PlatformAdapter): HTMLElement | null {
+  return findVisibleComposeScope(platform)?.querySelector<HTMLElement>(
+    platform.selectors.composer
   ) || null;
 }
 
-function preferDialogElements<T extends Element>(elements: T[]): T[] {
-  const dialog = findVisibleComposeDialog();
-  if (!dialog) return elements;
-  const scoped = elements.filter((element) => dialog.contains(element));
+function preferComposeScopeElements<T extends Element>(
+  platform: PlatformAdapter,
+  elements: T[]
+): T[] {
+  const scope = findVisibleComposeScope(platform);
+  if (!scope) return elements;
+  const scoped = elements.filter((element) => scope.contains(element));
   return scoped.length > 0 ? scoped : elements;
 }
 
@@ -1139,7 +1171,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
 
   // Strategy 1: file input — the reliable path.
   try {
-    if (await attachViaFileInput(file, payload.composerTarget)) {
+    if (await attachViaFileInput(file, payload.composerTarget ?? preferredComposerTarget)) {
       logUsage();
       setTimeout(() => hidePanel(), 400);
       return;
@@ -1150,7 +1182,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
 
   // Strategy 2: synthetic paste event on the contentEditable composer.
   try {
-    if (attachViaPasteEvent(file, payload.composerTarget)) {
+    if (attachViaPasteEvent(file, payload.composerTarget ?? preferredComposerTarget)) {
       logUsage();
       setTimeout(() => hidePanel(), 400);
       return;
@@ -1160,9 +1192,8 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
   }
 
   // Strategy 3: put the PNG on the clipboard so Cmd+V into the composer
-  // works. We deliberately do NOT writeText here — a text URL on the
-  // clipboard would paste as a link / base64 blob into X's text field,
-  // which is exactly the bug we're fixing.
+  // works. We deliberately do NOT writeText here — a text URL would paste as
+  // a link or base64 blob into the platform's text field.
   try {
     await navigator.clipboard.write([
       new ClipboardItem({ "image/png": file }),
@@ -1171,7 +1202,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput) {
     logUsage();
   } catch (err) {
     console.error("[MemeDrop] Clipboard fallback failed:", err);
-    showToast("Couldn't attach meme — open the image tab in X first", "error");
+    showToast("Couldn't attach meme — open the image control and try again", "error");
   }
 }
 

@@ -5,7 +5,11 @@ import "@fontsource/inter/latin-400.css";
 import "@fontsource/inter/latin-700.css";
 import "@fontsource/inter/latin-900.css";
 
-import { SELECTORS, URL_PATTERNS } from "./selectors";
+import { SELECTORS } from "./selectors";
+import {
+  getPlatformAdapter,
+  isInlineComposeSessionActive,
+} from "./platform-adapter";
 import { initSaveButton } from "./save-button";
 import { initMemeReplyButtons } from "./meme-reply-button";
 import {
@@ -17,6 +21,7 @@ import {
   insertMemeByUrl,
   hidePanel,
   isPanelVisible,
+  setSuggestionComposerTarget,
   setSuggestionSteeringInstruction,
 } from "./suggestion-panel";
 import {
@@ -34,6 +39,15 @@ import {
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const DEBUG_PREFIX = "[MemeDrop]";
+const platform = requirePlatformAdapter();
+
+function requirePlatformAdapter() {
+  const resolved = getPlatformAdapter();
+  if (!resolved) {
+    throw new Error("MemeDrop content script loaded on an unsupported platform");
+  }
+  return resolved;
+}
 
 type DraggedMeme = Pick<
   Parameters<typeof insertMemeByUrl>[0],
@@ -58,13 +72,17 @@ interface ReplyTweetSnapshot {
 }
 
 const memeReplyIntent = new MemeReplyIntent();
-const memeReplyButtons = initMemeReplyButtons((source) => {
-  memeReplyIntent.arm(source);
+const memeReplyButtons = initMemeReplyButtons(platform, (source, post) => {
   logDebug(
     "Meme reply armed",
     `- has tweet id: ${Boolean(source.tweetId)}
 - extracted text length: ${source.tweetText?.length || 0}`
   );
+  if (platform.id === "linkedin") {
+    activateInlineMemeReply(source, post);
+  } else {
+    memeReplyIntent.arm(source);
+  }
 });
 
 // A native X Reply click must never inherit an abandoned MemeDrop intent.
@@ -73,15 +91,16 @@ document.addEventListener(
   "click",
   (event) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (!target?.closest(SELECTORS.nativeReply)) return;
+    if (!target?.closest(platform.selectors.nativeReply)) return;
     if (!memeReplyButtons.isForwardingNativeReply()) {
       memeReplyIntent.clear();
+      if (platform.id === "linkedin") resetComposeSession();
     }
   },
   true
 );
 
-initSaveButton();
+if (platform.supportsTimelineSave) initSaveButton();
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "SUGGESTIONS_RESULT") {
@@ -185,7 +204,13 @@ ${title}${details ? `\n${details}` : ""}`);
 }
 
 function isComposeRoute(url = window.location.href): boolean {
-  return URL_PATTERNS.composeModal.test(url);
+  if (platform.isRouteCompose(url)) return true;
+  if (platform.id !== "linkedin") return false;
+  return isInlineComposeSessionActive({
+    hasSource: Boolean(activeMemeReplySource),
+    elapsedMs: Date.now() - activeInlineComposeStartedAt,
+    composerPresent: Boolean(document.querySelector(platform.selectors.composer)),
+  });
 }
 
 function getReplyViewports(): HTMLElement[] {
@@ -367,6 +392,41 @@ let activeSteeringInstruction: string | undefined;
 // Token used to abandon stale waitForTweetText() loops when the URL changes
 // again before tweet text appears.
 let waitToken = 0;
+// LinkedIn opens comment composers inline without changing routes. Keep a
+// short grace period while its editor is mounting, then require the editor to
+// remain present so abandoned comment boxes do not retain stale suggestions.
+let activeInlineComposeStartedAt = 0;
+
+function activateInlineMemeReply(source: MemeReplySource, post: HTMLElement) {
+  activeMemeReplySource = source;
+  activeInlineComposeStartedAt = Date.now();
+  setSuggestionComposerTarget(post);
+  activeSteeringInstruction = undefined;
+  setSuggestionSteeringInstruction(undefined);
+  lastSuggestionCacheKey = null;
+  dismissedSuggestionCacheKey = null;
+  currentComposeDismissed = false;
+  activeSuggestionRequestId = null;
+  waitToken++;
+  requestSuggestionsForCurrentCompose(false, source).catch((err) => {
+    console.error("[MemeDrop] LinkedIn suggestions failed:", err);
+  });
+}
+
+function resetComposeSession() {
+  memeReplyIntent.clear();
+  activeMemeReplySource = null;
+  activeInlineComposeStartedAt = 0;
+  setSuggestionComposerTarget(null);
+  activeSteeringInstruction = undefined;
+  setSuggestionSteeringInstruction(undefined);
+  lastSuggestionCacheKey = null;
+  dismissedSuggestionCacheKey = null;
+  currentComposeDismissed = false;
+  activeSuggestionRequestId = null;
+  waitToken++;
+  hidePanel();
+}
 
 async function waitForTweetText(token: number): Promise<string | null> {
   const deadline = Date.now() + 2500;
@@ -579,6 +639,11 @@ function onUrlChanged(url = window.location.href) {
 - is compose: ${isCompose}`
   );
 
+  if (platform.id === "linkedin") {
+    if (!isCompose) resetComposeSession();
+    return;
+  }
+
   if (isCompose) {
     const source = memeReplyIntent.consume();
     if (!source) {
@@ -603,16 +668,7 @@ function onUrlChanged(url = window.location.href) {
     return;
   }
 
-  memeReplyIntent.clear();
-  activeMemeReplySource = null;
-  activeSteeringInstruction = undefined;
-  setSuggestionSteeringInstruction(undefined);
-  lastSuggestionCacheKey = null;
-  dismissedSuggestionCacheKey = null;
-  currentComposeDismissed = false;
-  activeSuggestionRequestId = null;
-  waitToken++;
-  hidePanel();
+  resetComposeSession();
 }
 
 let lastSeenUrl = window.location.href;
@@ -664,7 +720,7 @@ setInterval(() => handlePotentialUrlChange("route poll"), 500);
 window.addEventListener("focus", () => handlePotentialUrlChange("focus"));
 
 // Initial URL check — handles direct loads of /compose/post.
-if (URL_PATTERNS.composeModal.test(window.location.href)) {
+if (platform.isRouteCompose(window.location.href)) {
   onUrlChanged(window.location.href);
 }
 
@@ -719,8 +775,8 @@ function mayBeDraggedMeme(dataTransfer: DataTransfer | null): boolean {
 function isComposerTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   return Boolean(
-    target.closest(SELECTORS.tweetTextarea) ||
-      target.querySelector(SELECTORS.tweetTextarea)
+    target.closest(platform.selectors.composer) ||
+      target.querySelector(platform.selectors.composer)
   );
 }
 

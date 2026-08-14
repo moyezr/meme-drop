@@ -58,7 +58,12 @@ for (const iconPath of ["icons/icon16.png", "icons/icon48.png", "icons/icon128.p
   }
 }
 
-for (const host of ["https://x.com/*", "https://twitter.com/*", expectedApiPermission]) {
+for (const host of [
+  "https://x.com/*",
+  "https://twitter.com/*",
+  "https://www.linkedin.com/*",
+  expectedApiPermission,
+]) {
   if (!hostPermissions.includes(host)) {
     fail(`Release package manifest is missing host permission: ${host}`);
   }
