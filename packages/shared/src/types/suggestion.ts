@@ -80,6 +80,8 @@ export interface MemeTextOverlay {
 export interface MemeTextRegion {
   id: string;
   text: string;
+  /** Defaults to 5.5% of the smaller region dimension. */
+  padding_ratio?: number;
   text_transform?: "uppercase" | "mocking" | "none";
   x: number;
   y: number;
@@ -90,10 +92,20 @@ export interface MemeTextRegion {
   font_scale?: number;
   max_lines?: number;
   max_chars?: number;
-  font?: {
-    family: "Impact";
-    min_size: number;
-    max_size: number;
-    stroke_ratio: number;
-  };
+  font?: MemeTextFont;
+}
+
+/**
+ * Typography is catalog-owned rather than model-owned. Defaults preserve the
+ * original Impact rendering for older template records.
+ */
+export interface MemeTextFont {
+  family?: "Impact" | "Anton" | "Inter";
+  weight?: 400 | 700 | 900;
+  min_size?: number;
+  max_size?: number;
+  fill_color?: string;
+  stroke_color?: string;
+  stroke_ratio?: number;
+  line_height_ratio?: number;
 }

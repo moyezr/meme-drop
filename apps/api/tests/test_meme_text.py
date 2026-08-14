@@ -128,6 +128,25 @@ def test_generated_regions_are_sanitized_and_overlay_preserves_layout() -> None:
     assert overlay is not None
     assert overlay["template_id"] == "drake-hotline-bling"
     assert overlay["regions"][0]["text_transform"] == "uppercase"
+    assert overlay["regions"][0]["padding_ratio"] == 0.055
+    assert overlay["regions"][0]["font"] == {
+        "family": "Impact",
+        "min_size": 14,
+        "max_size": 44,
+        "weight": 900,
+        "fill_color": "#FFFFFF",
+        "stroke_color": "#000000",
+        "stroke_ratio": 0.12,
+        "line_height_ratio": 1.08,
+    }
+
+
+def test_overlay_uses_catalog_owned_text_transform() -> None:
+    meme_template = template("mocking-spongebob")
+    overlay = build_overlay(meme_template, "Mocking Spongebob", {"quote": "we need no tests"})
+
+    assert overlay is not None
+    assert overlay["regions"][0]["text_transform"] == "mocking"
 
 
 def test_strict_generated_region_hygiene_rejects_incomplete_or_clipped_jokes() -> None:

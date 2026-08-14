@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 DEFAULT_CATALOG_PATH = Path(__file__).resolve().parents[1] / "data" / "meme_catalog.json"
 
@@ -14,10 +14,24 @@ DEFAULT_CATALOG_PATH = Path(__file__).resolve().parents[1] / "data" / "meme_cata
 class FontSpec(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    family: Literal["Impact"] = "Impact"
-    min_size: int
-    max_size: int
-    stroke_ratio: float
+    family: Literal["Impact", "Anton", "Inter"] = "Impact"
+    min_size: int = Field(default=18, ge=10, le=96)
+    max_size: int = Field(default=48, ge=10, le=120)
+    weight: Literal[400, 700, 900] = 900
+    fill_color: str = Field(default="#FFFFFF", pattern=r"^#[0-9A-Fa-f]{6}$")
+    stroke_color: str = Field(default="#000000", pattern=r"^#[0-9A-Fa-f]{6}$")
+    # Existing shipped manifests declare a ratio. This only supplies a compatible
+    # value for legacy records that predate the field.
+    stroke_ratio: float = Field(default=0.12, ge=0, le=0.25)
+    line_height_ratio: float = Field(default=1.08, ge=0.8, le=1.5)
+
+    @model_validator(mode="after")
+    def font_bounds_are_ordered(self) -> FontSpec:
+        if self.min_size > self.max_size:
+            raise ValueError("font.min_size must not exceed font.max_size")
+        if self.family == "Anton":
+            self.weight = 400
+        return self
 
 
 class TemplateRegion(BaseModel):
@@ -33,6 +47,8 @@ class TemplateRegion(BaseModel):
     valign: Literal["top", "middle", "bottom"] = "middle"
     max_lines: int
     max_chars: int
+    padding_ratio: float = Field(default=0.055, ge=0, le=0.2)
+    text_transform: Literal["uppercase", "none", "mocking"] = "uppercase"
     font: FontSpec
     notes: str | None = None
 

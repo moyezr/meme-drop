@@ -67,7 +67,7 @@ function main() {
     if (template.quality !== "draft") {
       fail(`Approved template is not a draft candidate: ${templateId}`);
     }
-    promotedTemplates.push({ ...template, quality: "verified" });
+    promotedTemplates.push(normalizeTypography({ ...template, quality: "verified" }));
   }
 
   promotedTemplates.sort((a, b) => a.template_id.localeCompare(b.template_id));
@@ -95,6 +95,51 @@ function main() {
   console.log(
     `[MemeDrop] promoted ${promotedTemplates.length} reviewed templates to ${path.relative(rootDir, outPath)}`
   );
+}
+
+/**
+ * Promotion is the compatibility boundary between historical annotations and
+ * runtime manifests. New records are authored with these fields, while old
+ * reviewed records receive the same explicit rendering contract on export.
+ */
+function normalizeTypography(template: MemeTemplate): MemeTemplate {
+  return {
+    ...template,
+    regions: template.regions.map((region) => {
+      const typography = region as unknown as Record<string, unknown>;
+      const font = region.font as Record<string, unknown>;
+      const family = oneOf(font.family, ["Impact", "Anton", "Inter"], "Impact");
+      return {
+        ...region,
+        padding_ratio: clampNumber(typography.padding_ratio, 0, 0.2, 0.055),
+        text_transform: oneOf(typography.text_transform, ["uppercase", "none", "mocking"], "uppercase"),
+        font: {
+          ...font,
+          family,
+          weight: family === "Anton" ? 400 : oneOf(font.weight, [400, 700, 900], 900),
+          fill_color: normalizeHexColor(font.fill_color, "#FFFFFF"),
+          stroke_color: normalizeHexColor(font.stroke_color, "#000000"),
+          stroke_ratio: clampNumber(font.stroke_ratio, 0, 0.25, 0.12),
+          line_height_ratio: clampNumber(font.line_height_ratio, 0.8, 1.5, 1.08),
+        },
+      };
+    }),
+  } as MemeTemplate;
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+function oneOf<T extends string | number>(value: unknown, values: readonly T[], fallback: T): T {
+  return values.includes(value as T) ? (value as T) : fallback;
+}
+
+function normalizeHexColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  return /^#[0-9a-f]{6}$/i.test(normalized) ? normalized.toUpperCase() : fallback;
 }
 
 function runDecisionValidator() {

@@ -15,6 +15,7 @@ import {
   normalizeSteeringInstruction,
 } from "../shared/suggestion-request";
 import { fetchMediaWithTimeout } from "../shared/media-fetch";
+import type { MemeTextOverlay } from "@memedrop/shared";
 import {
   UsageTelemetryQueue,
   type UsageEvent,
@@ -35,35 +36,6 @@ interface Suggestion {
   feedback_context?: Record<string, unknown>;
   image_data_url?: string | null;
   preview_image_data_url?: string | null;
-}
-
-interface MemeTextOverlay {
-  enabled: boolean;
-  style: "impact";
-  template_id?: string;
-  alt_text: string;
-  regions: MemeTextRegion[];
-}
-
-interface MemeTextRegion {
-  id: string;
-  text: string;
-  text_transform?: "uppercase" | "mocking" | "none";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  align?: "left" | "center" | "right";
-  valign?: "top" | "middle" | "bottom";
-  font_scale?: number;
-  max_lines?: number;
-  max_chars?: number;
-  font?: {
-    family: "Impact";
-    min_size: number;
-    max_size: number;
-    stroke_ratio: number;
-  };
 }
 
 interface CacheEntry {

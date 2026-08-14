@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from memedrop_api.catalog_schemas import (
     CatalogDraftUpdate,
+    CatalogFontAnnotation,
     CatalogTemplateAnnotation,
     slugify_template_id,
 )
@@ -73,6 +74,61 @@ def test_regions_must_stay_inside_image_and_use_unique_ids() -> None:
                 "annotation": annotation(regions=[region]),
             }
         )
+
+
+def test_typography_contract_defaults_and_rejects_invalid_values() -> None:
+    parsed = CatalogTemplateAnnotation.model_validate(
+        annotation(
+            regions=[
+                {
+                    "id": "top_caption",
+                    "role": "Setup",
+                    "x": 0.05,
+                    "y": 0.05,
+                    "width": 0.9,
+                    "height": 0.22,
+                    "max_lines": 2,
+                    "max_chars": 24,
+                }
+            ]
+        )
+    )
+    region = parsed.regions[0]
+    assert region.padding_ratio == 0.055
+    assert region.text_transform == "uppercase"
+    assert region.font.model_dump() == {
+        "family": "Impact",
+        "min_size": 18,
+        "max_size": 48,
+        "weight": 900,
+        "fill_color": "#FFFFFF",
+        "stroke_color": "#000000",
+        "stroke_ratio": 0.1,
+        "line_height_ratio": 1.08,
+    }
+
+    invalid = complete_annotation()
+    invalid_regions = invalid["regions"]
+    assert isinstance(invalid_regions, list)
+    invalid_region = invalid_regions[0]
+    assert isinstance(invalid_region, dict)
+    invalid_region["font"] = {
+        "family": "Comic Sans",
+        "min_size": 18,
+        "max_size": 48,
+        "fill_color": "white",
+        "stroke_color": "#000000",
+        "stroke_ratio": 0.3,
+        "line_height_ratio": 2,
+    }
+    with pytest.raises(ValidationError):
+        CatalogTemplateAnnotation.model_validate(invalid)
+
+
+def test_anton_annotations_normalize_to_the_available_weight() -> None:
+    font = CatalogFontAnnotation.model_validate({"family": "Anton", "weight": 900})
+
+    assert font.weight == 400
 
 
 def complete_annotation(**overrides: object) -> dict[str, object]:
@@ -156,6 +212,27 @@ def test_approval_requires_current_visual_qa() -> None:
         "good_examples": [{"top_caption": "Me shipping on a Monday"}],
         "bad_examples": [{"top_caption": "An unfunny explanation"}],
     }
+    with pytest.raises(ValidationError, match="current visual QA"):
+        CatalogDraftUpdate.model_validate(
+            {"revision": 1, "status": "approved", "annotation": changed}
+        )
+
+
+def test_typography_change_makes_visual_qa_stale() -> None:
+    value = complete_annotation()
+    value["visual_qa"] = visual_qa(value)
+
+    changed = complete_annotation()
+    changed["visual_qa"] = value["visual_qa"]
+    changed_regions = changed["regions"]
+    assert isinstance(changed_regions, list)
+    changed_region = changed_regions[0]
+    assert isinstance(changed_region, dict)
+    changed_region["padding_ratio"] = 0.12
+    changed_font = changed_region["font"]
+    assert isinstance(changed_font, dict)
+    changed_font["line_height_ratio"] = 1.24
+
     with pytest.raises(ValidationError, match="current visual QA"):
         CatalogDraftUpdate.model_validate(
             {"revision": 1, "status": "approved", "annotation": changed}

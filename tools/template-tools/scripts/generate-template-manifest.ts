@@ -54,11 +54,17 @@ interface TextRegion {
   valign: "top" | "middle" | "bottom";
   max_lines: number;
   max_chars: number;
+  padding_ratio: number;
+  text_transform: "uppercase" | "none" | "mocking";
   font: {
-    family: "Impact";
+    family: "Impact" | "Anton" | "Inter";
     min_size: number;
     max_size: number;
+    weight: 400 | 700 | 900;
+    fill_color: string;
+    stroke_color: string;
     stroke_ratio: number;
+    line_height_ratio: number;
   };
   notes?: string;
 }
@@ -203,7 +209,9 @@ async function loadMemeInputsFromDisk(): Promise<MemeInput[]> {
         id: path.parse(file).name,
         name,
         filePath: `/memes/${file}`,
-        formatType: "unknown",
+        // A local file has no database format metadata. This optional override
+        // makes deterministic dry-run annotation checks exercise overlay output.
+        formatType: args.formatType || "unknown",
       };
     });
 }
@@ -311,9 +319,14 @@ For each region include:
 - valign: top | middle | bottom
 - max_lines: 1 to 4
 - max_chars: realistic character budget for this box
-- font.family must be Impact
+- padding_ratio: 0 to 0.20, usually 0.055, for breathing room inside the box
+- text_transform: uppercase | none | mocking. Use mocking only for formats whose joke depends on alternating case.
+- font.family: Impact | Anton | Inter (Impact is the default for classic meme text)
 - font.min_size and font.max_size in pixels for this image size
-- font.stroke_ratio, usually 0.10 to 0.16
+- font.weight: 400 | 700 | 900
+- font.fill_color and font.stroke_color as #RRGGBB colors
+- font.stroke_ratio, 0 to 0.25, usually 0.10 to 0.16
+- font.line_height_ratio, 0.8 to 1.5, usually 1.08
 - notes, optional
 
 Also include caption_guidance:
@@ -412,11 +425,17 @@ function normalizeRegion(
     valign: oneOf(region.valign, ["top", "middle", "bottom"], "middle"),
     max_lines: clampInteger(region.max_lines, 1, 4, 2),
     max_chars: clampInteger(region.max_chars, 8, 90, 36),
+    padding_ratio: round(clampNumber(region.padding_ratio, 0, 0.2, 0.055), 3),
+    text_transform: oneOf(region.text_transform, ["uppercase", "none", "mocking"], "uppercase"),
     font: {
-      family: "Impact",
+      family: normalizeFontFamily(region.font?.family),
       min_size: minFont,
       max_size: maxFont,
-      stroke_ratio: round(clampNumber(region.font?.stroke_ratio, 0.06, 0.2, 0.12), 3),
+      weight: normalizeFontWeight(region.font?.family, region.font?.weight),
+      fill_color: normalizeHexColor(region.font?.fill_color, "#FFFFFF"),
+      stroke_color: normalizeHexColor(region.font?.stroke_color, "#000000"),
+      stroke_ratio: round(clampNumber(region.font?.stroke_ratio, 0, 0.25, 0.12), 3),
+      line_height_ratio: round(clampNumber(region.font?.line_height_ratio, 0.8, 1.5, 1.08), 3),
     },
     notes: region.notes ? String(region.notes).slice(0, 180) : undefined,
   };
@@ -510,11 +529,17 @@ function buildDryRunResponse(meme: MemeInput): ModelTemplateResponse {
             valign: "middle",
             max_lines: 2,
             max_chars: 42,
+            padding_ratio: 0.055,
+            text_transform: "uppercase",
             font: {
               family: "Impact",
               min_size: 16,
               max_size: 42,
+              weight: 900,
+              fill_color: "#FFFFFF",
+              stroke_color: "#000000",
               stroke_ratio: 0.12,
+              line_height_ratio: 1.08,
             },
           },
         ]
@@ -657,6 +682,7 @@ function parseArgs(argv: string[]) {
     id: typeof parsed.id === "string" ? parsed.id : undefined,
     out: typeof parsed.out === "string" ? parsed.out : undefined,
     model: typeof parsed.model === "string" ? parsed.model : undefined,
+    formatType: typeof parsed["format-type"] === "string" ? parsed["format-type"] : undefined,
   };
 }
 
@@ -688,8 +714,27 @@ function clampInteger(
   return Math.round(clampNumber(value, min, max, fallback));
 }
 
-function oneOf<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
+function oneOf<T extends string | number>(value: unknown, options: readonly T[], fallback: T): T {
   return options.includes(value as T) ? (value as T) : fallback;
+}
+
+function normalizeHexColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  return /^#[0-9a-f]{6}$/i.test(normalized) ? normalized.toUpperCase() : fallback;
+}
+
+function normalizeFontFamily(value: unknown): TextRegion["font"]["family"] {
+  return oneOf(value, ["Impact", "Anton", "Inter"], "Impact");
+}
+
+function normalizeFontWeight(
+  familyValue: unknown,
+  weightValue: unknown
+): TextRegion["font"]["weight"] {
+  return normalizeFontFamily(familyValue) === "Anton"
+    ? 400
+    : oneOf(weightValue, [400, 700, 900], 900);
 }
 
 function round(value: number, precision = 5): number {

@@ -47,6 +47,7 @@ Suggestion and catalog invariants:
 - Keep free text out of logs, persistence, usage events, and plaintext cache keys. Telemetry may retain only reviewed categorical context such as `suggestion_mode`.
 - Include every request-shaping input in client and server cache identity, hash sensitive values, and use request generations so stale results or media cannot replace newer suggestions.
 - Internal catalog tools create drafts only. Human review, rendered QA, benchmark coverage, and the existing promotion gates remain required before templates become eligible for suggestions.
+- Keep typography and placement catalog-owned and render them through `packages/shared`; bundled fonts must not add a request-time CDN dependency, and any render-input change must invalidate visual QA.
 - Do not add retrieval infrastructure for anticipated scale. Change retrieval only when benchmark recall or measured latency regresses; keep the model shortlist and visible result count bounded.
 
 Storage and secrets rules:

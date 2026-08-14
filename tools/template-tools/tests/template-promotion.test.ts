@@ -54,11 +54,45 @@ test("template promotion compiles approved reviewed drafts into verified templat
   assert.equal(result.status, 0, result.stderr || result.stdout);
 
   const promoted = JSON.parse(fs.readFileSync(outPath, "utf8")) as {
-    templates: Array<{ template_id: string; quality: string }>;
+    templates: Array<{
+      template_id: string;
+      quality: string;
+      regions: Array<{
+        padding_ratio: number;
+        text_transform: string;
+        font: {
+          family: string;
+          weight: number;
+          fill_color: string;
+          stroke_color: string;
+          stroke_ratio: number;
+          line_height_ratio: number;
+        };
+      }>;
+    }>;
   };
   assert.equal(promoted.templates.length, 1);
   assert.equal(promoted.templates[0]?.template_id, "absolute-cinema");
   assert.equal(promoted.templates[0]?.quality, "verified");
+  assert.deepEqual(promoted.templates[0]?.regions[0] && {
+    padding_ratio: promoted.templates[0].regions[0].padding_ratio,
+    text_transform: promoted.templates[0].regions[0].text_transform,
+    family: promoted.templates[0].regions[0].font.family,
+    weight: promoted.templates[0].regions[0].font.weight,
+    fill_color: promoted.templates[0].regions[0].font.fill_color,
+    stroke_color: promoted.templates[0].regions[0].font.stroke_color,
+    stroke_ratio: promoted.templates[0].regions[0].font.stroke_ratio,
+    line_height_ratio: promoted.templates[0].regions[0].font.line_height_ratio,
+  }, {
+    padding_ratio: 0.055,
+    text_transform: "uppercase",
+    family: "Impact",
+    weight: 900,
+    fill_color: "#FFFFFF",
+    stroke_color: "#000000",
+    stroke_ratio: 0.12,
+    line_height_ratio: 1.08,
+  });
 });
 
 test("template promotion rejects approved drafts without benchmark coverage", () => {

@@ -3,23 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const STATIC_LANDING_EXCEPTION = {
-  reviewBy: "2026-09-01",
-  packageVersions: {
-    "@vercel/analytics": "2.0.1",
-    next: "16.2.12",
-  },
-  vulnerabilityNames: new Set(["@vercel/analytics", "next", "postcss", "sharp"]),
-  advisoryUrls: new Set([
-    "https://github.com/advisories/GHSA-qx2v-qp2m-jg93",
-    "https://github.com/advisories/GHSA-6g55-p6wh-862q",
-    "https://github.com/advisories/GHSA-r28c-9q8g-f849",
-    "https://github.com/advisories/GHSA-fxqj-rqcc-2cmp",
-    "https://github.com/advisories/GHSA-f88m-g3jw-g9cj",
-  ]),
-};
-const REVIEWED_EXCEPTIONS = [STATIC_LANDING_EXCEPTION];
-
 auditNpmDependencies();
 auditPythonDependencies();
 console.log("[MemeDrop] security audit passed");
@@ -33,51 +16,8 @@ function auditNpmDependencies() {
     return;
   }
 
-  const unexpectedNames = names.filter(
-    (name) => !REVIEWED_EXCEPTIONS.some((exception) => exception.vulnerabilityNames.has(name))
-  );
-  const advisoryUrls = Object.values(vulnerabilities).flatMap((vulnerability) =>
-    (vulnerability.via || [])
-      .filter((item) => typeof item === "object" && item !== null)
-      .map((item) => item.url)
-      .filter(Boolean)
-  );
-  const unexpectedAdvisories = advisoryUrls.filter(
-    (url) => !REVIEWED_EXCEPTIONS.some((exception) => exception.advisoryUrls.has(url))
-  );
-
-  if (unexpectedNames.length > 0 || unexpectedAdvisories.length > 0) {
-    printVulnerabilities(vulnerabilities);
-    fail(
-      `npm audit found unreviewed vulnerabilities: packages=${unexpectedNames.join(",") || "none"}`
-    );
-  }
-
-  verifyReviewedExceptions();
-  console.log(
-    "[MemeDrop] npm audit passed with the reviewed static-landing exception"
-  );
-}
-
-function verifyReviewedExceptions() {
-  const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
-  const installed = {
-    "@vercel/analytics":
-      lock.packages?.["apps/landing/node_modules/@vercel/analytics"]?.version,
-    next: lock.packages?.["node_modules/next"]?.version,
-  };
-  for (const exception of REVIEWED_EXCEPTIONS) {
-    if (new Date() > new Date(`${exception.reviewBy}T23:59:59Z`)) {
-      fail(`dependency advisory review expired on ${exception.reviewBy}`);
-    }
-    for (const [name, expected] of Object.entries(exception.packageVersions)) {
-      if (installed[name] !== expected) {
-        fail(
-          `review dependency advisory exceptions after ${name} changes (${installed[name] || "missing"})`
-        );
-      }
-    }
-  }
+  printVulnerabilities(vulnerabilities);
+  fail(`npm audit found vulnerabilities: packages=${names.join(",")}`);
 }
 
 function auditPythonDependencies() {

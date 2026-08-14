@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { formatVisualQaTimestamp, qualityChecks, qualityScore, statusLabel, visualQaComplete } from "../catalog-quality";
 import type {
@@ -261,24 +261,45 @@ function LayoutPanel({
               value={selectedRegion.role}
             />
           </Field>
-          <div className="compact-grid four">
-            <NumberField label="X" value={selectedRegion.x} step={0.001} onChange={(value) => updateRegion((region) => (region.x = value))} />
-            <NumberField label="Y" value={selectedRegion.y} step={0.001} onChange={(value) => updateRegion((region) => (region.y = value))} />
-            <NumberField label="W" value={selectedRegion.width} step={0.001} onChange={(value) => updateRegion((region) => (region.width = value))} />
-            <NumberField label="H" value={selectedRegion.height} step={0.001} onChange={(value) => updateRegion((region) => (region.height = value))} />
-          </div>
-          <div className="compact-grid">
-            <SelectField label="Align" value={selectedRegion.align} options={["left", "center", "right"]} onChange={(value) => updateRegion((region) => (region.align = value as RegionAnnotation["align"]))} />
-            <SelectField label="Vertical" value={selectedRegion.valign} options={["top", "middle", "bottom"]} onChange={(value) => updateRegion((region) => (region.valign = value as RegionAnnotation["valign"]))} />
-            <NumberField label="Lines" value={selectedRegion.max_lines} onChange={(value) => updateRegion((region) => (region.max_lines = value))} />
-            <NumberField label="Characters" value={selectedRegion.max_chars} onChange={(value) => updateRegion((region) => (region.max_chars = value))} />
-          </div>
-          <div className="section-divider" />
-          <div className="compact-grid">
-            <NumberField label="Min font" value={selectedRegion.font.min_size} onChange={(value) => updateRegion((region) => (region.font.min_size = value))} />
-            <NumberField label="Max font" value={selectedRegion.font.max_size} onChange={(value) => updateRegion((region) => (region.font.max_size = value))} />
-            <NumberField label="Stroke" value={selectedRegion.font.stroke_ratio} step={0.01} onChange={(value) => updateRegion((region) => (region.font.stroke_ratio = value))} />
-          </div>
+          <LayoutGroup title="Region geometry" hint="Normalized to the source image (0–1).">
+            <div className="compact-grid four">
+              <NumberField label="X" max={1 - selectedRegion.width} min={0} step={0.001} value={selectedRegion.x} onChange={(value) => updateRegion((region) => (region.x = value))} />
+              <NumberField label="Y" max={1 - selectedRegion.height} min={0} step={0.001} value={selectedRegion.y} onChange={(value) => updateRegion((region) => (region.y = value))} />
+              <NumberField label="W" max={1 - selectedRegion.x} min={0.04} step={0.001} value={selectedRegion.width} onChange={(value) => updateRegion((region) => (region.width = value))} />
+              <NumberField label="H" max={1 - selectedRegion.y} min={0.04} step={0.001} value={selectedRegion.height} onChange={(value) => updateRegion((region) => (region.height = value))} />
+            </div>
+          </LayoutGroup>
+          <LayoutGroup title="Copy and spacing" hint="Use the padding to keep type off the region edge.">
+            <div className="compact-grid">
+              <SelectField label="Align" options={["left", "center", "right"]} value={selectedRegion.align} onChange={(value) => updateRegion((region) => (region.align = value as RegionAnnotation["align"]))} />
+              <SelectField label="Vertical" options={["top", "middle", "bottom"]} value={selectedRegion.valign} onChange={(value) => updateRegion((region) => (region.valign = value as RegionAnnotation["valign"]))} />
+              <SelectField label="Transform" options={["uppercase", "none", "mocking"]} value={selectedRegion.text_transform} onChange={(value) => updateRegion((region) => (region.text_transform = value as RegionAnnotation["text_transform"]))} />
+            </div>
+            <div className="compact-grid">
+              <NumberField label="Lines" max={4} min={1} value={selectedRegion.max_lines} onChange={(value) => updateRegion((region) => (region.max_lines = value))} />
+              <NumberField label="Characters" max={90} min={8} value={selectedRegion.max_chars} onChange={(value) => updateRegion((region) => (region.max_chars = value))} />
+              <NumberField hint="0–0.2 of region size" label="Padding" max={0.2} min={0} step={0.005} value={selectedRegion.padding_ratio} onChange={(value) => updateRegion((region) => (region.padding_ratio = value))} />
+            </div>
+          </LayoutGroup>
+          <LayoutGroup title="Typography" hint="The production renderer uses these exact choices in Render QA.">
+            <div className="compact-grid">
+              <SelectField label="Family" options={["Impact", "Anton", "Inter"]} value={selectedRegion.font.family} onChange={(value) => updateRegion((region) => {
+                region.font.family = value as RegionAnnotation["font"]["family"];
+                if (region.font.family === "Anton") region.font.weight = 400;
+              })} />
+              <SelectField disabled={selectedRegion.font.family === "Anton"} hint={selectedRegion.font.family === "Anton" ? "Anton is regular only" : undefined} label="Weight" options={["400", "700", "900"]} value={String(selectedRegion.font.weight)} onChange={(value) => updateRegion((region) => (region.font.weight = Number(value) as RegionAnnotation["font"]["weight"]))} />
+              <NumberField label="Line height" max={1.5} min={0.8} step={0.01} value={selectedRegion.font.line_height_ratio} onChange={(value) => updateRegion((region) => (region.font.line_height_ratio = value))} />
+            </div>
+            <div className="compact-grid">
+              <NumberField label="Min font" max={Math.min(96, selectedRegion.font.max_size)} min={10} value={selectedRegion.font.min_size} onChange={(value) => updateRegion((region) => (region.font.min_size = Math.min(value, region.font.max_size)))} />
+              <NumberField label="Max font" max={120} min={Math.max(10, selectedRegion.font.min_size)} value={selectedRegion.font.max_size} onChange={(value) => updateRegion((region) => (region.font.max_size = Math.max(value, region.font.min_size)))} />
+              <NumberField hint="0–0.25 of type size" label="Stroke width" max={0.25} min={0} step={0.01} value={selectedRegion.font.stroke_ratio} onChange={(value) => updateRegion((region) => (region.font.stroke_ratio = value))} />
+            </div>
+            <div className="compact-grid color-grid">
+              <ColorField label="Fill color" value={selectedRegion.font.fill_color} onChange={(value) => updateRegion((region) => (region.font.fill_color = value))} />
+              <ColorField label="Stroke color" value={selectedRegion.font.stroke_color} onChange={(value) => updateRegion((region) => (region.font.stroke_color = value))} />
+            </div>
+          </LayoutGroup>
           <Field label="Placement notes" hint="Occlusion, contrast, or subject boundaries">
             <textarea
               onChange={(event) => updateRegion((region) => (region.notes = event.target.value || null))}
@@ -367,10 +388,33 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   return <div className="field-group"><div className="field-heading"><label>{label}</label>{hint ? <span>{hint}</span> : null}</div>{children}</div>;
 }
 
-function NumberField({ label, value, step = 1, onChange }: { label: string; value: number; step?: number; onChange: (value: number) => void }) {
-  return <label className="mini-field"><span>{label}</span><input type="number" step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+function LayoutGroup({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+  return <section className="layout-control-group"><div><strong>{title}</strong><span>{hint}</span></div>{children}</section>;
 }
 
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  return <label className="mini-field"><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
+function NumberField({ label, value, step = 1, min, max, hint, onChange }: { label: string; value: number; step?: number; min?: number; max?: number; hint?: string; onChange: (value: number) => void }) {
+  return <label className="mini-field"><span>{label}{hint ? <small>{hint}</small> : null}</span><input max={max} min={min} type="number" step={step} value={value} onChange={(event) => {
+    const next = Number(event.target.value);
+    if (!Number.isFinite(next)) return;
+    onChange(Math.min(max ?? Number.POSITIVE_INFINITY, Math.max(min ?? Number.NEGATIVE_INFINITY, next)));
+  }} /></label>;
+}
+
+function SelectField({ label, value, options, hint, disabled = false, onChange }: { label: string; value: string; options: string[]; hint?: string; disabled?: boolean; onChange: (value: string) => void }) {
+  return <label className="mini-field"><span>{label}{hint ? <small>{hint}</small> : null}</span><select disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const inputId = `color-${label.replaceAll(" ", "-")}`;
+  const [draftValue, setDraftValue] = useState(value);
+  useEffect(() => setDraftValue(value), [value]);
+  const isValid = /^#[0-9a-f]{6}$/i.test(draftValue);
+  return <div className="mini-field color-field"><label htmlFor={inputId}>{label}</label><div><input aria-label={`${label} picker`} id={inputId} type="color" value={isValid ? draftValue : value} onChange={(event) => {
+    const next = event.target.value.toUpperCase();
+    setDraftValue(next);
+    onChange(next);
+  }} /><input aria-label={`${label} hex value`} maxLength={7} pattern="#[0-9A-Fa-f]{6}" type="text" value={draftValue} onBlur={() => {
+    if (isValid) onChange(draftValue.toUpperCase());
+    else setDraftValue(value);
+  }} onChange={(event) => setDraftValue(event.target.value.toUpperCase())} /></div></div>;
 }

@@ -1,10 +1,18 @@
 export type CatalogStatus = "draft" | "in_review" | "needs_work" | "approved" | "rejected";
 
+export type FontFamily = "Impact" | "Anton" | "Inter";
+export type FontWeight = 400 | 700 | 900;
+export type TextTransform = "uppercase" | "none" | "mocking";
+
 export interface FontAnnotation {
-  family: "Impact";
+  family: FontFamily;
+  weight: FontWeight;
   min_size: number;
   max_size: number;
+  fill_color: string;
+  stroke_color: string;
   stroke_ratio: number;
+  line_height_ratio: number;
 }
 
 export interface RegionAnnotation {
@@ -18,6 +26,8 @@ export interface RegionAnnotation {
   valign: "top" | "middle" | "bottom";
   max_lines: number;
   max_chars: number;
+  padding_ratio: number;
+  text_transform: TextTransform;
   font: FontAnnotation;
   notes?: string | null;
 }

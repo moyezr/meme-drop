@@ -115,8 +115,9 @@ pass mechanical checks, human taste review, rendered QA, benchmark coverage, and
 For every template:
 
 - place overlay regions on canonical text/empty space, away from faces and the visual punchline;
-- record the reviewed font, stroke, alignment, normalized coordinates, line count, and rendered
-  character capacity for every region;
+- record the reviewed font family/weight, fill and stroke colors, line height, padding, text
+  transform, alignment, normalized coordinates, line count, and rendered character capacity for
+  every region;
 - set `max_chars` to actual rendered capacity;
 - write realistic good examples that fit and bad examples that identify common failures;
 - document reusable joke shapes, use cases, anti-use cases, aliases, and semantic tags;
@@ -140,8 +141,10 @@ template's annotations, but local `approved` state still does not alter the runt
 Before local approval, open **Render QA**, inspect every good example with the production renderer,
 and resolve missing copy, truncation, or overflow. Recording a clean review stores a server-owned
 fingerprint. Any later edit to caption regions, font treatment, or good examples clears that review
-and requires another visual pass. Custom preview copy is exploratory and does not count as review
-evidence.
+and requires another visual pass. Impact preserves the legacy fast path. Anton and Inter are bundled
+with both the workbench and extension, so a selected custom face is loaded locally and rendered the
+same way in QA and the published meme; no font CDN is used at request time. Custom preview copy is
+exploratory and does not count as review evidence.
 
 For a disposable, database-free annotation page, generate the older browser-local workbench:
 
@@ -251,15 +254,8 @@ MEMEDROP_TEST_REDIS_URL=redis://localhost:6379/0 npm run test:api:integration
 ## Dependency security
 
 `npm run quality:security` audits the complete npm lock graph and exports the FastAPI production set
-from `apps/api/uv.lock` for `pip-audit`. Any new Python advisory fails immediately. npm findings pass
-only when every advisory exactly matches one of two reviewed, version-pinned policies:
-
-- build-time packages pulled by the latest Next.js static-export stack;
-- the nested Vite 5/esbuild copy inside the latest CRXJS build plugin.
-
-Those packages are not landing server or extension runtime code, but they still remain tracked risk.
-The exceptions expire on 2026-09-01. A dependency version change, advisory change, or expiry fails
-the gate and requires a fresh review; the command does not mean `npm audit` reports zero findings.
+from `apps/api/uv.lock` for `pip-audit`. Any npm or Python advisory fails the gate; update to a
+patched dependency rather than adding a standing exception.
 
 The landing workspace intentionally holds TypeScript 6 until stable Next.js supports the TypeScript
 7 compiler API. `@types/node` stays on major 22 to model the deployed Node 22 runtime. Revisit both

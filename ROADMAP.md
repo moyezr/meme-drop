@@ -28,11 +28,17 @@ Build the smallest internal tool that removes repeated manual work when reviewin
   state, keyboard save, and responsive layout rather than an API-served document editor.
 - Render every good example through the extension's shared production renderer, surface font size,
   line count, truncation, and overflow, and invalidate human QA whenever render inputs change.
+- Use the same bounded typography contract in the workbench, API, and extension: deterministic
+  bundled faces, weight, fill/stroke, line height, padding, text transform, and normalized placement.
 - Keep the workbench development-only. A local approval never changes runtime suggestion data.
 - Next: export a deterministic, checksummed release bundle and apply that bundle to production
   storage and PostgreSQL through a separately authorized script.
 - After the manual workflow is stable, add bounded AI assists for descriptions and retrieval-label
   proposals. AI output always lands as an editable suggestion and never changes review state.
+
+Next checkpoint: repair the current verified-catalog annotation warnings and `needs_work` templates
+with these controls, lowering the warning ceiling after each reviewed batch. Then build the
+checksummed development-to-production promotion bundle and authorized apply script.
 
 Success means a reviewer can add or improve a template without manually calculating coordinates,
 while every change is durable, reviewable, and exportable through the existing mechanical,

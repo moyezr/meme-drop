@@ -132,6 +132,8 @@ function auditRegion(
   region: MemeTextTemplateRegion,
   findings: Finding[]
 ) {
+  const typography = region as unknown as Record<string, unknown>;
+  const fontTypography = region.font as Record<string, unknown>;
   const add = (severity: Finding["severity"], message: string) => {
     findings.push({
       severity,
@@ -157,14 +159,47 @@ function auditRegion(
   if (region.max_chars > 42 && region.width < 0.45) {
     add("warn", `max_chars=${region.max_chars} is high for a narrow region`);
   }
+  const paddingRatio = numberOrDefault(typography.padding_ratio, 0.055);
+  if (paddingRatio < 0 || paddingRatio > 0.2) {
+    add("error", `padding_ratio=${paddingRatio} must be between 0 and 0.2`);
+  }
+  const textTransform = stringOrDefault(typography.text_transform, "uppercase");
+  if (!["uppercase", "none", "mocking"].includes(textTransform)) {
+    add("error", `unsupported text_transform=${textTransform}`);
+  }
   if (region.font.min_size < 8 || region.font.min_size > region.font.max_size) {
     add("error", "invalid font min/max size");
   }
   if (region.font.max_size > 72) {
     add("warn", `font max_size=${region.font.max_size} may overpower the meme`);
   }
-  if (region.font.stroke_ratio < 0.06 || region.font.stroke_ratio > 0.2) {
-    add("warn", `stroke_ratio=${region.font.stroke_ratio} is outside normal Impact range`);
+  const family = stringOrDefault(fontTypography.family, "Impact");
+  if (!["Impact", "Anton", "Inter"].includes(family)) {
+    add("error", `unsupported font.family=${family}`);
+  }
+  const rawWeight = fontTypography.weight;
+  const weight = numberOrDefault(rawWeight, family === "Anton" ? 400 : 900);
+  if (![400, 700, 900].includes(weight)) {
+    add("error", `unsupported font.weight=${weight}`);
+  }
+  if (family === "Anton" && rawWeight !== undefined && weight !== 400) {
+    add("error", "Anton must use its bundled 400 weight");
+  }
+  for (const [field, value] of [
+    ["fill_color", stringOrDefault(fontTypography.fill_color, "#FFFFFF")],
+    ["stroke_color", stringOrDefault(fontTypography.stroke_color, "#000000")],
+  ] as const) {
+    if (!/^#[0-9a-f]{6}$/i.test(value)) {
+      add("error", `font.${field} must be #RRGGBB`);
+    }
+  }
+  const strokeRatio = numberOrDefault(fontTypography.stroke_ratio, 0.12);
+  if (strokeRatio < 0 || strokeRatio > 0.25) {
+    add("error", `stroke_ratio=${strokeRatio} must be between 0 and 0.25`);
+  }
+  const lineHeightRatio = numberOrDefault(fontTypography.line_height_ratio, 1.08);
+  if (lineHeightRatio < 0.8 || lineHeightRatio > 1.5) {
+    add("error", `line_height_ratio=${lineHeightRatio} must be between 0.8 and 1.5`);
   }
 
   const capacity = estimateRegionCapacity(region);
@@ -268,20 +303,25 @@ function auditGuidanceExamples(template: MemeTemplate, findings: Finding[]) {
 function estimateRegionCapacity(region: MemeTextTemplateRegion): number {
   const widthPx = region.width * 1000;
   const heightPx = region.height * 833;
-  const padding = Math.max(4, Math.min(widthPx, heightPx) * 0.055);
+  const typography = region as unknown as Record<string, unknown>;
+  const fontTypography = region.font as Record<string, unknown>;
+  const padding = resolvePadding(widthPx, heightPx, typography.padding_ratio);
   const safeWidth = Math.max(8, widthPx - padding * 2);
   const safeHeight = Math.max(8, heightPx - padding * 2);
-  const lineCount = Math.max(1, Math.min(region.max_lines, Math.floor(safeHeight / (region.font.min_size * 1.08))));
+  const lineHeight = numberOrDefault(fontTypography.line_height_ratio, 1.08);
+  const lineCount = Math.max(1, Math.min(region.max_lines, Math.floor(safeHeight / (region.font.min_size * lineHeight))));
   const charsPerLine = safeWidth / (region.font.min_size * 0.62);
   return lineCount * charsPerLine;
 }
 
 function estimateTextFit(region: MemeTextTemplateRegion, rawText: string) {
-  const text = rawText.trim().toUpperCase();
+  const typography = region as unknown as Record<string, unknown>;
+  const fontTypography = region.font as Record<string, unknown>;
+  const text = transformForFit(rawText.trim(), stringOrDefault(typography.text_transform, "uppercase"));
   const words = text.split(/\s+/).filter(Boolean);
   const widthPx = region.width * 1000;
   const heightPx = region.height * 833;
-  const padding = Math.max(4, Math.min(widthPx, heightPx) * 0.055);
+  const padding = resolvePadding(widthPx, heightPx, typography.padding_ratio);
   const safeWidth = Math.max(8, widthPx - padding * 2);
   const safeHeight = Math.max(8, heightPx - padding * 2);
   let fontSize = region.font.max_size;
@@ -289,7 +329,7 @@ function estimateTextFit(region: MemeTextTemplateRegion, rawText: string) {
 
   while (
     fontSize - 0.5 >= region.font.min_size &&
-    (lines.length * fontSize * 1.08 > safeHeight ||
+    (lines.length * fontSize * numberOrDefault(fontTypography.line_height_ratio, 1.08) > safeHeight ||
       lines.some((line) => approximateImpactWidth(line, fontSize) > safeWidth))
   ) {
     fontSize -= 0.5;
@@ -305,6 +345,34 @@ function estimateTextFit(region: MemeTextTemplateRegion, rawText: string) {
   ].filter(Boolean).join(", ");
 
   return { truncated, tooSmall, reason: reason || "ok" };
+}
+
+function transformForFit(text: string, transform: string): string {
+  if (transform === "none") return text;
+  if (transform === "mocking") {
+    let upper = false;
+    return [...text.toLowerCase()]
+      .map((char) => {
+        if (!/[a-z]/.test(char)) return char;
+        upper = !upper;
+        return upper ? char.toUpperCase() : char;
+      })
+      .join("");
+  }
+  return text.toUpperCase();
+}
+
+function numberOrDefault(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function stringOrDefault(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function resolvePadding(width: number, height: number, value: unknown): number {
+  const ratio = Math.min(0.2, Math.max(0, numberOrDefault(value, 0.055)));
+  return ratio === 0 ? 0 : Math.max(4, Math.min(width, height) * ratio);
 }
 
 function wrapApproxLines(words: string[], maxWidth: number, fontSize: number, maxLines: number): string[] {

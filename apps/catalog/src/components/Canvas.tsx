@@ -148,37 +148,46 @@ export function Canvas({
         >
           <img alt={name} draggable={false} ref={imageRef} src={imageUrl} />
           {showBoxes
-            ? regions.map((region, index) => (
-                <button
-                  className={`caption-region ${selectedRegionId === region.id ? "selected" : ""}`}
-                  key={region.id}
-                  onPointerDown={(event) => beginInteraction(event, region, "move")}
-                  onClick={() => onSelectRegion(region.id)}
-                  style={{
-                    left: `${region.x * 100}%`,
-                    top: `${region.y * 100}%`,
-                    width: `${region.width * 100}%`,
-                    height: `${region.height * 100}%`,
-                    alignItems: { top: "flex-start", middle: "center", bottom: "flex-end" }[
-                      region.valign
-                    ],
-                    justifyContent: { left: "flex-start", center: "center", right: "flex-end" }[
-                      region.align
-                    ],
-                    textAlign: region.align,
-                    fontSize: `${Math.max(12, Math.min(34, region.font.max_size * 0.48))}px`,
-                  }}
-                  type="button"
-                >
-                  <span className="region-number">{index + 1}</span>
-                  <span className="region-copy">{previews[region.id] || region.role}</span>
-                  <span
-                    aria-hidden="true"
-                    className="resize-handle"
-                    onPointerDown={(event) => beginInteraction(event, region, "resize")}
-                  />
-                </button>
-              ))
+            ? regions.map((region, index) => {
+                const previewCopy = formatPreviewCopy(previews[region.id] || region.role, region.text_transform);
+                const previewFontSize = Math.max(12, Math.min(34, region.font.max_size * 0.48));
+                return (
+                  <button
+                    className={`caption-region ${selectedRegionId === region.id ? "selected" : ""}`}
+                    key={region.id}
+                    onPointerDown={(event) => beginInteraction(event, region, "move")}
+                    onClick={() => onSelectRegion(region.id)}
+                    style={{
+                      left: `${region.x * 100}%`,
+                      top: `${region.y * 100}%`,
+                      width: `${region.width * 100}%`,
+                      height: `${region.height * 100}%`,
+                      alignItems: { top: "flex-start", middle: "center", bottom: "flex-end" }[
+                        region.valign
+                      ],
+                      justifyContent: { left: "flex-start", center: "center", right: "flex-end" }[
+                        region.align
+                      ],
+                      textAlign: region.align,
+                      fontFamily: canvasFontFamily(region.font.family),
+                      fontWeight: region.font.weight,
+                      fontSize: `${previewFontSize}px`,
+                      lineHeight: region.font.line_height_ratio,
+                      color: region.font.fill_color,
+                      WebkitTextStroke: `${region.font.stroke_ratio === 0 ? 0 : Math.max(1, previewFontSize * region.font.stroke_ratio)}px ${region.font.stroke_color}`,
+                    }}
+                    type="button"
+                  >
+                    <span className="region-number">{index + 1}</span>
+                    <span className="region-copy">{previewCopy}</span>
+                    <span
+                      aria-hidden="true"
+                      className="resize-handle"
+                      onPointerDown={(event) => beginInteraction(event, region, "resize")}
+                    />
+                  </button>
+                );
+              })
             : null}
         </div>
         )}
@@ -221,4 +230,27 @@ export function Canvas({
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+function canvasFontFamily(family: RegionAnnotation["font"]["family"]): string {
+  return family === "Impact"
+    ? "Impact, Haettenschweiler, 'Arial Black', sans-serif"
+    : `${family}, sans-serif`;
+}
+
+function formatPreviewCopy(value: string, transform: RegionAnnotation["text_transform"]): string {
+  if (transform === "uppercase") return value.toUpperCase();
+  if (transform === "mocking") {
+    let upper = false;
+    return value
+      .toLowerCase()
+      .split("")
+      .map((character) => {
+        if (!/[a-z]/.test(character)) return character;
+        upper = !upper;
+        return upper ? character.toUpperCase() : character;
+      })
+      .join("");
+  }
+  return value;
 }

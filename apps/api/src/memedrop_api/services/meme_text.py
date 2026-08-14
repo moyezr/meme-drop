@@ -112,9 +112,7 @@ def build_overlay(
             {
                 "id": region.id,
                 "text": text,
-                "text_transform": "mocking"
-                if template.template_id == "mocking-spongebob"
-                else "uppercase",
+                "text_transform": region.text_transform,
                 "x": region.x,
                 "y": region.y,
                 "width": region.width,
@@ -123,6 +121,7 @@ def build_overlay(
                 "valign": region.valign,
                 "max_lines": region.max_lines,
                 "max_chars": region.max_chars,
+                "padding_ratio": region.padding_ratio,
                 "font": region.font.model_dump(),
             }
         )

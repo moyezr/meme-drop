@@ -1,3 +1,10 @@
+// Caption generation currently targets Latin-language posts. Bundling the
+// selected faces here keeps font CSS out of renderer unit-test imports.
+import "@fontsource/anton/latin-400.css";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/inter/latin-900.css";
+
 import { SELECTORS, URL_PATTERNS } from "./selectors";
 import { initSaveButton } from "./save-button";
 import { initMemeReplyButtons } from "./meme-reply-button";

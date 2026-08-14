@@ -906,7 +906,10 @@ export const MEME_TEMPLATE_MANIFEST: MemeTemplateManifest = {
       supports_overlay: true,
       quality: "verified",
       regions: [
-        region("quote", "mocked quote", 0.05, 0.05, 0.9, 0.2, 3, 54, 0.9),
+        {
+          ...region("quote", "mocked quote", 0.05, 0.05, 0.9, 0.2, 3, 54, 0.9),
+          text_transform: "mocking" as const,
+        },
       ],
       caption_guidance: guidance(
         "Repeat a bad take in mocking mixed-case energy.",

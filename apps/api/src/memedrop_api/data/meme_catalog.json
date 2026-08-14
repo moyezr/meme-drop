@@ -4008,6 +4008,7 @@
           "valign": "middle",
           "max_lines": 3,
           "max_chars": 54,
+          "text_transform": "mocking",
           "font": {
             "family": "Impact",
             "min_size": 13,

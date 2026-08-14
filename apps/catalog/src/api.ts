@@ -1,4 +1,5 @@
 import type { CatalogDraft, CatalogStatus, CreateDraftInput, TemplateAnnotation } from "./types";
+import { normalizeCatalogDraft } from "./annotation-normalization";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 const catalogUrl = `${API_BASE}/internal/api/catalog/templates`;
@@ -20,20 +21,19 @@ export async function listDrafts(filters: {
   if (filters.status) query.set("status", filters.status);
   if (filters.search) query.set("search", filters.search);
   const response = await request<{ drafts: CatalogDraft[] }>(`${catalogUrl}?${query}`);
-  return response.drafts;
+  return response.drafts.map(normalizeCatalogDraft);
 }
 
 export async function getDraft(id: string): Promise<CatalogDraft> {
-  return (await request<{ draft: CatalogDraft }>(`${catalogUrl}/${id}`)).draft;
+  return normalizeCatalogDraft((await request<{ draft: CatalogDraft }>(`${catalogUrl}/${id}`)).draft);
 }
 
 export async function createDraft(input: CreateDraftInput): Promise<CatalogDraft> {
-  return (
-    await request<{ draft: CatalogDraft }>(catalogUrl, {
+  const response = await request<{ draft: CatalogDraft }>(catalogUrl, {
       method: "POST",
       body: JSON.stringify(input),
-    })
-  ).draft;
+    });
+  return normalizeCatalogDraft(response.draft);
 }
 
 export async function updateDraft(input: {
@@ -42,16 +42,15 @@ export async function updateDraft(input: {
   status: CatalogStatus;
   annotation: TemplateAnnotation;
 }): Promise<CatalogDraft> {
-  return (
-    await request<{ draft: CatalogDraft }>(`${catalogUrl}/${input.id}`, {
+  const response = await request<{ draft: CatalogDraft }>(`${catalogUrl}/${input.id}`, {
       method: "PUT",
       body: JSON.stringify({
         revision: input.revision,
         status: input.status,
         annotation: input.annotation,
       }),
-    })
-  ).draft;
+    });
+  return normalizeCatalogDraft(response.draft);
 }
 
 export interface VisualQaCheck {

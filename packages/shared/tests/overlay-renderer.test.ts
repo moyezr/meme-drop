@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   drawMemeTextOverlay,
+  memeCanvasFont,
   measureMemeTextRegion,
+  resolveMemeTextFont,
 } from "../src/overlay-renderer.js";
 import type { MemeTextRegion } from "../src/types/suggestion.js";
 
@@ -96,4 +98,75 @@ test("overlay drawing returns aggregate diagnostics and paints transformed copy"
   assert.equal(diagnostics.regions[1].charLimitExceeded, true);
   assert.equal(diagnostics.hasTruncation, true);
   assert.ok(canvas.painted.some((entry) => entry.startsWith("fill:MoCkInG")));
+});
+
+test("legacy typography resolves to the original Impact canvas declaration", () => {
+  const font = resolveMemeTextFont();
+
+  assert.deepEqual(font, {
+    family: "Impact",
+    weight: 900,
+    fillColor: "#FFFFFF",
+    strokeColor: "#000000",
+    strokeRatio: 0.12,
+    lineHeightRatio: 1.08,
+  });
+  assert.equal(
+    memeCanvasFont(20, font),
+    "20px Impact, Haettenschweiler, 'Arial Black', sans-serif"
+  );
+});
+
+test("renderer applies catalog typography, colour, line-height, case, and zero padding", () => {
+  const canvas = new TestCanvasContext();
+  const diagnostics = drawMemeTextOverlay(
+    canvas as unknown as CanvasRenderingContext2D,
+    400,
+    400,
+    {
+      regions: [
+        region({
+          text: "Keep this case",
+          text_transform: "none",
+          padding_ratio: 0,
+          font: {
+            family: "Inter",
+            weight: 700,
+            min_size: 20,
+            max_size: 20,
+            fill_color: "#12ab34",
+            stroke_color: "#A1B2C3",
+            stroke_ratio: 0,
+            line_height_ratio: 1.3,
+          },
+        }),
+      ],
+    }
+  );
+
+  const [layout] = diagnostics.regions;
+  assert.equal(layout.text, "Keep this case");
+  assert.equal(layout.lineHeight, 26);
+  assert.deepEqual(layout.safeBounds, { x: 0, y: 0, width: 100, height: 100 });
+  assert.equal(canvas.fillStyle, "#12AB34");
+  assert.equal(canvas.strokeStyle, "#A1B2C3");
+  assert.equal(canvas.lineWidth, 0);
+  assert.ok(canvas.painted.every((entry) => !entry.startsWith("stroke:")));
+  assert.equal(canvas.font, "700 20px Inter, Arial, sans-serif");
+});
+
+test("Anton always uses its bundled 400 face and invalid values fall back safely", () => {
+  const anton = resolveMemeTextFont({
+    family: "Anton",
+    weight: 900,
+    fill_color: "orange",
+    stroke_ratio: 10,
+    line_height_ratio: 0.2,
+  });
+
+  assert.equal(anton.weight, 400);
+  assert.equal(memeCanvasFont(24, anton), "400 24px Anton, Impact, Haettenschweiler, 'Arial Black', sans-serif");
+  assert.equal(anton.fillColor, "#FFFFFF");
+  assert.equal(anton.strokeRatio, 0.25);
+  assert.equal(anton.lineHeightRatio, 0.8);
 });

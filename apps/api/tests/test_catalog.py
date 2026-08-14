@@ -2,6 +2,7 @@ from pathlib import Path
 
 from memedrop_api.services.catalog import (
     DEFAULT_CATALOG_PATH,
+    FontSpec,
     MemeCatalog,
     MemeTemplate,
     load_catalog_json,
@@ -85,3 +86,17 @@ def test_catalog_retrieval_metadata_is_versioned_and_backward_compatible() -> No
         "positive_hints": [],
         "anti_hints": [],
     }
+
+
+def test_runtime_catalog_normalizes_anton_to_its_available_weight() -> None:
+    font = FontSpec.model_validate(
+        {
+            "family": "Anton",
+            "weight": 900,
+            "min_size": 18,
+            "max_size": 48,
+            "stroke_ratio": 0.12,
+        }
+    )
+
+    assert font.weight == 400

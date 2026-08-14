@@ -28,6 +28,8 @@ test("generated manifests include normalized versioned retrieval metadata", asyn
       generatorPath,
       "--dry-run",
       "--files-only",
+      "--format-type",
+      "text_overlay",
       "--only",
       "Drake Hotline Bling",
       "--out",
@@ -44,6 +46,18 @@ test("generated manifests include normalized versioned retrieval metadata", asyn
 
   const manifest = JSON.parse(await fs.readFile(outputPath, "utf8")) as {
     templates: Array<{
+      regions: Array<{
+        padding_ratio: number;
+        text_transform: string;
+        font: {
+          family: string;
+          weight: number;
+          fill_color: string;
+          stroke_color: string;
+          stroke_ratio: number;
+          line_height_ratio: number;
+        };
+      }>;
       retrieval?: {
         version: number;
         joke_shapes: string[];
@@ -59,5 +73,29 @@ test("generated manifests include normalized versioned retrieval metadata", asyn
     joke_shapes: [],
     positive_hints: [],
     anti_hints: [],
+  });
+  assert.deepEqual(manifest.templates[0]?.regions[0], {
+    id: "top",
+    role: "setup text",
+    x: 0.05,
+    y: 0.05,
+    width: 0.9,
+    height: 0.18,
+    align: "center",
+    valign: "middle",
+    max_lines: 2,
+    max_chars: 42,
+    padding_ratio: 0.055,
+    text_transform: "uppercase",
+    font: {
+      family: "Impact",
+      min_size: 16,
+      max_size: 42,
+      weight: 900,
+      fill_color: "#FFFFFF",
+      stroke_color: "#000000",
+      stroke_ratio: 0.12,
+      line_height_ratio: 1.08,
+    },
   });
 });

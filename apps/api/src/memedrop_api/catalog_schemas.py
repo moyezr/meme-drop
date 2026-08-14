@@ -31,15 +31,25 @@ class CatalogDraftCreate(StrictModel):
 
 
 class CatalogFontAnnotation(StrictModel):
-    family: Literal["Impact"] = "Impact"
+    family: Literal["Impact", "Anton", "Inter"] = "Impact"
     min_size: int = Field(default=18, ge=10, le=96)
     max_size: int = Field(default=48, ge=10, le=120)
-    stroke_ratio: float = Field(default=0.1, ge=0.06, le=0.2)
+    weight: Literal[400, 700, 900] = 900
+    fill_color: Annotated[str, StringConstraints(pattern=r"^#[0-9A-Fa-f]{6}$")] = "#FFFFFF"
+    stroke_color: Annotated[str, StringConstraints(pattern=r"^#[0-9A-Fa-f]{6}$")] = "#000000"
+    # Catalog drafts historically used 0.10. Keep that default while allowing the
+    # existing runtime 0.12/0.14 values to pass through unchanged.
+    stroke_ratio: float = Field(default=0.1, ge=0, le=0.25)
+    line_height_ratio: float = Field(default=1.08, ge=0.8, le=1.5)
 
     @model_validator(mode="after")
     def font_bounds_are_ordered(self) -> CatalogFontAnnotation:
         if self.min_size > self.max_size:
             raise ValueError("font.min_size must not exceed font.max_size")
+        # Only the bundled Anton 400 face is available to the renderer. Normalize
+        # at the annotation boundary so saved drafts never claim a synthetic weight.
+        if self.family == "Anton":
+            self.weight = 400
         return self
 
 
@@ -62,6 +72,8 @@ class CatalogRegionAnnotation(StrictModel):
     valign: Literal["top", "middle", "bottom"] = "middle"
     max_lines: int = Field(ge=1, le=4)
     max_chars: int = Field(ge=8, le=90)
+    padding_ratio: float = Field(default=0.055, ge=0, le=0.2)
+    text_transform: Literal["uppercase", "none", "mocking"] = "uppercase"
     font: CatalogFontAnnotation = Field(default_factory=CatalogFontAnnotation)
     notes: str | None = Field(default=None, max_length=240)
 

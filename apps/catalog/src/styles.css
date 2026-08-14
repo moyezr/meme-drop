@@ -231,7 +231,18 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .region-selector-list .new-region-card { display: block; border-style: dashed; color: var(--muted); font-size: 9px; text-align: center; }
 .compact-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 .compact-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.layout-control-group { display: grid; gap: 9px; padding: 11px; border: 1px solid rgba(53, 61, 74, .78); border-radius: 9px; background: linear-gradient(145deg, rgba(26,30,38,.7), rgba(18,21,27,.7)); }
+.layout-control-group > div:first-child { display: grid; gap: 3px; }
+.layout-control-group > div:first-child strong { color: #dce3ed; font-size: 10px; }
+.layout-control-group > div:first-child span { color: var(--muted-2); font-size: 8px; line-height: 1.4; }
 .mini-field { display: grid; gap: 5px; color: var(--muted); font-size: 8px; font-weight: 750; }
+.mini-field > span, .mini-field > label { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.mini-field small { color: var(--muted-2); font-size: 7px; font-weight: 500; line-height: 1.2; text-align: right; }
+.mini-field input:disabled, .mini-field select:disabled { cursor: not-allowed; opacity: .55; }
+.color-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.color-field > div { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 6px; }
+.color-field input[type="color"] { width: 34px; height: 31px; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); cursor: pointer; }
+.color-field input[type="text"] { min-width: 0; height: 31px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); color: var(--text); font: 9px ui-monospace, monospace; text-transform: uppercase; }
 .mini-field input, .mini-field select { min-width: 0; height: 32px; padding: 0 7px; }
 .danger-button { min-height: 34px; border: 1px solid rgba(251,113,133,.25); border-radius: 7px; background: rgba(251,113,133,.06); color: #fda4af; font-size: 9px; font-weight: 750; }
 .panel-empty { display: grid; justify-items: center; padding: 34px 14px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); text-align: center; }

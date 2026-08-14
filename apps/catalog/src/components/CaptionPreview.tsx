@@ -36,6 +36,7 @@ export function CaptionPreview({ annotation, imageUrl, onVisualQaChange }: Capti
   const [customCaptions, setCustomCaptions] = useState<Record<string, string>>({});
   const [diagnostics, setDiagnostics] = useState<RenderDiagnostic[]>([]);
   const [rendering, setRendering] = useState(false);
+  const [fontsReady, setFontsReady] = useState(false);
   const [renderedSignature, setRenderedSignature] = useState<string | null>(null);
   const [reviewedExamples, setReviewedExamples] = useState<number[]>(
     annotation.visual_qa?.reviewed_example_indexes ?? [],
@@ -62,6 +63,10 @@ export function CaptionPreview({ annotation, imageUrl, onVisualQaChange }: Capti
     [annotation.name, annotation.regions, annotation.template_id, deferredCaptions],
   );
   const overlaySignature = useMemo(() => JSON.stringify(overlay.regions), [overlay.regions]);
+  const fontSignature = useMemo(
+    () => JSON.stringify(annotation.regions.map((region) => ({ family: region.font.family, weight: region.font.weight }))),
+    [annotation.regions],
+  );
 
   useEffect(() => {
     const request = ++imageRequest.current;
@@ -81,8 +86,21 @@ export function CaptionPreview({ annotation, imageUrl, onVisualQaChange }: Capti
     };
   }, [imageUrl]);
 
+  // Load every selected typeface while the image loads. Canvas does not redraw itself when a font
+  // arrives, so waiting here keeps this preview identical to a fresh production render.
   useEffect(() => {
-    if (!image || !canvasRef.current) return;
+    let active = true;
+    setFontsReady(false);
+    void loadOverlayFonts(annotation.regions).finally(() => {
+      if (active) setFontsReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [fontSignature]);
+
+  useEffect(() => {
+    if (!image || !canvasRef.current || !fontsReady) return;
     const request = ++renderRequest.current;
     setRendering(true);
     setRenderedSignature(null);
@@ -101,7 +119,7 @@ export function CaptionPreview({ annotation, imageUrl, onVisualQaChange }: Capti
       setRendering(false);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [image, overlay, overlaySignature]);
+  }, [fontsReady, image, overlay, overlaySignature]);
 
   useEffect(() => {
     setExampleIndex((index) => Math.min(index, Math.max(0, examples.length - 1)));
@@ -193,7 +211,7 @@ export function CaptionPreview({ annotation, imageUrl, onVisualQaChange }: Capti
         {imageError ? <p className="render-empty error">{imageError}</p> : null}
         {!image && !imageError ? <p className="render-empty">Loading source image…</p> : null}
         {image ? <canvas aria-label="Rendered meme preview" ref={canvasRef} /> : null}
-        {rendering ? <span className="rendering-indicator">Rendering…</span> : null}
+        {rendering || !fontsReady ? <span className="rendering-indicator">{fontsReady ? "Rendering…" : "Loading fonts…"}</span> : null}
       </div>
 
       {source === "custom" ? (
@@ -249,6 +267,15 @@ export function CaptionPreview({ annotation, imageUrl, onVisualQaChange }: Capti
       {qaError ? <p className="qa-error">{qaError}</p> : null}
     </div>
   );
+}
+
+async function loadOverlayFonts(regions: TemplateAnnotation["regions"]): Promise<void> {
+  if (!("fonts" in document)) return;
+  const fontSet = document.fonts;
+  const requests = new Set(
+    regions.map((region) => `${region.font.weight} 16px "${region.font.family}"`),
+  );
+  await Promise.all([...requests].map((font) => fontSet.load(font)));
 }
 
 function hasRenderIssue(diagnostic: RenderDiagnostic): boolean {

@@ -13,6 +13,7 @@ import {
 } from "../shared/suggestion-request";
 import type { MemeTextOverlay } from "@memedrop/shared";
 import { drawMemeTextOverlay } from "@memedrop/shared/overlay-renderer";
+import { ensureMemeOverlayFonts } from "./overlay-fonts";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const IMAGE_PLACEHOLDER =
@@ -947,7 +948,10 @@ async function renderMemeWithOverlay(
   overlay: MemeTextOverlay,
   maxDimension?: number
 ): Promise<string> {
-  const raw = await resolveMemeBlob(imageUrl, imageDataUrl);
+  const [raw] = await Promise.all([
+    resolveMemeBlob(imageUrl, imageDataUrl),
+    ensureMemeOverlayFonts(overlay),
+  ]);
   const bitmap = await createImageBitmap(raw);
   try {
     const canvas = document.createElement("canvas");

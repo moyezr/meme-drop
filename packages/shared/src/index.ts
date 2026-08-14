@@ -16,16 +16,20 @@ export type {
   SuggestionResult,
   MemeTextOverlay,
   MemeTextRegion,
+  MemeTextFont,
 } from "./types/suggestion.js";
 
 export {
   drawMemeTextOverlay,
   drawMemeTextRegion,
   measureMemeTextRegion,
+  resolveMemeTextFont,
+  memeCanvasFont,
 } from "./overlay-renderer.js";
 export type {
   MemeTextOverlayRenderDiagnostics,
   MemeTextRegionRenderDiagnostics,
+  ResolvedMemeTextFont,
 } from "./overlay-renderer.js";
 
 export type {

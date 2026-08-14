@@ -38,11 +38,17 @@ export interface MemeTextTemplateRegion {
   valign: "top" | "middle" | "bottom";
   max_lines: number;
   max_chars: number;
+  padding_ratio?: number;
+  text_transform?: "uppercase" | "mocking" | "none";
   font: {
-    family: "Impact";
+    family: "Impact" | "Anton" | "Inter";
+    weight?: 400 | 700 | 900;
     min_size: number;
     max_size: number;
-    stroke_ratio: number;
+    fill_color?: string;
+    stroke_color?: string;
+    stroke_ratio?: number;
+    line_height_ratio?: number;
   };
   notes?: string;
 }

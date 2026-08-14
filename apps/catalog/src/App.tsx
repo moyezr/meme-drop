@@ -163,7 +163,18 @@ export function App() {
       valign: "middle",
       max_lines: 2,
       max_chars: 42,
-      font: { family: "Impact", min_size: 18, max_size: 48, stroke_ratio: 0.1 },
+      padding_ratio: 0.055,
+      text_transform: "uppercase",
+      font: {
+        family: "Impact",
+        weight: 900,
+        min_size: 18,
+        max_size: 48,
+        fill_color: "#FFFFFF",
+        stroke_color: "#000000",
+        stroke_ratio: 0.1,
+        line_height_ratio: 1.08,
+      },
       notes: null,
     };
     annotation.regions.push(region);

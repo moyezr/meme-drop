@@ -46,7 +46,9 @@ test("quality score reflects human annotation completeness", () => {
       valign: "middle",
       max_lines: 2,
       max_chars: 32,
-      font: { family: "Impact", min_size: 18, max_size: 48, stroke_ratio: 0.1 },
+      font: { family: "Impact", weight: 900, min_size: 18, max_size: 48, fill_color: "#FFFFFF", stroke_color: "#000000", stroke_ratio: 0.1, line_height_ratio: 1.08 },
+      padding_ratio: 0.055,
+      text_transform: "uppercase",
     },
   ];
   value.visual_qa = {
@@ -74,7 +76,9 @@ test("rendered QA becomes incomplete when a region or a good example has not bee
       valign: "top",
       max_lines: 2,
       max_chars: 30,
-      font: { family: "Impact", min_size: 18, max_size: 42, stroke_ratio: 0.1 },
+      font: { family: "Impact", weight: 900, min_size: 18, max_size: 42, fill_color: "#FFFFFF", stroke_color: "#000000", stroke_ratio: 0.1, line_height_ratio: 1.08 },
+      padding_ratio: 0.055,
+      text_transform: "uppercase",
     },
   ];
   value.caption_guidance.good_examples = [{ top: "A short caption" }, { top: "A second caption" }];
@@ -102,7 +106,9 @@ test("only rendering inputs invalidate a visual QA record", () => {
       valign: "top",
       max_lines: 2,
       max_chars: 30,
-      font: { family: "Impact", min_size: 18, max_size: 42, stroke_ratio: 0.1 },
+      font: { family: "Impact", weight: 900, min_size: 18, max_size: 42, fill_color: "#FFFFFF", stroke_color: "#000000", stroke_ratio: 0.1, line_height_ratio: 1.08 },
+      padding_ratio: 0.055,
+      text_transform: "uppercase",
     },
   ];
   previous.caption_guidance.good_examples = [{ top: "Short setup" }];

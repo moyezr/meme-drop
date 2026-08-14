@@ -1,4 +1,25 @@
-import type { MemeTextOverlay, MemeTextRegion } from "./types/suggestion.js";
+import type { MemeTextFont, MemeTextOverlay, MemeTextRegion } from "./types/suggestion.js";
+
+export const DEFAULT_MEME_TEXT_FONT = {
+  family: "Impact",
+  weight: 900,
+  fillColor: "#FFFFFF",
+  strokeColor: "#000000",
+  strokeRatio: 0.12,
+  lineHeightRatio: 1.08,
+} as const;
+
+export const DEFAULT_MEME_TEXT_PADDING_RATIO = 0.055;
+
+export interface ResolvedMemeTextFont {
+  family: "Impact" | "Anton" | "Inter";
+  /** Anton only ships a 400 face, so it must never be synthetically weighted. */
+  weight: 400 | 700 | 900;
+  fillColor: string;
+  strokeColor: string;
+  strokeRatio: number;
+  lineHeightRatio: number;
+}
 
 /**
  * The computed result of laying out one caption region. The renderer returns
@@ -29,6 +50,7 @@ type RegionLayout = MemeTextRegionRenderDiagnostics & {
   textX: number;
   startY: number;
   strokeWidth: number;
+  font: ResolvedMemeTextFont;
 };
 
 /** Draw all caption regions and return the exact layout diagnostics. */
@@ -71,14 +93,16 @@ export function drawMemeTextRegion(
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
   ctx.miterLimit = 2;
-  ctx.font = impactFont(layout.fontSize);
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "#000";
+  ctx.font = memeCanvasFont(layout.fontSize, layout.font);
+  ctx.fillStyle = layout.font.fillColor;
+  ctx.strokeStyle = layout.font.strokeColor;
   ctx.lineWidth = layout.strokeWidth;
 
   for (let index = 0; index < layout.lines.length; index += 1) {
     const lineY = layout.startY + index * layout.lineHeight;
-    ctx.strokeText(layout.lines[index], layout.textX, lineY);
+    if (layout.strokeWidth > 0) {
+      ctx.strokeText(layout.lines[index], layout.textX, lineY);
+    }
     ctx.fillText(layout.lines[index], layout.textX, lineY);
   }
   ctx.restore();
@@ -107,10 +131,18 @@ function layoutMemeTextRegion(
   const width = region.width * canvasWidth;
   const height = region.height * canvasHeight;
   const rawText = region.text.trim();
+  const font = resolveMemeTextFont(region.font);
   const maxChars = region.max_chars || 120;
   const charLimitExceeded = rawText.length > maxChars;
   const text = transformOverlayText(rawText.slice(0, maxChars), region.text_transform);
-  const padding = Math.max(4, Math.min(width, height) * 0.055);
+  const paddingRatio = clampNumber(
+    region.padding_ratio,
+    0,
+    0.2,
+    DEFAULT_MEME_TEXT_PADDING_RATIO
+  );
+  const padding =
+    paddingRatio === 0 ? 0 : Math.max(4, Math.min(width, height) * paddingRatio);
   const safeBounds = {
     x: x + padding,
     y: y + padding,
@@ -123,32 +155,33 @@ function layoutMemeTextRegion(
   }
 
   const fontScale = region.font_scale ?? 1;
-  const manifestMax = region.font?.max_size || 52;
-  const manifestMin = region.font?.min_size || 12;
+  const manifestMax = region.font?.max_size ?? 52;
+  const manifestMin = region.font?.min_size ?? 12;
   const minFont = Math.max(10, manifestMin);
   const maxFont = estimateImpactFontSize(ctx, text, safeBounds.width, safeBounds.height, {
     minFont,
     maxFont: manifestMax,
     fontScale,
+    font,
   });
   const maxLines = region.max_lines || 4;
   let fontSize = maxFont;
-  let wrapped = wrapImpactLines(ctx, text, safeBounds.width, fontSize, maxLines);
+  let wrapped = wrapMemeTextLines(ctx, text, safeBounds.width, fontSize, maxLines, font);
 
   while (
     fontSize - 0.5 >= minFont &&
-    (wrapped.lines.length * fontSize * 1.08 > safeBounds.height ||
-      wrapped.lines.some((line) => measureImpactText(ctx, line, fontSize) > safeBounds.width))
+    (wrapped.lines.length * fontSize * font.lineHeightRatio > safeBounds.height ||
+      wrapped.lines.some((line) => measureMemeText(ctx, line, fontSize, font) > safeBounds.width))
   ) {
     fontSize -= 0.5;
-    wrapped = wrapImpactLines(ctx, text, safeBounds.width, fontSize, maxLines);
+    wrapped = wrapMemeTextLines(ctx, text, safeBounds.width, fontSize, maxLines, font);
   }
 
   fontSize = Math.max(minFont, fontSize);
-  wrapped = wrapImpactLines(ctx, text, safeBounds.width, fontSize, maxLines);
-  const lineHeight = fontSize * 1.08;
+  wrapped = wrapMemeTextLines(ctx, text, safeBounds.width, fontSize, maxLines, font);
+  const lineHeight = fontSize * font.lineHeightRatio;
   const widthOverflow = wrapped.lines.some(
-    (line) => measureImpactText(ctx, line, fontSize) > safeBounds.width
+    (line) => measureMemeText(ctx, line, fontSize, font) > safeBounds.width
   );
   const heightOverflow = wrapped.lines.length * lineHeight > safeBounds.height;
   const totalHeight = Math.min(lineHeight * wrapped.lines.length, safeBounds.height);
@@ -179,7 +212,8 @@ function layoutMemeTextRegion(
     safeBounds,
     textX,
     startY,
-    strokeWidth: Math.max(2, fontSize * (region.font?.stroke_ratio || 0.12)),
+    strokeWidth: font.strokeRatio === 0 ? 0 : Math.max(2, fontSize * font.strokeRatio),
+    font,
   };
 }
 
@@ -204,17 +238,19 @@ function emptyLayout(
     textX: safeBounds.x + safeBounds.width / 2,
     startY: safeBounds.y + safeBounds.height / 2,
     strokeWidth: 0,
+    font: resolveMemeTextFont(),
   };
 }
 
-function wrapImpactLines(
+function wrapMemeTextLines(
   ctx: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,
   fontSize: number,
-  maxLines: number
+  maxLines: number,
+  font: ResolvedMemeTextFont
 ): { lines: string[]; truncated: boolean } {
-  ctx.font = impactFont(fontSize);
+  ctx.font = memeCanvasFont(fontSize, font);
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = "";
@@ -267,18 +303,23 @@ function estimateImpactFontSize(
   text: string,
   width: number,
   height: number,
-  options: { minFont: number; maxFont: number; fontScale: number }
+  options: {
+    minFont: number;
+    maxFont: number;
+    fontScale: number;
+    font: ResolvedMemeTextFont;
+  }
 ): number {
   const words = text.split(/\s+/).filter(Boolean);
   const longestWordLength = words.reduce((max, word) => Math.max(max, word.length), 1);
   const targetLineCount = Math.max(1, Math.min(4, Math.ceil(text.length / 18)));
   const roughByLength = width / Math.max(longestWordLength * 0.72, text.length * 0.24);
-  const roughByHeight = height / (targetLineCount * 1.08);
+  const roughByHeight = height / (targetLineCount * options.font.lineHeightRatio);
   let size = Math.min(options.maxFont, Math.max(options.minFont, roughByLength, roughByHeight));
   size *= options.fontScale;
   size = Math.min(options.maxFont, Math.max(options.minFont, size));
 
-  ctx.font = impactFont(size);
+  ctx.font = memeCanvasFont(size, options.font);
   if (ctx.measureText(text).width <= width) return size;
 
   return Math.max(options.minFont, Math.min(size, width / Math.max(1, text.length * 0.54)));
@@ -306,15 +347,65 @@ function toMockingCase(text: string): string {
     .join("");
 }
 
-function measureImpactText(
+function measureMemeText(
   ctx: CanvasRenderingContext2D,
   text: string,
-  fontSize: number
+  fontSize: number,
+  font: ResolvedMemeTextFont
 ): number {
-  ctx.font = impactFont(fontSize);
+  ctx.font = memeCanvasFont(fontSize, font);
   return ctx.measureText(text).width;
 }
 
-function impactFont(fontSize: number): string {
-  return `${Math.floor(fontSize)}px Impact, Haettenschweiler, 'Arial Black', sans-serif`;
+/** Resolve untrusted persisted annotations to the narrow rendering contract. */
+export function resolveMemeTextFont(font?: MemeTextFont): ResolvedMemeTextFont {
+  const family = isFontFamily(font?.family) ? font.family : DEFAULT_MEME_TEXT_FONT.family;
+  const requestedWeight = isFontWeight(font?.weight) ? font.weight : DEFAULT_MEME_TEXT_FONT.weight;
+
+  return {
+    family,
+    weight: family === "Anton" ? 400 : requestedWeight,
+    fillColor: normalizeColor(font?.fill_color, DEFAULT_MEME_TEXT_FONT.fillColor),
+    strokeColor: normalizeColor(font?.stroke_color, DEFAULT_MEME_TEXT_FONT.strokeColor),
+    strokeRatio: clampNumber(font?.stroke_ratio, 0, 0.25, DEFAULT_MEME_TEXT_FONT.strokeRatio),
+    lineHeightRatio: clampNumber(
+      font?.line_height_ratio,
+      0.8,
+      1.5,
+      DEFAULT_MEME_TEXT_FONT.lineHeightRatio
+    ),
+  };
+}
+
+/**
+ * Return the exact canvas font declaration used for both measuring and
+ * drawing. Impact intentionally keeps its original declaration for backward
+ * compatible rendering; Anton is only distributed at weight 400.
+ */
+export function memeCanvasFont(fontSize: number, font: ResolvedMemeTextFont): string {
+  const size = Math.floor(fontSize);
+  if (font.family === "Impact") {
+    return `${size}px Impact, Haettenschweiler, 'Arial Black', sans-serif`;
+  }
+  if (font.family === "Anton") {
+    return `400 ${size}px Anton, Impact, Haettenschweiler, 'Arial Black', sans-serif`;
+  }
+  return `${font.weight} ${size}px Inter, Arial, sans-serif`;
+}
+
+function isFontFamily(value: unknown): value is ResolvedMemeTextFont["family"] {
+  return value === "Impact" || value === "Anton" || value === "Inter";
+}
+
+function isFontWeight(value: unknown): value is ResolvedMemeTextFont["weight"] {
+  return value === 400 || value === 700 || value === 900;
+}
+
+function normalizeColor(value: unknown, fallback: string): string {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : fallback;
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
 }
