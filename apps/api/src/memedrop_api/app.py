@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from memedrop_api.api.account import router as account_router
+from memedrop_api.api.agent_memes import router as agent_memes_router
 from memedrop_api.api.health import ReadinessCheck
 from memedrop_api.api.health import router as health_router
 from memedrop_api.api.internal_catalog import router as internal_catalog_router
@@ -33,9 +34,11 @@ from memedrop_api.rate_limit import (
     rate_limit_client_key,
 )
 from memedrop_api.repositories import BackendStore, SqlAlchemyStore
+from memedrop_api.services.agent_memes import AgentMemeService, MemeRenderer
 from memedrop_api.services.auto_tagger import auto_tag_meme
 from memedrop_api.services.catalog import MemeCatalog
 from memedrop_api.services.image_downloader import download_image
+from memedrop_api.services.meme_renderer import render_meme
 from memedrop_api.services.openrouter import OpenRouterSuggestionGateway
 from memedrop_api.services.storage import MemeStorage, create_meme_storage
 from memedrop_api.services.suggestion_engine import SuggestionService
@@ -56,6 +59,7 @@ def create_app(
     suggestion_service: SuggestionService | None = None,
     storage: MemeStorage | None = None,
     catalog_draft_store: CatalogDraftStore | None = None,
+    meme_renderer: MemeRenderer | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings()  # type: ignore[call-arg]
     meme_storage = storage or create_meme_storage(app_settings)
@@ -111,6 +115,11 @@ def create_app(
     app.state.auto_tag_meme = auto_tag_service or auto_tag_meme
     app.state.meme_storage = meme_storage
     app.state.suggestion_service = suggestions
+    app.state.agent_meme_service = AgentMemeService(
+        suggestions,
+        meme_storage,
+        meme_renderer or render_meme,
+    )
     app.state.meme_catalog = catalog
 
     app.add_middleware(
@@ -188,6 +197,7 @@ def create_app(
 
     app.include_router(health_router)
     app.include_router(account_router)
+    app.include_router(agent_memes_router)
     app.include_router(library_router)
     app.include_router(memes_router)
     app.include_router(suggest_router)
