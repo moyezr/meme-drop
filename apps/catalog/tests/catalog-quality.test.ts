@@ -15,7 +15,16 @@ function annotation(): TemplateAnnotation {
     regions: [],
     caption_guidance: { pattern: "", good_examples: [], bad_examples: [] },
     retrieval: { version: 1, joke_shapes: [], positive_hints: [], anti_hints: [] },
-    editorial: { description: "", use_cases: [], anti_use_cases: [] },
+    editorial: {
+      description: "",
+      canonical_meaning: "",
+      use_cases: [],
+      anti_use_cases: [],
+      tone_tags: [],
+      trend_notes: [],
+      freshness: "unknown",
+    },
+    safety: { sensitive_topics: [], brand_risks: [] },
   };
 }
 

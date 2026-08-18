@@ -214,9 +214,15 @@ def initial_annotation(
             ),
             "editorial": {
                 "description": "",
+                "canonical_meaning": "",
                 "use_cases": [],
                 "anti_use_cases": [],
+                "tone_tags": [],
+                "trend_notes": [],
+                "freshness": "unknown",
             },
+            "safety": {"sensitive_topics": [], "brand_risks": []},
+            "machine_provenance": None,
             "visual_qa": None,
         }
     )

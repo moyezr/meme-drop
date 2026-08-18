@@ -191,9 +191,18 @@ async def test_create_draft_copies_media_and_can_clone_existing_annotations(
     assert draft["annotation"]["regions"]
     assert draft["annotation"]["editorial"] == {
         "description": "",
+        "canonical_meaning": "",
         "use_cases": [],
         "anti_use_cases": [],
+        "tone_tags": [],
+        "trend_notes": [],
+        "freshness": "unknown",
     }
+    assert draft["annotation"]["safety"] == {
+        "sensitive_topics": [],
+        "brand_risks": [],
+    }
+    assert draft["annotation"]["machine_provenance"] is None
     assert len(store.drafts) == 1
     assert (storage_root / draft["asset_path"].removeprefix("/memes/")).is_file()
     assert (storage_root / draft["thumbnail_path"].removeprefix("/memes/")).is_file()

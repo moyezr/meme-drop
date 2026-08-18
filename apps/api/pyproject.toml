@@ -26,6 +26,7 @@ memedrop-usage-feedback = "memedrop_api.cli:usage_feedback"
 memedrop-storage-check = "memedrop_api.cli:storage_check"
 memedrop-suggestion-eval = "memedrop_api.suggestion_evaluation:main"
 memedrop-caption-eval = "memedrop_api.caption_evaluation:main"
+memedrop-catalog-import = "memedrop_api.catalog_import:main"
 
 [dependency-groups]
 dev = [

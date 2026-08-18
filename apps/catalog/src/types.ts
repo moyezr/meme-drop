@@ -53,11 +53,34 @@ export interface TemplateAnnotation {
   };
   editorial: {
     description: string;
+    canonical_meaning: string;
     use_cases: string[];
     anti_use_cases: string[];
+    tone_tags: string[];
+    trend_notes: string[];
+    freshness: "evergreen" | "current" | "saturated" | "unknown";
   };
+  safety: {
+    sensitive_topics: string[];
+    brand_risks: string[];
+  };
+  machine_provenance?: MachineProvenance | null;
   /** Local rendered review evidence. The API verifies its fingerprint before approval. */
   visual_qa?: VisualQaAnnotation | null;
+}
+
+export interface MachineProvenance {
+  status: "machine_generated";
+  requires_human_review: true;
+  semantic_model: string;
+  vision_model: string | null;
+  geometry_source: "vision_model" | "text_only_fallback";
+  prompt_version: string;
+  input_sha256: string;
+  generated_at: string;
+  source_provider: "imgflip";
+  source_id: string;
+  source_content_sha256: string;
 }
 
 export interface VisualQaAnnotation {

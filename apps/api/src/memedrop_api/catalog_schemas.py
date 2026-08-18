@@ -20,6 +20,9 @@ TemplateId = Annotated[
     ),
 ]
 ShortLabel = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+AnnotationText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)
+]
 
 
 class CatalogDraftCreate(StrictModel):
@@ -114,21 +117,49 @@ class CatalogVisualQA(StrictModel):
 
 class CatalogRetrievalAnnotation(StrictModel):
     version: Literal[1] = 1
-    joke_shapes: list[ShortLabel] = Field(default_factory=list, max_length=12)
-    positive_hints: list[ShortLabel] = Field(default_factory=list, max_length=24)
-    anti_hints: list[ShortLabel] = Field(default_factory=list, max_length=24)
+    joke_shapes: list[AnnotationText] = Field(default_factory=list, max_length=12)
+    positive_hints: list[AnnotationText] = Field(default_factory=list, max_length=24)
+    anti_hints: list[AnnotationText] = Field(default_factory=list, max_length=24)
 
 
 class CatalogEditorialAnnotation(StrictModel):
     description: str = Field(default="", max_length=800)
-    use_cases: list[ShortLabel] = Field(default_factory=list, max_length=16)
-    anti_use_cases: list[ShortLabel] = Field(default_factory=list, max_length=16)
+    canonical_meaning: str = Field(default="", max_length=600)
+    use_cases: list[AnnotationText] = Field(default_factory=list, max_length=16)
+    anti_use_cases: list[AnnotationText] = Field(default_factory=list, max_length=16)
+    tone_tags: list[AnnotationText] = Field(default_factory=list, max_length=12)
+    trend_notes: list[AnnotationText] = Field(default_factory=list, max_length=8)
+    freshness: Literal["evergreen", "current", "saturated", "unknown"] = "unknown"
+
+
+class CatalogSafetyAnnotation(StrictModel):
+    sensitive_topics: list[AnnotationText] = Field(default_factory=list, max_length=12)
+    brand_risks: list[AnnotationText] = Field(default_factory=list, max_length=12)
+
+
+class CatalogMachineProvenance(StrictModel):
+    """Read-only provenance for a prefilled machine draft.
+
+    This remains review metadata and is deliberately excluded from render fingerprints.
+    """
+
+    status: Literal["machine_generated"] = "machine_generated"
+    requires_human_review: Literal[True] = True
+    semantic_model: AnnotationText
+    vision_model: AnnotationText | None = None
+    geometry_source: Literal["vision_model", "text_only_fallback"]
+    prompt_version: AnnotationText
+    input_sha256: Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{64}$")]
+    generated_at: AwareDatetime
+    source_provider: Literal["imgflip"]
+    source_id: AnnotationText
+    source_content_sha256: Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{64}$")]
 
 
 class CatalogTemplateAnnotation(StrictModel):
     template_id: TemplateId
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
-    aliases: list[ShortLabel] = Field(default_factory=list, max_length=20)
+    aliases: list[AnnotationText] = Field(default_factory=list, max_length=20)
     source_image: Annotated[
         str,
         StringConstraints(strip_whitespace=True, pattern=r"^/memes/[A-Za-z0-9._/-]+$"),
@@ -139,6 +170,8 @@ class CatalogTemplateAnnotation(StrictModel):
     caption_guidance: CatalogCaptionGuidance = Field(default_factory=CatalogCaptionGuidance)
     retrieval: CatalogRetrievalAnnotation = Field(default_factory=CatalogRetrievalAnnotation)
     editorial: CatalogEditorialAnnotation = Field(default_factory=CatalogEditorialAnnotation)
+    safety: CatalogSafetyAnnotation = Field(default_factory=CatalogSafetyAnnotation)
+    machine_provenance: CatalogMachineProvenance | None = None
     visual_qa: CatalogVisualQA | None = None
 
     @model_validator(mode="after")

@@ -58,6 +58,18 @@ rows and existing thumbnails. It validates every referenced legacy file before t
 missing data cannot be silently ignored. Rerun this command as a controlled production release step
 to backfill existing catalog previews.
 
+Machine-generated scale drafts can be prefilled into the local human-review catalog without copying
+their source media. The importer is development-only, requires `meme-drop-dev`, dry-runs by default,
+and protects every existing catalog row from overwrite:
+
+```sh
+uv run --project apps/api memedrop-catalog-import
+uv run --project apps/api memedrop-catalog-import --write
+```
+
+The default input is `.memedrop/template-pipeline/manifest.json`. Imported records remain drafts,
+retain their model/source provenance, and start without visual QA evidence.
+
 Meme files use Supabase's S3-compatible API. Set `S3_BUCKET_NAME` explicitly to `meme-drop-dev` in
 development and `meme-drop-prod` in production; configuration rejects a missing S3 bucket or a
 bucket from the wrong environment. Keep
