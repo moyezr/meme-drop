@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import mimetypes
 import shutil
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from time import perf_counter
 from typing import Any, Protocol
@@ -17,6 +18,25 @@ from starlette.responses import FileResponse, Response
 from memedrop_api.config import Settings
 
 PUBLIC_PREFIX = "/memes/"
+DEFAULT_MAX_OBJECT_BYTES = 8 * 1024 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class StoredObject:
+    content: bytes
+    content_type: str
+
+
+class StorageReadError(Exception):
+    """Base error for internal storage reads."""
+
+
+class StorageObjectNotFoundError(StorageReadError):
+    """Raised when a public meme path is invalid or missing."""
+
+
+class StorageObjectTooLargeError(StorageReadError):
+    """Raised when an object exceeds the configured read limit."""
 
 
 class MemeStorage(Protocol):
@@ -27,6 +47,8 @@ class MemeStorage(Protocol):
     ) -> str: ...
 
     async def delete(self, public_path: str) -> bool: ...
+
+    async def read_bytes(self, public_path: str) -> StoredObject: ...
 
     async def serve(self, public_path: str) -> Response: ...
 
@@ -61,8 +83,11 @@ def validate_object_key(object_key: str) -> str:
 
 
 class LocalMemeStorage:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, max_object_bytes: int = DEFAULT_MAX_OBJECT_BYTES) -> None:
+        if max_object_bytes <= 0:
+            raise ValueError("max_object_bytes must be positive")
         self.root = root.resolve()
+        self.max_object_bytes = max_object_bytes
         self.root.mkdir(parents=True, exist_ok=True)
 
     async def put_file(self, source: Path, object_key: str) -> str:
@@ -91,6 +116,18 @@ class LocalMemeStorage:
             return True
         except FileNotFoundError:
             return False
+
+    async def read_bytes(self, public_path: str) -> StoredObject:
+        object_key = object_key_from_public_path(public_path)
+        if object_key is None:
+            raise StorageObjectNotFoundError(public_path)
+        try:
+            file_path = self._path(object_key)
+            content = await asyncio.to_thread(_read_local_bytes, file_path, self.max_object_bytes)
+        except (FileNotFoundError, ValueError) as error:
+            raise StorageObjectNotFoundError(public_path) from error
+        content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+        return StoredObject(content=content, content_type=content_type)
 
     async def serve(self, public_path: str) -> Response:
         object_key = object_key_from_public_path(public_path)
@@ -171,37 +208,49 @@ class S3MemeStorage:
         object_key = object_key_from_public_path(public_path)
         if object_key is None:
             return False
-        await asyncio.to_thread(
-            self.client.delete_object, Bucket=self.bucket, Key=object_key
-        )
+        await asyncio.to_thread(self.client.delete_object, Bucket=self.bucket, Key=object_key)
         return True
 
-    async def serve(self, public_path: str) -> Response:
+    async def read_bytes(self, public_path: str) -> StoredObject:
         object_key = object_key_from_public_path(public_path)
         if object_key is None:
-            raise HTTPException(status_code=404, detail="Not Found")
+            raise StorageObjectNotFoundError(public_path)
         try:
             result = await asyncio.to_thread(
                 self.client.get_object, Bucket=self.bucket, Key=object_key
             )
         except ClientError as error:
-            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey"}:
-                raise HTTPException(status_code=404, detail="Not Found") from error
+            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+                raise StorageObjectNotFoundError(public_path) from error
             raise
-        if int(result.get("ContentLength", 0)) > self.max_object_bytes:
-            raise HTTPException(status_code=502, detail="Stored image is too large")
         body = result["Body"]
-        content = await asyncio.to_thread(body.read)
-        body.close()
-        if len(content) > self.max_object_bytes:
-            raise HTTPException(status_code=502, detail="Stored image is too large")
-        return Response(
+        try:
+            content_length = result.get("ContentLength")
+            if content_length is not None and int(content_length) > self.max_object_bytes:
+                raise StorageObjectTooLargeError(public_path)
+            content = await asyncio.to_thread(body.read, self.max_object_bytes + 1)
+            if len(content) > self.max_object_bytes:
+                raise StorageObjectTooLargeError(public_path)
+        finally:
+            body.close()
+        return StoredObject(
             content=content,
-            media_type=result.get("ContentType", "application/octet-stream"),
+            content_type=result.get("ContentType") or "application/octet-stream",
+        )
+
+    async def serve(self, public_path: str) -> Response:
+        try:
+            stored_object = await self.read_bytes(public_path)
+        except StorageObjectNotFoundError as error:
+            raise HTTPException(status_code=404, detail="Not Found") from error
+        except StorageObjectTooLargeError as error:
+            raise HTTPException(status_code=502, detail="Stored image is too large") from error
+        return Response(
+            content=stored_object.content,
+            media_type=stored_object.content_type,
             headers={
                 "Cache-Control": (
-                    "public, max-age=3600, s-maxage=86400, "
-                    "stale-while-revalidate=604800"
+                    "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
                 )
             },
         )
@@ -233,9 +282,7 @@ class S3MemeStorage:
             result["read_ms"] = _elapsed_ms(read_started)
         finally:
             delete_started = perf_counter()
-            await asyncio.to_thread(
-                self.client.delete_object, Bucket=self.bucket, Key=object_key
-            )
+            await asyncio.to_thread(self.client.delete_object, Bucket=self.bucket, Key=object_key)
             result["delete_ms"] = _elapsed_ms(delete_started)
         return result
 
@@ -243,7 +290,19 @@ class S3MemeStorage:
 def create_meme_storage(settings: Settings) -> MemeStorage:
     if settings.storage_backend == "s3":
         return S3MemeStorage(settings)
-    return LocalMemeStorage(settings.meme_storage_path)
+    return LocalMemeStorage(settings.meme_storage_path, max_object_bytes=settings.max_image_bytes)
+
+
+def _read_local_bytes(file_path: Path, max_object_bytes: int) -> bytes:
+    if not file_path.is_file():
+        raise FileNotFoundError(file_path)
+    if file_path.stat().st_size > max_object_bytes:
+        raise StorageObjectTooLargeError(str(file_path))
+    with file_path.open("rb") as source:
+        content = source.read(max_object_bytes + 1)
+    if len(content) > max_object_bytes:
+        raise StorageObjectTooLargeError(str(file_path))
+    return content
 
 
 def _elapsed_ms(started: float) -> float:
