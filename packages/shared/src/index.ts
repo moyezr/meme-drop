@@ -10,6 +10,13 @@ export type {
 export type { User } from "./types/user.js";
 
 export type {
+  MemeGenerateOptions,
+  MemeGenerateRequest,
+  GeneratedMeme,
+  MemeGenerateResponse,
+} from "./types/meme-generation.js";
+
+export type {
   TweetContext,
   FeedbackContext,
   SuggestionRequest,
@@ -51,6 +58,8 @@ export {
 export type { TemplateLookupOptions } from "./data/template-lookup.js";
 
 export type {
+  MemeGenerateRouteRequest,
+  MemeGenerateRouteResponse,
   SuggestRequest,
   SuggestResponse,
   UsageRequest,
