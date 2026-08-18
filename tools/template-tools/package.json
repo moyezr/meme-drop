@@ -16,6 +16,7 @@
     "manifest:audit:all": "tsx scripts/audit-template-annotations.ts --scope all",
     "manifest:fix-examples": "tsx scripts/fix-template-example-lengths.ts",
     "manifest:review-queue": "tsx scripts/template-review-queue.ts",
+    "manifest:scale-review-plan": "tsx scripts/plan-scale-review.ts",
     "manifest:review-gate": "tsx scripts/template-review-queue.ts --limit 20 --fail-on-items",
     "manifest:expansion-report": "tsx scripts/template-expansion-report.ts",
     "manifest:coverage-gate": "tsx scripts/template-expansion-report.ts --fail-on-gaps --limit 0",

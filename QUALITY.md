@@ -178,6 +178,23 @@ npm run dataset:promotion-plan
 npm run dataset:benchmark-stubs
 ```
 
+For the development-only 1,000-source experiment, rank the completed machine drafts before opening
+the human review queue. Supplying the draft-catalog evaluation report adds real top-five and
+shortlist exposure to the priority score:
+
+```sh
+uv run --project apps/api memedrop-suggestion-eval \
+  --catalog .memedrop/template-pipeline/manifest.json \
+  --include-drafts --no-baseline \
+  --out .memedrop/template-pipeline/suggestion-eval.json
+npm run manifest:scale-review-plan --workspace=@memedrop/template-tools -- \
+  --evaluation .memedrop/template-pipeline/suggestion-eval.json
+```
+
+This plan is a triage artifact, not approval evidence. It prioritizes benchmark families, frequently
+returned drafts, popular sources, novel families, and mechanically suspicious annotations. Human
+rendered QA and benchmark review remain mandatory.
+
 Edit exported benchmark stubs into realistic cases with at least three acceptable families and clear
 rejections. Then validate/import them and promote only the reviewed batch:
 
