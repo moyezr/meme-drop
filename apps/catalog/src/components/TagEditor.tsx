@@ -46,6 +46,7 @@ export function TagEditor({
           ))}
           <input
             aria-label={`${label} value`}
+            maxLength={240}
             onBlur={addValue}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {

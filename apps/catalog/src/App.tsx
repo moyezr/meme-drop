@@ -288,6 +288,7 @@ export function App() {
               onRemoveRegion={removeRegion}
               onSelectRegion={setSelectedRegionId}
               onStatusChange={changeStatus}
+              reviewItem={reviewPlan?.queue.find((item) => item.template_id === current.template_id)}
               selectedRegionId={selectedRegionId}
             />
           </main>

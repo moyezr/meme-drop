@@ -5,6 +5,7 @@ import type {
   CatalogDraft,
   CatalogStatus,
   RegionAnnotation,
+  ScaleReviewItem,
   TemplateAnnotation,
 } from "../types";
 import { ExampleEditor } from "./ExampleEditor";
@@ -21,6 +22,7 @@ interface InspectorProps {
   onStatusChange: (status: CatalogStatus) => void;
   onAddRegion: () => void;
   onRemoveRegion: () => void;
+  reviewItem?: ScaleReviewItem;
 }
 
 export function Inspector({
@@ -31,6 +33,7 @@ export function Inspector({
   onStatusChange,
   onAddRegion,
   onRemoveRegion,
+  reviewItem,
 }: InspectorProps) {
   const [tab, setTab] = useState<InspectorTab>("content");
   const annotation = draft.annotation;
@@ -83,7 +86,12 @@ export function Inspector({
           />
         ) : null}
         {tab === "review" ? (
-          <ReviewPanel draft={draft} onStatusChange={onStatusChange} onNavigate={setTab} />
+          <ReviewPanel
+            draft={draft}
+            onStatusChange={onStatusChange}
+            onNavigate={setTab}
+            reviewItem={reviewItem}
+          />
         ) : null}
       </div>
     </aside>
@@ -129,6 +137,45 @@ function ContentPanel({
           value={annotation.editorial.description}
         />
       </Field>
+      <Field label="Canonical meaning" hint={`${annotation.editorial.canonical_meaning.length}/600`}>
+        <textarea
+          maxLength={600}
+          onChange={(event) =>
+            change((next) => (next.editorial.canonical_meaning = event.target.value))
+          }
+          placeholder="Explain the stable social or comedic meaning without referring to one specific post."
+          value={annotation.editorial.canonical_meaning}
+        />
+      </Field>
+      <TagEditor
+        label="Tone"
+        description="Emotional delivery and comic voice"
+        placeholder="sarcastic, awkward, triumphant…"
+        values={annotation.editorial.tone_tags}
+        onChange={(values) => change((next) => (next.editorial.tone_tags = values))}
+      />
+      <div className="compact-grid">
+        <Field label="Freshness" hint="Cultural shelf life">
+          <select
+            onChange={(event) => change((next) => {
+              next.editorial.freshness = event.target.value as TemplateAnnotation["editorial"]["freshness"];
+            })}
+            value={annotation.editorial.freshness}
+          >
+            <option value="unknown">Unknown</option>
+            <option value="evergreen">Evergreen</option>
+            <option value="current">Current</option>
+            <option value="saturated">Saturated</option>
+          </select>
+        </Field>
+      </div>
+      <TagEditor
+        label="Trend notes"
+        description="Only time-bounded, human-verified context"
+        placeholder="Leave empty unless a current use is verified"
+        values={annotation.editorial.trend_notes}
+        onChange={(values) => change((next) => (next.editorial.trend_notes = values))}
+      />
       <div className="section-divider" />
       <Field label="Caption pattern" hint="Reusable visual joke structure">
         <textarea
@@ -214,6 +261,21 @@ function RetrievalPanel({
         placeholder="easy success with no tension"
         values={annotation.retrieval.anti_hints}
         onChange={(values) => change((next) => (next.retrieval.anti_hints = values))}
+      />
+      <div className="section-divider" />
+      <TagEditor
+        label="Sensitive topics"
+        description="Situations where use needs extra care"
+        placeholder="grief, health, protected traits…"
+        values={annotation.safety.sensitive_topics}
+        onChange={(values) => change((next) => (next.safety.sensitive_topics = values))}
+      />
+      <TagEditor
+        label="Brand risks"
+        description="Rights, likeness, or brand-safety concerns"
+        placeholder="recognizable spokesperson, trademark context…"
+        values={annotation.safety.brand_risks}
+        onChange={(values) => change((next) => (next.safety.brand_risks = values))}
       />
     </div>
   );
@@ -320,10 +382,12 @@ function ReviewPanel({
   draft,
   onStatusChange,
   onNavigate,
+  reviewItem,
 }: {
   draft: CatalogDraft;
   onStatusChange: (status: CatalogStatus) => void;
   onNavigate: (tab: InspectorTab) => void;
+  reviewItem?: ScaleReviewItem;
 }) {
   const checks = qualityChecks(draft.annotation);
   const score = qualityScore(draft.annotation);
@@ -348,6 +412,29 @@ function ReviewPanel({
           </button>
         ))}
       </div>
+      {reviewItem ? (
+        <div className="review-context-card">
+          <div>
+            <span className="section-kicker">Scale review priority</span>
+            <strong>{reviewItem.lane.replaceAll("_", " ")} · {reviewItem.priority}</strong>
+          </div>
+          <ul>
+            {reviewItem.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {draft.annotation.machine_provenance ? (
+        <div className="machine-provenance-card">
+          <span className="section-kicker">Machine prefill</span>
+          <dl>
+            <div><dt>Semantic model</dt><dd>{draft.annotation.machine_provenance.semantic_model}</dd></div>
+            <div><dt>Vision model</dt><dd>{draft.annotation.machine_provenance.vision_model || "fallback"}</dd></div>
+            <div><dt>Prompt</dt><dd>{draft.annotation.machine_provenance.prompt_version}</dd></div>
+            <div><dt>Source</dt><dd>{draft.annotation.machine_provenance.source_provider}:{draft.annotation.machine_provenance.source_id}</dd></div>
+          </dl>
+          <p>Provenance is read-only. Every content and layout field above remains human-editable.</p>
+        </div>
+      ) : null}
       <div className={qaComplete ? "visual-qa-state passed" : "visual-qa-state"}>
         <span className="visual-qa-icon">{qaComplete ? "✓" : "!"}</span>
         <div>
