@@ -133,6 +133,80 @@ joke shapes, ordered region roles, physical text limits, and contrastive example
 to turn a specific post anchor into a new implication or reframe. No extra inference step is added,
 and incomplete or overlong model overlays fall back locally instead of rendering a clipped joke.
 
+## Agent meme API
+
+`POST /api/v1/memes/generate` is the minimal interface for an AI agent that needs a finished meme.
+Only `input` is required; it is the message, situation, or source content the agent wants to respond
+to. The server infers the useful humor context, chooses from verified templates, writes
+layout-constrained captions, and renders the selected result. Callers do not need to understand
+template IDs, caption regions, typography, or rendering.
+
+```json
+{
+  "input": "We postponed the launch again because someone found another timezone bug."
+}
+```
+
+The optional `options` object accepts:
+
+- `direction`: a 1-280 character creative preference, such as `dry and self-aware`. It cannot
+  override catalog, safety, region, or length constraints.
+- `count`: the requested number of memes from 1 through 5. It defaults to 1.
+
+`input` is trimmed and must contain 1-12,000 characters. Unknown request fields are rejected. These
+bounds, the five-result maximum, the verified-template shortlist, and server-owned `/memes/...`
+media keep work and external calls bounded.
+
+```sh
+curl --request POST http://localhost:3001/api/v1/memes/generate \
+  --header 'Content-Type: application/json' \
+  --data '{"input":"We postponed the launch again because someone found another timezone bug."}'
+
+curl --request POST http://localhost:3001/api/v1/memes/generate \
+  --header 'Content-Type: application/json' \
+  --data '{"input":"The build passed on the fifth attempt.","options":{"direction":"dry and self-aware","count":2}}'
+```
+
+A successful response returns ready-to-use, captioned images rather than blank templates or drawing
+instructions:
+
+```json
+{
+  "status": "ok",
+  "memes": [
+    {
+      "id": "meme_0123456789abcdef01234567",
+      "image_url": "/memes/generated/agents/0123456789abcdef.webp",
+      "alt_text": "A generated meme about repeatedly delaying a launch",
+      "caption": "THE PLAN / ANOTHER TIMEZONE BUG"
+    }
+  ]
+}
+```
+
+An `image_url` beginning with `/memes/` is relative to the MemeDrop API origin. For example, a
+caller using `https://api.example.com` resolves the sample path to
+`https://api.example.com/memes/generated/agents/0123456789abcdef.webp`.
+
+If no verified suggestion can be rendered, the endpoint still returns HTTP 200 with an explicit
+empty result:
+
+```json
+{
+  "status": "no_fit",
+  "memes": []
+}
+```
+
+Retrieval returns verified templates only. Provider failure or timeout uses the existing bounded,
+deterministic ranker and caption fallback. Generated asset identity is derived from the selected
+source media and canonical caption overlay, so the same rendered result reuses the same object path
+instead of creating duplicates.
+
+Raw `input`, `options.direction`, and plaintext captions are not logged or persisted as request or
+usage metadata. The rendered image is stored so its returned URL remains usable; sensitive request
+values are hashed wherever they participate in cache identity.
+
 ## Vercel
 
 Create a dedicated Vercel project with Root Directory set to `apps/api`. The app has its own
