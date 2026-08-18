@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ApiError, createDraft, getDraft, listDrafts, updateDraft } from "./api";
+import { ApiError, createDraft, getDraft, getScaleReviewPlan, listDrafts, updateDraft } from "./api";
+import type { ScaleReviewFilter } from "./catalog-priority";
 import { qualityScore, renderInputsChanged, statusLabel } from "./catalog-quality";
 import { Canvas } from "./components/Canvas";
 import { CatalogSidebar } from "./components/CatalogSidebar";
@@ -11,6 +12,7 @@ import type {
   CatalogStatus,
   CreateDraftInput,
   RegionAnnotation,
+  ScaleReviewPlan,
   TemplateAnnotation,
   VisualQaAnnotation,
 } from "./types";
@@ -21,6 +23,8 @@ export function App() {
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CatalogStatus | "">("");
+  const [reviewFilter, setReviewFilter] = useState<ScaleReviewFilter>("");
+  const [reviewPlan, setReviewPlan] = useState<ScaleReviewPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -44,6 +48,12 @@ export function App() {
     const timeout = window.setTimeout(loadCatalog, search ? 180 : 0);
     return () => window.clearTimeout(timeout);
   }, [loadCatalog, search]);
+
+  useEffect(() => {
+    getScaleReviewPlan()
+      .then(setReviewPlan)
+      .catch((error) => showNotice(messageFor(error), true));
+  }, []);
 
   const save = useCallback(async () => {
     if (!current || !dirty || saving) return;
@@ -246,9 +256,12 @@ export function App() {
           drafts={drafts}
           loading={loading}
           onCreate={() => { setCreateError(null); setCreateOpen(true); }}
+          onReviewFilter={setReviewFilter}
           onSearch={setSearch}
           onSelect={(id) => void selectDraft(id)}
           onStatus={setStatus}
+          reviewFilter={reviewFilter}
+          reviewPlan={reviewPlan}
           search={search}
           selectedId={current?.id ?? null}
           status={status}

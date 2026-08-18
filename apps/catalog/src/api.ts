@@ -1,4 +1,4 @@
-import type { CatalogDraft, CatalogStatus, CreateDraftInput, TemplateAnnotation } from "./types";
+import type { CatalogDraft, CatalogStatus, CreateDraftInput, ScaleReviewPlan, TemplateAnnotation } from "./types";
 import { normalizeCatalogDraft } from "./annotation-normalization";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
@@ -26,6 +26,12 @@ export async function listDrafts(filters: {
 
 export async function getDraft(id: string): Promise<CatalogDraft> {
   return normalizeCatalogDraft((await request<{ draft: CatalogDraft }>(`${catalogUrl}/${id}`)).draft);
+}
+
+export async function getScaleReviewPlan(): Promise<ScaleReviewPlan | null> {
+  return (await request<{ plan: ScaleReviewPlan | null }>(
+    `${API_BASE}/internal/api/catalog/review-plan`,
+  )).plan;
 }
 
 export async function createDraft(input: CreateDraftInput): Promise<CatalogDraft> {

@@ -105,6 +105,34 @@ export interface CatalogDraft {
   updated_at: string;
 }
 
+export type ScaleReviewLane =
+  | "benchmark_family"
+  | "high_exposure"
+  | "compare_verified"
+  | "novel";
+
+export interface ScaleReviewItem {
+  priority: number;
+  lane: ScaleReviewLane;
+  template_id: string;
+  name: string;
+  semantic_model: string;
+  source_rank: number | null;
+  benchmark_expected_hits: number;
+  shortlist_appearances: number;
+  top_5_appearances: number;
+  verified_family_match: string | null;
+  mechanical_warnings: string[];
+  reasons: string[];
+}
+
+export interface ScaleReviewPlan {
+  version: 1;
+  generated_at: string;
+  summary: Record<string, number>;
+  queue: ScaleReviewItem[];
+}
+
 export interface CreateDraftInput {
   name: string;
   template_id?: string;

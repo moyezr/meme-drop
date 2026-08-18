@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from io import BytesIO
@@ -8,8 +9,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import httpx
+import pytest
 from PIL import Image
 
+import memedrop_api.api.internal_catalog as internal_catalog
 from memedrop_api.app import create_app
 from memedrop_api.catalog_workbench import CatalogDraftConflict
 from memedrop_api.config import Settings
@@ -167,6 +170,53 @@ async def test_workbench_accepts_the_local_react_development_origin(
             "/internal/api/catalog/templates", headers={"origin": "http://localhost:5174"}
         )
     assert response.status_code == 200
+
+
+async def test_workbench_exposes_the_local_scale_review_plan(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan_path = tmp_path / "review-plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "generated_at": "2026-08-18T00:00:00Z",
+                "summary": {"templates": 1},
+                "queue": [
+                    {
+                        "template_id": "priority-template",
+                        "priority": 1200,
+                        "lane": "benchmark_family",
+                        "mechanical_warnings": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(internal_catalog, "SCALE_REVIEW_PLAN_PATH", plan_path)
+    client, _, _ = await make_harness(settings, tmp_path)
+    async with client:
+        response = await client.get("/internal/api/catalog/review-plan")
+
+    assert response.status_code == 200
+    assert response.json()["plan"]["queue"][0]["template_id"] == "priority-template"
+
+
+async def test_workbench_tolerates_a_missing_scale_review_plan(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        internal_catalog,
+        "SCALE_REVIEW_PLAN_PATH",
+        tmp_path / "missing-review-plan.json",
+    )
+    client, _, _ = await make_harness(settings, tmp_path)
+    async with client:
+        response = await client.get("/internal/api/catalog/review-plan")
+
+    assert response.status_code == 200
+    assert response.json() == {"plan": None}
 
 
 async def test_create_draft_copies_media_and_can_clone_existing_annotations(

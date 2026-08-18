@@ -1,5 +1,11 @@
 import { qualityScore, relativeUpdatedAt, statusLabel } from "../catalog-quality";
-import type { CatalogDraft, CatalogStatus } from "../types";
+import {
+  prioritizeCatalogDrafts,
+  scaleReviewItemsById,
+  scaleReviewLaneLabel,
+  type ScaleReviewFilter,
+} from "../catalog-priority";
+import type { CatalogDraft, CatalogStatus, ScaleReviewPlan } from "../types";
 import { QualityRing } from "./QualityRing";
 
 interface CatalogSidebarProps {
@@ -8,8 +14,11 @@ interface CatalogSidebarProps {
   search: string;
   status: CatalogStatus | "";
   loading: boolean;
+  reviewPlan: ScaleReviewPlan | null;
+  reviewFilter: ScaleReviewFilter;
   onSearch: (value: string) => void;
   onStatus: (value: CatalogStatus | "") => void;
+  onReviewFilter: (value: ScaleReviewFilter) => void;
   onSelect: (id: string) => void;
   onCreate: () => void;
 }
@@ -20,11 +29,16 @@ export function CatalogSidebar({
   search,
   status,
   loading,
+  reviewPlan,
+  reviewFilter,
   onSearch,
   onStatus,
+  onReviewFilter,
   onSelect,
   onCreate,
 }: CatalogSidebarProps) {
+  const reviewItems = scaleReviewItemsById(reviewPlan);
+  const visibleDrafts = prioritizeCatalogDrafts(drafts, reviewPlan, reviewFilter);
   return (
     <aside className="catalog-sidebar">
       <div className="catalog-sidebar-header">
@@ -32,7 +46,7 @@ export function CatalogSidebar({
           <span className="section-kicker">Library</span>
           <h2>Catalog</h2>
         </div>
-        <span className="count-badge">{drafts.length}</span>
+        <span className="count-badge">{visibleDrafts.length}</span>
       </div>
       <button className="add-meme-button" onClick={onCreate} type="button">
         <span>+</span>
@@ -66,10 +80,23 @@ export function CatalogSidebar({
             </button>
           ))}
         </div>
+        <select
+          aria-label="Filter review priority"
+          className="priority-filter"
+          onChange={(event) => onReviewFilter(event.target.value as ScaleReviewFilter)}
+          value={reviewFilter}
+        >
+          <option value="">All review priorities</option>
+          <option value="benchmark_family">Benchmark families</option>
+          <option value="high_exposure">High exposure</option>
+          <option value="compare_verified">Compare verified</option>
+          <option value="novel">Novel candidates</option>
+          <option value="warnings">Warnings</option>
+        </select>
       </div>
       <div className="catalog-list" aria-live="polite">
         {loading ? <CatalogSkeleton /> : null}
-        {!loading && !drafts.length ? (
+        {!loading && !visibleDrafts.length ? (
           <div className="catalog-empty">
             <span>◇</span>
             <strong>No drafts found</strong>
@@ -77,8 +104,9 @@ export function CatalogSidebar({
           </div>
         ) : null}
         {!loading
-          ? drafts.map((draft) => {
+          ? visibleDrafts.map((draft) => {
               const score = qualityScore(draft.annotation);
+              const priority = reviewItems.get(draft.template_id);
               return (
                 <button
                   className={`catalog-item ${selectedId === draft.id ? "selected" : ""}`}
@@ -86,12 +114,18 @@ export function CatalogSidebar({
                   onClick={() => onSelect(draft.id)}
                   type="button"
                 >
-                  <img alt="" src={draft.thumbnail_path || draft.asset_path} />
+                  <img alt="" loading="lazy" src={draft.thumbnail_path || draft.asset_path} />
                   <span className="catalog-item-body">
                     <strong>{draft.name}</strong>
                     <span className="catalog-item-meta">
                       <i className={`status-dot ${draft.status}`} />
                       {statusLabel(draft.status)} · {relativeUpdatedAt(draft.updated_at)}
+                      {priority ? (
+                        <b className={`priority-label ${priority.lane}`}>
+                          {scaleReviewLaneLabel(priority.lane)}
+                          {priority.mechanical_warnings.length ? " !" : ""}
+                        </b>
+                      ) : null}
                     </span>
                   </span>
                   <QualityRing score={score} size="small" />

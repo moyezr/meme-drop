@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from pathlib import Path
 from urllib.parse import urlparse
@@ -25,6 +26,12 @@ from memedrop_api.services.thumbnails import THUMBNAIL_CONTENT_TYPE, make_thumbn
 LOGGER = logging.getLogger("memedrop.internal_catalog")
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "test"}
 CATALOG_DEV_PORT = 5174
+SCALE_REVIEW_PLAN_PATH = (
+    Path(__file__).resolve().parents[5]
+    / ".memedrop"
+    / "template-pipeline"
+    / "review-plan.json"
+)
 
 
 def require_local_catalog_request(request: Request) -> None:
@@ -47,6 +54,27 @@ def require_local_catalog_request(request: Request) -> None:
 
 
 router = APIRouter(tags=["internal-catalog"], dependencies=[Depends(require_local_catalog_request)])
+
+
+@router.get("/internal/api/catalog/review-plan")
+async def get_catalog_review_plan() -> dict[str, object]:
+    """Expose the ignored, local scale-review plan to the human workbench."""
+
+    try:
+        raw = await asyncio.to_thread(SCALE_REVIEW_PLAN_PATH.read_text, encoding="utf-8")
+    except FileNotFoundError:
+        return {"plan": None}
+    try:
+        plan = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=500, detail="Scale review plan is invalid JSON") from error
+    if (
+        not isinstance(plan, dict)
+        or plan.get("version") != 1
+        or not isinstance(plan.get("queue"), list)
+    ):
+        raise HTTPException(status_code=500, detail="Scale review plan has an invalid shape")
+    return {"plan": plan}
 
 
 @router.post("/internal/api/catalog/visual-qa/check")

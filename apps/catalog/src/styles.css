@@ -72,6 +72,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .status-tabs { display: grid; grid-template-columns: repeat(4, 1fr); padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: #0a0c0f; }
 .status-tabs button { height: 25px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 9px; font-weight: 700; }
 .status-tabs button.active { background: var(--panel-3); box-shadow: 0 1px 3px #000; color: var(--text); }
+.priority-filter { width: 100%; height: 31px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--muted); font-size: 9px; }
 .catalog-list { overflow-y: auto; flex: 1; padding: 7px; }
 .catalog-item { display: grid; grid-template-columns: 43px minmax(0, 1fr) 29px; gap: 9px; align-items: center; width: 100%; margin-bottom: 3px; padding: 7px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; }
 .catalog-item:hover { background: rgba(255,255,255,.025); }
@@ -80,6 +81,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .catalog-item-body { display: grid; min-width: 0; gap: 5px; }
 .catalog-item-body strong { overflow: hidden; font-size: 11px; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
 .catalog-item-meta { display: flex; align-items: center; gap: 5px; color: var(--muted-2); font-size: 8px; text-transform: uppercase; }
+.priority-label { overflow: hidden; padding: 2px 4px; border-radius: 4px; background: var(--panel-3); color: #9aa5b5; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.priority-label.benchmark_family { background: rgba(53,185,242,.12); color: #8edcff; }
+.priority-label.high_exposure { background: rgba(251,191,36,.1); color: #fcd66b; }
+.priority-label.compare_verified { background: rgba(167,139,250,.11); color: #c4b5fd; }
+.priority-label.novel { background: rgba(74,222,128,.1); color: #86efac; }
 .quality-ring { --score: 0deg; position: relative; display: grid; flex: 0 0 auto; place-items: center; border-radius: 50%; background: conic-gradient(var(--blue) var(--score), #252a33 0); }
 .quality-ring::after { position: absolute; border-radius: inherit; background: var(--panel); content: ""; }
 .quality-ring span, .quality-ring small { position: relative; z-index: 1; }
