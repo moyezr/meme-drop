@@ -17,11 +17,14 @@ from memedrop_api.db import (
     TrendSnapshotRecord,
 )
 from memedrop_api.trends import (
+    TrendAssessment,
     TrendCard,
     TrendDuration,
+    TrendEvidenceState,
     TrendLifecycle,
     TrendObservation,
     TrendSnapshot,
+    assess_trend,
     trend_snapshot_fingerprint,
 )
 
@@ -40,6 +43,18 @@ class ObservationWriteResult:
 class TrendVectorMatch:
     card: TrendCard
     cosine_distance: float
+
+
+@dataclass(frozen=True)
+class CanonicalEnrichmentWrite:
+    cards: tuple[TrendCard, ...]
+    observations: tuple[ObservationWriteResult, ...]
+
+    @property
+    def observations_created(self) -> int:
+        return sum(
+            result.changed and result.seen_count == 1 for result in self.observations
+        )
 
 
 class SqlAlchemyTrendRepository:
@@ -77,6 +92,169 @@ class SqlAlchemyTrendRepository:
         return (
             [_card_from_record(row) for row in stored_cards],
             stored_observations,
+        )
+
+    async def persist_canonical_enrichment(
+        self,
+        session: AsyncSession,
+        *,
+        cards: Sequence[TrendCard],
+        observations: Sequence[TrendObservation],
+        assessed_at: datetime,
+    ) -> CanonicalEnrichmentWrite:
+        """Merge one enrichment into durable evidence and reassess affected cards.
+
+        Model-provided evidence counts and lifecycle fields are provisional. Durable rows are
+        the authority for source diversity, observation counts, historical timestamps, and
+        recurrence. The caller owns the transaction so claim completion can be committed with
+        these writes atomically.
+        """
+
+        _validate_aware_time(assessed_at, field_name="assessed_at")
+        card_by_id = {card.id: card for card in cards}
+        if len(card_by_id) != len(cards):
+            raise ValueError("enrichment cards must be unique")
+        if len({observation.id for observation in observations}) != len(observations):
+            raise ValueError("enrichment observations must be unique")
+        if any(observation.observed_at > assessed_at for observation in observations):
+            raise ValueError("observations cannot follow the assessment time")
+
+        affected_ids = set(card_by_id)
+        affected_ids.update(observation.trend_id for observation in observations)
+        if not affected_ids:
+            return CanonicalEnrichmentWrite(cards=(), observations=())
+
+        locked_rows = (
+            await session.scalars(
+                select(TrendCardRecord)
+                .where(TrendCardRecord.id.in_(affected_ids))
+                .order_by(TrendCardRecord.id)
+                .with_for_update()
+            )
+        ).all()
+        existing_by_id = {row.id: row for row in locked_rows}
+        missing_observation_cards = {
+            observation.trend_id
+            for observation in observations
+            if observation.trend_id not in existing_by_id
+            and observation.trend_id not in card_by_id
+        }
+        if missing_observation_cards:
+            raise ValueError("observations must reference an existing or enriched trend card")
+
+        observed_trend_ids = {observation.trend_id for observation in observations}
+        missing_evidence = set(card_by_id) - set(existing_by_id) - observed_trend_ids
+        if missing_evidence:
+            raise ValueError("new trend cards require at least one durable observation")
+
+        for trend_id in sorted(set(card_by_id) - set(existing_by_id), key=str):
+            incoming = [
+                observation
+                for observation in observations
+                if observation.trend_id == trend_id
+            ]
+            source_count = len({observation.source_domain for observation in incoming})
+            first_seen_at = min(
+                observation.published_at or observation.observed_at
+                for observation in incoming
+            )
+            last_confirmed_at = max(observation.observed_at for observation in incoming)
+            candidate = card_by_id[trend_id]
+            state = TrendEvidenceState(
+                first_seen_at=first_seen_at,
+                last_confirmed_at=last_confirmed_at,
+                confidence=candidate.confidence,
+                momentum=candidate.momentum,
+                source_count=source_count,
+                observation_count=len(incoming),
+                recurrence_count=0,
+            )
+            assessment = assess_trend(state, as_of=assessed_at)
+            canonical_new = _reassessed_card(candidate, state, assessment)
+            row = await self._upsert_card(session, canonical_new)
+            card_by_id[trend_id] = canonical_new
+            existing_by_id[trend_id] = row
+
+        observation_results: list[ObservationWriteResult] = []
+        changed_observed_at: dict[UUID, datetime] = {}
+        for observation in sorted(observations, key=lambda item: str(item.id)):
+            result = await self._record_observation(session, observation)
+            observation_results.append(result)
+            if result.changed:
+                previous = changed_observed_at.get(observation.trend_id)
+                if previous is None or observation.observed_at > previous:
+                    changed_observed_at[observation.trend_id] = observation.observed_at
+
+        stored_cards: list[TrendCard] = []
+        originally_existing_ids = {row.id for row in locked_rows}
+        for trend_id in sorted(affected_ids, key=str):
+            current_row = existing_by_id[trend_id]
+            base_card = card_by_id.get(trend_id, _card_from_record(current_row))
+            evidence = (
+                await session.execute(
+                    select(
+                        func.count(TrendObservationRecord.id),
+                        func.count(func.distinct(TrendObservationRecord.source_domain)),
+                        func.min(TrendObservationRecord.first_seen_at),
+                        func.min(TrendObservationRecord.published_at),
+                        func.max(TrendObservationRecord.last_seen_at),
+                    ).where(TrendObservationRecord.trend_id == trend_id)
+                )
+            ).one()
+            observation_count = int(evidence[0] or 0)
+            source_count = int(evidence[1] or 0)
+            if observation_count < 1 or source_count < 1 or evidence[2] is None:
+                raise RuntimeError("trend card has no durable evidence")
+
+            first_seen_candidates = [evidence[2]]
+            if evidence[3] is not None:
+                first_seen_candidates.append(evidence[3])
+            if trend_id in originally_existing_ids:
+                first_seen_candidates.append(current_row.first_seen_at)
+            first_seen_at = min(first_seen_candidates)
+            last_confirmed_at = evidence[4]
+            if trend_id in originally_existing_ids:
+                last_confirmed_at = max(
+                    last_confirmed_at,
+                    current_row.last_confirmed_at,
+                )
+            if last_confirmed_at > assessed_at:
+                raise ValueError("durable evidence cannot follow the assessment time")
+
+            recurrence_count = (
+                current_row.recurrence_count if trend_id in originally_existing_ids else 0
+            )
+            latest_change = changed_observed_at.get(trend_id)
+            if (
+                trend_id in originally_existing_ids
+                and latest_change is not None
+                and latest_change > current_row.expires_at
+            ):
+                recurrence_count += 1
+
+            state = TrendEvidenceState(
+                first_seen_at=first_seen_at,
+                last_confirmed_at=last_confirmed_at,
+                confidence=base_card.confidence,
+                momentum=base_card.momentum,
+                source_count=source_count,
+                observation_count=observation_count,
+                recurrence_count=recurrence_count,
+            )
+            assessment = assess_trend(state, as_of=assessed_at)
+            canonical = _reassessed_card(
+                base_card,
+                state,
+                assessment,
+                version=current_row.version,
+            )
+            stored = await self._upsert_card(session, canonical)
+            existing_by_id[trend_id] = stored
+            stored_cards.append(_card_from_record(stored))
+
+        return CanonicalEnrichmentWrite(
+            cards=tuple(stored_cards),
+            observations=tuple(observation_results),
         )
 
     async def list_active_cards(
@@ -336,6 +514,33 @@ def _card_values(card: TrendCard) -> dict[str, object]:
         "recurrence_count": card.recurrence_count,
         "version": card.version,
     }
+
+
+def _reassessed_card(
+    card: TrendCard,
+    state: TrendEvidenceState,
+    assessment: TrendAssessment,
+    *,
+    version: int = 1,
+) -> TrendCard:
+    values = card.model_dump()
+    values.update(
+        {
+            "first_seen_at": state.first_seen_at,
+            "last_confirmed_at": state.last_confirmed_at,
+            "expires_at": assessment.expires_at,
+            "confidence": state.confidence,
+            "momentum": state.momentum,
+            "source_count": state.source_count,
+            "observation_count": state.observation_count,
+            "recurrence_count": state.recurrence_count,
+            "lifecycle": assessment.lifecycle,
+            "duration_class": assessment.duration_class,
+            "vitality": assessment.vitality,
+            "version": version,
+        }
+    )
+    return TrendCard.model_validate(values)
 
 
 def _card_from_record(row: TrendCardRecord) -> TrendCard:

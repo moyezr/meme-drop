@@ -337,6 +337,89 @@ class TrendSnapshotRecord(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class TrendScanQueryRecord(Base):
+    """Opaque, leased collector work; query text must never be persisted here."""
+
+    __tablename__ = "trend_scan_queries"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('claimed', 'released', 'completed')",
+            name="trend_scan_queries_status_check",
+        ),
+        CheckConstraint(
+            "attempt_count >= 1 AND cards_upserted >= 0 AND observations_stored >= 0",
+            name="trend_scan_queries_counts_check",
+        ),
+        CheckConstraint(
+            "(status = 'claimed' AND claimed_by IS NOT NULL "
+            "AND lease_expires_at IS NOT NULL AND completed_at IS NULL) OR "
+            "(status = 'released' AND claimed_by IS NULL "
+            "AND lease_expires_at IS NULL AND completed_at IS NULL) OR "
+            "(status = 'completed' AND claimed_by IS NULL "
+            "AND lease_expires_at IS NULL AND completed_at IS NOT NULL)",
+            name="trend_scan_queries_state_check",
+        ),
+        Index("idx_trend_scan_queries_status_lease", "status", "lease_expires_at"),
+    )
+
+    scan_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    query_fingerprint: Mapped[str] = mapped_column(String(64), primary_key=True)
+    status: Mapped[str] = mapped_column(String(20))
+    claimed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    cards_upserted: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    observations_stored: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0")
+    )
+
+
+class TrendCreditPeriodRecord(Base):
+    """Monthly aggregate used to enforce the application-side Tavily ceiling."""
+
+    __tablename__ = "trend_credit_periods"
+    __table_args__ = (
+        CheckConstraint(
+            "period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'",
+            name="trend_credit_periods_period_check",
+        ),
+        CheckConstraint(
+            "reserved_credits >= 0", name="trend_credit_periods_credits_check"
+        ),
+    )
+
+    period: Mapped[str] = mapped_column(String(7), primary_key=True)
+    reserved_credits: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class TrendCreditReservationRecord(Base):
+    """Idempotency ledger for provider-credit reservations."""
+
+    __tablename__ = "trend_credit_reservations"
+    __table_args__ = (
+        CheckConstraint("credits > 0", name="trend_credit_reservations_credits_check"),
+        Index("idx_trend_credit_reservations_period", "period"),
+    )
+
+    reservation_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    period: Mapped[str] = mapped_column(
+        ForeignKey("trend_credit_periods.period", ondelete="CASCADE"), nullable=False
+    )
+    credits: Mapped[int] = mapped_column(Integer)
+    reserved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class Database:
     def __init__(self, database_url: str) -> None:
         self.engine: AsyncEngine = create_async_engine(

@@ -1,7 +1,10 @@
 from memedrop_api.db import (
     Base,
     TrendCardRecord,
+    TrendCreditPeriodRecord,
+    TrendCreditReservationRecord,
     TrendObservationRecord,
+    TrendScanQueryRecord,
     TrendSnapshotRecord,
     database_connect_args,
     normalize_database_url,
@@ -28,6 +31,9 @@ def test_database_models_preserve_existing_table_names() -> None:
         "trend_cards",
         "trend_observations",
         "trend_snapshots",
+        "trend_scan_queries",
+        "trend_credit_periods",
+        "trend_credit_reservations",
     }
 
 
@@ -52,6 +58,31 @@ def test_trend_tables_keep_raw_provider_content_out_of_durable_storage() -> None
     assert "embedding" in TrendCardRecord.__table__.columns
     assert "cards" in TrendSnapshotRecord.__table__.columns
     assert "raw_content" not in Base.metadata.tables["trend_observations"].columns
+
+    assert set(TrendScanQueryRecord.__table__.columns.keys()) == {
+        "scan_id",
+        "query_fingerprint",
+        "status",
+        "claimed_by",
+        "claimed_at",
+        "lease_expires_at",
+        "completed_at",
+        "attempt_count",
+        "cards_upserted",
+        "observations_stored",
+    }
+    assert "query" not in TrendScanQueryRecord.__table__.columns
+    assert set(TrendCreditPeriodRecord.__table__.columns.keys()) == {
+        "period",
+        "reserved_credits",
+        "updated_at",
+    }
+    assert set(TrendCreditReservationRecord.__table__.columns.keys()) == {
+        "reservation_id",
+        "period",
+        "credits",
+        "reserved_at",
+    }
 
 
 def test_transaction_pooler_disables_psycopg_prepared_statements() -> None:
