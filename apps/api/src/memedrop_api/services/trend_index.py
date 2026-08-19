@@ -85,6 +85,7 @@ class RedisTrendIndex:
         max_query_signals: int = 12,
         max_candidates: int = 20,
         max_results: int = 2,
+        minimum_score: float = 0.5,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         if timeout_seconds <= 0:
@@ -97,6 +98,8 @@ class RedisTrendIndex:
             raise ValueError("max_candidates must be between 1 and 20")
         if not 1 <= max_results <= 2:
             raise ValueError("max_results must be between 1 and 2")
+        if not 0 <= minimum_score <= 1:
+            raise ValueError("minimum_score must be between 0 and 1")
         for name, value in (
             ("max_cards", max_cards),
             ("max_index_keys", max_index_keys),
@@ -124,6 +127,7 @@ class RedisTrendIndex:
         self.max_query_signals = max_query_signals
         self.max_candidates = max_candidates
         self.max_results = max_results
+        self.minimum_score = minimum_score
         self.clock = clock or (lambda: datetime.now(UTC))
 
     async def close(self) -> None:
@@ -249,7 +253,7 @@ class RedisTrendIndex:
                 retrieval_score=candidate_scores[card_id] / normalizer,
                 now=now,
             )
-            if score is not None:
+            if score is not None and score >= self.minimum_score:
                 ranked.append((score, card_id, card))
 
         ranked.sort(key=lambda item: (-item[0], item[1]))

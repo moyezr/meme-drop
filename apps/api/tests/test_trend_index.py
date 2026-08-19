@@ -227,7 +227,7 @@ async def test_publish_switches_versions_and_gives_old_namespace_a_grace_ttl() -
 
 async def test_retrieve_bounds_work_and_reranks_fresh_active_cards() -> None:
     client = MemoryRedis()
-    index = make_index(client)
+    index = make_index(client, minimum_score=0)
     documents = [
         TrendIndexDocument(
             card=make_card(
@@ -304,6 +304,24 @@ async def test_retrieve_discards_oversized_query_signals_before_redis_lookup() -
     assert result.version == "v1"
     assert result.cards == ()
     assert client.zrevrange_calls == 0
+
+
+async def test_retrieve_requires_a_minimum_relevance_score() -> None:
+    client = MemoryRedis()
+    index = make_index(client)
+    await index.publish(
+        "v1",
+        [TrendIndexDocument(card=make_card("bounded"), terms=("match",))],
+    )
+
+    weak = await index.retrieve(
+        [TrendQuerySignal(kind="term", value="match")]
+        + [TrendQuerySignal(kind="term", value=f"miss-{number}") for number in range(9)]
+    )
+    strong = await index.retrieve([TrendQuerySignal(kind="term", value="match")])
+
+    assert weak.cards == ()
+    assert [card.key for card in strong.cards] == ["bounded"]
 
 
 def test_rerank_uses_canonical_adaptive_decay_and_current_lifecycle() -> None:
