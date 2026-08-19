@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -26,6 +27,7 @@ from memedrop_api.services.suggestion_engine import (
     suggestion_request_key,
     tokenize_sequence,
 )
+from memedrop_api.services.trend_index import TrendQuerySignal, TrendRetrieval
 from tests.conftest import INSTALL_ID, ApiHarness
 from tests.fakes import FakeStore
 
@@ -42,15 +44,25 @@ class FakeGateway:
         self.seen_template_ids: list[list[str]] = []
         self.seen_contexts: list[TweetContext | None] = []
         self.seen_steering_instructions: list[str | None] = []
+        self.seen_trend_cards: list[tuple[object, ...]] = []
+        self.seen_caption_trend_cards: list[tuple[object, ...]] = []
 
     async def select_and_caption(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, limit, *, context=None, steering_instruction=None
+        self,
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         self.joint_calls += 1
         self.seen_template_counts.append(len(templates))
         self.seen_template_ids.append([template.template_id for template in templates])
         self.seen_contexts.append(context)
         self.seen_steering_instructions.append(steering_instruction)
+        self.seen_trend_cards.append(tuple(trend_cards))
         if self.joint_error is not None:
             raise self.joint_error
         if self.fail_joint:
@@ -58,10 +70,22 @@ class FakeGateway:
         return JointSuggestionResult(self.selections[:limit], self.captions)
 
     async def generate_captions(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, *, context=None
+        self, tweet_text, templates, *, context=None, trend_cards=()
     ):
         self.caption_calls += 1
+        self.seen_caption_trend_cards.append(tuple(trend_cards))
         return self.captions
+
+
+class RotatingTrendRetriever:
+    def __init__(self, retrievals: list[TrendRetrieval]) -> None:
+        self.retrievals = retrievals
+        self.calls: list[tuple[TrendQuerySignal, ...]] = []
+
+    async def retrieve(self, signals):  # type: ignore[no-untyped-def]
+        self.calls.append(tuple(signals))
+        index = min(len(self.calls) - 1, len(self.retrievals) - 1)
+        return self.retrievals[index]
 
 
 def global_meme(name: str) -> dict[str, Any]:
@@ -780,6 +804,60 @@ def test_suggestion_cache_key_hashes_and_separates_steering_instruction() -> Non
 
     assert automatic != steered
     assert instruction not in steered
+
+
+async def test_trends_are_retrieved_before_cache_and_versions_invalidate_results() -> None:
+    service, _, gateway = service_with_templates("this-is-fine")
+    gateway.selections = [TemplateSelection("this-is-fine", "current context", 0.91)]
+    gateway.captions = {
+        "this-is-fine": {
+            "speech_bubble_text": "This is current",
+            "bottom_caption": "Project Zephyr launch",
+        }
+    }
+    trend_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    card_v1 = SimpleNamespace(id=trend_id, version=1)
+    card_v2 = SimpleNamespace(id=trend_id, version=2)
+    v1 = TrendRetrieval(version="index-v1", cards=(card_v1,))  # type: ignore[arg-type]
+    v2 = TrendRetrieval(version="index-v2", cards=(card_v2,))  # type: ignore[arg-type]
+    retriever = RotatingTrendRetriever([v1, v1, v2])
+    service.trend_retriever = retriever  # type: ignore[assignment]
+
+    post = "Secret Project Zephyr launch fell over after the victory lap"
+    first = await service.get_suggestions(post, user_id=INSTALL_ID, limit=1)
+    cached = await service.get_suggestions(post, user_id=INSTALL_ID, limit=1)
+    refreshed_by_trend = await service.get_suggestions(post, user_id=INSTALL_ID, limit=1)
+
+    assert first == cached == refreshed_by_trend
+    assert len(retriever.calls) == 3
+    assert gateway.joint_calls == 2
+    assert gateway.seen_trend_cards == [(card_v1,), (card_v2,)]
+    assert all(
+        "secret project zephyr launch" not in signal.value for signal in retriever.calls[0]
+    )
+
+
+async def test_standalone_caption_generation_receives_trend_cards() -> None:
+    service, store, gateway = service_with_templates("this-is-fine")
+    meme = global_meme("This Is Fine")
+    store.memes = [meme]
+    gateway.captions = {
+        "this-is-fine": {
+            "speech_bubble_text": "Still current",
+            "bottom_caption": "The trend matched",
+        }
+    }
+    card = SimpleNamespace(
+        id=UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+        version=1,
+    )
+    retrieval = TrendRetrieval(version="index-v1", cards=(card,))  # type: ignore[arg-type]
+    service.trend_retriever = RotatingTrendRetriever([retrieval])  # type: ignore[assignment]
+
+    overlay = await service.get_tailored_overlay("A current launch joke", UUID(meme["id"]))
+
+    assert overlay is not None
+    assert gateway.seen_caption_trend_cards == [(card,)]
 
 
 def test_local_ranker_meets_benchmark_retrieval_gates() -> None:

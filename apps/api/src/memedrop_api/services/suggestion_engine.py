@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import heapq
+import json
 import logging
 import math
 import re
@@ -24,6 +25,14 @@ from memedrop_api.services.meme_text import (
     clean_generated_regions,
 )
 from memedrop_api.services.openrouter import SuggestionModelGateway, TemplateSelection
+from memedrop_api.services.trend_context import (
+    MAX_TREND_CARDS,
+    TrendRetriever,
+    trend_card_cache_versions,
+    trend_query_signals,
+)
+from memedrop_api.services.trend_index import TrendRetrieval
+from memedrop_api.trends import TrendCard
 
 LOGGER = logging.getLogger("memedrop.suggestions")
 SUGGESTION_CACHE_TTL_SECONDS = 5 * 60
@@ -462,6 +471,7 @@ class Candidate:
 class SuggestionTiming:
     """Non-sensitive durations for the user-visible suggestion pipeline."""
 
+    trend_lookup_ms: float = 0.0
     candidate_load_ms: float = 0.0
     local_rank_ms: float = 0.0
     joint_model_ms: float = 0.0
@@ -470,13 +480,18 @@ class SuggestionTiming:
     cache_hit: bool = False
 
     @classmethod
-    def cached(cls) -> SuggestionTiming:
-        return cls(joint_outcome="cache", cache_hit=True)
+    def cached(cls, *, trend_lookup_ms: float = 0.0) -> SuggestionTiming:
+        return cls(
+            trend_lookup_ms=trend_lookup_ms,
+            joint_outcome="cache",
+            cache_hit=True,
+        )
 
     def server_timing_header(self, total_ms: float) -> str:
         """Serialize timings using the standard HTTP Server-Timing header."""
 
         metrics = (
+            ("trend-lookup", self.trend_lookup_ms, None),
             ("candidate-load", self.candidate_load_ms, None),
             ("local-rank", self.local_rank_ms, None),
             ("joint-model", self.joint_model_ms, self.joint_outcome),
@@ -630,11 +645,14 @@ class SuggestionService:
         catalog: MemeCatalog,
         gateway: SuggestionModelGateway,
         settings: Settings,
+        *,
+        trend_retriever: TrendRetriever | None = None,
     ) -> None:
         self.store = store
         self.catalog = catalog
         self.gateway = gateway
         self.settings = settings
+        self.trend_retriever = trend_retriever
         self.cache: OrderedDict[str, tuple[float, list[dict[str, Any]]]] = OrderedDict()
         # A request can arrive from both the content script and a retry before the first
         # response has populated ``cache``. Keep just one computation in flight per
@@ -685,15 +703,25 @@ class SuggestionService:
         steering_instruction: str | None = None,
     ) -> SuggestionRun:
         normalized_limit = max(1, min(5, int(limit or 5)))
+        context = heuristic_tweet_context(tweet_text)
+        trend_lookup_started = time.perf_counter()
+        trend_retrieval = await self._retrieve_trends(context)
+        trend_lookup_ms = elapsed_ms(trend_lookup_started)
+        has_trend_context = bool(trend_retrieval.cards)
         key = suggestion_request_key(
             tweet_text,
             user_id=user_id,
             limit=normalized_limit,
             cache_key=cache_key,
             steering_instruction=steering_instruction,
+            trend_version=trend_retrieval.version if has_trend_context else None,
+            trend_card_versions=trend_card_cache_versions(trend_retrieval.cards),
         )
         if not refresh and (cached := self._read_cache(key)) is not None:
-            return SuggestionRun(cached, SuggestionTiming.cached())
+            return SuggestionRun(
+                cached,
+                SuggestionTiming.cached(trend_lookup_ms=trend_lookup_ms),
+            )
         # A refresh must never read a completed cache entry. It may, however, share a
         # still-running refresh with an identical request. Keep refresh work separate
         # from ordinary cache-miss work so a refresh always triggers fresh inference.
@@ -708,6 +736,9 @@ class SuggestionService:
                     key=key,
                     refresh_feedback=refresh,
                     steering_instruction=steering_instruction,
+                    context=context,
+                    trend_cards=trend_retrieval.cards,
+                    trend_lookup_ms=trend_lookup_ms,
                 )
             )
             self._inflight_suggestions[flight_key] = task
@@ -731,9 +762,11 @@ class SuggestionService:
         key: str,
         refresh_feedback: bool,
         steering_instruction: str | None,
+        context: TweetContext,
+        trend_cards: tuple[TrendCard, ...],
+        trend_lookup_ms: float,
     ) -> SuggestionRun:
         started = time.perf_counter()
-        context = heuristic_tweet_context(tweet_text)
         candidate_load_started = time.perf_counter()
         candidates = await self._load_candidates(user_id, refresh_feedback=refresh_feedback)
         candidate_load_ms = elapsed_ms(candidate_load_started)
@@ -770,13 +803,23 @@ class SuggestionService:
         model_selections: list[TemplateSelection] = []
         generated: dict[str, dict[str, str]] = {}
         try:
-            model = await self.gateway.select_and_caption(
-                tweet_text,
-                shortlist_templates,
-                limit,
-                context=context,
-                steering_instruction=steering_instruction,
-            )
+            if trend_cards:
+                model = await self.gateway.select_and_caption(
+                    tweet_text,
+                    shortlist_templates,
+                    limit,
+                    context=context,
+                    steering_instruction=steering_instruction,
+                    trend_cards=trend_cards,
+                )
+            else:
+                model = await self.gateway.select_and_caption(
+                    tweet_text,
+                    shortlist_templates,
+                    limit,
+                    context=context,
+                    steering_instruction=steering_instruction,
+                )
         except TimeoutError:
             # A bounded provider miss is an expected availability condition, not an
             # application crash. Keep logs actionable without emitting a cancellation stack.
@@ -845,6 +888,7 @@ class SuggestionService:
             )
         self._write_cache(key, result)
         timing = SuggestionTiming(
+            trend_lookup_ms=trend_lookup_ms,
             candidate_load_ms=candidate_load_ms,
             local_rank_ms=local_rank_ms,
             joint_model_ms=joint_model_ms,
@@ -859,6 +903,7 @@ class SuggestionService:
                 "returned": len(result),
                 "duration_ms": round(elapsed_ms(started)),
                 "candidate_load_ms": round(timing.candidate_load_ms),
+                "trend_lookup_ms": round(timing.trend_lookup_ms),
                 "local_rank_ms": round(timing.local_rank_ms),
                 "joint_model_ms": round(timing.joint_model_ms),
                 "response_assembly_ms": round(timing.response_assembly_ms),
@@ -879,10 +924,19 @@ class SuggestionService:
         if template is None:
             return None
         context = heuristic_tweet_context(tweet_text)
+        trend_retrieval = await self._retrieve_trends(context)
         try:
-            generated = await self.gateway.generate_captions(
-                tweet_text, [template], context=context
-            )
+            if trend_retrieval.cards:
+                generated = await self.gateway.generate_captions(
+                    tweet_text,
+                    [template],
+                    context=context,
+                    trend_cards=trend_retrieval.cards,
+                )
+            else:
+                generated = await self.gateway.generate_captions(
+                    tweet_text, [template], context=context
+                )
         except Exception:
             generated = {}
         regions = clean_generated_regions(
@@ -894,6 +948,15 @@ class SuggestionService:
         if not regions and self.settings.contextual_caption_fallback:
             regions = build_fallback_caption_set(tweet_text, context, template) or {}
         return build_overlay(template, str(row["name"]), regions)
+
+    async def _retrieve_trends(self, context: TweetContext) -> TrendRetrieval:
+        if self.trend_retriever is None:
+            return TrendRetrieval.empty()
+        retrieval = await self.trend_retriever.retrieve(trend_query_signals(context))
+        return TrendRetrieval(
+            version=retrieval.version,
+            cards=tuple(retrieval.cards[:MAX_TREND_CARDS]),
+        )
 
     async def _load_candidates(
         self, user_id: UUID, *, refresh_feedback: bool = False
@@ -1653,23 +1716,30 @@ def suggestion_request_key(
     limit: int,
     cache_key: str | None,
     steering_instruction: str | None = None,
+    trend_version: str | None = None,
+    trend_card_versions: tuple[str, ...] = (),
 ) -> str:
     """Build a complete, per-user key for cached and in-flight suggestions.
 
-    ``cache_key`` is a client optimization hint, not a substitute for the source text:
-    the caption and ranking both depend on the text itself. Including both prevents a
-    stale or colliding client key from reusing another request's suggestions.
+    The result exposes no post text, client key, direction, or user identifier. All
+    request-shaping inputs are canonicalized together and represented by one digest.
     """
-    normalized_cache_key = normalize_text(cache_key) if cache_key else ""
-    steering_hash = (
-        hashlib.sha256(normalize_text(steering_instruction).encode()).hexdigest()[:16]
-        if steering_instruction
-        else ""
-    )
-    return (
-        f"user:{user_id}|tweet:{normalize_text(tweet_text)}|client:{normalized_cache_key}"
-        f"|steering:{steering_hash}|limit:{limit}|fastapi:v1"
-    )
+    canonical_identity = {
+        "cache_key": canonical_cache_value(cache_key),
+        "limit": limit,
+        "post": canonical_cache_value(tweet_text),
+        "schema": "suggestion-v2",
+        "steering": canonical_cache_value(steering_instruction),
+        "trend_cards": list(trend_card_versions),
+        "trend_version": trend_version or "",
+        "user_id": str(user_id),
+    }
+    encoded = json.dumps(canonical_identity, sort_keys=True, separators=(",", ":"))
+    return f"suggestion:sha256:{hashlib.sha256(encoded.encode()).hexdigest()}"
+
+
+def canonical_cache_value(value: str | None) -> str:
+    return value.strip() if value else ""
 
 
 def safe_log_cache_key(value: str) -> str:
