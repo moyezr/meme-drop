@@ -1642,11 +1642,6 @@ def structural_joke_shape_boost(tweet_text: str, candidate: Candidate) -> float:
     return min(boost, 0.3)
 
 
-def tokenize(value: str) -> set[str]:
-    """Compatibility helper for callers that only need unique normalized tokens."""
-    return set(tokenize_sequence(value))
-
-
 def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().lower())
 

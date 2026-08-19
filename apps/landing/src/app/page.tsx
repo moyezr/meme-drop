@@ -1,5 +1,3 @@
-const chromeStoreUrl = process.env.NEXT_PUBLIC_CHROME_STORE_URL || "#";
-
 export default function Home() {
   return (
     <main className="pageShell">

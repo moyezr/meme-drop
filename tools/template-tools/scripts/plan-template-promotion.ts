@@ -198,7 +198,6 @@ function planTemplate(
 ): PlannedTemplate {
   const visualWarnings = visualWarningsForTemplate(template);
   const blockers: string[] = [];
-  const warnings: string[] = [];
   const isVerifiedDuplicate = context.verifiedIds.has(template.template_id);
 
   if (isVerifiedDuplicate) {
