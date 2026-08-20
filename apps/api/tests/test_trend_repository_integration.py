@@ -78,7 +78,15 @@ async def test_trend_repository_is_idempotent_and_snapshots_are_repeatable(
         )
         assert card.id in {match.card.id for match in matches}
 
-        first_snapshot = await repository.publish_snapshot([stored], created_at=NOW)
+        staged_snapshot = await repository.stage_snapshot([stored], created_at=NOW)
+        assert staged_snapshot.published_at is None
+        assert await repository.get_snapshot(staged_snapshot.version) is None
+        assert await repository.get_snapshot() is None
+
+        first_snapshot = await repository.mark_snapshot_published(
+            staged_snapshot.version,
+            published_at=NOW,
+        )
         replayed_snapshot = await repository.publish_snapshot([stored], created_at=NOW)
         assert replayed_snapshot == first_snapshot
         assert await repository.get_snapshot(first_snapshot.version) == first_snapshot

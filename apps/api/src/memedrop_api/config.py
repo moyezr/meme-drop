@@ -49,6 +49,21 @@ class Settings(BaseSettings):
     openrouter_auto_tag_model: str = Field(
         default="qwen/qwen3.6-plus", validation_alias="OPENROUTER_AUTO_TAG_MODEL"
     )
+    gemini_api_key: str | None = Field(
+        default=None,
+        validation_alias="GEMINI_API_KEY",
+        exclude=True,
+        repr=False,
+    )
+    gemini_trend_model: str = Field(
+        default="gemini-3.7-flash", validation_alias="GEMINI_TREND_MODEL"
+    )
+    tavily_api_key: str | None = Field(
+        default=None,
+        validation_alias="TAVILY_API_KEY",
+        exclude=True,
+        repr=False,
+    )
     legacy_openrouter_meme_model: str | None = Field(
         default=None,
         validation_alias="OPENROUTER_MEME_MODEL",
@@ -60,6 +75,31 @@ class Settings(BaseSettings):
         default="memory", validation_alias="MEMEDROP_RATE_LIMIT_STORE"
     )
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
+    trends_enabled: bool = Field(default=False, validation_alias="MEMEDROP_TRENDS_ENABLED")
+    trend_monthly_credit_budget: int = Field(
+        default=750,
+        validation_alias="MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET",
+        ge=1,
+        le=1_000,
+    )
+    trend_collection_timeout_seconds: float = Field(
+        default=8.0,
+        validation_alias="MEMEDROP_TREND_COLLECTION_TIMEOUT_SECONDS",
+        ge=0.1,
+        le=30,
+    )
+    trend_enrichment_timeout_seconds: float = Field(
+        default=20.0,
+        validation_alias="MEMEDROP_TREND_ENRICHMENT_TIMEOUT_SECONDS",
+        ge=0.1,
+        le=60,
+    )
+    trend_collection_cooldown_seconds: float = Field(
+        default=1.0,
+        validation_alias="MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS",
+        ge=0,
+        le=60,
+    )
     api_rate_limit_window_ms: int = Field(
         default=60_000, validation_alias="MEMEDROP_RATE_LIMIT_WINDOW_MS", gt=0
     )
@@ -152,6 +192,17 @@ class Settings(BaseSettings):
         if not self.s3_bucket_name:
             raise RuntimeError("S3_BUCKET_NAME is required for S3 storage")
         return self.s3_bucket_name
+
+    @property
+    def trend_redis_url(self) -> str | None:
+        """Return a usable optional trend-index endpoint without making it an app dependency."""
+
+        if not self.trends_enabled or not self.redis_url:
+            return None
+        endpoint = urlparse(self.redis_url)
+        if endpoint.scheme not in {"redis", "rediss"} or not endpoint.hostname:
+            return None
+        return self.redis_url
 
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:

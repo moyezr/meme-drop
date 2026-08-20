@@ -121,37 +121,51 @@ def test_no_trend_cards_leave_existing_prompt_shape_unchanged() -> None:
 
 
 def test_suggestion_cache_identity_is_private_complete_and_trend_versioned() -> None:
-    values = {
-        "tweet_text": "Secret Project Zephyr launch",
-        "user_id": USER_ID,
-        "limit": 2,
-        "cache_key": "client-secret-key",
-        "steering_instruction": "Use dry humor",
-        "trend_version": "index-v1",
-        "trend_card_versions": ("card-a:v1",),
-    }
-    baseline = suggestion_request_key(**values)
+    tweet_text = "Secret Project Zephyr launch"
+    client_cache_key = "client-secret-key"
+    steering_instruction = "Use dry humor"
+
+    def build_key(
+        *,
+        post: str = tweet_text,
+        user_id: UUID = USER_ID,
+        limit: int = 2,
+        cache_key: str = client_cache_key,
+        direction: str = steering_instruction,
+        trend_version: str = "index-v1",
+        card_versions: tuple[str, ...] = ("card-a:v1",),
+    ) -> str:
+        return suggestion_request_key(
+            post,
+            user_id=user_id,
+            limit=limit,
+            cache_key=cache_key,
+            steering_instruction=direction,
+            trend_version=trend_version,
+            trend_card_versions=card_versions,
+        )
+
+    baseline = build_key()
 
     assert baseline.startswith("suggestion:sha256:")
     assert len(baseline) == len("suggestion:sha256:") + 64
     for private_value in (
-        values["tweet_text"],
-        values["cache_key"],
-        values["steering_instruction"],
+        tweet_text,
+        client_cache_key,
+        steering_instruction,
         str(USER_ID),
     ):
         assert str(private_value) not in baseline
-    for field, replacement in (
-        ("tweet_text", "Different post"),
-        ("user_id", UUID("22222222-2222-4222-8222-222222222222")),
-        ("limit", 3),
-        ("cache_key", "different-client-key"),
-        ("steering_instruction", "Use absurd humor"),
-        ("trend_version", "index-v2"),
-        ("trend_card_versions", ("card-a:v2",)),
-    ):
-        changed = {**values, field: replacement}
-        assert suggestion_request_key(**changed) != baseline
+    changed_keys = (
+        build_key(post="Different post"),
+        build_key(user_id=UUID("22222222-2222-4222-8222-222222222222")),
+        build_key(limit=3),
+        build_key(cache_key="different-client-key"),
+        build_key(direction="Use absurd humor"),
+        build_key(trend_version="index-v2"),
+        build_key(card_versions=("card-a:v2",)),
+    )
+    assert all(changed != baseline for changed in changed_keys)
 
 
 async def test_redis_failure_remains_fail_open_for_projected_signals() -> None:

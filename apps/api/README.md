@@ -28,6 +28,42 @@ interactive joint call, `OPENROUTER_CAPTION_MODEL` for the explicit caption endp
 `OPENROUTER_AUTO_TAG_MODEL` for saved-image vision tagging. Offline catalog generation separately
 uses `OPENROUTER_TEMPLATE_MODEL`; the API runtime does not read it.
 
+## Trend memory
+
+Trend collection is an offline refresh job; the request path never calls Tavily. The collector has
+a hard application cap of 750 Tavily credits per calendar month for the free-tier allowance, with
+claims and credit reservations coordinated in PostgreSQL. PostgreSQL is the lifecycle-aware source
+of truth for normalized trend cards and evidence metadata. A successful refresh publishes an
+immutable snapshot and switches the versioned Redis serving index only after the new namespace is
+complete.
+
+Suggestion and standalone-caption requests derive bounded lookup signals locally, retrieve at most
+two relevant cards, and add no more than 1,200 characters of compact, explicitly untrusted cultural
+context to a prompt. The post and catalog-owned template grammar remain canonical, and prompts
+prohibit forced, mismatched, or stale references. Raw Tavily snippets and source-post text are not
+persisted or logged, and post text never appears in plaintext cache keys. Redis or model-provider
+unavailability fails open to the existing deterministic suggestion and caption fallback; Tavily
+unavailability cannot add a request-time dependency.
+
+Apply the current Alembic migrations before refreshing; they create the trend memory, immutable
+snapshot, collection-claim, and monthly credit-ledger schema. Local refreshes require PostgreSQL
+with pgvector, Redis, and the offline Tavily/model credentials in the ignored environment file:
+
+```sh
+npm run db:up
+npm run db:migrate
+npm run trends:refresh
+# Direct API-workspace entry point:
+uv run --project apps/api memedrop-trend-refresh
+```
+
+Set `MEMEDROP_TRENDS_ENABLED=true` for both the refresh job and request-time Redis lookup. A single
+six-hour scheduler may run the default command: deterministic UTC scan buckets make the daily and
+weekly profiles idempotently skip until their cadence advances. For isolated runs, repeat
+`--profile pulse`, `--profile daily`, or `--profile weekly` as needed. The curated schedule uses an
+estimated 592 basic searches per 30 days before retries; the PostgreSQL ledger still enforces the
+750-credit ceiling across workers and retries.
+
 ## Development
 
 From the repository root:

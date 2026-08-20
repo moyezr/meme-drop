@@ -316,7 +316,21 @@ class SqlAlchemyTrendRepository:
         *,
         created_at: datetime,
     ) -> TrendSnapshot:
-        """Create or reuse an immutable, monotonically versioned serving snapshot."""
+        """Create and publish a snapshot without an external serving-index handoff."""
+
+        snapshot = await self.stage_snapshot(cards, created_at=created_at)
+        return await self.mark_snapshot_published(
+            snapshot.version,
+            published_at=created_at,
+        )
+
+    async def stage_snapshot(
+        self,
+        cards: Sequence[TrendCard],
+        *,
+        created_at: datetime,
+    ) -> TrendSnapshot:
+        """Create or reuse an immutable snapshot without marking it served."""
 
         _validate_aware_time(created_at, field_name="created_at")
         ordered_cards = tuple(sorted(cards, key=lambda card: str(card.id)))
@@ -343,7 +357,6 @@ class SqlAlchemyTrendRepository:
                 version=version,
                 cards=ordered_cards,
                 created_at=created_at,
-                published_at=created_at,
             )
             row = TrendSnapshotRecord(
                 version=snapshot.version,
@@ -357,6 +370,32 @@ class SqlAlchemyTrendRepository:
             session.add(row)
             await session.flush()
             return snapshot
+
+    async def mark_snapshot_published(
+        self,
+        version: int,
+        *,
+        published_at: datetime,
+    ) -> TrendSnapshot:
+        """Publish a staged snapshot after its external serving pointer has switched."""
+
+        if version < 1:
+            raise ValueError("version must be positive")
+        _validate_aware_time(published_at, field_name="published_at")
+        async with self.database.session() as session, session.begin():
+            row = await session.scalar(
+                select(TrendSnapshotRecord)
+                .where(TrendSnapshotRecord.version == version)
+                .with_for_update()
+            )
+            if row is None:
+                raise ValueError("trend snapshot does not exist")
+            if row.published_at is None:
+                if published_at < row.created_at:
+                    raise ValueError("published_at must not precede snapshot creation")
+                row.published_at = published_at
+                await session.flush()
+            return _snapshot_from_record(row)
 
     async def get_snapshot(self, version: int | None = None) -> TrendSnapshot | None:
         statement = select(TrendSnapshotRecord).where(

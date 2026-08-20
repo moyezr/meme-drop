@@ -69,6 +69,7 @@
     "dataset:usage-feedback": "npm run usage-feedback --workspace=@memedrop/api --",
     "storage:check": "npm run storage:check --workspace=@memedrop/api",
     "storage:latency": "npm run storage:latency --workspace=@memedrop/api",
+    "trends:refresh": "npm run trends:refresh --workspace=@memedrop/api --",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:init": "npm run db:init --workspace=@memedrop/api",

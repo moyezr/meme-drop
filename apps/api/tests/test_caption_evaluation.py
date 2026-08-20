@@ -15,7 +15,14 @@ from memedrop_api.suggestion_evaluation import default_benchmark_path
 
 class FakeCaptionGateway:
     async def select_and_caption(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, limit, *, context=None, steering_instruction=None
+        self,
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         assert len(templates) <= 12
         assert context is not None
@@ -30,7 +37,7 @@ class FakeCaptionGateway:
         )
 
     async def generate_captions(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, *, context=None
+        self, tweet_text, templates, *, context=None, trend_cards=()
     ):
         return {}
 

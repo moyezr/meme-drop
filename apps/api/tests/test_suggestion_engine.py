@@ -350,7 +350,13 @@ async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None, steering_instruction=None
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         model_started.set()
         await allow_model.wait()
@@ -360,6 +366,7 @@ async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
             limit,
             context=context,
             steering_instruction=steering_instruction,
+            trend_cards=trend_cards,
         )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
@@ -383,7 +390,13 @@ async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None, steering_instruction=None
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         model_started.set()
         await allow_model.wait()
@@ -393,6 +406,7 @@ async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None
             limit,
             context=context,
             steering_instruction=steering_instruction,
+            trend_cards=trend_cards,
         )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
@@ -419,7 +433,13 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None, steering_instruction=None
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         model_started.set()
         await allow_model.wait()
@@ -429,6 +449,7 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
             limit,
             context=context,
             steering_instruction=steering_instruction,
+            trend_cards=trend_cards,
         )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]

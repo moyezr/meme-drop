@@ -289,6 +289,33 @@ def storage_check() -> None:
     print(json.dumps(result, sort_keys=True))
 
 
+def trend_refresh() -> None:
+    """Run the bounded scheduled collector; Tavily is never imported by the API app."""
+
+    from memedrop_api.services.trend_runtime import (  # noqa: PLC0415
+        TREND_QUERY_PROFILES,
+        TrendRefreshConfigurationError,
+        refresh_trends,
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Collect normalized cultural trends and publish the Redis serving index"
+    )
+    parser.add_argument(
+        "--profile",
+        action="append",
+        choices=[profile.name for profile in TREND_QUERY_PROFILES],
+        help="run one curated cadence profile; repeat to run several (default: all)",
+    )
+    arguments = parser.parse_args()
+    settings = Settings()  # type: ignore[call-arg]
+    try:
+        report = asyncio.run(refresh_trends(settings, profile_names=arguments.profile))
+    except TrendRefreshConfigurationError as error:
+        parser.error(str(error))
+    print(json.dumps(report.as_json(), sort_keys=True))
+
+
 async def build_usage_feedback_report(
     settings: Settings, *, days: int, minimum_shown: int, limit: int
 ) -> dict[str, object]:

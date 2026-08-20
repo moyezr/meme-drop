@@ -42,6 +42,7 @@ from memedrop_api.services.meme_renderer import render_meme
 from memedrop_api.services.openrouter import OpenRouterSuggestionGateway
 from memedrop_api.services.storage import MemeStorage, create_meme_storage
 from memedrop_api.services.suggestion_engine import SuggestionService
+from memedrop_api.services.trend_index import RedisTrendIndex
 
 LOGGER = logging.getLogger("memedrop.api")
 REQUEST_ID_HEADER = "x-request-id"
@@ -68,13 +69,17 @@ def create_app(
     catalog_store = catalog_draft_store or SqlAlchemyCatalogDraftStore(database)
     catalog = MemeCatalog.load()
     default_gateway: OpenRouterSuggestionGateway | None = None
+    default_trend_index: RedisTrendIndex | None = None
     if suggestion_service is None:
         default_gateway = OpenRouterSuggestionGateway(app_settings)
+        if trend_redis_url := app_settings.trend_redis_url:
+            default_trend_index = RedisTrendIndex(trend_redis_url)
         suggestions = SuggestionService(
             backend_store,
             catalog,
             default_gateway,
             app_settings,
+            trend_retriever=default_trend_index,
         )
     else:
         suggestions = suggestion_service
@@ -95,6 +100,8 @@ def create_app(
         finally:
             if default_gateway is not None:
                 await default_gateway.close()
+            if default_trend_index is not None:
+                await default_trend_index.close()
             await limiter.close()
             await database.close()
 
@@ -115,6 +122,7 @@ def create_app(
     app.state.auto_tag_meme = auto_tag_service or auto_tag_meme
     app.state.meme_storage = meme_storage
     app.state.suggestion_service = suggestions
+    app.state.trend_index = default_trend_index
     app.state.agent_meme_service = AgentMemeService(
         suggestions,
         meme_storage,
