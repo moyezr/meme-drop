@@ -2,7 +2,7 @@
 
 ## Boundaries
 
-MemeDrop is one source repository with three deployable runtimes and one local-only internal app.
+MemeDrop is one source repository with three deployable runtimes and development-only internal apps.
 Turborepo coordinates local and CI tasks; it does not couple their deployments.
 
 ```text
@@ -15,12 +15,14 @@ apps/landing (static Next.js)        apps/extension (Chrome/React)
                             + pgvector
 
 apps/catalog (local React/Vite) -> development-only catalog API
+apps/template-pipeline (local Node CLI) -> sources + OpenRouter + meme-drop-dev
 ```
 
 | Workspace | Owns |
 | --- | --- |
 | `apps/api` | HTTP contract, ranking/caption services, persistence, storage, Python tests |
 | `apps/catalog` | Local human annotation workflow, visual region editor, quality checklist |
+| `apps/template-pipeline` | Development-only template discovery, machine draft annotation, and real-catalog scale fixtures |
 | `apps/extension` | X integration, service worker, suggestion UI, popup/library |
 | `apps/landing` | Public static marketing pages |
 | `packages/shared` | TypeScript contracts and source template manifests |

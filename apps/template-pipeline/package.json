@@ -1,0 +1,28 @@
+{
+  "name": "@memedrop/template-pipeline",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "scrape": "tsx src/cli.ts scrape",
+    "annotate": "tsx src/cli.ts annotate",
+    "refine": "tsx src/cli.ts annotate --refresh-annotations",
+    "run": "tsx src/cli.ts run",
+    "status": "tsx src/cli.ts status"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1111.0",
+    "ajv": "8.20.0",
+    "cheerio": "1.2.0",
+    "dotenv": "17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2"
+  }
+}

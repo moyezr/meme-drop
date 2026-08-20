@@ -10,6 +10,7 @@ This is a Turborepo monorepo, but its applications deploy independently:
 | --- | --- | --- |
 | `apps/api` | FastAPI, recommendation pipeline, PostgreSQL, object storage | Vercel project rooted at `apps/api` |
 | `apps/catalog` | React/Vite internal catalog annotation workbench | Local development only |
+| `apps/template-pipeline` | Idempotent template discovery, media ingest, and machine draft annotation | Local development only |
 | `apps/extension` | React/Vite Chrome extension for X | Chrome Web Store package |
 | `apps/landing` | Static Next.js marketing site | Vercel project rooted at `apps/landing` |
 | `packages/shared` | TypeScript API contracts and template manifests | workspace dependency |
@@ -100,6 +101,18 @@ npm run quality:tuning
 npm run quality:dataset-plan
 npm run dataset:taste-review
 ```
+
+Large-catalog development experiment:
+
+```sh
+npm run dataset:scale:scrape -- --limit 1000
+npm run dataset:scale:annotate -- --limit 1000
+npm run dataset:scale:status
+```
+
+The scale pipeline writes only to `meme-drop-dev`, exports machine-generated drafts, and never
+bypasses human review, rendered QA, benchmark coverage, or the existing promotion gates. See
+`apps/template-pipeline/README.md` for its checkpoint, retry, and evaluation workflow.
 
 See `QUALITY.md` before changing template annotations, benchmarks, ranking, captions, or promotion
 data. The deterministic local ranker is the availability and release-quality floor even when model
