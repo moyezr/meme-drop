@@ -786,6 +786,11 @@ async def test_caption_route_returns_overlay_and_null_for_missing_meme(
 ) -> None:
     meme = global_meme("Drake Hotline Bling")
     api_harness.store.memes = [meme]
+    gateway = FakeGateway()
+    gateway.captions = {
+        "drake-hotline-bling": {"reject": "skipping tests", "approve": "shipping safely"}
+    }
+    api_harness.app.state.suggestion_service.gateway = gateway
 
     response = await api_harness.client.post(
         "/api/v1/suggest/caption",
