@@ -92,7 +92,7 @@ async def test_joint_request_uses_latency_routing_and_disables_reasoning() -> No
         await gateway.select_and_caption("tweet", [template], 1)
 
     assert captured["max_tokens"] == 600
-    assert captured["model"] == "openai/gpt-5.4-mini"
+    assert captured["model"] == "google/gemini-3.7-flash"
     assert captured["temperature"] == 0.7
     assert captured["reasoning"] == {"effort": "none", "exclude": True}
     assert captured["provider"] == {
@@ -244,7 +244,7 @@ async def test_joint_suggestion_passes_its_dedicated_deadline_to_the_provider() 
     assert await_args is not None
     assert await_args.kwargs["timeout_ms"] == 1_234
     assert await_args.kwargs["max_tokens"] == 600
-    assert await_args.kwargs["model"] == "openai/gpt-5.4-mini"
+    assert await_args.kwargs["model"] == "google/gemini-3.7-flash"
     assert await_args.kwargs["reasoning_effort"] == "none"
     assert await_args.kwargs["provider"] == {
         "sort": "latency",

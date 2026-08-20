@@ -18,9 +18,9 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.cors_origins == list(DEFAULT_ALLOWED_ORIGINS)
     assert settings.cors_origin_regex == DEVELOPMENT_EXTENSION_ORIGIN_REGEX
     assert settings.require_install_id is False
-    assert settings.openrouter_suggestion_model == "openai/gpt-5.4-mini"
+    assert settings.openrouter_suggestion_model == "google/gemini-3.7-flash"
     assert settings.openrouter_caption_model == "google/gemini-3.7-flash"
-    assert settings.openrouter_auto_tag_model == "qwen/qwen3.6-plus"
+    assert settings.openrouter_auto_tag_model == "google/gemini-3.7-flash"
     assert settings.joint_provider_sort == "latency"
     assert settings.joint_provider_preferred_p90_latency_seconds == 2.5
 
