@@ -2,9 +2,9 @@
   "version": 1,
   "generated_at": "2026-05-14T15:34:39.388Z",
   "generator": {
-    "provider": "openai",
-    "model": "gpt-5.4-mini",
-    "note": "Generated offline from meme images with OpenAI Batch API. Treat quality=draft as review-required before runtime use."
+    "provider": "legacy-batch",
+    "model": "retired",
+    "note": "Generated offline by a retired legacy batch pipeline. Treat quality=draft as review-required before runtime use."
   },
   "templates": [
     {
