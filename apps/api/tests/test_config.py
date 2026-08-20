@@ -21,6 +21,7 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.openrouter_suggestion_model == "google/gemini-3.7-flash"
     assert settings.openrouter_caption_model == "google/gemini-3.7-flash"
     assert settings.openrouter_auto_tag_model == "google/gemini-3.7-flash"
+    assert settings.openrouter_trend_model == "google/gemini-3.7-flash"
     assert settings.joint_provider_sort == "latency"
     assert settings.joint_provider_preferred_p90_latency_seconds == 2.5
 
@@ -37,6 +38,7 @@ def test_purpose_specific_models_are_loaded_independently(monkeypatch) -> None: 
     monkeypatch.setenv("OPENROUTER_SUGGESTION_MODEL", "provider/fast")
     monkeypatch.setenv("OPENROUTER_CAPTION_MODEL", "provider/funny")
     monkeypatch.setenv("OPENROUTER_AUTO_TAG_MODEL", "provider/vision")
+    monkeypatch.setenv("OPENROUTER_TREND_MODEL", "provider/trends")
 
     settings = Settings(  # type: ignore[call-arg]
         database_url="postgresql://localhost/memedrop",
@@ -46,6 +48,7 @@ def test_purpose_specific_models_are_loaded_independently(monkeypatch) -> None: 
     assert settings.openrouter_suggestion_model == "provider/fast"
     assert settings.openrouter_caption_model == "provider/funny"
     assert settings.openrouter_auto_tag_model == "provider/vision"
+    assert settings.openrouter_trend_model == "provider/trends"
 
 
 def test_vercel_environment_selects_production_when_explicit_override_is_absent(

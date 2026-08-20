@@ -39,7 +39,6 @@ def settings(tmp_path: Path) -> Settings:
         image_download_path=tmp_path / "downloads",
         cors_origins_value="http://localhost:5173",
         openrouter_api_key=None,
-        gemini_api_key=None,
         tavily_api_key=None,
         trends_enabled=False,
         rate_limit_store="memory",

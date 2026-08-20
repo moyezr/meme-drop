@@ -25,8 +25,9 @@ and deployment commands.
 
 Runtime OpenRouter models are independently configurable: `OPENROUTER_SUGGESTION_MODEL` for the
 interactive joint call, `OPENROUTER_CAPTION_MODEL` for the explicit caption endpoint, and
-`OPENROUTER_AUTO_TAG_MODEL` for saved-image vision tagging. Offline catalog generation separately
-uses `OPENROUTER_TEMPLATE_MODEL`; the API runtime does not read it.
+`OPENROUTER_AUTO_TAG_MODEL` for saved-image vision tagging. Offline trend enrichment uses
+`OPENROUTER_TREND_MODEL`; offline catalog generation separately uses `OPENROUTER_TEMPLATE_MODEL`,
+which the API runtime does not read.
 
 ## Trend memory
 
@@ -47,7 +48,9 @@ unavailability cannot add a request-time dependency.
 
 Apply the current Alembic migrations before refreshing; they create the trend memory, immutable
 snapshot, collection-claim, and monthly credit-ledger schema. Local refreshes require PostgreSQL
-with pgvector, Redis, and the offline Tavily/model credentials in the ignored environment file:
+with pgvector, Redis, Tavily, and OpenRouter credentials in the ignored environment files. Trend
+enrichment uses `google/gemini-3.7-flash` through OpenRouter and does not call Google's direct
+Gemini API:
 
 ```sh
 npm run db:up

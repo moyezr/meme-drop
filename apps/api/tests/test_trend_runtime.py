@@ -65,7 +65,7 @@ def configured_settings(**overrides: Any) -> Settings:
         "trends_enabled": True,
         "redis_url": "redis://127.0.0.1:6379/0",
         "tavily_api_key": "tavily-secret",
-        "gemini_api_key": "gemini-secret",
+        "openrouter_api_key": "openrouter-secret",
         "_env_file": None,
     }
     values.update(overrides)
@@ -80,11 +80,11 @@ def test_trend_settings_are_optional_bounded_and_secret_repr_safe() -> None:
 
     assert defaults.trends_enabled is False
     assert defaults.trend_monthly_credit_budget == 750
-    assert defaults.gemini_trend_model == "gemini-3.7-flash"
+    assert defaults.openrouter_trend_model == "google/gemini-3.7-flash"
     assert defaults.trend_redis_url is None
     assert configured.trend_redis_url == "redis://127.0.0.1:6379/0"
     assert "tavily-secret" not in repr(configured)
-    assert "gemini-secret" not in repr(configured)
+    assert "openrouter-secret" not in repr(configured)
 
 
 def test_curated_profile_schedule_stays_below_six_hundred_basic_credits() -> None:
@@ -169,7 +169,7 @@ def test_refresh_configuration_fails_before_provider_work_with_named_settings() 
     message = str(captured.value)
     assert "MEMEDROP_TRENDS_ENABLED=true" in message
     assert "TAVILY_API_KEY" in message
-    assert "GEMINI_API_KEY" in message
+    assert "OPENROUTER_API_KEY" in message
     assert "REDIS_URL" in message
 
 

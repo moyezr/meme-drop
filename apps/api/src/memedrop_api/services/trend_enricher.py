@@ -31,8 +31,6 @@ from memedrop_api.trends import (
 )
 
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
-GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-DEFAULT_GEMINI_MODEL = "gemini-3.7-flash"
 MAX_ENRICHMENT_SOURCES = 5
 MAX_ENRICHED_TRENDS = 5
 MAX_EVIDENCE_TEXT_CHARS = 4_000
@@ -40,7 +38,6 @@ MAX_ENRICHMENT_PROMPT_CHARS = 6_000
 MAX_MODEL_OUTPUT_TOKENS = 2_000
 MAX_MODEL_RESPONSE_CHARS = 24_000
 _JSON_FENCE_PATTERN = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
-_GEMINI_MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 CompactText = Annotated[
     str,
@@ -189,8 +186,8 @@ class _BaseModelTrendEnricher:
         return self._client
 
 
-class ModelTrendEnricher(_BaseModelTrendEnricher):
-    """Normalize evidence through an OpenRouter-compatible structured-output endpoint."""
+class OpenRouterTrendEnricher(_BaseModelTrendEnricher):
+    """Normalize evidence through OpenRouter's structured-output endpoint."""
 
     def __init__(
         self,
@@ -198,11 +195,15 @@ class ModelTrendEnricher(_BaseModelTrendEnricher):
         api_key: str,
         model: str,
         timeout_seconds: float,
+        site_url: str = "http://localhost:3001",
+        app_name: str = "MemeDrop",
         endpoint: str = OPENROUTER_CHAT_COMPLETIONS_URL,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         if not endpoint.startswith("https://"):
             raise ValueError("model endpoint must use HTTPS")
+        if not site_url.strip() or not app_name.strip():
+            raise ValueError("OpenRouter attribution values are required")
         super().__init__(
             api_key=api_key,
             model=model,
@@ -210,6 +211,8 @@ class ModelTrendEnricher(_BaseModelTrendEnricher):
             client=client,
         )
         self._endpoint = endpoint
+        self._site_url = site_url.strip()
+        self._app_name = app_name.strip()
 
     async def _structured_completion(self, prompt: str) -> str:
         client = await self._get_client()
@@ -234,7 +237,11 @@ class ModelTrendEnricher(_BaseModelTrendEnricher):
             async with asyncio.timeout(self._timeout_seconds):
                 response = await client.post(
                     self._endpoint,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
+                    headers={
+                        "Authorization": f"Bearer {self._api_key}",
+                        "HTTP-Referer": self._site_url,
+                        "X-Title": self._app_name,
+                    },
                     json=body,
                     timeout=httpx.Timeout(self._timeout_seconds),
                 )
@@ -260,65 +267,6 @@ class ModelTrendEnricher(_BaseModelTrendEnricher):
         if len(content) > MAX_MODEL_RESPONSE_CHARS:
             raise TrendEnrichmentError("trend enrichment provider output exceeded its limit")
         return content
-
-
-class GeminiTrendEnricher(_BaseModelTrendEnricher):
-    """Normalize evidence through Gemini generateContent without putting keys in URLs."""
-
-    def __init__(
-        self,
-        *,
-        api_key: str,
-        timeout_seconds: float,
-        model: str = DEFAULT_GEMINI_MODEL,
-        client: httpx.AsyncClient | None = None,
-    ) -> None:
-        if not _GEMINI_MODEL_PATTERN.fullmatch(model.strip()):
-            raise ValueError("Gemini model must be a plain model identifier")
-        super().__init__(
-            api_key=api_key,
-            model=model,
-            timeout_seconds=timeout_seconds,
-            client=client,
-        )
-
-    async def _structured_completion(self, prompt: str) -> str:
-        client = await self._get_client()
-        body = {
-            "systemInstruction": {
-                "parts": [{"text": trend_enrichment_system_prompt()}],
-            },
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": prompt}],
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.1,
-                "candidateCount": 1,
-                "maxOutputTokens": MAX_MODEL_OUTPUT_TOKENS,
-                "responseMimeType": "application/json",
-                "responseJsonSchema": _gemini_response_schema(),
-            },
-        }
-        endpoint = f"{GEMINI_API_BASE_URL}/models/{self._model}:generateContent"
-        try:
-            async with asyncio.timeout(self._timeout_seconds):
-                response = await client.post(
-                    endpoint,
-                    headers={"x-goog-api-key": self._api_key},
-                    json=body,
-                    timeout=httpx.Timeout(self._timeout_seconds),
-                )
-            response.raise_for_status()
-        except (httpx.HTTPError, TimeoutError):
-            raise TrendEnrichmentError("trend enrichment provider request failed") from None
-        try:
-            payload = response.json()
-        except ValueError:
-            raise TrendEnrichmentError("trend enrichment provider returned invalid JSON") from None
-        return _gemini_candidate_text(payload)
 
 
 def trend_enrichment_system_prompt() -> str:
@@ -404,54 +352,6 @@ def _parse_model_response(content: str) -> _ModelTrendResponse:
         return _ModelTrendResponse.model_validate_json(stripped)
     except ValidationError:
         raise TrendEnrichmentError("trend enrichment output failed schema validation") from None
-
-
-def _gemini_response_schema() -> dict[str, object]:
-    """Return the shared schema without string keywords unsupported by generateContent."""
-    schema = _without_gemini_unsupported_keywords(_ModelTrendResponse.model_json_schema())
-    if not isinstance(schema, dict):
-        raise AssertionError("trend response schema must be an object")
-    return schema
-
-
-def _without_gemini_unsupported_keywords(value: object) -> object:
-    if isinstance(value, dict):
-        return {
-            key: _without_gemini_unsupported_keywords(item)
-            for key, item in value.items()
-            if key not in {"maxLength", "minLength", "pattern"}
-        }
-    if isinstance(value, list):
-        return [_without_gemini_unsupported_keywords(item) for item in value]
-    return value
-
-
-def _gemini_candidate_text(payload: object) -> str:
-    if not isinstance(payload, dict):
-        raise TrendEnrichmentError("trend enrichment provider returned an invalid response")
-    candidates = payload.get("candidates")
-    if not isinstance(candidates, list) or not candidates or not isinstance(candidates[0], dict):
-        raise TrendEnrichmentError("trend enrichment provider omitted structured output")
-    candidate = candidates[0]
-    finish_reason = candidate.get("finishReason")
-    if finish_reason not in {None, "STOP"}:
-        raise TrendEnrichmentError("trend enrichment provider did not complete its output")
-    content = candidate.get("content")
-    if not isinstance(content, dict) or not isinstance(content.get("parts"), list):
-        raise TrendEnrichmentError("trend enrichment provider omitted structured output")
-    text_parts = [
-        part["text"]
-        for part in content["parts"]
-        if isinstance(part, dict)
-        and part.get("thought") is not True
-        and isinstance(part.get("text"), str)
-    ]
-    if not text_parts:
-        raise TrendEnrichmentError("trend enrichment provider returned non-text output")
-    text = "".join(text_parts)
-    if len(text) > MAX_MODEL_RESPONSE_CHARS:
-        raise TrendEnrichmentError("trend enrichment provider output exceeded its limit")
-    return text
 
 
 def _build_enrichment_batch(

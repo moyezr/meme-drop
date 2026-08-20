@@ -17,7 +17,7 @@ from memedrop_api.services.tavily_trends import (
     TrendSearchQuery,
     TrendSearchTopic,
 )
-from memedrop_api.services.trend_enricher import GeminiTrendEnricher
+from memedrop_api.services.trend_enricher import OpenRouterTrendEnricher
 from memedrop_api.services.trend_index import RedisTrendIndex, TrendIndexDocument
 from memedrop_api.trend_collection_store import SqlAlchemyTrendCollectionStore
 from memedrop_api.trend_repository import SqlAlchemyTrendRepository
@@ -291,8 +291,8 @@ def validate_trend_refresh_settings(settings: Settings) -> None:
         missing.append("MEMEDROP_TRENDS_ENABLED=true")
     if not settings.tavily_api_key:
         missing.append("TAVILY_API_KEY")
-    if not settings.gemini_api_key:
-        missing.append("GEMINI_API_KEY")
+    if not settings.openrouter_api_key:
+        missing.append("OPENROUTER_API_KEY")
     endpoint = urlparse(settings.redis_url or "")
     if endpoint.scheme not in {"redis", "rediss"} or not endpoint.hostname:
         missing.append("REDIS_URL=redis://... or rediss://...")
@@ -317,10 +317,12 @@ async def refresh_trends(
     database = Database(settings.database_url)
     store = SqlAlchemyTrendCollectionStore(database)
     repository = SqlAlchemyTrendRepository(database)
-    enricher = GeminiTrendEnricher(
-        api_key=settings.gemini_api_key or "",
-        model=settings.gemini_trend_model,
+    enricher = OpenRouterTrendEnricher(
+        api_key=settings.openrouter_api_key or "",
+        model=settings.openrouter_trend_model,
         timeout_seconds=settings.trend_enrichment_timeout_seconds,
+        site_url=settings.openrouter_site_url,
+        app_name=settings.openrouter_app_name,
     )
     collector = TavilyTrendCollector(
         api_key=settings.tavily_api_key or "",

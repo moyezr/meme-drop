@@ -35,7 +35,12 @@ class Settings(BaseSettings):
     )
     port: int = Field(default=3001, validation_alias="PORT", gt=0, le=65535)
     database_url: str = Field(validation_alias="DATABASE_URL", min_length=1)
-    openrouter_api_key: str | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
+    openrouter_api_key: str | None = Field(
+        default=None,
+        validation_alias="OPENROUTER_API_KEY",
+        exclude=True,
+        repr=False,
+    )
     openrouter_site_url: str = Field(
         default="http://localhost:3001", validation_alias="OPENROUTER_SITE_URL"
     )
@@ -49,14 +54,8 @@ class Settings(BaseSettings):
     openrouter_auto_tag_model: str = Field(
         default="google/gemini-3.7-flash", validation_alias="OPENROUTER_AUTO_TAG_MODEL"
     )
-    gemini_api_key: str | None = Field(
-        default=None,
-        validation_alias="GEMINI_API_KEY",
-        exclude=True,
-        repr=False,
-    )
-    gemini_trend_model: str = Field(
-        default="gemini-3.7-flash", validation_alias="GEMINI_TREND_MODEL"
+    openrouter_trend_model: str = Field(
+        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_TREND_MODEL"
     )
     tavily_api_key: str | None = Field(
         default=None,
