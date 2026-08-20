@@ -172,6 +172,26 @@ async def test_workbench_accepts_the_local_react_development_origin(
     assert response.status_code == 200
 
 
+def test_scale_review_plan_path_discovers_the_workspace_root(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    module_path = workspace / "apps" / "api" / "src" / "memedrop_api" / "api" / "module.py"
+    workspace.mkdir()
+    (workspace / "package.json").write_text("{}", encoding="utf-8")
+
+    assert internal_catalog.resolve_scale_review_plan_path(module_path) == (
+        workspace / ".memedrop" / "template-pipeline" / "review-plan.json"
+    )
+
+
+def test_scale_review_plan_path_uses_a_safe_packaged_fallback(tmp_path: Path) -> None:
+    module_path = tmp_path / "app" / "src" / "memedrop_api" / "api" / "module.py"
+    fallback_root = tmp_path / "app"
+
+    assert internal_catalog.resolve_scale_review_plan_path(
+        module_path, fallback_root=fallback_root
+    ) == fallback_root / ".memedrop" / "template-pipeline" / "review-plan.json"
+
+
 async def test_workbench_exposes_the_local_scale_review_plan(
     settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

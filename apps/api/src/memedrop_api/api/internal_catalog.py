@@ -26,12 +26,26 @@ from memedrop_api.services.thumbnails import THUMBNAIL_CONTENT_TYPE, make_thumbn
 LOGGER = logging.getLogger("memedrop.internal_catalog")
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "test"}
 CATALOG_DEV_PORT = 5174
-SCALE_REVIEW_PLAN_PATH = (
-    Path(__file__).resolve().parents[5]
-    / ".memedrop"
-    / "template-pipeline"
-    / "review-plan.json"
-)
+
+
+def resolve_scale_review_plan_path(
+    module_path: Path | None = None, *, fallback_root: Path | None = None
+) -> Path:
+    """Locate the ignored review plan without assuming a source-tree depth."""
+
+    resolved_module_path = module_path or Path(__file__).resolve()
+    workspace_root = next(
+        (
+            parent
+            for parent in resolved_module_path.parents
+            if (parent / "package.json").is_file()
+        ),
+        fallback_root or Path.cwd(),
+    )
+    return workspace_root / ".memedrop" / "template-pipeline" / "review-plan.json"
+
+
+SCALE_REVIEW_PLAN_PATH = resolve_scale_review_plan_path()
 
 
 def require_local_catalog_request(request: Request) -> None:
