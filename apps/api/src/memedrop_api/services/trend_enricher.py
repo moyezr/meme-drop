@@ -17,7 +17,11 @@ from pydantic import (
     model_validator,
 )
 
-from memedrop_api.services.tavily_trends import TavilyEvidenceInput, TrendEnrichmentBatch
+from memedrop_api.services.tavily_trends import (
+    TavilyEvidenceInput,
+    TrendEnrichmentBatch,
+    TrendEvidenceEnrichmentError,
+)
 from memedrop_api.trends import (
     TrendCard,
     TrendEvidenceState,
@@ -58,7 +62,7 @@ TrendKey = Annotated[
 ]
 
 
-class TrendEnrichmentError(RuntimeError):
+class TrendEnrichmentError(TrendEvidenceEnrichmentError):
     """A known provider, response, or evidence-contract failure."""
 
 

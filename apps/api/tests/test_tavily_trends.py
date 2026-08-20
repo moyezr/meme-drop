@@ -15,6 +15,7 @@ from memedrop_api.services.tavily_trends import (
     TavilyTrendCollector,
     TrendCommitResult,
     TrendEnrichmentBatch,
+    TrendEvidenceEnrichmentError,
     TrendSearchQuery,
     canonical_source_url,
     retry_delay_seconds,
@@ -375,6 +376,38 @@ async def test_unexpected_enrichment_bug_is_released_and_propagated() -> None:
                 queries=[TrendSearchQuery(key="daily", text="daily trends")],
             )
 
+    assert len(store.releases) == 1
+
+
+async def test_known_enrichment_provider_failure_releases_claim_and_continues() -> None:
+    class UnavailableEnricher:
+        async def enrich(
+            self,
+            evidence: Sequence[TavilyEvidenceInput],
+            *,
+            observed_at: datetime,
+        ) -> TrendEnrichmentBatch:
+            raise TrendEvidenceEnrichmentError("provider unavailable")
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"results": [result(1)]}, request=request)
+
+    store = FakeStore()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        collector = TavilyTrendCollector(
+            api_key="secret",
+            store=store,
+            enricher=UnavailableEnricher(),
+            client=client,
+            clock=lambda: NOW,
+        )
+        report = await collector.collect(
+            scan_id="unavailable-enricher",
+            queries=[TrendSearchQuery(key="daily", text="daily trends")],
+        )
+
+    assert report.failed_queries == 1
+    assert report.completed_queries == 0
     assert len(store.releases) == 1
 
 

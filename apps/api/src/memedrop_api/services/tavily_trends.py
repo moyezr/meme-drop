@@ -46,6 +46,10 @@ class TavilyBudgetExhausted(TavilyCollectionError):
     """Raised internally when the application credit ceiling rejects an attempt."""
 
 
+class TrendEvidenceEnrichmentError(RuntimeError):
+    """Known model availability or schema failure for one transient evidence batch."""
+
+
 @dataclass(frozen=True, slots=True)
 class TrendSearchQuery:
     """A curated discovery query.
@@ -362,7 +366,7 @@ class TavilyTrendCollector:
                     query_fingerprint=query.fingerprint,
                 )
                 break
-            except TavilyCollectionError:
+            except (TavilyCollectionError, TrendEvidenceEnrichmentError):
                 report.failed_queries += 1
                 await self._store.release_scan_query(
                     scan_id=scan_id,
@@ -570,13 +574,7 @@ def _normalize_domains(domains: Sequence[str]) -> tuple[str, ...]:
     normalized: list[str] = []
     for value in domains:
         domain = value.strip().lower().rstrip(".")
-        if (
-            not domain
-            or len(domain) > 253
-            or "/" in domain
-            or ":" in domain
-            or " " in domain
-        ):
+        if not domain or len(domain) > 253 or "/" in domain or ":" in domain or " " in domain:
             raise ValueError("domain filters must contain hostnames only")
         normalized.append(domain)
     return tuple(dict.fromkeys(normalized))
