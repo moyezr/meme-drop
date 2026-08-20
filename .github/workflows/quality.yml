@@ -42,6 +42,7 @@ jobs:
           name: memedrop-extension-release
           path: .memedrop/memedrop-extension-v*.zip
           if-no-files-found: error
+          include-hidden-files: true
 
   backend-image:
     name: Backend image smoke
