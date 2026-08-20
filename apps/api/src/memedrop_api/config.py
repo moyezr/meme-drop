@@ -44,7 +44,7 @@ class Settings(BaseSettings):
         default="openai/gpt-5.4-mini", validation_alias="OPENROUTER_SUGGESTION_MODEL"
     )
     openrouter_caption_model: str = Field(
-        default="openai/gpt-5.4-mini", validation_alias="OPENROUTER_CAPTION_MODEL"
+        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_CAPTION_MODEL"
     )
     openrouter_auto_tag_model: str = Field(
         default="qwen/qwen3.6-plus", validation_alias="OPENROUTER_AUTO_TAG_MODEL"

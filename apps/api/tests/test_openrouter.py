@@ -119,7 +119,7 @@ async def test_standalone_caption_request_does_not_apply_joint_provider_routing(
         await gateway.generate_captions("tweet", [template])
 
     assert captured["max_tokens"] == 1800
-    assert captured["model"] == "openai/gpt-5.4-mini"
+    assert captured["model"] == "google/gemini-3.7-flash"
     assert captured["reasoning"] == {"effort": "low", "exclude": True}
     assert "provider" not in captured
 
