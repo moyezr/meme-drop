@@ -153,6 +153,183 @@ video {
   color: var(--blue-hover);
 }
 
+.contentPage {
+  width: min(100% - 40px, 960px);
+  margin: 0 auto;
+  padding: 36px 0 72px;
+}
+
+.pageNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 52px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.pageNav a {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.pageNav a:hover {
+  color: var(--blue-hover);
+}
+
+.pageNavLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.contentPage h1 {
+  max-width: 780px;
+  margin-bottom: 18px;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(58px, 9vw, 112px);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 0.85;
+}
+
+.contentPage h2 {
+  margin: 54px 0 14px;
+  color: var(--ink);
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.contentPage h3 {
+  margin: 30px 0 10px;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.contentPage p,
+.contentPage li {
+  color: #3c4043;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.contentPage p {
+  max-width: 760px;
+  margin-bottom: 18px;
+}
+
+.contentPage ul {
+  max-width: 760px;
+  margin: 0 0 18px;
+  padding-left: 22px;
+}
+
+.contentPage li + li {
+  margin-top: 8px;
+}
+
+.pageIntro {
+  max-width: 720px;
+  margin-bottom: 24px !important;
+  color: var(--muted) !important;
+  font-size: 20px !important;
+}
+
+.notice {
+  max-width: 800px;
+  margin: 28px 0;
+  padding: 18px 20px;
+  border: 1px solid #f6c26b;
+  border-radius: 14px;
+  background: #fff8e6;
+}
+
+.notice p {
+  margin: 0;
+  color: #684d13;
+}
+
+.notice strong {
+  color: #513b09;
+}
+
+.codeBlock {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 16px 0 22px;
+  padding: 20px;
+  border-radius: 14px;
+  background: #202124;
+  color: #f8f9fa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.codeBlock code {
+  font: inherit;
+}
+
+.inlineCode {
+  padding: 0.12em 0.3em;
+  border-radius: 4px;
+  background: #f1f3f4;
+  color: #202124;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.contractTable {
+  width: 100%;
+  margin: 16px 0 22px;
+  border: 1px solid var(--line);
+  border-collapse: separate;
+  border-radius: 12px;
+  border-spacing: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.contractTable th,
+.contractTable td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+  color: #3c4043;
+  font-size: 14px;
+  line-height: 1.5;
+  vertical-align: top;
+}
+
+.contractTable th {
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.contractTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.policyMeta {
+  color: var(--muted) !important;
+  font-size: 14px !important;
+}
+
+.contentFooter {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.contentFooter a {
+  color: var(--blue);
+  font-weight: 600;
+}
+
 @media (max-width: 720px) {
   .hero {
     width: min(100% - 24px, 1180px);
@@ -179,5 +356,30 @@ video {
   .footer {
     width: min(100% - 24px, 1180px);
     padding-bottom: 24px;
+  }
+
+  .contentPage {
+    width: min(100% - 24px, 960px);
+    padding-top: 24px;
+  }
+
+  .pageNav {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 40px;
+  }
+
+  .contentPage h1 {
+    font-size: clamp(54px, 18vw, 88px);
+  }
+
+  .pageIntro {
+    font-size: 18px !important;
+  }
+
+  .contractTable {
+    display: block;
+    overflow-x: auto;
   }
 }

@@ -35,6 +35,10 @@ export default function Home() {
             GitHub
           </a>
           <span aria-hidden="true">·</span>
+          <a href="/docs/">Agent docs</a>
+          <span aria-hidden="true">·</span>
+          <a href="/privacy-policy/">Privacy</a>
+          <span aria-hidden="true">·</span>
           <span>MemeDrop</span>
         </div>
         <p className="footerNote">
