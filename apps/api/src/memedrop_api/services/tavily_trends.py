@@ -85,12 +85,28 @@ class TavilyUsage:
     """Non-sensitive usage values returned by Tavily's authenticated usage endpoint."""
 
     key_usage: int
-    key_limit: int
+    key_limit: int | None
     key_search_usage: int
+    account_plan_usage: int
+    account_plan_limit: int
 
     def __post_init__(self) -> None:
-        if min(self.key_usage, self.key_limit, self.key_search_usage) < 0:
-            raise ValueError("Tavily usage values cannot be negative")
+        values = (
+            self.key_usage,
+            self.key_search_usage,
+            self.account_plan_usage,
+            self.account_plan_limit,
+        )
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in values
+        ):
+            raise ValueError("Tavily usage values must be non-negative integers")
+        if self.key_limit is not None and (
+            isinstance(self.key_limit, bool)
+            or not isinstance(self.key_limit, int)
+            or self.key_limit < 0
+        ):
+            raise ValueError("Tavily key limit must be null or a non-negative integer")
 
 
 @dataclass(frozen=True, slots=True)
@@ -643,14 +659,30 @@ def normalize_tavily_usage(response: httpx.Response) -> TavilyUsage:
         payload = response.json()
     except ValueError as error:
         raise TavilyResponseError("Tavily usage preflight returned invalid JSON") from error
-    if not isinstance(payload, dict) or not isinstance(payload.get("key"), dict):
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("key"), dict)
+        or not isinstance(payload.get("account"), dict)
+    ):
         raise TavilyResponseError("Tavily usage preflight returned an invalid response")
     key = payload["key"]
+    account = payload["account"]
+    if (
+        not {"usage", "limit", "search_usage"} <= key.keys()
+        or not {
+            "plan_usage",
+            "plan_limit",
+        }
+        <= account.keys()
+    ):
+        raise TavilyResponseError("Tavily usage preflight omitted required usage values")
     try:
         return TavilyUsage(
             key_usage=_non_negative_int(key.get("usage")),
-            key_limit=_non_negative_int(key.get("limit")),
+            key_limit=_optional_non_negative_int(key.get("limit")),
             key_search_usage=_non_negative_int(key.get("search_usage")),
+            account_plan_usage=_non_negative_int(account.get("plan_usage")),
+            account_plan_limit=_non_negative_int(account.get("plan_limit")),
         )
     except ValueError as error:
         raise TavilyResponseError("Tavily usage preflight omitted numeric usage values") from error
@@ -679,6 +711,12 @@ def _non_negative_int(value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValueError("value must be a non-negative integer")
     return value
+
+
+def _optional_non_negative_int(value: object) -> int | None:
+    if value is None:
+        return None
+    return _non_negative_int(value)
 
 
 def _tavily_http_failure_category(status_code: int) -> TrendFailureCategory:

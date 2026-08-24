@@ -246,7 +246,13 @@ async def test_refresh_keeps_the_last_snapshot_when_every_claimed_query_fails(
 
         async def preflight(self) -> TavilyUsage:
             calls.append("preflight")
-            return TavilyUsage(key_usage=0, key_limit=1_000, key_search_usage=0)
+            return TavilyUsage(
+                key_usage=0,
+                key_limit=None,
+                key_search_usage=0,
+                account_plan_usage=0,
+                account_plan_limit=1_000,
+            )
 
         async def collect(self, **values: object) -> TrendCollectionReport:
             calls.append("collect")

@@ -541,7 +541,12 @@ async def test_preflight_uses_the_non_search_usage_endpoint_without_reserving_cr
                     "map_usage": 7,
                     "research_usage": 3,
                 },
-                "account": {"current_plan": "Researcher", "search_usage": 350},
+                "account": {
+                    "current_plan": "Researcher",
+                    "plan_usage": 150,
+                    "plan_limit": 1_000,
+                    "search_usage": 350,
+                },
             },
             request=request,
         )
@@ -561,7 +566,13 @@ async def test_preflight_uses_the_non_search_usage_endpoint_without_reserving_cr
     assert captured_request.method == "GET"
     assert str(captured_request.url) == "https://api.tavily.com/usage"
     assert captured_request.headers["Authorization"] == "Bearer tvly-test-secret"
-    assert usage == TavilyUsage(key_usage=150, key_limit=1_000, key_search_usage=100)
+    assert usage == TavilyUsage(
+        key_usage=150,
+        key_limit=1_000,
+        key_search_usage=100,
+        account_plan_usage=150,
+        account_plan_limit=1_000,
+    )
     assert not store.reserved
 
 
@@ -584,7 +595,58 @@ async def test_preflight_categorizes_invalid_tavily_credentials_without_a_search
 
 
 def test_usage_normalization_rejects_missing_or_non_numeric_values() -> None:
-    response = httpx.Response(200, json={"key": {"usage": "150", "limit": 1_000}})
+    response = httpx.Response(
+        200,
+        json={
+            "key": {"usage": "150", "limit": 1_000, "search_usage": 100},
+            "account": {"plan_usage": 150, "plan_limit": 1_000},
+        },
+    )
+
+    with pytest.raises(TavilyCollectionError, match="omitted numeric usage"):
+        normalize_tavily_usage(response)
+
+
+def test_usage_normalization_accepts_null_key_limit_on_free_plan() -> None:
+    response = httpx.Response(
+        200,
+        json={
+            "key": {"usage": 8, "limit": None, "search_usage": 8},
+            "account": {"plan_usage": 8, "plan_limit": 1_000},
+        },
+    )
+
+    assert normalize_tavily_usage(response) == TavilyUsage(
+        key_usage=8,
+        key_limit=None,
+        key_search_usage=8,
+        account_plan_usage=8,
+        account_plan_limit=1_000,
+    )
+
+
+def test_usage_normalization_rejects_an_omitted_key_limit() -> None:
+    response = httpx.Response(
+        200,
+        json={
+            "key": {"usage": 8, "search_usage": 8},
+            "account": {"plan_usage": 8, "plan_limit": 1_000},
+        },
+    )
+
+    with pytest.raises(TavilyCollectionError, match="omitted required usage"):
+        normalize_tavily_usage(response)
+
+
+@pytest.mark.parametrize("invalid_value", [-1, True, 1.5, "1000"])
+def test_usage_normalization_rejects_invalid_account_plan_values(invalid_value: object) -> None:
+    response = httpx.Response(
+        200,
+        json={
+            "key": {"usage": 8, "limit": None, "search_usage": 8},
+            "account": {"plan_usage": 8, "plan_limit": invalid_value},
+        },
+    )
 
     with pytest.raises(TavilyCollectionError, match="omitted numeric usage"):
         normalize_tavily_usage(response)

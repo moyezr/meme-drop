@@ -48,7 +48,13 @@ def completed_report() -> TrendRefreshReport:
         active_cards=0,
         snapshot_version=1,
         index_version="snapshot-v1",
-        tavily_usage=TavilyUsage(key_usage=1, key_limit=1_000, key_search_usage=1),
+        tavily_usage=TavilyUsage(
+            key_usage=1,
+            key_limit=None,
+            key_search_usage=1,
+            account_plan_usage=1,
+            account_plan_limit=1_000,
+        ),
     )
 
 
@@ -124,6 +130,13 @@ async def test_cron_returns_a_bounded_operator_report_after_completion() -> None
     assert response.status_code == 200
     assert response.json()["status"] == "completed"
     assert response.json()["report"]["snapshot_version"] == 1
+    assert response.json()["report"]["tavily_usage"] == {
+        "key_usage": 1,
+        "key_limit": None,
+        "key_search_usage": 1,
+        "account_plan_usage": 1,
+        "account_plan_limit": 1_000,
+    }
     assert lock.released == ["lease-token"]
 
 
