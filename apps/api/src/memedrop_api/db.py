@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -31,6 +32,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from memedrop_api.public_ids import PublicIdKind, create_public_id
 
 
 def normalize_database_url(url: str) -> str:
@@ -418,6 +421,304 @@ class TrendCreditReservationRecord(Base):
     )
     credits: Mapped[int] = mapped_column(Integer)
     reserved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AgentAccount(Base):
+    """Tenant account for an agent developer using the public MemeDrop API.
+
+    Agent accounts are deliberately soft-disabled through ``status`` rather than
+    deleted: credit and generation history remain attributable to their tenant.
+    """
+
+    __tablename__ = "agent_accounts"
+    __table_args__ = (
+        CheckConstraint(
+            "id ~ '^acct_[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22}$'",
+            name="agent_accounts_id_format_check",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'suspended', 'closed')",
+            name="agent_accounts_status_check",
+        ),
+        Index("idx_agent_accounts_status_created_at", "status", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(27),
+        primary_key=True,
+        default=lambda: create_public_id(PublicIdKind.AGENT_ACCOUNT).value,
+    )
+    name: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class AgentApiKey(Base):
+    """An agent credential record; the plaintext secret is never stored."""
+
+    __tablename__ = "agent_api_keys"
+    __table_args__ = (
+        CheckConstraint(
+            "id ~ '^key_[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22}$'",
+            name="agent_api_keys_id_format_check",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'revoked')", name="agent_api_keys_status_check"
+        ),
+        CheckConstraint(
+            "(status = 'active' AND revoked_at IS NULL AND revocation_reason IS NULL "
+            "AND revoked_by_actor IS NULL) OR "
+            "(status = 'revoked' AND revoked_at IS NOT NULL AND revocation_reason IS NOT NULL "
+            "AND revoked_by_actor IS NOT NULL)",
+            name="agent_api_keys_revocation_state_check",
+        ),
+        CheckConstraint(
+            "last_used_at IS NULL OR last_used_at >= created_at",
+            name="agent_api_keys_last_used_at_check",
+        ),
+        CheckConstraint(
+            "revoked_at IS NULL OR revoked_at >= created_at",
+            name="agent_api_keys_revoked_at_check",
+        ),
+        UniqueConstraint("secret_hash", name="uq_agent_api_keys_secret_hash"),
+        UniqueConstraint("id", "agent_account_id", name="uq_agent_api_keys_id_account"),
+        Index("idx_agent_api_keys_account_status", "agent_account_id", "status"),
+        Index("idx_agent_api_keys_last_used_at", "last_used_at"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(26),
+        primary_key=True,
+        default=lambda: create_public_id(PublicIdKind.API_KEY).value,
+    )
+    agent_account_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(120))
+    secret_hash: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'")
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revocation_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    revoked_by_actor: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class AgentGeneration(Base):
+    """One idempotent agent generation request without source-post plaintext."""
+
+    __tablename__ = "agent_generations"
+    __table_args__ = (
+        CheckConstraint(
+            "id ~ '^gen_[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22}$'",
+            name="agent_generations_id_format_check",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'processing', 'succeeded', 'no_fit', 'failed', 'cancelled')",
+            name="agent_generations_status_check",
+        ),
+        CheckConstraint(
+            "(status IN ('pending', 'processing') AND completed_at IS NULL "
+            "AND failure_code IS NULL) OR "
+            "(status IN ('succeeded', 'no_fit') AND completed_at IS NOT NULL "
+            "AND failure_code IS NULL) OR "
+            "(status IN ('failed', 'cancelled') AND completed_at IS NOT NULL "
+            "AND failure_code IS NOT NULL)",
+            name="agent_generations_completion_state_check",
+        ),
+        CheckConstraint(
+            "completed_at IS NULL OR completed_at >= created_at",
+            name="agent_generations_completed_at_check",
+        ),
+        UniqueConstraint(
+            "agent_account_id",
+            "idempotency_key_hash",
+            name="uq_agent_generations_account_idempotency",
+        ),
+        UniqueConstraint("id", "agent_account_id", name="uq_agent_generations_id_account"),
+        ForeignKeyConstraint(
+            ["api_key_id", "agent_account_id"],
+            ["agent_api_keys.id", "agent_api_keys.agent_account_id"],
+            ondelete="RESTRICT",
+        ),
+        Index("idx_agent_generations_account_created_at", "agent_account_id", "created_at"),
+        Index("idx_agent_generations_account_status", "agent_account_id", "status"),
+        Index("idx_agent_generations_api_key_created_at", "api_key_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(26),
+        primary_key=True,
+        default=lambda: create_public_id(PublicIdKind.GENERATION).value,
+    )
+    agent_account_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    api_key_id: Mapped[str] = mapped_column(String(26))
+    idempotency_key_hash: Mapped[str] = mapped_column(String(64))
+    request_fingerprint: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default=text("'pending'")
+    )
+    failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class CreditLedgerEntry(Base):
+    """Immutable signed integer credit movement for an agent account."""
+
+    __tablename__ = "credit_ledger_entries"
+    __table_args__ = (
+        CheckConstraint(
+            "id ~ '^led_[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22}$'",
+            name="credit_ledger_entries_id_format_check",
+        ),
+        CheckConstraint(
+            "reason IN ('purchase', 'grant', 'generation_reservation', "
+            "'generation_commit', 'generation_release', 'adjustment', 'expiration', 'refund')",
+            name="credit_ledger_entries_reason_check",
+        ),
+        CheckConstraint(
+            "(reason IN ('purchase', 'grant', 'refund') AND credit_delta > 0) OR "
+            "(reason = 'generation_reservation' AND credit_delta < 0) OR "
+            "(reason = 'generation_commit' AND credit_delta = 0) OR "
+            "(reason = 'generation_release' AND credit_delta > 0) OR "
+            "(reason = 'expiration' AND credit_delta < 0) OR "
+            "(reason = 'adjustment' AND credit_delta <> 0)",
+            name="credit_ledger_entries_reason_delta_check",
+        ),
+        CheckConstraint(
+            "actor_type IN ('system', 'account', 'operator', 'payment')",
+            name="credit_ledger_entries_actor_type_check",
+        ),
+        UniqueConstraint(
+            "agent_account_id",
+            "idempotency_key_hash",
+            name="uq_credit_ledger_entries_account_idempotency",
+        ),
+        ForeignKeyConstraint(
+            ["generation_id", "agent_account_id"],
+            ["agent_generations.id", "agent_generations.agent_account_id"],
+            ondelete="RESTRICT",
+        ),
+        Index("idx_credit_ledger_entries_account_recorded_at", "agent_account_id", "recorded_at"),
+        Index("idx_credit_ledger_entries_generation", "generation_id"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(26),
+        primary_key=True,
+        default=lambda: create_public_id(PublicIdKind.LEDGER_ENTRY).value,
+    )
+    agent_account_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    generation_id: Mapped[str | None] = mapped_column(String(26), nullable=True)
+    credit_delta: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(40))
+    actor_type: Mapped[str] = mapped_column(String(20))
+    actor_id: Mapped[str] = mapped_column(String(120))
+    idempotency_key_hash: Mapped[str] = mapped_column(String(64))
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class GeneratedAsset(Base):
+    """A generated object with explicit ownership and retention/deletion state."""
+
+    __tablename__ = "generated_assets"
+    __table_args__ = (
+        CheckConstraint(
+            "id ~ '^asset_[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22}$'",
+            name="generated_assets_id_format_check",
+        ),
+        CheckConstraint(
+            "deletion_state IN ('active', 'pending', 'failed', 'deleted')",
+            name="generated_assets_deletion_state_check",
+        ),
+        CheckConstraint(
+            "expires_at > created_at", name="generated_assets_expiry_check"
+        ),
+        CheckConstraint(
+            "deletion_attempts >= 0", name="generated_assets_deletion_attempts_check"
+        ),
+        CheckConstraint(
+            "deleted_at IS NULL OR deleted_at >= created_at",
+            name="generated_assets_deleted_at_check",
+        ),
+        CheckConstraint(
+            "(deletion_state = 'deleted' AND deleted_at IS NOT NULL) OR "
+            "(deletion_state IN ('active', 'pending', 'failed') AND deleted_at IS NULL)",
+            name="generated_assets_deletion_timestamps_check",
+        ),
+        UniqueConstraint("object_key", name="uq_generated_assets_object_key"),
+        ForeignKeyConstraint(
+            ["generation_id", "agent_account_id"],
+            ["agent_generations.id", "agent_generations.agent_account_id"],
+            ondelete="RESTRICT",
+        ),
+        Index("idx_generated_assets_account_created_at", "agent_account_id", "created_at"),
+        Index(
+            "idx_generated_assets_deletion_state_expires_at",
+            "deletion_state",
+            "expires_at",
+        ),
+        Index("idx_generated_assets_generation", "generation_id"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(28),
+        primary_key=True,
+        default=lambda: create_public_id(PublicIdKind.ASSET).value,
+    )
+    agent_account_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    generation_id: Mapped[str] = mapped_column(String(26))
+    object_key: Mapped[str] = mapped_column(Text)
+    content_type: Mapped[str] = mapped_column(String(127))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now() + interval '30 days'")
+    )
+    deletion_state: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'")
+    )
+    deletion_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0")
+    )
+    last_deletion_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    deletion_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
 
 
 class Database:

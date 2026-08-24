@@ -34,6 +34,11 @@ def test_database_models_preserve_existing_table_names() -> None:
         "trend_scan_queries",
         "trend_credit_periods",
         "trend_credit_reservations",
+        "agent_accounts",
+        "agent_api_keys",
+        "agent_generations",
+        "credit_ledger_entries",
+        "generated_assets",
     }
 
 
