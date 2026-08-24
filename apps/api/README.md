@@ -32,11 +32,14 @@ which the API runtime does not read.
 ## Trend memory
 
 Trend collection is an offline refresh job; the request path never calls Tavily. The collector has
-a hard application cap of 750 Tavily credits per calendar month for the free-tier allowance, with
-claims and credit reservations coordinated in PostgreSQL. PostgreSQL is the lifecycle-aware source
-of truth for normalized trend cards and evidence metadata. A successful refresh publishes an
-immutable snapshot and switches the versioned Redis serving index only after the new namespace is
-complete.
+a hard application cap of 900 Tavily credits per calendar month, with claims and local credit
+reservations coordinated in PostgreSQL. Before it reserves a search credit, each refresh validates
+the Tavily credential through its non-search usage endpoint and includes the provider-reported key
+usage separately in its operator output. PostgreSQL is the lifecycle-aware source of truth for
+normalized trend cards and evidence metadata. A successful refresh publishes an immutable snapshot
+and switches the versioned Redis serving index only after the new namespace is complete. A refresh
+where every claimed query fails exits non-zero and leaves the prior PostgreSQL snapshot and Redis
+pointer unchanged.
 
 Suggestion and standalone-caption requests derive bounded lookup signals locally, retrieve at most
 two relevant cards, and add no more than 1,200 characters of compact, explicitly untrusted cultural
@@ -61,11 +64,11 @@ uv run --project apps/api memedrop-trend-refresh
 ```
 
 Set `MEMEDROP_TRENDS_ENABLED=true` for both the refresh job and request-time Redis lookup. A single
-six-hour scheduler may run the default command: deterministic UTC scan buckets make the daily and
+four-hour scheduler may run the default command: deterministic UTC scan buckets make the daily and
 weekly profiles idempotently skip until their cadence advances. For isolated runs, repeat
 `--profile pulse`, `--profile daily`, or `--profile weekly` as needed. The curated schedule uses an
-estimated 592 basic searches per 30 days before retries; the PostgreSQL ledger still enforces the
-750-credit ceiling across workers and retries.
+estimated 771 basic searches per 30 days before retries; the PostgreSQL ledger still enforces the
+900-credit ceiling across workers and retries.
 
 ## Development
 

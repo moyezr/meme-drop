@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
@@ -286,10 +287,46 @@ async def test_provider_errors_have_a_stable_failure_type_and_are_not_retried() 
             timeout_seconds=5,
             client=client,
         )
-        with pytest.raises(TrendEnrichmentError, match="provider request failed"):
+        with pytest.raises(TrendEnrichmentError, match="provider request failed") as captured:
             await enricher.enrich([evidence(0)], observed_at=NOW)
 
     assert calls == 1
+    assert captured.value.category == "openrouter_unavailable"
+
+
+async def test_transport_errors_are_categorized_as_openrouter_unavailable() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        enricher = OpenRouterTrendEnricher(
+            api_key="secret",
+            model="model",
+            timeout_seconds=5,
+            client=client,
+        )
+        with pytest.raises(TrendEnrichmentError, match="provider request failed") as captured:
+            await enricher.enrich([evidence(0)], observed_at=NOW)
+
+    assert captured.value.category == "openrouter_unavailable"
+
+
+async def test_provider_timeout_is_categorized_as_openrouter_timeout() -> None:
+    async def respond(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(0.2)
+        return httpx.Response(200, json=completion({"trends": []}), request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        enricher = OpenRouterTrendEnricher(
+            api_key="secret",
+            model="model",
+            timeout_seconds=0.1,
+            client=client,
+        )
+        with pytest.raises(TrendEnrichmentError, match="provider request timed out") as captured:
+            await enricher.enrich([evidence(0)], observed_at=NOW)
+
+    assert captured.value.category == "openrouter_timeout"
 
 
 async def test_unexpected_model_client_bug_remains_visible() -> None:

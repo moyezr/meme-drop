@@ -9,11 +9,14 @@ import pytest
 import memedrop_api.app as app_module
 import memedrop_api.cli as cli_module
 from memedrop_api.config import Settings
+from memedrop_api.services.tavily_trends import TavilyUsage, TrendCollectionReport
 from memedrop_api.services.trend_index import TrendRetrieval
 from memedrop_api.services.trend_runtime import (
     TREND_QUERY_PROFILES,
     TrendRefreshConfigurationError,
+    TrendRefreshFailed,
     publish_serving_snapshot,
+    refresh_trends,
     scheduled_monthly_credit_estimate,
     serving_trend_cards,
     trend_index_document,
@@ -79,7 +82,7 @@ def test_trend_settings_are_optional_bounded_and_secret_repr_safe() -> None:
     configured = configured_settings()
 
     assert defaults.trends_enabled is False
-    assert defaults.trend_monthly_credit_budget == 750
+    assert defaults.trend_monthly_credit_budget == 900
     assert defaults.openrouter_trend_model == "google/gemini-3.7-flash"
     assert defaults.trend_redis_url is None
     assert configured.trend_redis_url == "redis://127.0.0.1:6379/0"
@@ -87,14 +90,16 @@ def test_trend_settings_are_optional_bounded_and_secret_repr_safe() -> None:
     assert "openrouter-secret" not in repr(configured)
 
 
-def test_curated_profile_schedule_stays_below_six_hundred_basic_credits() -> None:
+def test_curated_profile_schedule_leaves_retry_headroom_under_the_nine_hundred_credit_ceiling() -> (
+    None
+):
     assert [profile.name for profile in TREND_QUERY_PROFILES] == [
         "pulse",
         "daily",
         "weekly",
     ]
-    assert scheduled_monthly_credit_estimate() == pytest.approx(591.43, abs=0.01)
-    assert scheduled_monthly_credit_estimate() < 600
+    assert scheduled_monthly_credit_estimate() == pytest.approx(771.43, abs=0.01)
+    assert scheduled_monthly_credit_estimate() < 900
 
 
 def test_scan_identity_is_deterministic_for_each_utc_cadence_bucket() -> None:
@@ -102,8 +107,8 @@ def test_scan_identity_is_deterministic_for_each_utc_cadence_bucket() -> None:
     first = datetime(2026, 8, 19, 13, 59, tzinfo=UTC)
 
     assert trend_scan_id(profile, at=first) == "trend-pulse-20260819T120000Z"
-    assert trend_scan_id(profile, at=first + timedelta(hours=3)) == ("trend-pulse-20260819T120000Z")
-    assert trend_scan_id(profile, at=first + timedelta(hours=5)) == ("trend-pulse-20260819T180000Z")
+    assert trend_scan_id(profile, at=first + timedelta(hours=2)) == ("trend-pulse-20260819T120000Z")
+    assert trend_scan_id(profile, at=first + timedelta(hours=3)) == ("trend-pulse-20260819T160000Z")
 
 
 def test_index_document_includes_exact_fields_and_tokens_from_multiword_cues() -> None:
@@ -187,6 +192,122 @@ def test_cli_reports_configuration_errors_clearly(
 
     assert captured.value.code == 2
     assert "TAVILY_API_KEY" in capsys.readouterr().err
+
+
+def test_cli_returns_nonzero_when_all_claimed_queries_fail(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    async def fail_refresh(*args: object, **kwargs: object) -> object:
+        raise TrendRefreshFailed(
+            "trend refresh had no successful provider queries; preserving the last "
+            "published snapshot (tavily_auth)"
+        )
+
+    monkeypatch.setattr(cli_module, "Settings", lambda: configured_settings())
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.refresh_trends", fail_refresh)
+    monkeypatch.setattr(sys, "argv", ["memedrop-trend-refresh", "--profile", "pulse"])
+
+    with pytest.raises(SystemExit) as captured:
+        cli_module.trend_refresh()
+
+    assert captured.value.code == 2
+    assert "tavily_auth" in capsys.readouterr().err
+
+
+async def test_refresh_keeps_the_last_snapshot_when_every_claimed_query_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    failed_collection = TrendCollectionReport(
+        requested_queries=3,
+        claimed_queries=3,
+        skipped_queries=0,
+        completed_queries=0,
+        failed_queries=3,
+        local_credit_reservations=3,
+        provider_search_credits=0,
+        evidence_discovered=0,
+        cards_upserted=0,
+        observations_stored=0,
+        budget_exhausted=False,
+        failure_categories={"tavily_auth": 3},
+    )
+
+    class FakeDatabase:
+        def __init__(self, database_url: str) -> None:
+            calls.append("database")
+
+        async def close(self) -> None:
+            calls.append("database-close")
+
+    class FakeCollector:
+        def __init__(self, **values: object) -> None:
+            calls.append("collector")
+
+        async def preflight(self) -> TavilyUsage:
+            calls.append("preflight")
+            return TavilyUsage(key_usage=0, key_limit=1_000, key_search_usage=0)
+
+        async def collect(self, **values: object) -> TrendCollectionReport:
+            calls.append("collect")
+            return failed_collection
+
+        async def close(self) -> None:
+            calls.append("collector-close")
+
+    class FakeEnricher:
+        def __init__(self, **values: object) -> None:
+            calls.append("enricher")
+
+        async def close(self) -> None:
+            calls.append("enricher-close")
+
+    class FakeIndex:
+        def __init__(self, redis_url: str) -> None:
+            calls.append("index")
+
+        async def close(self) -> None:
+            calls.append("index-close")
+
+    class UnexpectedRepository:
+        def __init__(self, database: object) -> None:
+            calls.append("repository")
+
+        async def list_active_cards(self, **values: object) -> object:
+            raise AssertionError("failed refresh must not read or publish a replacement snapshot")
+
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.Database", FakeDatabase)
+    monkeypatch.setattr(
+        "memedrop_api.services.trend_runtime.SqlAlchemyTrendCollectionStore",
+        lambda database: object(),
+    )
+    monkeypatch.setattr(
+        "memedrop_api.services.trend_runtime.SqlAlchemyTrendRepository", UnexpectedRepository
+    )
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.TavilyTrendCollector", FakeCollector)
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.OpenRouterTrendEnricher", FakeEnricher)
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.RedisTrendIndex", FakeIndex)
+
+    with pytest.raises(TrendRefreshFailed, match="tavily_auth"):
+        await refresh_trends(
+            configured_settings(),
+            profile_names=("pulse",),
+            at=datetime(2026, 8, 19, 12, tzinfo=UTC),
+        )
+
+    assert calls == [
+        "database",
+        "repository",
+        "enricher",
+        "collector",
+        "index",
+        "preflight",
+        "collect",
+        "collector-close",
+        "enricher-close",
+        "index-close",
+        "database-close",
+    ]
 
 
 async def test_app_injects_and_closes_only_the_configured_redis_trend_retriever(

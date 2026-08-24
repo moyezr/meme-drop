@@ -10,14 +10,17 @@ import pytest
 from memedrop_api.services.tavily_trends import (
     DEFAULT_MONTHLY_CREDIT_BUDGET,
     TAVILY_MAX_RESULTS,
+    TavilyCollectionError,
     TavilyCollectorConfig,
     TavilyEvidenceInput,
     TavilyTrendCollector,
+    TavilyUsage,
     TrendCommitResult,
     TrendEnrichmentBatch,
     TrendEvidenceEnrichmentError,
     TrendSearchQuery,
     canonical_source_url,
+    normalize_tavily_usage,
     retry_delay_seconds,
 )
 from memedrop_api.trends import TrendObservation, trend_id_for_key
@@ -119,7 +122,10 @@ async def test_collector_forces_basic_bounded_search_and_stores_only_enriched_ob
         )
         return httpx.Response(
             200,
-            json={"results": [result(number) for number in range(1, 7)] + [duplicate]},
+            json={
+                "results": [result(number) for number in range(1, 7)] + [duplicate],
+                "usage": {"credits": 1},
+            },
             request=request,
         )
 
@@ -150,6 +156,7 @@ async def test_collector_forces_basic_bounded_search_and_stores_only_enriched_ob
         "auto_parameters": False,
         "max_results": 5,
         "include_answer": False,
+        "include_usage": True,
         "include_raw_content": False,
         "include_images": False,
         "topic": "news",
@@ -166,7 +173,8 @@ async def test_collector_forces_basic_bounded_search_and_stores_only_enriched_ob
     assert evidence[0].published_at == datetime(2026, 8, 19, 8, tzinfo=UTC)
     assert not hasattr(store.commits[0].observations[0], "provider_excerpt")
     assert report.completed_queries == 1
-    assert report.credits_reserved == 1
+    assert report.local_credit_reservations == 1
+    assert report.provider_search_credits == 1
     assert report.evidence_discovered == 5
     assert report.cards_upserted == 0
     assert report.observations_stored == 5
@@ -255,7 +263,7 @@ async def test_monthly_budget_denial_stops_scan_without_calling_provider() -> No
     assert store.reserved[0]["hard_limit"] == DEFAULT_MONTHLY_CREDIT_BUDGET
     assert len(store.releases) == 1
     assert report.budget_exhausted
-    assert report.credits_reserved == 0
+    assert report.local_credit_reservations == 0
 
 
 async def test_429_retry_honors_retry_after_and_reserves_each_outbound_attempt() -> None:
@@ -291,7 +299,7 @@ async def test_429_retry_honors_retry_after_and_reserves_each_outbound_attempt()
     assert delays == [2]
     assert len(store.reserved) == 2
     assert len({item["reservation_id"] for item in store.reserved}) == 2
-    assert report.credits_reserved == 2
+    assert report.local_credit_reservations == 2
     assert report.completed_queries == 1
 
 
@@ -321,6 +329,7 @@ async def test_non_retryable_provider_failure_releases_claim_without_leaking_res
     assert len(store.releases) == 1
     assert report.failed_queries == 1
     assert report.completed_queries == 0
+    assert report.failure_categories == {"tavily_response": 1}
 
 
 async def test_collector_applies_a_strict_wall_clock_timeout() -> None:
@@ -345,6 +354,7 @@ async def test_collector_applies_a_strict_wall_clock_timeout() -> None:
         )
 
     assert report.failed_queries == 1
+    assert report.failure_categories == {"tavily_timeout": 1}
     assert len(store.releases) == 1
 
 
@@ -508,6 +518,73 @@ def test_retry_delay_caps_retry_after_and_uses_exponential_fallback() -> None:
 
 
 def test_free_tier_configuration_cannot_exceed_provider_allowance() -> None:
-    assert TavilyCollectorConfig().monthly_credit_budget == 750
+    assert TavilyCollectorConfig().monthly_credit_budget == 900
     with pytest.raises(ValueError, match="between 1 and 1000"):
         TavilyCollectorConfig(monthly_credit_budget=1_001)
+
+
+async def test_preflight_uses_the_non_search_usage_endpoint_without_reserving_credits() -> None:
+    captured_request: httpx.Request | None = None
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_request
+        captured_request = request
+        return httpx.Response(
+            200,
+            json={
+                "key": {
+                    "usage": 150,
+                    "limit": 1_000,
+                    "search_usage": 100,
+                    "extract_usage": 25,
+                    "crawl_usage": 15,
+                    "map_usage": 7,
+                    "research_usage": 3,
+                },
+                "account": {"current_plan": "Researcher", "search_usage": 350},
+            },
+            request=request,
+        )
+
+    store = FakeStore()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        collector = TavilyTrendCollector(
+            api_key="tvly-test-secret",
+            store=store,
+            enricher=CapturingEnricher(),
+            client=client,
+            clock=lambda: NOW,
+        )
+        usage = await collector.preflight()
+
+    assert captured_request is not None
+    assert captured_request.method == "GET"
+    assert str(captured_request.url) == "https://api.tavily.com/usage"
+    assert captured_request.headers["Authorization"] == "Bearer tvly-test-secret"
+    assert usage == TavilyUsage(key_usage=150, key_limit=1_000, key_search_usage=100)
+    assert not store.reserved
+
+
+async def test_preflight_categorizes_invalid_tavily_credentials_without_a_search() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        collector = TavilyTrendCollector(
+            api_key="tvly-invalid",
+            store=FakeStore(),
+            enricher=CapturingEnricher(),
+            client=client,
+            clock=lambda: NOW,
+        )
+        with pytest.raises(TavilyCollectionError, match="usage preflight was rejected") as captured:
+            await collector.preflight()
+
+    assert captured.value.category == "tavily_auth"
+
+
+def test_usage_normalization_rejects_missing_or_non_numeric_values() -> None:
+    response = httpx.Response(200, json={"key": {"usage": "150", "limit": 1_000}})
+
+    with pytest.raises(TavilyCollectionError, match="omitted numeric usage"):
+        normalize_tavily_usage(response)

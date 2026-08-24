@@ -57,17 +57,17 @@ diagnose latency, quality, cost, and availability regressions.
 
 ### P0 — Make trend ingestion operational and safe
 
-- [ ] Validate the rotated Tavily key with Tavily's authenticated, non-search usage endpoint.
-- [ ] Add a provider preflight that rejects missing or invalid credentials before reserving local
+- [x] Validate the rotated Tavily key with Tavily's authenticated, non-search usage endpoint.
+- [x] Add a provider preflight that rejects missing or invalid credentials before reserving local
   search credits.
-- [ ] Return a non-zero CLI status when every claimed query fails.
-- [ ] Report bounded, non-sensitive failure categories such as `tavily_auth`,
+- [x] Return a non-zero CLI status when every claimed query fails.
+- [x] Report bounded, non-sensitive failure categories such as `tavily_auth`,
   `tavily_rate_limit`, `tavily_timeout`, `openrouter_timeout`, and `schema_rejected`.
-- [ ] Preserve the last published PostgreSQL snapshot and Redis pointer when a refresh produces no
+- [x] Preserve the last published PostgreSQL snapshot and Redis pointer when a refresh produces no
   successful query results because of provider or infrastructure failure.
-- [ ] Distinguish local credit reservations from provider-reported Tavily usage in operator output.
-- [ ] Set the application monthly ceiling to 900 Tavily credits.
-- [ ] Change the pulse profile from a six-hour cadence to a four-hour cadence after the safe-failure
+- [x] Distinguish local credit reservations from provider-reported Tavily usage in operator output.
+- [x] Set the application monthly ceiling to 900 Tavily credits.
+- [x] Change the pulse profile from a six-hour cadence to a four-hour cadence after the safe-failure
   work is deployed. The expected schedule is approximately 771 basic searches per 30 days, leaving
   approximately 129 credits for retries under the 900-credit ceiling.
 - [ ] Add a protected, idempotent cron entry point suitable for Vercel Cron Jobs. It must authenticate

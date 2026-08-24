@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
     trends_enabled: bool = Field(default=False, validation_alias="MEMEDROP_TRENDS_ENABLED")
     trend_monthly_credit_budget: int = Field(
-        default=750,
+        default=900,
         validation_alias="MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET",
         ge=1,
         le=1_000,

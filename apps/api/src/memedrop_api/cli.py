@@ -295,6 +295,7 @@ def trend_refresh() -> None:
     from memedrop_api.services.trend_runtime import (  # noqa: PLC0415
         TREND_QUERY_PROFILES,
         TrendRefreshConfigurationError,
+        TrendRefreshFailed,
         refresh_trends,
     )
 
@@ -311,7 +312,7 @@ def trend_refresh() -> None:
     settings = Settings()  # type: ignore[call-arg]
     try:
         report = asyncio.run(refresh_trends(settings, profile_names=arguments.profile))
-    except TrendRefreshConfigurationError as error:
+    except (TrendRefreshConfigurationError, TrendRefreshFailed) as error:
         parser.error(str(error))
     print(json.dumps(report.as_json(), sort_keys=True))
 

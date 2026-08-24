@@ -11,8 +11,10 @@ from urllib.parse import urlparse
 from memedrop_api.config import Settings
 from memedrop_api.db import Database
 from memedrop_api.services.tavily_trends import (
+    TavilyCollectionError,
     TavilyCollectorConfig,
     TavilyTrendCollector,
+    TavilyUsage,
     TrendCollectionReport,
     TrendSearchQuery,
     TrendSearchTopic,
@@ -58,6 +60,10 @@ class TrendRefreshConfigurationError(RuntimeError):
     """Raised before a scheduled refresh can consume provider credits."""
 
 
+class TrendRefreshFailed(RuntimeError):
+    """Raised when a refresh has no successful provider query to safely publish."""
+
+
 @dataclass(frozen=True, slots=True)
 class TrendQueryProfile:
     name: str
@@ -83,6 +89,7 @@ class TrendRefreshReport:
     active_cards: int
     snapshot_version: int
     index_version: str
+    tavily_usage: TavilyUsage
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -97,13 +104,14 @@ class TrendRefreshReport:
             "active_cards": self.active_cards,
             "snapshot_version": self.snapshot_version,
             "index_version": self.index_version,
+            "tavily_usage": asdict(self.tavily_usage),
         }
 
 
 TREND_QUERY_PROFILES = (
     TrendQueryProfile(
         name="pulse",
-        cadence=timedelta(hours=6),
+        cadence=timedelta(hours=4),
         queries=(
             TrendSearchQuery(
                 key="pulse.internet",
@@ -338,6 +346,12 @@ async def refresh_trends(
     index = RedisTrendIndex(settings.redis_url or "")
     reports: list[ProfileRefreshReport] = []
     try:
+        try:
+            tavily_usage = await collector.preflight()
+        except TavilyCollectionError as error:
+            raise TrendRefreshConfigurationError(
+                f"Tavily usage preflight failed ({error.category})"
+            ) from None
         for position, profile in enumerate(profiles):
             scan_id = trend_scan_id(profile, at=observed_at)
             collection = await collector.collect(scan_id=scan_id, queries=profile.queries)
@@ -350,6 +364,14 @@ async def refresh_trends(
             )
             if position < len(profiles) - 1 and settings.trend_collection_cooldown_seconds:
                 await sleep(settings.trend_collection_cooldown_seconds)
+
+        if _all_claimed_queries_failed(reports):
+            categories = _failure_categories(reports)
+            category_text = ", ".join(categories) or "unknown"
+            raise TrendRefreshFailed(
+                "trend refresh had no successful provider queries; preserving the last "
+                f"published snapshot ({category_text})"
+            )
 
         active_cards = serving_trend_cards(
             await repository.list_active_cards(as_of=observed_at, limit=500)
@@ -366,12 +388,36 @@ async def refresh_trends(
             active_cards=len(snapshot.cards),
             snapshot_version=snapshot.version,
             index_version=index_version,
+            tavily_usage=tavily_usage,
         )
     finally:
         await collector.close()
         await enricher.close()
         await index.close()
         await database.close()
+
+
+def _all_claimed_queries_failed(reports: Sequence[ProfileRefreshReport]) -> bool:
+    collections = tuple(item.collection for item in reports)
+    return (
+        bool(collections)
+        and sum(item.claimed_queries for item in collections) > 0
+        and sum(item.completed_queries for item in collections) == 0
+        and sum(item.failed_queries for item in collections) > 0
+    )
+
+
+def _failure_categories(reports: Sequence[ProfileRefreshReport]) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {
+                category
+                for report in reports
+                for category, count in report.collection.failure_categories.items()
+                if count > 0
+            }
+        )
+    )
 
 
 def _normalized_tokens(values: Sequence[str], *, limit: int) -> tuple[str, ...]:

@@ -246,8 +246,16 @@ class OpenRouterTrendEnricher(_BaseModelTrendEnricher):
                     timeout=httpx.Timeout(self._timeout_seconds),
                 )
             response.raise_for_status()
-        except (httpx.HTTPError, TimeoutError):
-            raise TrendEnrichmentError("trend enrichment provider request failed") from None
+        except TimeoutError:
+            raise TrendEnrichmentError(
+                "trend enrichment provider request timed out",
+                category="openrouter_timeout",
+            ) from None
+        except httpx.HTTPError:
+            raise TrendEnrichmentError(
+                "trend enrichment provider request failed",
+                category="openrouter_unavailable",
+            ) from None
 
         try:
             payload = response.json()

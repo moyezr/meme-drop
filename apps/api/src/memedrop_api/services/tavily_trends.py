@@ -18,8 +18,9 @@ import httpx
 from memedrop_api.trends import TrendCard, TrendObservation, canonicalize_evidence_url
 
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
+TAVILY_USAGE_URL = "https://api.tavily.com/usage"
 TAVILY_MAX_RESULTS = 5
-DEFAULT_MONTHLY_CREDIT_BUDGET = 750
+DEFAULT_MONTHLY_CREDIT_BUDGET = 900
 MAX_PROVIDER_EXCERPT_CHARS = 1_200
 MAX_PROVIDER_TITLE_CHARS = 300
 MAX_SOURCE_URL_CHARS = 2_048
@@ -30,6 +31,16 @@ _SCAN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 TrendTimeRange = Literal["day", "week", "month"]
 TrendSearchTopic = Literal["general", "news"]
+TrendFailureCategory = Literal[
+    "tavily_auth",
+    "tavily_rate_limit",
+    "tavily_timeout",
+    "tavily_unavailable",
+    "tavily_response",
+    "openrouter_timeout",
+    "openrouter_unavailable",
+    "schema_rejected",
+]
 Sleep = Callable[[float], Awaitable[None]]
 Clock = Callable[[], datetime]
 
@@ -37,17 +48,49 @@ Clock = Callable[[], datetime]
 class TavilyCollectionError(RuntimeError):
     """Base error for a bounded Tavily collection attempt."""
 
+    def __init__(self, message: str, *, category: TrendFailureCategory) -> None:
+        super().__init__(message)
+        self.category = category
+
 
 class TavilyResponseError(TavilyCollectionError):
     """Raised when Tavily returns a response that cannot be safely normalized."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, category="tavily_response")
 
 
 class TavilyBudgetExhausted(TavilyCollectionError):
     """Raised internally when the application credit ceiling rejects an attempt."""
 
+    def __init__(self) -> None:
+        super().__init__("application Tavily credit ceiling reached", category="tavily_response")
+
 
 class TrendEvidenceEnrichmentError(RuntimeError):
     """Known model availability or schema failure for one transient evidence batch."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: TrendFailureCategory = "schema_rejected",
+    ) -> None:
+        super().__init__(message)
+        self.category = category
+
+
+@dataclass(frozen=True, slots=True)
+class TavilyUsage:
+    """Non-sensitive usage values returned by Tavily's authenticated usage endpoint."""
+
+    key_usage: int
+    key_limit: int
+    key_search_usage: int
+
+    def __post_init__(self) -> None:
+        if min(self.key_usage, self.key_limit, self.key_search_usage) < 0:
+            raise ValueError("Tavily usage values cannot be negative")
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,11 +295,13 @@ class TrendCollectionReport:
     skipped_queries: int
     completed_queries: int
     failed_queries: int
-    credits_reserved: int
+    local_credit_reservations: int
+    provider_search_credits: int
     evidence_discovered: int
     cards_upserted: int
     observations_stored: int
     budget_exhausted: bool
+    failure_categories: dict[TrendFailureCategory, int]
 
 
 @dataclass(slots=True)
@@ -266,11 +311,16 @@ class _MutableReport:
     skipped_queries: int = 0
     completed_queries: int = 0
     failed_queries: int = 0
-    credits_reserved: int = 0
+    local_credit_reservations: int = 0
+    provider_search_credits: int = 0
     evidence_discovered: int = 0
     cards_upserted: int = 0
     observations_stored: int = 0
     budget_exhausted: bool = False
+    failure_categories: dict[TrendFailureCategory, int] = field(default_factory=dict)
+
+    def record_failure(self, category: TrendFailureCategory) -> None:
+        self.failure_categories[category] = self.failure_categories.get(category, 0) + 1
 
     def freeze(self) -> TrendCollectionReport:
         return TrendCollectionReport(
@@ -279,11 +329,13 @@ class _MutableReport:
             skipped_queries=self.skipped_queries,
             completed_queries=self.completed_queries,
             failed_queries=self.failed_queries,
-            credits_reserved=self.credits_reserved,
+            local_credit_reservations=self.local_credit_reservations,
+            provider_search_credits=self.provider_search_credits,
             evidence_discovered=self.evidence_discovered,
             cards_upserted=self.cards_upserted,
             observations_stored=self.observations_stored,
             budget_exhausted=self.budget_exhausted,
+            failure_categories=dict(sorted(self.failure_categories.items())),
         )
 
 
@@ -312,6 +364,34 @@ class TavilyTrendCollector:
         self._sleep = sleep
         self._clock = clock or (lambda: datetime.now(UTC))
         self._closed = False
+
+    async def preflight(self) -> TavilyUsage:
+        """Validate credentials and capture provider usage without making a search request."""
+
+        client = await self._get_client()
+        response: httpx.Response
+        try:
+            async with asyncio.timeout(self._config.request_timeout_seconds):
+                response = await client.get(
+                    TAVILY_USAGE_URL,
+                    headers={"Authorization": f"Bearer {self._api_key}"},
+                    timeout=httpx.Timeout(self._config.request_timeout_seconds),
+                )
+            response.raise_for_status()
+        except TimeoutError:
+            raise TavilyCollectionError(
+                "Tavily usage preflight timed out", category="tavily_timeout"
+            ) from None
+        except httpx.TransportError:
+            raise TavilyCollectionError(
+                "Tavily usage preflight was unavailable", category="tavily_unavailable"
+            ) from None
+        except httpx.HTTPStatusError as error:
+            raise TavilyCollectionError(
+                "Tavily usage preflight was rejected",
+                category=_tavily_http_failure_category(error.response.status_code),
+            ) from None
+        return normalize_tavily_usage(response)
 
     async def close(self) -> None:
         if self._closed:
@@ -366,8 +446,9 @@ class TavilyTrendCollector:
                     query_fingerprint=query.fingerprint,
                 )
                 break
-            except (TavilyCollectionError, TrendEvidenceEnrichmentError):
+            except (TavilyCollectionError, TrendEvidenceEnrichmentError) as error:
                 report.failed_queries += 1
+                report.record_failure(error.category)
                 await self._store.release_scan_query(
                     scan_id=scan_id,
                     query_fingerprint=query.fingerprint,
@@ -397,6 +478,7 @@ class TavilyTrendCollector:
         report: _MutableReport,
     ) -> tuple[TavilyEvidenceInput, ...]:
         last_error: BaseException | None = None
+        category: TrendFailureCategory = "tavily_unavailable"
         for attempt in range(self._config.max_attempts):
             reserved_at = self._utc_now()
             reserved = await self._store.reserve_monthly_credits(
@@ -408,24 +490,35 @@ class TavilyTrendCollector:
             )
             if not reserved:
                 raise TavilyBudgetExhausted
-            report.credits_reserved += 1
+            report.local_credit_reservations += 1
 
             response: httpx.Response | None = None
             try:
                 response = await self._post_search(query)
                 response.raise_for_status()
+                report.provider_search_credits += tavily_response_search_credits(response)
                 return normalize_tavily_response(
                     response,
                     query=query,
                     collected_at=self._utc_now(),
                 )
-            except (httpx.TransportError, TimeoutError, TavilyResponseError) as error:
+            except TimeoutError as error:
                 last_error = error
+                category = "tavily_timeout"
+            except httpx.TransportError as error:
+                last_error = error
+                category = "tavily_unavailable"
+            except TavilyResponseError as error:
+                last_error = error
+                category = error.category
             except httpx.HTTPStatusError as error:
                 last_error = error
+                category = _tavily_http_failure_category(error.response.status_code)
                 retryable_server_error = 500 <= error.response.status_code < 600
                 if error.response.status_code != 429 and not retryable_server_error:
-                    raise TavilyCollectionError("Tavily rejected the search request") from error
+                    raise TavilyCollectionError(
+                        "Tavily rejected the search request", category=category
+                    ) from error
 
             if attempt + 1 < self._config.max_attempts:
                 delay = retry_delay_seconds(
@@ -438,7 +531,9 @@ class TavilyTrendCollector:
                 if delay:
                     await self._sleep(delay)
 
-        raise TavilyCollectionError("Tavily search attempts were exhausted") from last_error
+        raise TavilyCollectionError(
+            "Tavily search attempts were exhausted", category=category
+        ) from last_error
 
     async def _post_search(self, query: TrendSearchQuery) -> httpx.Response:
         client = await self._get_client()
@@ -448,6 +543,7 @@ class TavilyTrendCollector:
             "auto_parameters": False,
             "max_results": TAVILY_MAX_RESULTS,
             "include_answer": False,
+            "include_usage": True,
             "include_raw_content": False,
             "include_images": False,
             "topic": query.topic,
@@ -538,6 +634,61 @@ def normalize_tavily_response(
         if previous is None or evidence.provider_score > previous.provider_score:
             normalized[source_fingerprint] = evidence
     return tuple(normalized.values())
+
+
+def normalize_tavily_usage(response: httpx.Response) -> TavilyUsage:
+    """Accept only the bounded numeric fields needed for operations reporting."""
+
+    try:
+        payload = response.json()
+    except ValueError as error:
+        raise TavilyResponseError("Tavily usage preflight returned invalid JSON") from error
+    if not isinstance(payload, dict) or not isinstance(payload.get("key"), dict):
+        raise TavilyResponseError("Tavily usage preflight returned an invalid response")
+    key = payload["key"]
+    try:
+        return TavilyUsage(
+            key_usage=_non_negative_int(key.get("usage")),
+            key_limit=_non_negative_int(key.get("limit")),
+            key_search_usage=_non_negative_int(key.get("search_usage")),
+        )
+    except ValueError as error:
+        raise TavilyResponseError("Tavily usage preflight omitted numeric usage values") from error
+
+
+def tavily_response_search_credits(response: httpx.Response) -> int:
+    """Return the search credits Tavily explicitly reports for this successful response.
+
+    A response without the optional usage object remains a successful search, but is reported as
+    unknown/zero rather than being confused with an application-side reservation.
+    """
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return 0
+    if not isinstance(payload, dict) or not isinstance(payload.get("usage"), dict):
+        return 0
+    try:
+        return _non_negative_int(payload["usage"].get("credits"))
+    except ValueError:
+        return 0
+
+
+def _non_negative_int(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("value must be a non-negative integer")
+    return value
+
+
+def _tavily_http_failure_category(status_code: int) -> TrendFailureCategory:
+    if status_code in {401, 403}:
+        return "tavily_auth"
+    if status_code == 429:
+        return "tavily_rate_limit"
+    if 400 <= status_code < 500:
+        return "tavily_response"
+    return "tavily_unavailable"
 
 
 def retry_delay_seconds(
