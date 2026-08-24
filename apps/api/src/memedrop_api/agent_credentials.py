@@ -31,6 +31,10 @@ class AgentAccountInactive(AgentCredentialError):
     """The addressed account does not exist or is not active."""
 
 
+class AgentAccountNotFound(AgentCredentialError):
+    """The addressed account does not exist."""
+
+
 class AgentApiKeyNotFound(AgentCredentialError):
     """The addressed API key does not exist or is no longer active."""
 
@@ -64,6 +68,14 @@ class ApiKeyRecord:
     revoked_by_actor: str | None
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AgentAccountStatus:
+    """Content-free operator view of an account and its credential metadata."""
+
+    account: AgentAccountRecord
+    api_keys: tuple[ApiKeyRecord, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +122,8 @@ class AgentCredentialRepository(Protocol):
 
     async def create_account(self, *, name: str) -> AgentAccountRecord: ...
 
+    async def account_status(self, *, account_id: str) -> AgentAccountStatus: ...
+
     async def issue_api_key(
         self,
         *,
@@ -155,6 +169,10 @@ class AgentCredentialService:
         return await self._repository.create_account(
             name=_validate_name(name, field_name="account name"),
         )
+
+    async def account_status(self, *, account_id: str) -> AgentAccountStatus:
+        _validate_account_id(account_id)
+        return await self._repository.account_status(account_id=account_id)
 
     async def issue_api_key(self, *, account_id: str, name: str) -> IssuedApiKey:
         _validate_account_id(account_id)
@@ -242,6 +260,21 @@ def parse_bearer_authorization(authorization: str | None) -> str:
     ):
         raise InvalidAuthorization("authorization must use the Bearer scheme")
     return credential
+
+
+def bearer_api_key_id(authorization: str | None) -> str | None:
+    """Return a validated public key ID for pre-auth abuse controls only.
+
+    This parses and validates the credential shape but neither hashes nor
+    returns its secret.  Authentication still performs constant-time secret
+    verification immediately afterwards.
+    """
+
+    try:
+        key_id, _ = _parse_credential(parse_bearer_authorization(authorization))
+    except InvalidAuthorization:
+        return None
+    return key_id
 
 
 def _new_api_secret() -> str:

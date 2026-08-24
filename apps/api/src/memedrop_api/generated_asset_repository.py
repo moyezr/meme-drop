@@ -122,10 +122,14 @@ class SqlAlchemyGeneratedAssetRetentionRepository:
             claim_timeout=claim_timeout,
         )
         async with self.database.session() as session:
-            count, oldest_expiry = (await session.execute(statement)).one()
+            retryable_count, oldest_retryable, blocked_count, oldest_blocked = (
+                await session.execute(statement)
+            ).one()
         return GeneratedAssetCleanupMetrics(
-            retryable_expired_assets=int(count or 0),
-            oldest_retryable_expiry=oldest_expiry,
+            retryable_expired_assets=int(retryable_count or 0),
+            oldest_retryable_expiry=oldest_retryable,
+            blocked_expired_assets=int(blocked_count or 0),
+            oldest_blocked_expiry=oldest_blocked,
         )
 
 
@@ -170,16 +174,24 @@ def _cleanup_metrics_statement(
     max_deletion_attempts: int,
     claim_timeout: timedelta,
 ):
+    retryable = _retryable_expired_asset_condition(
+        as_of=as_of,
+        max_deletion_attempts=max_deletion_attempts,
+        claim_timeout=claim_timeout,
+    )
+    blocked = _blocked_expired_asset_condition(
+        as_of=as_of,
+        max_deletion_attempts=max_deletion_attempts,
+        claim_timeout=claim_timeout,
+    )
     return select(
-        func.count(GeneratedAsset.id),
-        func.min(GeneratedAsset.expires_at),
+        func.count(GeneratedAsset.id).filter(retryable),
+        func.min(GeneratedAsset.expires_at).filter(retryable),
+        func.count(GeneratedAsset.id).filter(blocked),
+        func.min(GeneratedAsset.expires_at).filter(blocked),
     ).where(
         GeneratedAsset.expires_at <= as_of,
-        _retryable_expired_asset_condition(
-            as_of=as_of,
-            max_deletion_attempts=max_deletion_attempts,
-            claim_timeout=claim_timeout,
-        ),
+        or_(retryable, blocked),
     )
 
 
@@ -207,6 +219,37 @@ def _retryable_expired_asset_condition(
             GeneratedAsset.last_deletion_attempt_at <= as_of - claim_timeout,
         ),
     )
+
+
+def _blocked_expired_asset_condition(
+    *,
+    as_of: datetime,
+    max_deletion_attempts: int,
+    claim_timeout: timedelta,
+):
+    """Identify expired assets that cannot be claimed without operator action.
+
+    A max-attempt pending row is still treated as in flight until its claim lease
+    becomes stale. Once stale it is blocked, rather than retryable, because claiming
+    it again would exceed the configured attempt ceiling.
+    """
+
+    attempts_exhausted = GeneratedAsset.deletion_attempts >= max_deletion_attempts
+    stale_pending = and_(
+        GeneratedAsset.deletion_state == "pending",
+        attempts_exhausted,
+        GeneratedAsset.last_deletion_attempt_at.is_not(None),
+        GeneratedAsset.last_deletion_attempt_at <= as_of - claim_timeout,
+    )
+    permanent_failure = and_(
+        GeneratedAsset.deletion_state == "failed",
+        GeneratedAsset.deletion_error_code.in_(PERMANENT_DELETION_ERROR_CODES),
+    )
+    exhausted_terminal_attempt = and_(
+        GeneratedAsset.deletion_state.in_(("active", "failed")),
+        attempts_exhausted,
+    )
+    return or_(permanent_failure, exhausted_terminal_attempt, stale_pending)
 
 
 def _validate_claim_inputs(

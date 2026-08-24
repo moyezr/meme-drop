@@ -41,19 +41,28 @@ and switches the versioned Redis serving index only after the new namespace is c
 where every claimed query fails exits non-zero and leaves the prior PostgreSQL snapshot and Redis
 pointer unchanged.
 
-Suggestion and standalone-caption requests derive bounded lookup signals locally, retrieve at most
-two relevant cards, and add no more than 1,200 characters of compact, explicitly untrusted cultural
-context to a prompt. The post and catalog-owned template grammar remain canonical, and prompts
-prohibit forced, mismatched, or stale references. Raw Tavily snippets and source-post text are not
-persisted or logged, and post text never appears in plaintext cache keys. Redis or model-provider
-unavailability fails open to the existing deterministic suggestion and caption fallback; Tavily
-unavailability cannot add a request-time dependency.
+Suggestion and standalone-caption requests derive bounded structured lookup context locally. A
+short OpenRouter query-embedding request supplements the Redis signal index with at most 12
+pgvector candidates, restricted to the configured embedding model and exact card versions in the
+latest published snapshot. Lifecycle, vitality, semantic distance, and lexical fit rerank the
+combined candidates. At most two cards and 1,200 characters of compact, explicitly untrusted
+cultural context reach a prompt. The post and catalog-owned template grammar remain canonical, and
+prompts prohibit forced, mismatched, or stale references. Raw Tavily snippets and source-post text
+are not persisted or logged, and post text never appears in plaintext cache keys. Redis,
+query-embedding, or pgvector unavailability fails open to the existing Redis/deterministic
+suggestion and caption fallback; Tavily unavailability cannot add a request-time dependency.
 
 Apply the current Alembic migrations before refreshing; they create the trend memory, immutable
 snapshot, collection-claim, and monthly credit-ledger schema. Local refreshes require PostgreSQL
 with pgvector, Redis, Tavily, and OpenRouter credentials in the ignored environment files. Trend
 enrichment uses `google/gemini-3.7-flash` through OpenRouter and does not call Google's direct
-Gemini API:
+Gemini API. Before publishing a snapshot, active serving cards without a current semantic vector
+are embedded in bounded batches with `google/gemini-embedding-2` through OpenRouter. The embedding
+document contains normalized trend-card semantics only—never Tavily evidence, excerpts, or URLs.
+Each vector stores its OpenRouter model and a SHA-256 fingerprint of that semantic document.
+Unchanged model-and-fingerprint pairs keep their existing vectors; a semantic card or configured
+model change invalidates the vector and the next refresh replaces it. Any embedding-provider or
+response failure leaves the previous published PostgreSQL snapshot and Redis pointer in place:
 
 ```sh
 npm run db:up
@@ -63,21 +72,49 @@ npm run trends:refresh
 uv run --project apps/api memedrop-trend-refresh
 ```
 
-Set `MEMEDROP_TRENDS_ENABLED=true` for both the refresh job and request-time Redis lookup. A single
-four-hour scheduler may run the default command: deterministic UTC scan buckets make the daily and
-weekly profiles idempotently skip until their cadence advances. For isolated runs, repeat
-`--profile pulse`, `--profile daily`, or `--profile weekly` as needed. The curated schedule uses an
-estimated 771 basic searches per 30 days before retries; the PostgreSQL ledger still enforces the
-900-credit ceiling across workers and retries.
+Set `MEMEDROP_TRENDS_ENABLED=true` for both the refresh job and request-time Redis lookup. The
+default refresh runs the pulse, daily, and weekly profiles together; deterministic UTC scan buckets
+make repeated daily and weekly work idempotently skip until its cadence advances. For isolated
+runs, repeat `--profile pulse`, `--profile daily`, or `--profile weekly` as needed.
 
-In production, Vercel Cron calls `GET /internal/cron/trends/refresh` every four hours in UTC. It
-must be given `CRON_SECRET`; Vercel sends it as `Authorization: Bearer $CRON_SECRET`, and the API
+The checked-in Hobby-compatible Vercel schedule calls `GET /internal/cron/trends/refresh` once
+daily at 02:00 UTC and therefore runs only one of the pulse profile's four-hour buckets each day. It
+uses approximately 321 basic searches per 30 days before retries. This is the current preview
+cadence, not the intended launch cadence. Before production launch, upgrade the API project to
+Vercel Pro (or use an equivalent external scheduler) and change the trend schedule to
+`0 */4 * * *`; that activates every pulse bucket and uses an estimated 771 searches per 30 days.
+The PostgreSQL ledger enforces the 900-credit ceiling in either case.
+
+The scheduled endpoint must be given `CRON_SECRET`; Vercel sends it as
+`Authorization: Bearer $CRON_SECRET`, and the API
 rejects missing or mismatched values without running the job. A Redis lease prevents overlapping or
 duplicate scheduler deliveries from doing provider work; the one-hour lease bounds a stuck worker,
 and an overlap returns a successful
-`{"status":"skipped","reason":"in_progress"}` result. The included four-hour Vercel schedule
-requires Vercel Pro. Vercel Hobby permits daily cron schedules only, so use a Pro project or an
-equivalent external scheduler before enabling production trends.
+`{"status":"skipped","reason":"in_progress"}` result.
+
+## Generated-image retention
+
+Every durable generated asset expires 30 days after creation. Vercel Cron calls the protected
+`GET /internal/cron/assets/cleanup` route daily at 03:30 UTC using the same `CRON_SECRET` bearer
+authentication as trend refresh. A separate owner-fenced Redis lease prevents overlapping cleanup
+runs. Each run claims no more than 100 expired records with PostgreSQL `FOR UPDATE SKIP LOCKED`,
+deletes only the exact object key stored on each record, and retains categorical success or failure
+state for bounded retries. It never lists, empties, creates, or deletes a bucket.
+
+The response contains only status, counts, stale-generation reconciliation count, remaining retryable
+backlog, and oldest deletion lag; it never includes object keys, account identifiers, captions, or
+source text. Configure
+`MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE`,
+`MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS`, and
+`MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS` only when the defaults are unsuitable. The
+claim timeout must be at least as long as the Redis lease. Production requires `CRON_SECRET` even
+when trend collection is disabled; development remains usable without it, and the cron route then
+rejects every request.
+
+The report separates retryable backlog from `blocked_expired_assets`. A permanent key failure, an
+exhausted failed record, or a max-attempt pending claim whose lease has gone stale remains blocked
+and continuously makes the cron return HTTP 503 until an operator repairs it. A fresh pending claim
+is still considered in flight and is not reported as blocked until the configured claim timeout.
 
 `/health` remains the monitoring endpoint. When trends are enabled, it also reports the latest
 published snapshot's content-free age and returns HTTP 503 when no snapshot exists, it contains no
@@ -194,10 +231,10 @@ and incomplete or overlong model overlays fall back locally instead of rendering
 ## Agent meme API
 
 `POST /api/v1/memes/generate` is the minimal interface for an AI agent that needs a finished meme.
-Only `input` is required; it is the message, situation, or source content the agent wants to respond
-to. The server infers the useful humor context, chooses from verified templates, writes
-layout-constrained captions, and renders the selected result. Callers do not need to understand
-template IDs, caption regions, typography, or rendering.
+The JSON body stays small: only `input` is required. Public-agent calls must also send an issued
+Bearer API credential and an `Idempotency-Key`; install IDs are not accepted as agent
+authentication. The server infers humor context, chooses verified templates, renders the result,
+and returns durable media records without persisting or returning source text or captions.
 
 ```json
 {
@@ -217,10 +254,14 @@ media keep work and external calls bounded.
 
 ```sh
 curl --request POST http://localhost:3001/api/v1/memes/generate \
+  --header 'Authorization: Bearer key_….<secret>' \
+  --header 'Idempotency-Key: launch-reply-001' \
   --header 'Content-Type: application/json' \
   --data '{"input":"We postponed the launch again because someone found another timezone bug."}'
 
 curl --request POST http://localhost:3001/api/v1/memes/generate \
+  --header 'Authorization: Bearer key_….<secret>' \
+  --header 'Idempotency-Key: build-reply-001' \
   --header 'Content-Type: application/json' \
   --data '{"input":"The build passed on the fifth attempt.","options":{"direction":"dry and self-aware","count":2}}'
 ```
@@ -233,18 +274,18 @@ instructions:
   "status": "ok",
   "memes": [
     {
-      "id": "meme_0123456789abcdef01234567",
-      "image_url": "/memes/generated/agents/0123456789abcdef.webp",
-      "alt_text": "A generated meme about repeatedly delaying a launch",
-      "caption": "THE PLAN / ANOTHER TIMEZONE BUG"
+      "id": "asset_0123456789abcdef012345",
+      "image_url": "http://localhost:3001/api/v1/memes/assets/asset_0123456789abcdef012345",
+      "expires_at": "2026-09-23T12:00:00Z"
     }
   ]
 }
 ```
 
-An `image_url` beginning with `/memes/` is relative to the MemeDrop API origin. For example, a
-caller using `https://api.example.com` resolves the sample path to
-`https://api.example.com/memes/generated/agents/0123456789abcdef.webp`.
+Generated media URLs are absolute and require the same Bearer credential. Their expiry is thirty
+days after generation. Configure `MEMEDROP_API_PUBLIC_ORIGIN=http://localhost:3001` locally and
+the exact HTTPS API origin (`https://memedropapi.moyezrabbani.dev`) in production. Generic
+`/memes/generated/agents/...` paths intentionally do not serve generated agent images.
 
 If no verified suggestion can be rendered, the endpoint still returns HTTP 200 with an explicit
 empty result:
@@ -256,14 +297,63 @@ empty result:
 }
 ```
 
-Retrieval returns verified templates only. Provider failure or timeout uses the existing bounded,
-deterministic ranker and caption fallback. Generated asset identity is derived from the selected
-source media and canonical caption overlay, so the same rendered result reuses the same object path
-instead of creating duplicates.
+Retrieval returns verified templates only. A new request reserves one credit; a successful image
+commits it only after the full durable asset set is stored transactionally. `no_fit`, rendering,
+storage, cancellation, and internal failures release the reservation. A terminal idempotent replay
+returns the stored media without invoking retrieval, rendering, or storage again.
+
+The protected daily generated-asset maintenance cron also performs bounded stale-generation
+reconciliation. After `MEMEDROP_AGENT_GENERATION_STALE_TIMEOUT_SECONDS` (30 minutes by default),
+it holds the account and generation locks, lists at most the fixed five-result output bound plus one object
+under that exact account-and-generation prefix, and deletes only those keys. An overflow, listing,
+or deletion failure leaves the generation processing and its credit reserved for the next protected
+delivery; it never falls back to a bucket-wide scan. Only after cleanup succeeds does it mark the
+request `generation_timeout` and release the reservation exactly once.
 
 Raw `input`, `options.direction`, and plaintext captions are not logged or persisted as request or
 usage metadata. The rendered image is stored so its returned URL remains usable; sensitive request
 values are hashed wherever they participate in cache identity.
+
+## Private-beta account administration
+
+Private-beta accounts, API keys, and credits are managed only through the server-side operator CLI.
+Run migrations first, then create an account and use the returned compact `acct_...` ID in later
+commands:
+
+```sh
+npm run db:migrate
+npm run agent:admin -- account-create --name "Acme beta" --confirm
+npm run agent:admin -- key-issue --account-id acct_... --name "Production" --confirm
+npm run agent:admin -- credits-grant --account-id acct_... --credits 25 \
+  --idempotency-key acme-initial-20260824 --actor operator:moyez --confirm
+npm run agent:admin -- status --account-id acct_...
+```
+
+`key-issue` prints the complete Bearer credential exactly once. Transfer that value directly to an
+approved password manager or equivalent secret-delivery channel; do not redirect it into this
+repository, a ticket, terminal scrollback capture, or shared logs. Treat stdout as secret-bearing for issuance and
+rotation, and ensure terminal capture, CI logs, and command auditing cannot retain it. The database
+stores only its SHA-256 hash, so the credential cannot be retrieved later. Status output contains
+only operator-safe account/key names, compact IDs, categorical states, timestamps, and the current
+credit balance.
+
+Rotate or revoke a key with an explicit bounded reason code and operator identity:
+
+```sh
+npm run agent:admin -- key-rotate --account-id acct_... --key-id key_... \
+  --name "Production replacement" --reason scheduled_rotation \
+  --actor operator:moyez --confirm
+npm run agent:admin -- key-revoke --account-id acct_... --key-id key_... \
+  --reason operator_request --actor operator:moyez --confirm
+```
+
+Rotation atomically revokes the old key and prints the replacement credential exactly once.
+Every mutation requires `--confirm`. Credit grants accept 1 through 1,000,000 credits and are
+idempotent within the addressed account: replay the same `--idempotency-key` and amount for a safe
+retry, and use a unique operator key for each intended grant. Reusing that account/key pair with a
+different amount or actor fails instead of silently changing a grant. `--actor` is written as
+bounded operator attribution in the immutable credit ledger. There is intentionally no dashboard,
+payment integration, or account self-service in the private-beta workflow.
 
 ## Vercel
 

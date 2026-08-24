@@ -12,7 +12,9 @@ from sqlalchemy.exc import IntegrityError
 
 from memedrop_api.agent_credentials import (
     AgentAccountInactive,
+    AgentAccountNotFound,
     AgentAccountRecord,
+    AgentAccountStatus,
     AgentApiKeyNotFound,
     ApiKeyRecord,
     PublicIdCollisionExhausted,
@@ -42,6 +44,23 @@ class SqlAlchemyAgentCredentialRepository:
             return _account_record(row)
 
         return await self._retry_public_id_insert("agent_accounts", insert)
+
+    async def account_status(self, *, account_id: str) -> AgentAccountStatus:
+        """Read safe account and key metadata without credential hashes or user content."""
+
+        async with self._database.session() as session:
+            account = await session.get(AgentAccount, account_id)
+            if account is None:
+                raise AgentAccountNotFound("agent account was not found")
+            keys = tuple(
+                _key_record(row)
+                for row in await session.scalars(
+                    select(AgentApiKey)
+                    .where(AgentApiKey.agent_account_id == account_id)
+                    .order_by(AgentApiKey.created_at, AgentApiKey.id)
+                )
+            )
+        return AgentAccountStatus(account=_account_record(account), api_keys=keys)
 
     async def issue_api_key(
         self,

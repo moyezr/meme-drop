@@ -9,7 +9,9 @@ import pytest
 import memedrop_api.app as app_module
 import memedrop_api.cli as cli_module
 from memedrop_api.config import Settings
+from memedrop_api.services.hybrid_trend_retrieval import HybridTrendRetriever
 from memedrop_api.services.tavily_trends import TavilyUsage, TrendCollectionReport
+from memedrop_api.services.trend_embeddings import TrendEmbeddingError
 from memedrop_api.services.trend_index import TrendRetrieval
 from memedrop_api.services.trend_runtime import (
     TREND_QUERY_PROFILES,
@@ -84,6 +86,8 @@ def test_trend_settings_are_optional_bounded_and_secret_repr_safe() -> None:
     assert defaults.trends_enabled is False
     assert defaults.trend_monthly_credit_budget == 900
     assert defaults.openrouter_trend_model == "google/gemini-3.7-flash"
+    assert defaults.openrouter_embedding_model == "google/gemini-embedding-2"
+    assert defaults.trend_embedding_batch_size == 32
     assert defaults.trend_redis_url is None
     assert configured.trend_redis_url == "redis://127.0.0.1:6379/0"
     assert "tavily-secret" not in repr(configured)
@@ -316,6 +320,123 @@ async def test_refresh_keeps_the_last_snapshot_when_every_claimed_query_fails(
     ]
 
 
+async def test_embedding_failure_preserves_the_published_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    successful_collection = TrendCollectionReport(
+        requested_queries=1,
+        claimed_queries=1,
+        skipped_queries=0,
+        completed_queries=1,
+        failed_queries=0,
+        local_credit_reservations=1,
+        provider_search_credits=1,
+        evidence_discovered=1,
+        cards_upserted=1,
+        observations_stored=1,
+        budget_exhausted=False,
+        failure_categories={},
+    )
+    card = make_card()
+
+    class FakeDatabase:
+        def __init__(self, database_url: str) -> None:
+            calls.append("database")
+
+        async def close(self) -> None:
+            calls.append("database-close")
+
+    class FakeCollector:
+        def __init__(self, **values: object) -> None:
+            calls.append("collector")
+
+        async def preflight(self) -> TavilyUsage:
+            return TavilyUsage(
+                key_usage=1,
+                key_limit=None,
+                key_search_usage=1,
+                account_plan_usage=1,
+                account_plan_limit=1_000,
+            )
+
+        async def collect(self, **values: object) -> TrendCollectionReport:
+            return successful_collection
+
+        async def close(self) -> None:
+            calls.append("collector-close")
+
+    class FakeEnricher:
+        def __init__(self, **values: object) -> None:
+            calls.append("enricher")
+
+        async def close(self) -> None:
+            calls.append("enricher-close")
+
+    class FakeRepository:
+        def __init__(self, database: object) -> None:
+            calls.append("repository")
+
+        async def list_active_cards(self, **values: object) -> list[TrendCard]:
+            return [card]
+
+        async def list_stale_embedding_ids(
+            self, fingerprints: object, *, model: str
+        ) -> set[object]:
+            return {card.id}
+
+        async def store_card_embeddings(
+            self, embeddings: object, *, model: str
+        ) -> int:
+            raise AssertionError("failed provider response must not persist an embedding")
+
+        async def stage_snapshot(self, cards: object, *, created_at: datetime) -> TrendSnapshot:
+            raise AssertionError("embedding failure must not stage a replacement snapshot")
+
+    class FailingEmbedder:
+        def __init__(self, **values: object) -> None:
+            calls.append("embedder")
+
+        async def embed_cards(self, cards: object) -> list[list[float]]:
+            raise TrendEmbeddingError("openrouter_embedding_unavailable")
+
+        async def close(self) -> None:
+            calls.append("embedder-close")
+
+    class FakeIndex:
+        def __init__(self, redis_url: str) -> None:
+            calls.append("index")
+
+        async def close(self) -> None:
+            calls.append("index-close")
+
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.Database", FakeDatabase)
+    monkeypatch.setattr(
+        "memedrop_api.services.trend_runtime.SqlAlchemyTrendCollectionStore",
+        lambda database: object(),
+    )
+    monkeypatch.setattr(
+        "memedrop_api.services.trend_runtime.SqlAlchemyTrendRepository", FakeRepository
+    )
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.TavilyTrendCollector", FakeCollector)
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.OpenRouterTrendEnricher", FakeEnricher)
+    monkeypatch.setattr(
+        "memedrop_api.services.trend_runtime.OpenRouterTrendEmbedder", FailingEmbedder
+    )
+    monkeypatch.setattr("memedrop_api.services.trend_runtime.RedisTrendIndex", FakeIndex)
+
+    with pytest.raises(TrendRefreshFailed, match="openrouter_embedding_unavailable"):
+        await refresh_trends(
+            configured_settings(),
+            profile_names=("pulse",),
+            at=datetime(2026, 8, 19, 12, tzinfo=UTC),
+        )
+
+    assert "embedder-close" in calls
+    assert "index-close" in calls
+    assert "database-close" in calls
+
+
 async def test_app_injects_and_closes_only_the_configured_redis_trend_retriever(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -337,11 +458,14 @@ async def test_app_injects_and_closes_only_the_configured_redis_trend_retriever(
     app = app_module.create_app(configured_settings())
 
     assert len(created) == 1
-    assert app.state.trend_index is created[0]
-    assert app.state.suggestion_service.trend_retriever is created[0]
+    index: FakeTrendIndex = created[0]
+    assert app.state.trend_index is index
+    hybrid = app.state.suggestion_service.trend_retriever
+    assert isinstance(hybrid, HybridTrendRetriever)
+    assert hybrid.lexical_retriever is index
     async with app.router.lifespan_context(app):
-        assert created[0].closed is False
-    assert created[0].closed is True
+        assert index.closed is False
+    assert index.closed is True
 
 
 def test_app_does_not_construct_a_trend_retriever_when_feature_is_disabled(

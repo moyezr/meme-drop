@@ -7,7 +7,7 @@ import os
 import re
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Protocol, TypedDict, cast
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -17,7 +17,21 @@ from alembic.config import Config
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from memedrop_api.config import PRODUCTION_BUCKET, Settings
+from memedrop_api.agent_account_repository import SqlAlchemyAgentCredentialRepository
+from memedrop_api.agent_credentials import (
+    AgentAccountRecord,
+    AgentAccountStatus,
+    AgentCredentialError,
+    AgentCredentialService,
+    ApiKeyRecord,
+    IssuedApiKey,
+)
+from memedrop_api.agent_generation_credits import (
+    AgentGenerationCreditError,
+    AgentGenerationCreditService,
+    CreditBalance,
+)
+from memedrop_api.config import PRODUCTION_API_ORIGIN, PRODUCTION_BUCKET, Settings
 from memedrop_api.db import Database, Meme, User
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.storage import (
@@ -52,6 +66,46 @@ PLACEHOLDER_MARKERS = (
 class RemoteTemplate(TypedDict):
     name: str
     url: str
+
+
+class AgentCredentialAdministrator(Protocol):
+    async def create_account(self, *, name: str) -> AgentAccountRecord: ...
+
+    async def account_status(self, *, account_id: str) -> AgentAccountStatus: ...
+
+    async def issue_api_key(self, *, account_id: str, name: str) -> IssuedApiKey: ...
+
+    async def rotate_api_key(
+        self,
+        *,
+        account_id: str,
+        key_id: str,
+        name: str,
+        reason: str,
+        actor: str,
+    ) -> IssuedApiKey: ...
+
+    async def revoke_api_key(
+        self,
+        *,
+        account_id: str,
+        key_id: str,
+        reason: str,
+        actor: str,
+    ) -> ApiKeyRecord: ...
+
+
+class AgentCreditAdministrator(Protocol):
+    async def grant_credits(
+        self,
+        *,
+        account_id: str,
+        credits: int,
+        grant_idempotency_key: str,
+        operator_actor_id: str | None = None,
+    ) -> CreditBalance: ...
+
+    async def balance(self, *, account_id: str) -> CreditBalance: ...
 
 
 def db_init() -> None:
@@ -251,6 +305,212 @@ def validate_production_env() -> None:
     print(f"[MemeDrop] production env validated (warnings={len(warnings)})")
 
 
+def agent_admin() -> None:
+    """Run one explicit private-beta account administration operation."""
+
+    parser = agent_admin_parser()
+    arguments = parser.parse_args()
+    settings = Settings()  # type: ignore[call-arg]
+    database = Database(settings.database_url)
+    credentials = AgentCredentialService(SqlAlchemyAgentCredentialRepository(database))
+    credits = AgentGenerationCreditService(database)
+    try:
+        result = asyncio.run(
+            _run_agent_admin_operation(
+                arguments,
+                credentials=credentials,
+                credits=credits,
+                database=database,
+            )
+        )
+    except (AgentCredentialError, AgentGenerationCreditError) as error:
+        parser.error(str(error))
+    print(json.dumps(result, sort_keys=True))
+
+
+def agent_admin_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="memedrop-agent-admin",
+        description="Administer private-beta agent accounts without exposing user content",
+    )
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    account_create = commands.add_parser("account-create", help="create an agent account")
+    account_create.add_argument("--name", required=True)
+    _require_confirmation(account_create)
+
+    key_issue = commands.add_parser("key-issue", help="issue a new API key")
+    key_issue.add_argument("--account-id", required=True)
+    key_issue.add_argument("--name", required=True)
+    _require_confirmation(key_issue)
+
+    key_rotate = commands.add_parser("key-rotate", help="atomically rotate an active API key")
+    key_rotate.add_argument("--account-id", required=True)
+    key_rotate.add_argument("--key-id", required=True)
+    key_rotate.add_argument("--name", required=True)
+    key_rotate.add_argument("--reason", required=True, type=_audit_code)
+    key_rotate.add_argument("--actor", required=True, type=_operator_actor)
+    _require_confirmation(key_rotate)
+
+    key_revoke = commands.add_parser("key-revoke", help="revoke an active API key")
+    key_revoke.add_argument("--account-id", required=True)
+    key_revoke.add_argument("--key-id", required=True)
+    key_revoke.add_argument("--reason", required=True, type=_audit_code)
+    key_revoke.add_argument("--actor", required=True, type=_operator_actor)
+    _require_confirmation(key_revoke)
+
+    credit_grant = commands.add_parser(
+        "credits-grant", help="append an idempotent operator credit grant"
+    )
+    credit_grant.add_argument("--account-id", required=True)
+    credit_grant.add_argument("--credits", required=True, type=_credit_count)
+    credit_grant.add_argument("--idempotency-key", required=True)
+    credit_grant.add_argument("--actor", required=True, type=_operator_actor)
+    _require_confirmation(credit_grant)
+
+    status = commands.add_parser("status", help="inspect content-free account status")
+    status.add_argument("--account-id", required=True)
+    return parser
+
+
+async def execute_agent_admin_operation(
+    arguments: argparse.Namespace,
+    *,
+    credentials: AgentCredentialAdministrator,
+    credits: AgentCreditAdministrator,
+) -> dict[str, object]:
+    command = cast(str, arguments.command)
+    if command == "account-create":
+        account = await credentials.create_account(name=arguments.name)
+        return {"status": "created", "account": _account_status_json(account)}
+    if command == "key-issue":
+        issued = await credentials.issue_api_key(
+            account_id=arguments.account_id,
+            name=arguments.name,
+        )
+        return _issued_key_json(issued, status="issued")
+    if command == "key-rotate":
+        issued = await credentials.rotate_api_key(
+            account_id=arguments.account_id,
+            key_id=arguments.key_id,
+            name=arguments.name,
+            reason=arguments.reason,
+            actor=arguments.actor,
+        )
+        return _issued_key_json(issued, status="rotated")
+    if command == "key-revoke":
+        key = await credentials.revoke_api_key(
+            account_id=arguments.account_id,
+            key_id=arguments.key_id,
+            reason=arguments.reason,
+            actor=arguments.actor,
+        )
+        return {"status": "revoked", "api_key": _api_key_status_json(key)}
+    if command == "credits-grant":
+        balance = await credits.grant_credits(
+            account_id=arguments.account_id,
+            credits=arguments.credits,
+            grant_idempotency_key=arguments.idempotency_key,
+            operator_actor_id=arguments.actor,
+        )
+        return {"status": "granted", "balance": _credit_balance_json(balance)}
+    if command == "status":
+        account_status = await credentials.account_status(account_id=arguments.account_id)
+        balance = await credits.balance(account_id=arguments.account_id)
+        return {
+            "status": "ok",
+            "account": _account_status_json(account_status.account),
+            "api_keys": [_api_key_status_json(key) for key in account_status.api_keys],
+            "balance": _credit_balance_json(balance),
+        }
+    raise AssertionError("argparse returned an unknown agent admin command")
+
+
+async def _run_agent_admin_operation(
+    arguments: argparse.Namespace,
+    *,
+    credentials: AgentCredentialAdministrator,
+    credits: AgentCreditAdministrator,
+    database: Database,
+) -> dict[str, object]:
+    try:
+        return await execute_agent_admin_operation(
+            arguments,
+            credentials=credentials,
+            credits=credits,
+        )
+    finally:
+        await database.close()
+
+
+def _issued_key_json(issued: IssuedApiKey, *, status: str) -> dict[str, object]:
+    # This is the only serialization path for plaintext credentials. The caller prints this
+    # result once; status and later inspection paths contain key metadata only.
+    return {
+        "status": status,
+        "api_key": _api_key_status_json(issued.key),
+        "credential": issued.credential,
+    }
+
+
+def _account_status_json(account: AgentAccountRecord) -> dict[str, object]:
+    return {
+        "id": account.id,
+        "name": account.name,
+        "status": account.status,
+        "created_at": account.created_at.isoformat(),
+        "updated_at": account.updated_at.isoformat(),
+    }
+
+
+def _api_key_status_json(key: ApiKeyRecord) -> dict[str, object]:
+    return {
+        "id": key.id,
+        "account_id": key.agent_account_id,
+        "name": key.name,
+        "status": key.status,
+        "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
+        "revoked_at": key.revoked_at.isoformat() if key.revoked_at else None,
+        "created_at": key.created_at.isoformat(),
+        "updated_at": key.updated_at.isoformat(),
+    }
+
+
+def _credit_balance_json(balance: CreditBalance) -> dict[str, object]:
+    return {"account_id": balance.agent_account_id, "credits": balance.credits}
+
+
+def _require_confirmation(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        required=True,
+        help="confirm this database mutation",
+    )
+
+
+def _credit_count(raw: str) -> int:
+    try:
+        credits = int(raw)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("credits must be a whole number") from error
+    if not 1 <= credits <= 1_000_000:
+        raise argparse.ArgumentTypeError("credits must be from 1 to 1000000")
+    return credits
+
+
+def _audit_code(raw: str) -> str:
+    if not re.fullmatch(r"[a-z0-9_]{1,40}", raw):
+        raise argparse.ArgumentTypeError("reason must be 1 to 40 lowercase code characters")
+    return raw
+
+
+def _operator_actor(raw: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9_.:@-]{1,120}", raw):
+        raise argparse.ArgumentTypeError("actor must be a 1 to 120 character operator identifier")
+    return raw
+
+
 def usage_feedback() -> None:
     parser = argparse.ArgumentParser(description="Summarize recommendation outcome signals")
     parser.add_argument("--days", type=int, default=30)
@@ -346,6 +606,32 @@ def production_env_findings(
         if raw and (not raw.isdigit() or int(raw) <= 0):
             errors.append(f"{name} must be a positive integer.")
 
+    def bounded_int(name: str, *, minimum: int, maximum: int) -> int | None:
+        raw = value(name)
+        try:
+            parsed = int(raw)
+        except ValueError:
+            if raw:
+                errors.append(f"{name} must be an integer from {minimum} to {maximum}.")
+            return None
+        if not minimum <= parsed <= maximum:
+            errors.append(f"{name} must be from {minimum} to {maximum}.")
+            return None
+        return parsed
+
+    def bounded_float(name: str, *, minimum: float, maximum: float) -> float | None:
+        raw = value(name)
+        try:
+            parsed = float(raw)
+        except ValueError:
+            if raw:
+                errors.append(f"{name} must be a number from {minimum} to {maximum}.")
+            return None
+        if not minimum <= parsed <= maximum:
+            errors.append(f"{name} must be from {minimum} to {maximum}.")
+            return None
+        return parsed
+
     def reject_placeholder(name: str, raw: str) -> None:
         if raw and is_placeholder_value(raw):
             errors.append(f"{name} must not use a placeholder value.")
@@ -367,6 +653,12 @@ def production_env_findings(
         )
     site_url = value("OPENROUTER_SITE_URL")
     validate_url("OPENROUTER_SITE_URL", site_url, {"https"}, errors)
+    public_origin = value("MEMEDROP_API_PUBLIC_ORIGIN")
+    validate_url("MEMEDROP_API_PUBLIC_ORIGIN", public_origin, {"https"}, errors)
+    if public_origin.rstrip("/") != PRODUCTION_API_ORIGIN:
+        errors.append(
+            f"MEMEDROP_API_PUBLIC_ORIGIN must be exactly {PRODUCTION_API_ORIGIN}."
+        )
 
     api_key = value("OPENROUTER_API_KEY")
     if is_placeholder_value(api_key):
@@ -379,8 +671,48 @@ def production_env_findings(
         "OPENROUTER_SUGGESTION_MODEL",
         "OPENROUTER_CAPTION_MODEL",
         "OPENROUTER_AUTO_TAG_MODEL",
+        "OPENROUTER_TREND_MODEL",
+        "OPENROUTER_EMBEDDING_MODEL",
     ):
         reject_placeholder(name, value(name))
+    if value("MEMEDROP_TRENDS_ENABLED").lower() not in {"1", "true", "yes", "on"}:
+        errors.append("MEMEDROP_TRENDS_ENABLED must be true for production launch.")
+    tavily_api_key = value("TAVILY_API_KEY")
+    reject_placeholder("TAVILY_API_KEY", tavily_api_key)
+    cron_secret = value("CRON_SECRET")
+    reject_placeholder("CRON_SECRET", cron_secret)
+    if cron_secret and not 16 <= len(cron_secret) <= 512:
+        errors.append("CRON_SECRET must contain 16 to 512 characters.")
+
+    bounded_int("MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET", minimum=1, maximum=1_000)
+    bounded_float("MEMEDROP_TREND_COLLECTION_TIMEOUT_SECONDS", minimum=0.1, maximum=30)
+    bounded_float("MEMEDROP_TREND_ENRICHMENT_TIMEOUT_SECONDS", minimum=0.1, maximum=60)
+    bounded_float("MEMEDROP_TREND_EMBEDDING_TIMEOUT_SECONDS", minimum=0.1, maximum=60)
+    bounded_int("MEMEDROP_TREND_EMBEDDING_BATCH_SIZE", minimum=1, maximum=128)
+    bounded_float("MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS", minimum=0, maximum=60)
+    bounded_int("MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS", minimum=60, maximum=3_600)
+    bounded_int("MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS", minimum=3_600, maximum=86_400)
+
+    bounded_int("MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE", minimum=1, maximum=100)
+    cleanup_claim_timeout = bounded_int(
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS",
+        minimum=60,
+        maximum=86_400,
+    )
+    cleanup_lock_ttl = bounded_int(
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS",
+        minimum=60,
+        maximum=3_600,
+    )
+    if (
+        cleanup_claim_timeout is not None
+        and cleanup_lock_ttl is not None
+        and cleanup_claim_timeout < cleanup_lock_ttl
+    ):
+        errors.append(
+            "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS must be greater than or "
+            "equal to MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS."
+        )
     if environment.get("OPENROUTER_MEME_MODEL", "").strip():
         errors.append(
             "OPENROUTER_MEME_MODEL was removed; set OPENROUTER_SUGGESTION_MODEL and "

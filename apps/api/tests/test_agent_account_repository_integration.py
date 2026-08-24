@@ -51,6 +51,12 @@ async def test_credentials_are_hashed_and_rotation_is_tenant_scoped(database: Da
     assert stored.secret_hash == hashlib.sha256(issued.secret.encode()).hexdigest()
     assert issued.secret not in stored.secret_hash
 
+    status = await service.account_status(account_id=account.id)
+    assert status.account.id == account.id
+    assert [key.id for key in status.api_keys] == [issued.key.id]
+    assert issued.secret not in repr(status)
+    assert "secret_hash" not in repr(status)
+
     principal = await service.authenticate_bearer(f"Bearer {issued.credential}")
     assert principal.agent_account_id == account.id
     async with database.session() as session:

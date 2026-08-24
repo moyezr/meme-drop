@@ -8,12 +8,15 @@ import pytest
 
 from memedrop_api.agent_credentials import (
     AgentAccountInactive,
+    AgentAccountNotFound,
     AgentAccountRecord,
+    AgentAccountStatus,
     AgentApiKeyNotFound,
     AgentCredentialService,
     ApiKeyRecord,
     InvalidAuthorization,
     StoredCredential,
+    bearer_api_key_id,
     parse_bearer_authorization,
 )
 from memedrop_api.public_ids import PublicIdKind, create_public_id
@@ -33,6 +36,13 @@ class FakeCredentialRepository:
         )
         self.accounts[account_id] = account
         return account
+
+    async def account_status(self, *, account_id: str) -> AgentAccountStatus:
+        account = self.accounts.get(account_id)
+        if account is None:
+            raise AgentAccountNotFound("agent account was not found")
+        keys = tuple(key for key, _ in self.keys.values() if key.agent_account_id == account_id)
+        return AgentAccountStatus(account=account, api_keys=keys)
 
     async def issue_api_key(self, *, account_id: str, name: str, secret_hash: str) -> ApiKeyRecord:
         account = self.accounts.get(account_id)
@@ -164,6 +174,32 @@ async def test_issued_api_key_has_a_public_lookup_id_and_256_bit_secret(
     assert stored_hash == hashlib.sha256(issued.secret.encode()).hexdigest()
     assert "secret" not in ApiKeyRecord.__dataclass_fields__
     assert "secret_hash" not in ApiKeyRecord.__dataclass_fields__
+
+
+async def test_bearer_key_id_parser_never_returns_or_hashes_the_secret() -> None:
+    repository = FakeCredentialRepository()
+    service = AgentCredentialService(repository)
+    account = await service.create_account(name="Parser test")
+    issued = await service.issue_api_key(account_id=account.id, name="parser")
+
+    assert bearer_api_key_id(f"Bearer {issued.credential}") == issued.key.id
+    assert bearer_api_key_id(f"Bearer {issued.key.id}.not-a-valid-secret") is None
+    assert bearer_api_key_id("Basic not-a-bearer") is None
+
+
+async def test_account_status_returns_safe_key_metadata_without_secrets(
+    service: AgentCredentialService,
+) -> None:
+    account = await service.create_account(name="Meme agent")
+    issued = await service.issue_api_key(account_id=account.id, name="production")
+
+    status = await service.account_status(account_id=account.id)
+
+    assert status.account == account
+    assert [key.id for key in status.api_keys] == [issued.key.id]
+    assert issued.secret not in repr(status)
+    with pytest.raises(AgentAccountNotFound):
+        await service.account_status(account_id=create_public_id(PublicIdKind.AGENT_ACCOUNT).value)
 
 
 @pytest.mark.parametrize(

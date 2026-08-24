@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import case, func, or_, select, text, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from memedrop_api.db import (
@@ -62,11 +64,26 @@ class SqlAlchemyTrendRepository:
         self.database = database
 
     async def upsert_card(
-        self, card: TrendCard, *, embedding: Sequence[float] | None = None
+        self,
+        card: TrendCard,
+        *,
+        embedding: Sequence[float] | None = None,
+        embedding_model: str | None = None,
+        embedding_fingerprint: str | None = None,
     ) -> TrendCard:
-        _validate_embedding(embedding)
+        _validate_embedding_metadata(
+            embedding,
+            model=embedding_model,
+            fingerprint=embedding_fingerprint,
+        )
         async with self.database.session() as session, session.begin():
-            row = await self._upsert_card(session, card, embedding=embedding)
+            row = await self._upsert_card(
+                session,
+                card,
+                embedding=embedding,
+                embedding_model=embedding_model,
+                embedding_fingerprint=embedding_fingerprint,
+            )
         return _card_from_record(row)
 
     async def record_observation(
@@ -279,10 +296,90 @@ class SqlAlchemyTrendRepository:
             rows = (await session.scalars(statement)).all()
         return [_card_from_record(row) for row in rows]
 
+    async def list_stale_embedding_ids(
+        self,
+        fingerprints: Mapping[UUID, str],
+        *,
+        model: str,
+    ) -> set[UUID]:
+        """Return addressed cards missing the exact requested semantic vector."""
+
+        if not fingerprints:
+            return set()
+        card_ids = list(fingerprints)
+        if len(card_ids) > 1_000:
+            raise ValueError("embedding candidate list is limited to 1000 cards")
+        _validate_embedding_model(model)
+        for fingerprint in fingerprints.values():
+            _validate_embedding_fingerprint(fingerprint)
+        statement = select(
+            TrendCardRecord.id,
+            TrendCardRecord.embedding.is_(None),
+            TrendCardRecord.embedding_model,
+            TrendCardRecord.embedding_fingerprint,
+        ).where(
+            TrendCardRecord.id.in_(card_ids),
+        )
+        async with self.database.session() as session:
+            rows = (await session.execute(statement)).all()
+        return {
+            card_id
+            for card_id, missing, stored_model, stored_fingerprint in rows
+            if _embedding_is_stale(
+                missing=missing,
+                stored_model=stored_model,
+                stored_fingerprint=stored_fingerprint,
+                required_model=model,
+                required_fingerprint=fingerprints[card_id],
+            )
+        }
+
+    async def store_card_embeddings(
+        self,
+        embeddings: Sequence[tuple[UUID, Sequence[float], str, int]],
+        *,
+        model: str,
+    ) -> int:
+        """Persist validated vectors without changing semantic card versions."""
+
+        if not embeddings:
+            return 0
+        _validate_embedding_model(model)
+        card_ids = [card_id for card_id, _, _, _ in embeddings]
+        if len(card_ids) > 1_000:
+            raise ValueError("embedding write is limited to 1000 cards")
+        if len(set(card_ids)) != len(card_ids):
+            raise ValueError("embedding writes must have unique card IDs")
+        for _, embedding, fingerprint, expected_version in embeddings:
+            _validate_embedding(embedding, required=True)
+            _validate_embedding_fingerprint(fingerprint)
+            if expected_version < 1:
+                raise ValueError("expected card version must be positive")
+
+        stored = 0
+        async with self.database.session() as session, session.begin():
+            for card_id, embedding, fingerprint, expected_version in embeddings:
+                result = cast(
+                    CursorResult[Any],
+                    await session.execute(
+                        _store_card_embedding_statement(
+                            card_id=card_id,
+                            embedding=embedding,
+                            model=model,
+                            fingerprint=fingerprint,
+                            expected_version=expected_version,
+                        )
+                    ),
+                )
+                stored += result.rowcount
+        return stored
+
     async def search_active_by_embedding(
         self,
         embedding: Sequence[float],
         *,
+        model: str,
+        eligible_card_versions: Mapping[UUID, int],
         as_of: datetime,
         limit: int = 20,
     ) -> list[TrendVectorMatch]:
@@ -290,13 +387,24 @@ class SqlAlchemyTrendRepository:
 
         _validate_aware_time(as_of, field_name="as_of")
         _validate_embedding(embedding, required=True)
+        _validate_embedding_model(model)
         _validate_limit(limit, maximum=100)
+        if not eligible_card_versions:
+            return []
+        if len(eligible_card_versions) > 500:
+            raise ValueError("semantic retrieval is limited to 500 published cards")
+        if any(version < 1 for version in eligible_card_versions.values()):
+            raise ValueError("published semantic candidate versions must be positive")
         vector = list(embedding)
         distance = TrendCardRecord.embedding.cosine_distance(vector).label("cosine_distance")
         statement = (
             select(TrendCardRecord, distance)
             .where(
                 TrendCardRecord.embedding.is_not(None),
+                TrendCardRecord.embedding_model == model,
+                tuple_(TrendCardRecord.id, TrendCardRecord.version).in_(
+                    tuple(eligible_card_versions.items())
+                ),
                 TrendCardRecord.lifecycle != "dormant",
                 TrendCardRecord.expires_at > as_of,
             )
@@ -417,9 +525,13 @@ class SqlAlchemyTrendRepository:
         card: TrendCard,
         *,
         embedding: Sequence[float] | None = None,
+        embedding_model: str | None = None,
+        embedding_fingerprint: str | None = None,
     ) -> TrendCardRecord:
         values = _card_values(card)
         values["embedding"] = list(embedding) if embedding is not None else None
+        values["embedding_model"] = embedding_model
+        values["embedding_fingerprint"] = embedding_fingerprint
         insert_statement = insert(TrendCardRecord).values(**values)
         excluded = insert_statement.excluded
         updated_values = {
@@ -448,17 +560,62 @@ class SqlAlchemyTrendRepository:
                 "recurrence_count",
             )
         }
+        semantic_change_conditions = [
+            getattr(TrendCardRecord, field).is_distinct_from(getattr(excluded, field))
+            for field in (
+                "name",
+                "premise",
+                "aliases",
+                "entities",
+                "topics",
+                "communities",
+                "recognition_cues",
+                "comic_tensions",
+                "usage_guidance",
+                "avoid_guidance",
+            )
+        ]
         if embedding is not None:
             updated_values["embedding"] = excluded.embedding
+            updated_values["embedding_model"] = excluded.embedding_model
+            updated_values["embedding_fingerprint"] = excluded.embedding_fingerprint
+        else:
+            updated_values["embedding"] = case(
+                (or_(*semantic_change_conditions), None),
+                else_=TrendCardRecord.embedding,
+            )
+            updated_values["embedding_model"] = case(
+                (or_(*semantic_change_conditions), None),
+                else_=TrendCardRecord.embedding_model,
+            )
+            updated_values["embedding_fingerprint"] = case(
+                (or_(*semantic_change_conditions), None),
+                else_=TrendCardRecord.embedding_fingerprint,
+            )
         updated_values["version"] = TrendCardRecord.version + 1
         updated_values["updated_at"] = func.now()
         change_conditions = [
             getattr(TrendCardRecord, field).is_distinct_from(getattr(excluded, field))
             for field in updated_values
-            if field not in {"version", "updated_at", "embedding"}
+            if field
+            not in {
+                "version",
+                "updated_at",
+                "embedding",
+                "embedding_model",
+                "embedding_fingerprint",
+            }
         ]
         if embedding is not None:
-            change_conditions.append(TrendCardRecord.embedding.is_(None))
+            change_conditions.extend(
+                (
+                    TrendCardRecord.embedding.is_(None),
+                    TrendCardRecord.embedding_model.is_distinct_from(embedding_model),
+                    TrendCardRecord.embedding_fingerprint.is_distinct_from(
+                        embedding_fingerprint
+                    ),
+                )
+            )
         upsert_statement = insert_statement.on_conflict_do_update(
             index_elements=[TrendCardRecord.id],
             set_=updated_values,
@@ -633,6 +790,80 @@ def _validate_embedding(
         raise ValueError("trend embeddings must contain exactly 1536 values")
     if not all(math.isfinite(value) for value in embedding):
         raise ValueError("trend embeddings must contain only finite values")
+
+
+def _validate_embedding_metadata(
+    embedding: Sequence[float] | None,
+    *,
+    model: str | None,
+    fingerprint: str | None,
+) -> None:
+    _validate_embedding(embedding)
+    if embedding is None:
+        if model is not None or fingerprint is not None:
+            raise ValueError("embedding metadata requires an embedding")
+        return
+    if model is None or fingerprint is None:
+        raise ValueError("embedding model and fingerprint are required")
+    _validate_embedding_model(model)
+    _validate_embedding_fingerprint(fingerprint)
+
+
+def _validate_embedding_model(model: str) -> None:
+    if not model or model != model.strip() or len(model) > 120:
+        raise ValueError("embedding model must be 1 to 120 trimmed characters")
+
+
+def _validate_embedding_fingerprint(fingerprint: str) -> None:
+    if len(fingerprint) != 64 or any(
+        character not in "0123456789abcdef" for character in fingerprint
+    ):
+        raise ValueError("embedding fingerprint must be a lowercase SHA-256 digest")
+
+
+def _embedding_is_stale(
+    *,
+    missing: bool,
+    stored_model: str | None,
+    stored_fingerprint: str | None,
+    required_model: str,
+    required_fingerprint: str,
+) -> bool:
+    return (
+        missing
+        or stored_model != required_model
+        or stored_fingerprint != required_fingerprint
+    )
+
+
+def _store_card_embedding_statement(
+    *,
+    card_id: UUID,
+    embedding: Sequence[float],
+    model: str,
+    fingerprint: str,
+    expected_version: int,
+):
+    """Build a compare-and-set write that rejects stale semantic documents."""
+
+    return (
+        update(TrendCardRecord)
+        .where(
+            TrendCardRecord.id == card_id,
+            TrendCardRecord.version == expected_version,
+            or_(
+                TrendCardRecord.embedding.is_(None),
+                TrendCardRecord.embedding_model.is_distinct_from(model),
+                TrendCardRecord.embedding_fingerprint.is_distinct_from(fingerprint),
+            ),
+        )
+        .values(
+            embedding=list(embedding),
+            embedding_model=model,
+            embedding_fingerprint=fingerprint,
+            updated_at=func.now(),
+        )
+    )
 
 
 def _validate_aware_time(value: datetime, *, field_name: str) -> None:

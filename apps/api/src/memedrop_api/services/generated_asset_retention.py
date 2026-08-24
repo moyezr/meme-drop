@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore[import-untyped]
 
-from memedrop_api.services.storage import MemeStorage, public_path_for_key
+from memedrop_api.services.storage import public_path_for_key
 
 DEFAULT_CLEANUP_BATCH_SIZE = 100
 DEFAULT_CLAIM_TIMEOUT = timedelta(minutes=15)
@@ -32,6 +32,8 @@ class GeneratedAssetCleanupMetrics:
 
     retryable_expired_assets: int
     oldest_retryable_expiry: datetime | None
+    blocked_expired_assets: int = 0
+    oldest_blocked_expiry: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +45,9 @@ class GeneratedAssetCleanupReport:
     failed: int
     remaining_retryable_assets: int
     oldest_retryable_lag_seconds: int | None
+    blocked_expired_assets: int = 0
+    oldest_blocked_lag_seconds: int | None = None
+    stale_generations_reconciled: int = 0
 
 
 class GeneratedAssetRetentionRepository(Protocol):
@@ -79,6 +84,20 @@ class GeneratedAssetRetentionRepository(Protocol):
     ) -> GeneratedAssetCleanupMetrics: ...
 
 
+class MemeObjectDeleter(Protocol):
+    async def delete(self, public_path: str) -> bool: ...
+
+
+class StaleGenerationReconciler(Protocol):
+    """Content-free accounting repair invoked by the maintenance cron."""
+
+    async def reconcile_stale_generations(self) -> int: ...
+
+
+class StaleGenerationReconciliationFailure(RuntimeError):
+    """The bounded accounting repair did not complete in this cron delivery."""
+
+
 class GeneratedAssetRetentionService:
     """Delete expired generated images while keeping a durable retry trail.
 
@@ -89,7 +108,7 @@ class GeneratedAssetRetentionService:
     def __init__(
         self,
         repository: GeneratedAssetRetentionRepository,
-        storage: MemeStorage,
+        storage: MemeObjectDeleter,
         *,
         batch_size: int = DEFAULT_CLEANUP_BATCH_SIZE,
         max_deletion_attempts: int = MAX_DELETION_ATTEMPTS,
@@ -133,8 +152,9 @@ class GeneratedAssetRetentionService:
             ):
                 failed += 1
 
+        metrics_as_of = _require_aware_time(self.now(), field_name="now")
         metrics = await self.repository.cleanup_metrics(
-            as_of=_require_aware_time(self.now(), field_name="now"),
+            as_of=metrics_as_of,
             max_deletion_attempts=self.max_deletion_attempts,
             claim_timeout=self.claim_timeout,
         )
@@ -144,8 +164,13 @@ class GeneratedAssetRetentionService:
             failed=failed,
             remaining_retryable_assets=metrics.retryable_expired_assets,
             oldest_retryable_lag_seconds=_lag_seconds(
-                as_of,
+                metrics_as_of,
                 metrics.oldest_retryable_expiry,
+            ),
+            blocked_expired_assets=metrics.blocked_expired_assets,
+            oldest_blocked_lag_seconds=_lag_seconds(
+                metrics_as_of,
+                metrics.oldest_blocked_expiry,
             ),
         )
 
@@ -163,6 +188,31 @@ class GeneratedAssetRetentionService:
         except OSError:
             return "storage_io_error"
         return None
+
+
+class GeneratedAssetMaintenanceService:
+    """Run retention and stale-reservation reconciliation under one cron lease.
+
+    The route owns authentication and distributed locking.  This composition
+    keeps the two bounded maintenance actions in one protected delivery while
+    preserving a small, content-free report for operators.
+    """
+
+    def __init__(
+        self,
+        retention: GeneratedAssetRetentionService,
+        generations: StaleGenerationReconciler,
+    ) -> None:
+        self.retention = retention
+        self.generations = generations
+
+    async def cleanup_expired_assets(self) -> GeneratedAssetCleanupReport:
+        report = await self.retention.cleanup_expired_assets()
+        try:
+            reconciled = await self.generations.reconcile_stale_generations()
+        except Exception as error:
+            raise StaleGenerationReconciliationFailure from error
+        return replace(report, stale_generations_reconciled=reconciled)
 
 
 def _client_error_code(error: ClientError) -> str:

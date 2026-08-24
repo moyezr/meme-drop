@@ -19,6 +19,11 @@ from memedrop_api.services.tavily_trends import (
     TrendSearchQuery,
     TrendSearchTopic,
 )
+from memedrop_api.services.trend_embeddings import (
+    OpenRouterTrendEmbedder,
+    TrendEmbeddingError,
+    trend_card_embedding_fingerprint,
+)
 from memedrop_api.services.trend_enricher import OpenRouterTrendEnricher
 from memedrop_api.services.trend_index import RedisTrendIndex, TrendIndexDocument
 from memedrop_api.trend_collection_store import SqlAlchemyTrendCollectionStore
@@ -344,6 +349,7 @@ async def refresh_trends(
         ),
     )
     index = RedisTrendIndex(settings.redis_url or "")
+    embedder: OpenRouterTrendEmbedder | None = None
     reports: list[ProfileRefreshReport] = []
     try:
         try:
@@ -376,6 +382,46 @@ async def refresh_trends(
         active_cards = serving_trend_cards(
             await repository.list_active_cards(as_of=observed_at, limit=500)
         )
+        embedding_fingerprints = {
+            card.id: trend_card_embedding_fingerprint(card) for card in active_cards
+        }
+        stale_embedding_ids = await repository.list_stale_embedding_ids(
+            embedding_fingerprints,
+            model=settings.openrouter_embedding_model,
+        )
+        cards_to_embed = [
+            card for card in active_cards if card.id in stale_embedding_ids
+        ]
+        if cards_to_embed:
+            embedder = OpenRouterTrendEmbedder(
+                api_key=settings.openrouter_api_key or "",
+                model=settings.openrouter_embedding_model,
+                timeout_seconds=settings.trend_embedding_timeout_seconds,
+                batch_size=settings.trend_embedding_batch_size,
+                site_url=settings.openrouter_site_url,
+                app_name=settings.openrouter_app_name,
+            )
+            try:
+                vectors = await embedder.embed_cards(cards_to_embed)
+                stored = await repository.store_card_embeddings(
+                    [
+                        (
+                            card.id,
+                            vector,
+                            embedding_fingerprints[card.id],
+                            card.version,
+                        )
+                        for card, vector in zip(cards_to_embed, vectors, strict=True)
+                    ],
+                    model=settings.openrouter_embedding_model,
+                )
+                if stored != len(cards_to_embed):
+                    raise TrendEmbeddingError("trend_embedding_persistence_conflict")
+            except TrendEmbeddingError as error:
+                raise TrendRefreshFailed(
+                    "trend card embedding failed; preserving the last published snapshot "
+                    f"({error.category})"
+                ) from None
         snapshot = await publish_serving_snapshot(
             repository,
             index,
@@ -393,6 +439,8 @@ async def refresh_trends(
     finally:
         await collector.close()
         await enricher.close()
+        if embedder is not None:
+            await embedder.close()
         await index.close()
         await database.close()
 

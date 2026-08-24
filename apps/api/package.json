@@ -14,6 +14,7 @@
     "lint": "uv run ruff check .",
     "format": "uv run ruff format .",
     "production-env": "uv run memedrop-validate-production-env",
+    "agent:admin": "uv run --env-file ../../.env memedrop-agent-admin",
     "usage-feedback": "uv run --env-file ../../.env memedrop-usage-feedback",
     "storage:check": "uv run --env-file ../../.env memedrop-storage-check",
     "storage:latency": "uv run --env-file ../../.env memedrop-storage-check --latency",

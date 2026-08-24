@@ -18,6 +18,7 @@ DEFAULT_STORAGE_PATH = Path("/tmp/memedrop-storage")
 DEFAULT_DOWNLOAD_PATH = Path("/tmp/memedrop-downloads")
 DEVELOPMENT_BUCKET = "meme-drop-dev"
 PRODUCTION_BUCKET = "meme-drop-prod"
+PRODUCTION_API_ORIGIN = "https://memedropapi.moyezrabbani.dev"
 CronSecret = Annotated[str, StringConstraints(strip_whitespace=True, min_length=16, max_length=512)]
 
 
@@ -45,6 +46,10 @@ class Settings(BaseSettings):
     openrouter_site_url: str = Field(
         default="http://localhost:3001", validation_alias="OPENROUTER_SITE_URL"
     )
+    api_public_origin: str = Field(
+        default="http://localhost:3001",
+        validation_alias="MEMEDROP_API_PUBLIC_ORIGIN",
+    )
     openrouter_app_name: str = Field(default="MemeDrop", validation_alias="OPENROUTER_APP_NAME")
     openrouter_suggestion_model: str = Field(
         default="google/gemini-3.7-flash", validation_alias="OPENROUTER_SUGGESTION_MODEL"
@@ -57,6 +62,10 @@ class Settings(BaseSettings):
     )
     openrouter_trend_model: str = Field(
         default="google/gemini-3.7-flash", validation_alias="OPENROUTER_TREND_MODEL"
+    )
+    openrouter_embedding_model: str = Field(
+        default="google/gemini-embedding-2",
+        validation_alias="OPENROUTER_EMBEDDING_MODEL",
     )
     tavily_api_key: str | None = Field(
         default=None,
@@ -94,6 +103,18 @@ class Settings(BaseSettings):
         ge=0.1,
         le=60,
     )
+    trend_embedding_timeout_seconds: float = Field(
+        default=20.0,
+        validation_alias="MEMEDROP_TREND_EMBEDDING_TIMEOUT_SECONDS",
+        ge=0.1,
+        le=60,
+    )
+    trend_embedding_batch_size: int = Field(
+        default=32,
+        validation_alias="MEMEDROP_TREND_EMBEDDING_BATCH_SIZE",
+        ge=1,
+        le=128,
+    )
     trend_collection_cooldown_seconds: float = Field(
         default=1.0,
         validation_alias="MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS",
@@ -111,6 +132,30 @@ class Settings(BaseSettings):
         validation_alias="MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS",
         ge=60,
         le=3_600,
+    )
+    generated_asset_cleanup_batch_size: int = Field(
+        default=100,
+        validation_alias="MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE",
+        ge=1,
+        le=100,
+    )
+    generated_asset_cleanup_claim_timeout_seconds: int = Field(
+        default=900,
+        validation_alias="MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS",
+        ge=60,
+        le=86_400,
+    )
+    generated_asset_cleanup_lock_ttl_seconds: int = Field(
+        default=900,
+        validation_alias="MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS",
+        ge=60,
+        le=3_600,
+    )
+    agent_generation_stale_timeout_seconds: int = Field(
+        default=1_800,
+        validation_alias="MEMEDROP_AGENT_GENERATION_STALE_TIMEOUT_SECONDS",
+        ge=300,
+        le=86_400,
     )
     trend_snapshot_max_age_seconds: int = Field(
         default=28_800,
@@ -148,9 +193,7 @@ class Settings(BaseSettings):
     s3_endpoint: str | None = Field(default=None, validation_alias="S3_ENDPOINT")
     s3_region: str | None = Field(default=None, validation_alias="S3_REGION")
     s3_access_key_id: str | None = Field(default=None, validation_alias="S3_ACCESS_KEY_ID")
-    s3_secret_access_key: str | None = Field(
-        default=None, validation_alias="S3_SECRET_ACCESS_KEY"
-    )
+    s3_secret_access_key: str | None = Field(default=None, validation_alias="S3_SECRET_ACCESS_KEY")
     s3_bucket_name: str | None = Field(default=None, validation_alias="S3_BUCKET_NAME")
     legacy_storage_bucket: str | None = Field(
         default=None,
@@ -222,6 +265,21 @@ class Settings(BaseSettings):
             return None
         return self.redis_url
 
+    @property
+    def normalized_api_public_origin(self) -> str:
+        """Origin used for agent-visible media URLs, without a trailing slash."""
+
+        return self.api_public_origin.rstrip("/")
+
+    @property
+    def cron_redis_url(self) -> str | None:
+        """Return a validated Redis endpoint for scheduled job coordination."""
+
+        endpoint = urlparse(self.redis_url or "")
+        if endpoint.scheme not in {"redis", "rediss"} or not endpoint.hostname:
+            return None
+        return self.redis_url
+
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:
         if self.legacy_openrouter_meme_model:
@@ -233,9 +291,7 @@ class Settings(BaseSettings):
         if self.legacy_storage_bucket:
             raise ValueError("MEMEDROP_STORAGE_BUCKET was removed; use S3_BUCKET_NAME")
         if self.s3_bucket_name and self.s3_bucket_name != expected_bucket:
-            raise ValueError(
-                f"S3_BUCKET_NAME must be {expected_bucket} in {self.node_env}"
-            )
+            raise ValueError(f"S3_BUCKET_NAME must be {expected_bucket} in {self.node_env}")
         if self.storage_backend == "s3":
             missing = [
                 name
@@ -258,7 +314,32 @@ class Settings(BaseSettings):
             redis_endpoint = urlparse(self.redis_url or "")
             if redis_endpoint.scheme not in {"redis", "rediss"} or not redis_endpoint.hostname:
                 raise ValueError("REDIS_URL must be a valid redis:// or rediss:// URL")
+        public_origin = urlparse(self.api_public_origin)
+        allowed_public_schemes = {"https"} if self.is_production else {"http", "https"}
+        if (
+            public_origin.scheme not in allowed_public_schemes
+            or not public_origin.hostname
+            or public_origin.username
+            or public_origin.password
+            or public_origin.query
+            or public_origin.fragment
+            or public_origin.path not in {"", "/"}
+        ):
+            required_scheme = "https" if self.is_production else "http or https"
+            raise ValueError(f"MEMEDROP_API_PUBLIC_ORIGIN must be a valid {required_scheme} origin")
+        if (
+            self.generated_asset_cleanup_claim_timeout_seconds
+            < self.generated_asset_cleanup_lock_ttl_seconds
+        ):
+            raise ValueError(
+                "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS must be greater than or "
+                "equal to MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS"
+            )
         if self.is_production:
+            if self.normalized_api_public_origin != PRODUCTION_API_ORIGIN:
+                raise ValueError(
+                    f"MEMEDROP_API_PUBLIC_ORIGIN must be {PRODUCTION_API_ORIGIN} in production"
+                )
             if not self.openrouter_api_key:
                 raise ValueError("OPENROUTER_API_KEY is required in production")
             if not self.cors_origins_value.strip():
@@ -269,14 +350,11 @@ class Settings(BaseSettings):
                 raise ValueError("MEMEDROP_STORAGE_BACKEND must be s3 in production")
             if self.rate_limit_store != "redis":
                 raise ValueError("MEMEDROP_RATE_LIMIT_STORE must be redis in production")
+            if not self.trend_cron_secret:
+                raise ValueError("CRON_SECRET is required in production for scheduled cleanup")
             if self.trends_enabled:
                 missing_trend_settings = [
-                    name
-                    for name, value in (
-                        ("TAVILY_API_KEY", self.tavily_api_key),
-                        ("CRON_SECRET", self.trend_cron_secret),
-                    )
-                    if not value
+                    name for name, value in (("TAVILY_API_KEY", self.tavily_api_key),) if not value
                 ]
                 if missing_trend_settings:
                     raise ValueError(

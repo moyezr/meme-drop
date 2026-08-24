@@ -22,16 +22,17 @@ test("the agent-facing response contains ready-to-use memes", () => {
     status: "ok",
     memes: [
       {
-        id: "suggestion-123",
-        image_url: "https://cdn.example.test/finished-meme.jpg",
-        alt_text: "A finished meme about postponing a launch.",
-        caption: "ONE LAST TIMEZONE FIX",
+        id: "asset_23456789ABCDEFGHJKLMNP",
+        image_url: "https://memedropapi.moyezrabbani.dev/api/v1/memes/assets/asset_23456789ABCDEFGHJKLMNP",
+        expires_at: "2026-09-23T12:00:00Z",
       },
     ],
   } satisfies MemeGenerateResponse;
   const routeResponse: MemeGenerateRouteResponse = response;
 
   assert.deepEqual(routeResponse, response);
+  assert.equal("caption" in response.memes[0], false);
+  assert.equal("alt_text" in response.memes[0], false);
 });
 
 test("the agent-facing request supports bounded optional tuning", () => {

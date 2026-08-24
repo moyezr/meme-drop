@@ -10,12 +10,11 @@ export interface MemeGenerateRequest {
   options?: MemeGenerateOptions;
 }
 
-/** A ready-to-use meme. `image_url` points to the finished, captioned image. */
+/** A durable generated image. The URL requires the caller's Bearer credential. */
 export interface GeneratedMeme {
   id: string;
   image_url: string;
-  alt_text: string;
-  caption: string;
+  expires_at: string;
 }
 
 export interface MemeGenerateResponse {

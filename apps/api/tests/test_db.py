@@ -1,3 +1,7 @@
+from typing import cast
+
+from sqlalchemy import Table
+
 from memedrop_api.db import (
     Base,
     TrendCardRecord,
@@ -61,6 +65,12 @@ def test_trend_tables_keep_raw_provider_content_out_of_durable_storage() -> None
         "query_fingerprint",
     }
     assert "embedding" in TrendCardRecord.__table__.columns
+    assert "embedding_model" in TrendCardRecord.__table__.columns
+    assert "embedding_fingerprint" in TrendCardRecord.__table__.columns
+    assert any(
+        constraint.name == "trend_cards_embedding_metadata_check"
+        for constraint in cast(Table, TrendCardRecord.__table__).constraints
+    )
     assert "cards" in TrendSnapshotRecord.__table__.columns
     assert "raw_content" not in Base.metadata.tables["trend_observations"].columns
 

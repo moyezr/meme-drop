@@ -29,7 +29,7 @@ class FakeLock:
 
 
 def trend_settings() -> Settings:
-    return Settings(
+    return Settings(  # type: ignore[call-arg]
         database_url="postgresql://test:test@127.0.0.1:5432/test",
         trends_enabled=True,
         redis_url="redis://127.0.0.1:6379/0",

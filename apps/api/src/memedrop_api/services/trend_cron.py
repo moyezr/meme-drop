@@ -1,8 +1,10 @@
-"""Small, bounded coordination primitives for scheduled trend refreshes."""
+"""Small, bounded coordination primitives for scheduled jobs."""
 
 from __future__ import annotations
 
+import hmac
 from secrets import token_urlsafe
+from typing import Protocol
 
 from redis.asyncio import Redis
 
@@ -15,8 +17,14 @@ return 0
 """
 
 
-class RedisTrendRefreshLock:
-    """A short lease that prevents duplicate cron deliveries from running together.
+class CronLock(Protocol):
+    async def acquire(self) -> str | None: ...
+
+    async def release(self, token: str) -> bool: ...
+
+
+class RedisCronLock:
+    """An owner-fenced lease that prevents duplicate cron deliveries from overlapping.
 
     The random lease token is compared by Redis before deleting the lock. This means a
     slow worker cannot release a newer worker's lease after its own TTL expires.
@@ -49,3 +57,27 @@ class RedisTrendRefreshLock:
 
     async def close(self) -> None:
         await self._redis.aclose()
+
+
+class RedisTrendRefreshLock(RedisCronLock):
+    """Backward-compatible trend refresh lock with its established Redis key."""
+
+    def __init__(
+        self,
+        redis_url: str,
+        *,
+        ttl_seconds: int,
+        key: str = TREND_REFRESH_LOCK_KEY,
+    ) -> None:
+        super().__init__(redis_url, ttl_seconds=ttl_seconds, key=key)
+
+
+def is_authorized_cron_request(authorization: str | None, expected_secret: str | None) -> bool:
+    """Validate Vercel's bearer token without exposing comparison timing."""
+
+    if not authorization or not expected_secret:
+        return False
+    scheme, separator, token = authorization.partition(" ")
+    return bool(separator) and scheme.casefold() == "bearer" and hmac.compare_digest(
+        token, expected_secret
+    )

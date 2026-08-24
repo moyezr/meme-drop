@@ -94,6 +94,7 @@ Supply real production values through `.env.prod` locally and Vercel's productio
 ```text
 MEMEDROP_ENV=production
 DATABASE_URL=<supabase-transaction-pooler-url>
+MEMEDROP_API_PUBLIC_ORIGIN=https://memedropapi.moyezrabbani.dev
 
 OPENROUTER_API_KEY=<production-key>
 OPENROUTER_SITE_URL=https://<production-api-origin>
@@ -102,13 +103,23 @@ OPENROUTER_SUGGESTION_MODEL=google/gemini-3.7-flash
 OPENROUTER_CAPTION_MODEL=google/gemini-3.7-flash
 OPENROUTER_AUTO_TAG_MODEL=google/gemini-3.7-flash
 OPENROUTER_TREND_MODEL=google/gemini-3.7-flash
+OPENROUTER_EMBEDDING_MODEL=google/gemini-embedding-2
 
 # Enable only after the Redis serving index and the Vercel Cron secret are configured.
 MEMEDROP_TRENDS_ENABLED=true
 TAVILY_API_KEY=<tavily-key>
+MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET=900
+MEMEDROP_TREND_COLLECTION_TIMEOUT_SECONDS=8
+MEMEDROP_TREND_ENRICHMENT_TIMEOUT_SECONDS=20
+MEMEDROP_TREND_EMBEDDING_TIMEOUT_SECONDS=20
+MEMEDROP_TREND_EMBEDDING_BATCH_SIZE=32
+MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS=1
 CRON_SECRET=<long-random-secret>
 MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS=3600
 MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS=28800
+MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE=100
+MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS=900
+MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS=900
 
 MEMEDROP_CORS_ORIGINS=chrome-extension://<final-extension-id>
 MEMEDROP_RATE_LIMIT_STORE=redis
@@ -138,10 +149,23 @@ enabled in the Vercel project.
 
 When `MEMEDROP_TRENDS_ENABLED=true`, set the same `CRON_SECRET` in the API project and rely on the
 checked-in `apps/api/vercel.json` schedule. Vercel calls the protected endpoint with a bearer token
-and schedules in UTC. The configured four-hour cadence requires Vercel Pro; Vercel Hobby supports
-daily schedules only, so use Pro or an equivalent external scheduler. Monitor `GET /health` and
-alert on HTTP 503: trend-enabled health checks become 503 when the latest published trend snapshot
-is missing, empty, or older than eight hours by default.
+and schedules in UTC. The checked-in Hobby-compatible preview schedule refreshes all profiles once
+daily at 02:00 UTC, which executes only one of the pulse profile's four-hour buckets and uses about
+321 searches per 30 days. Before launch, upgrade to Vercel Pro (or an equivalent external
+scheduler), change the trend cron expression to `0 */4 * * *`, and verify the expected roughly 771
+monthly searches remain under the 900-credit ceiling. Monitor `GET /health` and alert on HTTP 503:
+the intended launch health policy treats a missing, empty, or older-than-eight-hours snapshot as
+unhealthy, so the daily preview cadence is not the final production trend configuration.
+
+`CRON_SECRET` is required in production even if trends are disabled because the same constant-time
+bearer authentication protects the daily generated-asset cleanup. The checked-in schedule calls
+`GET /internal/cron/assets/cleanup` at 03:30 UTC. Its Redis lease and PostgreSQL claims make duplicate
+deliveries safe, and its response exposes only bounded counts and deletion lag. Alert on any
+non-2xx cleanup response and on a growing `remaining_retryable_assets`,
+`oldest_retryable_lag_seconds`, `blocked_expired_assets`, or `oldest_blocked_lag_seconds` value.
+Blocked expired assets include permanent failures, exhausted attempts, and max-attempt pending
+claims after their lease goes stale; the endpoint continues returning HTTP 503 until they are
+repaired rather than allowing a retention breach to disappear from monitoring.
 
 With those variables loaded into an operator shell:
 
@@ -167,18 +191,70 @@ Do not run either operation during a Vercel build or function startup. Confirm t
 pgvector extension exist, meme rows were created, original images and thumbnails are in
 `meme-drop-prod`, and nothing was written to `meme-drop-dev`.
 
+### Bootstrap a private-beta agent account
+
+Account provisioning is an explicit operator operation against the migrated production database.
+Create the account, copy its returned compact ID, issue one API key, grant the agreed beta credits,
+and inspect the content-free result:
+
+```sh
+npm run agent:admin -- account-create --name "Acme beta" --confirm
+npm run agent:admin -- key-issue --account-id acct_... --name "Production" --confirm
+npm run agent:admin -- credits-grant --account-id acct_... --credits 25 \
+  --idempotency-key acme-initial-20260824 --actor operator:moyez --confirm
+npm run agent:admin -- status --account-id acct_...
+```
+
+The issue response is the only time the full Bearer credential is available. Put it directly in an
+approved password manager or equivalent one-time secret-delivery channel. Never redirect the
+command output to a repository file, ticket, terminal scrollback capture, or shared log. Treat
+issuance and rotation stdout as secret-bearing, and disable or protect terminal capture, CI logs,
+and command auditing around those operations. MemeDrop persists only the credential hash and cannot
+recover the plaintext secret.
+
+Use these explicit commands for key lifecycle changes:
+
+```sh
+npm run agent:admin -- key-rotate --account-id acct_... --key-id key_... \
+  --name "Production replacement" --reason scheduled_rotation \
+  --actor operator:moyez --confirm
+npm run agent:admin -- key-revoke --account-id acct_... --key-id key_... \
+  --reason operator_request --actor operator:moyez --confirm
+```
+
+Rotation prints its replacement credential exactly once. Every mutation requires `--confirm`.
+Within one account, credit-grant retries must reuse the same idempotency key and amount; a changed
+amount or actor fails, and every intended grant needs a unique operator key. The required `--actor`
+is stored as bounded operator attribution in the immutable credit ledger. The status command returns
+only operator-safe account/key names, IDs, categorical states, timestamps, and the credit balance.
+It does not return credentials, request content, captions, or generated media metadata.
+
+### Confirm daily generated-media maintenance
+
+The protected `GET /internal/cron/assets/cleanup` schedule runs retention cleanup and
+stale-generation credit reconciliation under one `CRON_SECRET`-authenticated Redis lease. Keep
+`MEMEDROP_AGENT_GENERATION_STALE_TIMEOUT_SECONDS=1800` unless observed rendering latency requires
+a reviewed adjustment. Its report includes `stale_generations_reconciled`; a 503
+`generation_reconciliation` result requires operator investigation before the next delivery.
+
+For a stale request, the service derives only its compact account-and-generation object prefix,
+lists at most the fixed five-result output limit plus one object, and deletes only keys returned beneath
+that prefix. An overflow, listing, or deletion error leaves the request processing and its credit
+reserved for a retry; it never performs a bucket-wide scan or deletion.
+
 ## 7. Publish the site and privacy policy
 
 Before Chrome submission:
 
 - replace every placeholder in `PRIVACY.md`, including the contact email;
 - confirm provider and data-retention disclosures;
-- publish the policy at a stable HTTPS route such as `/privacy`;
+- deploy and verify `https://memedrop.moyezrabbani.dev/privacy-policy/` without authentication;
 - configure a real support email;
-- deploy the landing project and verify the policy without authentication.
+- verify the hosted page matches the release commit and canonical URL.
 
-The repository currently contains the policy document but still needs a hosted landing-page privacy
-route for launch.
+The landing route `/privacy-policy/` is implemented and statically exported. Its hosted availability
+and final provider disclosures remain external deployment checks; do not treat a successful local
+build as proof that the public URL is live.
 
 ## 8. Deploy and verify the API
 
@@ -205,7 +281,7 @@ Create real listing metadata:
 
 ```sh
 npm run store-listing:init -- \
-  --privacy-policy-url https://<public-site>/privacy \
+  --privacy-policy-url https://memedrop.moyezrabbani.dev/privacy-policy/ \
   --support-email <real-support-email>
 ```
 

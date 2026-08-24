@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
-  description: "MemeDrop's current pre-launch privacy disclosure and support contact.",
+  description: "MemeDrop's private-beta privacy disclosure and support contact.",
   alternates: {
     canonical: "/privacy-policy/",
   },
@@ -28,18 +28,18 @@ export default function PrivacyPolicyPage() {
       <header>
         <h1>Privacy policy</h1>
         <p className="pageIntro">
-          A plain-language disclosure of how the current MemeDrop development product handles
-          information, and what remains to be finalized before a public launch.
+          A plain-language disclosure of how the MemeDrop private beta handles information, and
+          which hosted-provider and billing details remain to be finalized before public launch.
         </p>
         <p className="policyMeta">Effective date: August 24, 2026</p>
       </header>
 
       <aside className="notice" aria-label="Pre-launch policy status">
         <p>
-          <strong>Pre-launch notice.</strong> MemeDrop is not yet a public, self-service API. This
-          page describes the current implementation and intended launch controls. It will be
-          replaced or updated before public access once account, billing, retention, and provider
-          settings have been verified.
+          <strong>Private-beta notice.</strong> MemeDrop is not yet a public, self-service API.
+          Agent accounts, one-way-hashed credentials, credits, authenticated generation, and
+          30-day generated-asset cleanup are implemented. Production provider retention,
+          infrastructure logging, payment, and billing settings still require hosted verification.
         </p>
       </aside>
 
@@ -64,23 +64,30 @@ export default function PrivacyPolicyPage() {
         <h3>Generated media</h3>
         <p>
           MemeDrop stores rendered meme images in the configured object-storage service so they can
-          be returned to the caller. The current implementation does not yet enforce the planned
-          30-day expiry and deletion workflow. That workflow is a launch requirement, not a claim
-          about the current service.
+          be returned to the authenticated account. Each durable generated asset expires 30 days
+          after generation. Expired media is no longer served; a protected daily cleanup job deletes
+          its exact stored object and keeps failures visible for operator retry. Rendered pixels
+          necessarily contain the generated caption even though caption text is not stored as a
+          separate application field.
         </p>
         <h3>Technical and operational data</h3>
         <p>
           The service and its infrastructure may process standard request and diagnostic data, such
           as timestamps, response status, latency, network metadata, browser or device information,
-          and rate-limit signals. The application is designed to keep raw submitted text, captions,
-          API secrets, and request bodies out of application telemetry. A full production log and
-          retention audit has not been completed yet.
+          and rate-limit signals. The implementation excludes raw submitted text, optional creative
+          direction, plaintext captions, API-key secrets, and request bodies from application
+          persistence and telemetry. Request identity uses a one-way SHA-256 fingerprint rather
+          than stored plaintext. A full hosted-infrastructure log and retention audit has not been
+          completed yet.
         </p>
         <h3>Account, API, and billing data</h3>
         <p>
-          Public agent accounts, API keys, credits, and payments are not available yet. When they
-          are introduced, this policy will specify the account information collected, key storage
-          approach, credit-ledger retention, payment processor, and billing-record retention.
+          Private-beta agent accounts, API keys, and credit ledgers are available through an
+          operator-only workflow. MemeDrop stores account and key names, compact IDs, categorical
+          status, key-use and lifecycle timestamps, credit-ledger attribution, and generation/asset
+          lifecycle metadata. API-key secrets are shown once at issuance and stored only as
+          one-way SHA-256 hashes. Payments, recharging, and self-service billing are not implemented;
+          the future payment processor and billing-record retention remain to be determined.
         </p>
       </section>
 
@@ -100,8 +107,9 @@ export default function PrivacyPolicyPage() {
         <p>
           The website uses Vercel Analytics. Meme media is stored through the configured
           object-storage provider. These providers process data under their own terms and privacy
-          notices; their precise production configuration and retention settings are still being
-          verified.
+          notices. Their hosted production configuration, provider-side input retention, model
+          training controls, log retention, deletion propagation, and subprocessors are still being
+          verified; the application-level exclusions above do not control provider-held copies.
         </p>
       </section>
 
@@ -121,23 +129,26 @@ export default function PrivacyPolicyPage() {
           MemeDrop does not sell submitted content. Information is shared with the service
           providers described above only as needed to run the service, and may be disclosed when
           required by law or to protect the service, its users, or the public. A public launch will
-          include provider-specific retention details and a complete list of material processors.
+          include verified provider-specific retention details and a complete list of material
+          processors.
         </p>
       </section>
 
       <section aria-labelledby="retention">
         <h2 id="retention">Retention and your choices</h2>
         <p>
-          The intended public policy is that generated images expire 30 days after successful
-          generation. This has not been implemented yet, so do not rely on the current development
-          service for a 30-day deletion guarantee. Final retention periods for application logs,
-          PostgreSQL, Redis, OpenRouter, Tavily, analytics, object storage, and the future payment
-          provider will be published before public launch.
+          Generated images expire 30 days after successful generation. Authenticated media access
+          stops at expiry, and the implemented scheduled cleanup deletes exact stored objects in
+          bounded batches. Retryable and blocked cleanup backlogs remain visible to operators so a
+          deletion failure does not disappear silently. Durable account, key, credit-ledger, and
+          categorical generation records are retained for private-beta operations and auditing.
         </p>
         <p>
-          Account deletion, data export, API-key revocation, early asset deletion, billing-record
-          retention, and a generated-content complaint process are also pending public-launch
-          implementation. Until self-service controls are available, contact us for a request.
+          Final hosted retention periods for application and infrastructure logs, PostgreSQL,
+          Redis, OpenRouter, Tavily, analytics, and object storage still require verification.
+          Billing retention is not yet applicable because payments are not implemented. API keys
+          can be revoked by an operator; account self-service, early asset deletion, and a
+          generated-content complaint workflow remain pending. Contact us for a request.
         </p>
       </section>
 
@@ -145,9 +156,10 @@ export default function PrivacyPolicyPage() {
         <h2 id="security">Security</h2>
         <p>
           We use reasonable technical measures appropriate to the current stage of the product, but
-          no internet service can promise absolute security. Public launch depends on additional
-          authentication, tenant isolation, credit controls, lifecycle jobs, observability, and
-          production security checks.
+          no internet service can promise absolute security. Private-beta generation and media are
+          tenant-authenticated, API-key secrets are one-way hashed, credits are transactionally
+          accounted, and generated assets have a scheduled lifecycle job. Public launch still
+          depends on hosted observability, incident-response, and production security verification.
         </p>
       </section>
 

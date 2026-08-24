@@ -4,21 +4,24 @@ import asyncio
 import hashlib
 import os
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, update
 
 from memedrop_api.agent_generation_credits import (
     AgentGenerationCreditError,
     AgentGenerationCreditService,
     CreditBalance,
+    GenerationAssetInput,
     GenerationResult,
     GenerationStatus,
     IdempotencyConflict,
     InsufficientCredits,
     InvalidGenerationTransition,
     _derived_ledger_identity,
+    _grant_actor_metadata,
     _hash_idempotency_key,
     _validate_settlement,
 )
@@ -37,6 +40,17 @@ FINGERPRINT_A = "a" * 64
 FINGERPRINT_B = "b" * 64
 
 
+class RecordingGenerationObjectCleaner:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+        self.calls: list[tuple[str, str]] = []
+
+    async def cleanup_generation_objects(self, *, account_id: str, generation_id: str) -> None:
+        self.calls.append((account_id, generation_id))
+        if self.error is not None:
+            raise self.error
+
+
 def test_idempotency_and_ledger_identities_are_opaque_stable_and_distinct() -> None:
     key = "client-retry-123"
     first = _hash_idempotency_key(key, namespace="generation")
@@ -48,6 +62,13 @@ def test_idempotency_and_ledger_identities_are_opaque_stable_and_distinct() -> N
     assert _derived_ledger_identity("gen_23456789ABCDEFGHJKLMNP", "reservation") != (
         _derived_ledger_identity("gen_23456789ABCDEFGHJKLMNP", "commit")
     )
+
+
+def test_credit_grant_actor_metadata_is_bounded_and_defaults_to_system() -> None:
+    assert _grant_actor_metadata(None) == ("system", "credit_grant")
+    assert _grant_actor_metadata("operator:alice") == ("operator", "operator:alice")
+    with pytest.raises(AgentGenerationCreditError, match="operator actor"):
+        _grant_actor_metadata("free form actor")
 
 
 @pytest.mark.parametrize(
@@ -123,8 +144,24 @@ async def test_generation_reservation_replay_release_and_terminal_guards(
     account_id, api_key_id = await _account_with_key(database)
     service = AgentGenerationCreditService(database)
     assert await service.grant_credits(
-        account_id=account_id, credits=1, grant_idempotency_key="initial-grant"
+        account_id=account_id,
+        credits=1,
+        grant_idempotency_key="initial-grant",
+        operator_actor_id="operator:integration",
     ) == CreditBalance(account_id, 1)
+    assert await service.grant_credits(
+        account_id=account_id,
+        credits=1,
+        grant_idempotency_key="initial-grant",
+        operator_actor_id="operator:integration",
+    ) == CreditBalance(account_id, 1)
+    with pytest.raises(IdempotencyConflict, match="prior grant"):
+        await service.grant_credits(
+            account_id=account_id,
+            credits=1,
+            grant_idempotency_key="initial-grant",
+            operator_actor_id="operator:different",
+        )
 
     started = await service.begin_generation(
         account_id=account_id,
@@ -172,6 +209,10 @@ async def test_generation_reservation_replay_release_and_terminal_guards(
         ("generation_reservation", -1),
         ("generation_release", 1),
     ]
+    assert (ledger[0].actor_type, ledger[0].actor_id) == (
+        "operator",
+        "operator:integration",
+    )
     assert len({entry.idempotency_key_hash for entry in ledger}) == 3
     assert all("generation-retry" not in entry.idempotency_key_hash for entry in ledger)
 
@@ -191,13 +232,22 @@ async def test_successful_fallback_commits_once_and_concurrent_starts_cannot_ove
         idempotency_key="fallback",
         request_fingerprint=FINGERPRINT_A,
     )
-    settled = await service.settle_generation(
+    settled = await service.complete_generation_with_assets(
         account_id=account_id,
         generation_id=first.id,
-        outcome=GenerationStatus.SUCCEEDED,
-        returned_asset_count=1,
+        assets=(
+            GenerationAssetInput(
+                object_key=f"generated/agents/{account_id}/{first.id}/1-fallback.webp",
+                content_type="image/webp",
+                content_hash="a" * 64,
+            ),
+        ),
     )
-    assert (settled.status, settled.balance.credits) == (GenerationStatus.SUCCEEDED, 1)
+    assert (settled.generation.status, settled.generation.balance.credits) == (
+        GenerationStatus.SUCCEEDED,
+        1,
+    )
+    assert len(settled.assets) == 1
 
     outcomes = await asyncio.gather(
         service.begin_generation(
@@ -275,3 +325,98 @@ async def test_generation_primary_key_collision_retries_with_a_new_compact_id(
 
     assert issued_collision
     assert result.id != colliding_generation_id
+
+
+@pytest.mark.integration
+async def test_stale_generation_reconciliation_releases_once_under_concurrency(
+    database: Database,
+) -> None:
+    account_id, api_key_id = await _account_with_key(database)
+    service = AgentGenerationCreditService(
+        database,
+        stale_generation_after=timedelta(minutes=10),
+        generation_object_cleaner=RecordingGenerationObjectCleaner(),
+    )
+    await service.grant_credits(
+        account_id=account_id,
+        credits=1,
+        grant_idempotency_key="stale-generation-grant",
+    )
+    started = await service.begin_generation(
+        account_id=account_id,
+        api_key_id=api_key_id,
+        idempotency_key="stale-generation",
+        request_fingerprint=FINGERPRINT_A,
+    )
+    now = datetime.now(UTC)
+    async with database.session() as session, session.begin():
+        await session.execute(
+            update(AgentGeneration)
+            .where(AgentGeneration.id == started.id)
+            .values(created_at=now - timedelta(minutes=11))
+        )
+
+    outcomes = await asyncio.gather(
+        service.reconcile_stale_generations(as_of=now, account_id=account_id),
+        service.reconcile_stale_generations(as_of=now, account_id=account_id),
+    )
+    assert sorted(outcomes) == [0, 1]
+    assert await service.reconcile_stale_generations(as_of=now, account_id=account_id) == 0
+    result = await service.generation_result(account_id=account_id, generation_id=started.id)
+    assert (result.status, result.failure_code, result.balance) == (
+        GenerationStatus.FAILED,
+        "generation_timeout",
+        CreditBalance(account_id, 1),
+    )
+    ledger = await _ledger_rows(database, account_id)
+    assert [(entry.reason, entry.credit_delta) for entry in ledger] == [
+        ("grant", 1),
+        ("generation_reservation", -1),
+        ("generation_release", 1),
+    ]
+
+
+@pytest.mark.integration
+async def test_stale_cleanup_failure_preserves_processing_reservation_for_retry(
+    database: Database,
+) -> None:
+    account_id, api_key_id = await _account_with_key(database)
+    service = AgentGenerationCreditService(
+        database,
+        stale_generation_after=timedelta(minutes=10),
+        generation_object_cleaner=RecordingGenerationObjectCleaner(
+            OSError("object listing unavailable")
+        ),
+    )
+    await service.grant_credits(
+        account_id=account_id,
+        credits=1,
+        grant_idempotency_key="stale-cleanup-failure-grant",
+    )
+    started = await service.begin_generation(
+        account_id=account_id,
+        api_key_id=api_key_id,
+        idempotency_key="stale-cleanup-failure",
+        request_fingerprint=FINGERPRINT_A,
+    )
+    now = datetime.now(UTC)
+    async with database.session() as session, session.begin():
+        await session.execute(
+            update(AgentGeneration)
+            .where(AgentGeneration.id == started.id)
+            .values(created_at=now - timedelta(minutes=11))
+        )
+
+    with pytest.raises(OSError, match="listing unavailable"):
+        await service.reconcile_stale_generations(as_of=now, account_id=account_id)
+
+    result = await service.generation_result(account_id=account_id, generation_id=started.id)
+    assert (result.status, result.balance) == (
+        GenerationStatus.PROCESSING,
+        CreditBalance(account_id, 0),
+    )
+    ledger = await _ledger_rows(database, account_id)
+    assert [(entry.reason, entry.credit_delta) for entry in ledger] == [
+        ("grant", 1),
+        ("generation_reservation", -1),
+    ]

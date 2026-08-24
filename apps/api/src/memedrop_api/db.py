@@ -215,6 +215,12 @@ class TrendCardRecord(Base):
             "last_confirmed_at >= first_seen_at AND expires_at > last_confirmed_at",
             name="trend_cards_timestamps_check",
         ),
+        CheckConstraint(
+            "(embedding IS NULL AND embedding_model IS NULL AND embedding_fingerprint IS NULL) "
+            "OR (embedding IS NOT NULL AND embedding_model IS NOT NULL "
+            "AND embedding_fingerprint ~ '^[a-f0-9]{64}$')",
+            name="trend_cards_embedding_metadata_check",
+        ),
         Index("idx_trend_cards_lifecycle_expires_at", "lifecycle", "expires_at"),
         Index("idx_trend_cards_last_confirmed_at", "last_confirmed_at"),
         Index("idx_trend_cards_aliases_gin", "aliases", postgresql_using="gin"),
@@ -267,6 +273,8 @@ class TrendCardRecord(Base):
     recurrence_count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     version: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    embedding_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )

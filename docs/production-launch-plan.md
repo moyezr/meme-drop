@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-08-24
+Last updated: 2026-08-25
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and decisions here as implementation progresses.
@@ -13,6 +13,25 @@ to a task in this plan.
 - `[~]` In progress
 - `[x]` Complete and verified
 - `[?]` Product or technical decision required
+
+## Current delivery boundary
+
+The current engineering goal is a deployment-ready release candidate, not a live deployment.
+Complete every repository-owned prerequisite: application behavior, migrations, environment
+contracts, release gates, tests, documentation, operational endpoints, smoke commands, and
+deployment/runbook guidance.
+
+Do not provision or mutate hosted infrastructure in this phase. Creating managed databases or
+Redis instances, creating or changing buckets, configuring domains or hosted secrets, upgrading a
+Vercel plan, installing uptime alerts, applying production migrations, deploying a release, and
+opening public access are follow-up deployment actions. Keep each one visible as an external launch
+step so we can review provider choices, costs, risks, and rollback procedures before execution.
+
+Repository readiness is enforced by `npm run quality:deployment-readiness`. The gate accepts only
+loopback PostgreSQL and Redis test services and a disposable test database name; clears provider and
+storage credentials; and blocks on static analysis, all deterministic tests and builds, recommendation
+tuning, the complete migration/integration suite, API and backend-image smoke tests, and dependency
+security audits. It deliberately does not make provider calls or validate hosted configuration.
 
 ## Confirmed product decisions
 
@@ -56,6 +75,11 @@ The service must preserve the last known-good catalog and trend index through pr
 avoid leaking post text or secrets, enforce tenant boundaries, and expose enough telemetry to
 diagnose latency, quality, cost, and availability regressions.
 
+Repository completion and hosted deployment are separate gates. Checked-in routes, schedules,
+validation, and documentation may be marked complete from local evidence; Vercel plan upgrades,
+environment-secret changes, managed-service provisioning, DNS changes, production migrations, and
+live smoke tests remain incomplete until an operator performs and verifies those external actions.
+
 ## Critical path
 
 ### P0 — Make trend ingestion operational and safe
@@ -71,15 +95,25 @@ diagnose latency, quality, cost, and availability regressions.
 - [x] Distinguish local credit reservations from provider-reported Tavily usage in operator output.
 - [x] Set the application monthly ceiling to 900 Tavily credits.
 - [x] Change the pulse profile from a six-hour cadence to a four-hour cadence after the safe-failure
-  work is deployed. The expected schedule is approximately 771 basic searches per 30 days, leaving
-  approximately 129 credits for retries under the 900-credit ceiling.
+  work is deployed. The code supports four-hour buckets, but the checked-in Hobby preview schedule
+  currently invokes all profiles once daily and uses approximately 321 searches per 30 days.
 - [x] Add a protected, idempotent cron entry point suitable for Vercel Cron Jobs. It authenticates
   the scheduler, uses deterministic UTC scan buckets, and prevents overlapping executions.
-- [x] Configure the Vercel cron schedule and document its deployment variables, including the
-  Vercel Pro requirement for four-hour schedules.
+- [~] Configure the Vercel cron schedule and document its deployment variables. The current
+  Hobby-compatible schedule runs once daily; production launch requires upgrading to Vercel Pro
+  (or an equivalent scheduler), changing the trend cron to `0 */4 * * *`, and verifying the
+  expected approximately 771 searches leave approximately 129 retry credits under the 900-credit
+  ceiling.
 - [~] Add stale-snapshot monitoring: `/health` returns HTTP 503 with content-free snapshot age
   details when no usable snapshot has been published within the eight-hour window. Configure the
   production uptime monitor to alert on that non-200 response during deployment.
+- [x] Embed active serving trend cards in bounded OpenRouter batches before snapshot publication.
+  Semantic or configured-model changes invalidate stored vectors using durable model-and-document
+  fingerprint metadata, unchanged cards skip recomputation, and embedding failures preserve the
+  previously published PostgreSQL snapshot and Redis pointer.
+- [x] Add bounded hybrid suggestion-time retrieval. Redis lexical matches and pgvector semantic
+  candidates are reranked with lifecycle and vitality signals; semantic queries are restricted to
+  exact card versions in the latest published snapshot and fail open on provider or database error.
 - [ ] Run a real refresh and verify the full path: Tavily discovery, OpenRouter enrichment,
   PostgreSQL cards and observations, embeddings, immutable snapshot, Redis publication, and bounded
   prompt retrieval.
@@ -90,7 +124,7 @@ relevant trend card without adding more than the existing bounded prompt allowan
 
 ### P0 — Harden the agent meme-generation API
 
-- [~] Treat the existing `POST /api/v1/memes/generate` implementation as a vertical slice and audit
+- [x] Treat the existing `POST /api/v1/memes/generate` implementation as a vertical slice and audit
   every dependency for production behavior rather than creating a second endpoint.
 - [x] Preserve the minimal contract:
 
@@ -110,25 +144,25 @@ relevant trend card without adding more than the existing bounded prompt allowan
   inventory of the affected tables, foreign keys, URLs, and rollback plan.
 - [x] Use compact IDs for new agent accounts, API keys, credit-ledger entries, generation records,
   and generated assets.
-- [~] Add API-key authentication for agent routes. The credential service and tenant-scoped
-  persistence are complete; route enforcement is in progress. Store only a one-way hash of each
-  secret; retain a short public key identifier for lookup, display, rotation, and audit.
-- [~] Support credential creation, naming, rotation, revocation, and last-used metadata. The
-  transactional service is complete; operator and dashboard entry points remain.
-- [ ] Enforce tenant-scoped rate limits and credit limits. An install ID must not be accepted as
+- [x] Add API-key authentication for agent routes. Store only a one-way hash of each secret; retain
+  a short public key identifier for lookup, display, rotation, and audit.
+- [x] Support credential creation, naming, rotation, revocation, and last-used metadata through the
+  explicit private-beta operator CLI. Self-service dashboard entry points remain a separate track.
+- [x] Enforce tenant-scoped rate limits and credit limits. An install ID must not be accepted as
   authentication for an external production agent.
-- [~] Add request idempotency so a caller retry cannot create a second charge or duplicate asset.
-  Atomic generation and ledger behavior is complete; route and asset replay are in progress.
-- [ ] Define stable machine-readable errors for invalid input, invalid credentials, insufficient
+- [x] Add request idempotency so a caller retry cannot create a second charge or duplicate asset.
+- [x] Define stable machine-readable errors for invalid input, invalid credentials, insufficient
   credits, rate limiting, provider timeout, `no_fit`, and internal failure.
-- [ ] Return an absolute HTTPS `image_url` using the production API origin.
-- [ ] Keep provider calls, shortlist size, result count, rendering, media reads, and response size
+- [x] Return an absolute HTTPS `image_url` using the production API origin.
+- [x] Keep provider calls, shortlist size, result count, rendering, media reads, and response size
   bounded.
-- [ ] Verify deterministic fallback behavior and define when fallback results are acceptable for
+- [x] Verify deterministic fallback behavior and define when fallback results are acceptable for
   a paid generation.
-- [ ] Add end-to-end tests covering authentication, credit debit, idempotent replay, trend context,
-  model success/failure, rendering, object persistence, and media retrieval.
-- [ ] Add contract tests shared by the FastAPI implementation, TypeScript types, and published docs.
+- [x] Add provider-free end-to-end boundary tests covering authentication, credit debit, idempotent
+  replay, model success/failure, rendering, object persistence, and media retrieval. A live hosted
+  provider smoke remains an external deployment check.
+- [x] Add contract checks shared by the FastAPI implementation, TypeScript types, and published
+  docs.
 
 Done when: a newly issued API key can make an idempotent generation request, receive a finished
 image with a compact public ID, observe one correct credit transaction, and retry without being
@@ -153,7 +187,8 @@ charged or stored twice.
 - [ ] Select and integrate a payment provider only after the ledger and pricing model are reviewed.
 - [ ] Add recharge webhooks with signature verification and idempotent fulfillment.
 - [ ] Add balance, ledger, and usage endpoints for the dashboard.
-- [ ] Add reconciliation and operator adjustment tooling.
+- [x] Add bounded stale-reservation reconciliation and idempotent operator grant tooling. General
+  post-billing adjustments remain part of the future payment workflow.
 
 Done when: accounting remains correct under concurrency and retries, a generation's fully loaded
 cost is measurable, pricing meets the chosen margin target, and a payment retry cannot add credits
@@ -164,17 +199,18 @@ twice.
 - [x] Add a durable generated-asset record containing compact ID, owning account, object key,
   content type, content hash, created time, expiry time, generation ID, and deletion state.
 - [x] Set `expires_at` to 30 days after successful generation.
-- [ ] Prevent cross-tenant asset enumeration and access.
-- [ ] Define cache headers and URL behavior before and after expiry.
-- [~] Add a protected, idempotent cleanup job suitable for Vercel Cron Jobs. The bounded,
-  retry-safe cleanup service is complete; protected routing and scheduling are in progress.
-- [~] Delete expired objects from the correct environment bucket in bounded batches, then record
+- [x] Prevent cross-tenant asset enumeration and access.
+- [x] Define private, no-store cache headers and authenticated URL behavior before and after expiry.
+- [x] Add a protected, idempotent cleanup job suitable for Vercel Cron Jobs. The bounded,
+  retry-safe service is protected by constant-time bearer authentication and a Redis lease.
+- [x] Delete expired objects from the correct environment bucket in bounded batches, then record
   deletion success. Retry failures without losing the durable expiry record.
-- [ ] Ensure idempotent generation does not extend retention unless that behavior is explicitly
+- [x] Ensure idempotent generation does not extend retention unless that behavior is explicitly
   selected and accounted for.
-- [~] Add storage-volume, deletion-lag, and cleanup-failure metrics. Cleanup backlog count and oldest
-  retryable lag are implemented; production metrics export and alerting remain.
-- [ ] Document the 30-day policy in the API docs and privacy policy.
+- [~] Add storage-volume, deletion-lag, and cleanup-failure metrics. The scheduled response exposes
+  bounded cleanup outcomes, backlog count, and oldest retryable lag; production metrics export,
+  storage-volume aggregation, and alerting remain.
+- [x] Document the 30-day policy in the API docs and privacy policy.
 
 Done when: every generated object is attributable to one account and generation, becomes
 unavailable after its documented expiry, and is eventually removed without broad or unsafe bucket
@@ -183,11 +219,12 @@ operations.
 ### P1 — Ship agent documentation and management UI
 
 - [x] Create `apps/landing` route `/docs`.
-- [~] Publish the minimal quickstart first: authentication, one curl request, one TypeScript
+- [x] Publish the minimal quickstart first: authentication, one curl request, one TypeScript
   example, one Python example, response schema, credit behavior, retention, errors, rate limits,
   idempotency, and production base URL.
-- [ ] Generate or validate documentation examples against the shared API contract in CI.
-- [ ] Document timeout and retry guidance for agents.
+- [x] Validate documentation assertions against the implemented API source and shared contract in
+  the landing build and CI.
+- [x] Document timeout and retry guidance for agents.
 - [ ] Keep a versioned changelog and compatibility policy.
 - [ ] Design dashboard authentication and account recovery.
 - [ ] Build dashboard pages for API keys, remaining credits, recharge, usage history, generation
@@ -282,8 +319,8 @@ quality gates, and catalog growth does not regress relevance, readability, safet
   failure; charge a successful deterministic fallback; never recharge a matching replay.
 - [?] Credit package sizes, price, tax treatment, refunds, expiry, and target gross margin.
 - [?] Payment provider and supported countries/currencies.
-- [?] Whether generated image URLs require authenticated access, signed access, or unguessable
-  public access during the 30-day retention window.
+- [x] Generated image URLs require the owning account's Bearer credential throughout the 30-day
+  retention window and return gone after expiry.
 - [?] Whether customers can explicitly delete generated images before expiry.
 - [?] Dashboard authentication provider and account model.
 - [?] Initial public content-safety policy and appeal/takedown process.

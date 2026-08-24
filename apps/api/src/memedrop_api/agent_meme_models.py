@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -31,8 +32,7 @@ class GenerateMemeRequest(AgentMemeModel):
 class GeneratedMeme(AgentMemeModel):
     id: str
     image_url: str
-    alt_text: str
-    caption: str
+    expires_at: datetime
 
 
 class GenerateMemeResponse(AgentMemeModel):

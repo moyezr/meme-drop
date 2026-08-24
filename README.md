@@ -77,6 +77,7 @@ npm test                      # root, API, extension, shared, and tooling tests
 npm run lint                  # Ruff and workspace lint tasks
 npm run build                 # all buildable workspaces
 npm run quality:security      # npm graph and locked Python production dependencies
+npm run quality:deployment-readiness # local-only repository release-candidate proof
 npm run release:dry-run       # CI-safe promotion, security, and extension packaging gates
 ```
 

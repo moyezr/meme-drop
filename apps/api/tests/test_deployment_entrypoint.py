@@ -20,11 +20,12 @@ def test_vercel_uses_automatic_root_entrypoint_detection() -> None:
     assert (project_root / "app.py").is_file()
 
 
-def test_vercel_cron_uses_the_protected_four_hour_trend_refresh_route() -> None:
+def test_vercel_crons_keep_trends_current_and_clean_generated_assets_daily() -> None:
     project_root = Path(__file__).parents[1]
     config = json.loads((project_root / "vercel.json").read_text(encoding="utf-8"))
 
     assert config["$schema"] == "https://openapi.vercel.sh/vercel.json"
     assert config["crons"] == [
-        {"path": "/internal/cron/trends/refresh", "schedule": "0 */4 * * *"}
+        {"path": "/internal/cron/trends/refresh", "schedule": "0 2 * * *"},
+        {"path": "/internal/cron/assets/cleanup", "schedule": "30 3 * * *"},
     ]

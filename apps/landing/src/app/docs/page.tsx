@@ -3,59 +3,86 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Agent API documentation",
   description:
-    "The current MemeDrop agent meme-generation endpoint, request shape, response shape, and production-readiness status.",
-  alternates: {
-    canonical: "/docs/",
-  },
+    "Integrate with MemeDrop's authenticated, idempotent private-beta meme-generation API.",
+  alternates: { canonical: "/docs/" },
 };
 
-const curlExample = `curl --request POST http://localhost:3001/api/v1/memes/generate \\
-  --header "Content-Type: application/json" \\
-  --data '{
-    "input": "We deployed on Friday and immediately broke checkout"
-  }'`;
+const apiOrigin = "https://memedropapi.moyezrabbani.dev";
 
-const typeScriptExample = `const response = await fetch(
-  "http://localhost:3001/api/v1/memes/generate",
+const curlExample = [
+  "curl --request POST " + apiOrigin + "/api/v1/memes/generate \\",
+  '  --header "Authorization: Bearer $MEMEDROP_API_KEY" \\',
+  '  --header "Idempotency-Key: reply-20260824-001" \\',
+  '  --header "Content-Type: application/json" \\',
+  "  --data '{",
+  '    "input": "We deployed on Friday and immediately broke checkout"',
+  "  }'",
+].join("\n");
+
+const mediaExample = [
+  "curl --output meme.webp \\",
+  '  --header "Authorization: Bearer $MEMEDROP_API_KEY" \\',
+  '  "' + apiOrigin + '/api/v1/memes/assets/asset_23456789ABCDEFGHJKLMNP"',
+].join("\n");
+
+const typeScriptExample = [
+  "const idempotencyKey = crypto.randomUUID();",
+  'const response = await fetch("' + apiOrigin + '/api/v1/memes/generate", {',
+  '  method: "POST",',
+  "  headers: {",
+  '    Authorization: "Bearer " + process.env.MEMEDROP_API_KEY,',
+  '    "Idempotency-Key": idempotencyKey,',
+  '    "Content-Type": "application/json",',
+  "  },",
+  "  body: JSON.stringify({",
+  '    input: "We deployed on Friday and immediately broke checkout",',
+  '    options: { direction: "dry and self-aware", count: 1 },',
+  "  }),",
+  "  signal: AbortSignal.timeout(30_000),",
+  "});",
+  "",
+  "const result = await response.json();",
+  'if (response.ok && result.status === "ok") {',
+  "  console.log(result.memes[0].image_url);",
+  "}",
+].join("\n");
+
+const pythonExample = [
+  "import os",
+  "import uuid",
+  "import requests",
+  "",
+  "response = requests.post(",
+  '    "' + apiOrigin + '/api/v1/memes/generate",',
+  "    headers={",
+  '        "Authorization": f"Bearer {os.environ[\'MEMEDROP_API_KEY\']}",',
+  '        "Idempotency-Key": str(uuid.uuid4()),',
+  "    },",
+  '    json={"input": "We deployed on Friday and immediately broke checkout"},',
+  "    timeout=30,",
+  ")",
+  "result = response.json()",
+  "",
+  'if response.ok and result["status"] == "ok":',
+  '    print(result["memes"][0]["image_url"])',
+].join("\n");
+
+const responseExample = JSON.stringify(
   {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      input: "We deployed on Friday and immediately broke checkout",
-      options: { direction: "dry and self-aware", count: 1 },
-    }),
+    status: "ok",
+    memes: [
+      {
+        id: "asset_23456789ABCDEFGHJKLMNP",
+        image_url: apiOrigin + "/api/v1/memes/assets/asset_23456789ABCDEFGHJKLMNP",
+        expires_at: "2026-09-23T12:00:00Z",
+      },
+    ],
   },
+  null,
+  2,
 );
 
-const result = await response.json();
-if (result.status === "ok") {
-  console.log(result.memes[0].image_url);
-}`;
-
-const pythonExample = `import requests
-
-response = requests.post(
-    "http://localhost:3001/api/v1/memes/generate",
-    json={"input": "We deployed on Friday and immediately broke checkout"},
-    timeout=30,
-)
-response.raise_for_status()
-result = response.json()
-
-if result["status"] == "ok":
-    print(result["memes"][0]["image_url"])`;
-
-const responseExample = `{
-  "status": "ok",
-  "memes": [
-    {
-      "id": "meme_0d42…",
-      "image_url": "/memes/generated/agents/0d42….webp",
-      "alt_text": "Personalized meme",
-      "caption": "THE PLAN / ANOTHER TIMEZONE BUG"
-    }
-  ]
-}`;
+const errorExample = JSON.stringify({ error: { code: "insufficient_credits" } }, null, 2);
 
 export default function AgentDocsPage() {
   return (
@@ -77,45 +104,71 @@ export default function AgentDocsPage() {
       <header>
         <h1>Agent API</h1>
         <p className="pageIntro">
-          Generate a ready-to-use meme from one piece of context. The current endpoint accepts a
-          small JSON body and returns either finished meme data or a stable no-fit result.
+          Give MemeDrop one piece of context and get a finished, captioned meme. The
+          private-beta API uses a small authenticated request, one-charge idempotency,
+          and durable media that expires after 30 days.
         </p>
       </header>
 
-      <aside className="notice" aria-label="Pre-production status">
+      <aside className="notice" aria-label="Private beta access">
         <p>
-          <strong>Pre-production contract.</strong> The endpoint below exists in the current API,
-          but public API-key access, credit billing, idempotency keys, 30-day asset expiry, and
-          absolute production image URLs are still being implemented. Do not build a production
-          integration against the planned origin yet.
+          <strong>Private beta.</strong> Credentials and starting credits are issued by
+          a MemeDrop operator to approved agent developers. There is no public sign-up,
+          payment flow, or self-service key dashboard yet. Keep the issued Bearer
+          credential in a secret manager; its plaintext value cannot be retrieved later.
         </p>
       </aside>
 
       <section aria-labelledby="quickstart">
         <h2 id="quickstart">Quickstart</h2>
         <p>
-          Run the API locally, then send the source text your agent wants to react to. The only
-          required field is <code className="inlineCode">input</code>.
+          The production base URL is <code className="inlineCode">{apiOrigin}</code>.
+          Only <code className="inlineCode">input</code> is required in the JSON body;
+          authentication and an idempotency key are required headers.
         </p>
         <pre className="codeBlock"><code>{curlExample}</code></pre>
         <p>
-          A successful response has <code className="inlineCode">status: "ok"</code>. When no
-          suitable, renderable meme is available, it has{" "}
-          <code className="inlineCode">status: "no_fit"</code> and an empty{" "}
+          A success has <code className="inlineCode">status: &quot;ok&quot;</code>.
+          When no verified template can be rendered, the API returns HTTP 200 with{" "}
+          <code className="inlineCode">status: &quot;no_fit&quot;</code> and an empty{" "}
           <code className="inlineCode">memes</code> array.
         </p>
       </section>
 
       <section aria-labelledby="request">
-        <h2 id="request">Request</h2>
+        <h2 id="request">Request contract</h2>
         <p>
-          <code className="inlineCode">POST /api/v1/memes/generate</code> with{" "}
-          <code className="inlineCode">Content-Type: application/json</code>.
+          Send <code className="inlineCode">POST /api/v1/memes/generate</code> with:
         </p>
         <table className="contractTable">
           <thead>
+            <tr><th scope="col">Header</th><th scope="col">Rules</th></tr>
+          </thead>
+          <tbody>
             <tr>
-              <th scope="col">Field</th>
+              <td><code className="inlineCode">Authorization</code></td>
+              <td>
+                Required. <code className="inlineCode">Bearer &lt;issued credential&gt;</code>.
+                Legacy install IDs are not agent authentication.
+              </td>
+            </tr>
+            <tr>
+              <td><code className="inlineCode">Idempotency-Key</code></td>
+              <td>
+                Required. 1–200 visible, non-whitespace characters. Use a new value for
+                each intended generation and preserve it for retries of that exact body.
+              </td>
+            </tr>
+            <tr>
+              <td><code className="inlineCode">Content-Type</code></td>
+              <td>Required. <code className="inlineCode">application/json</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+        <table className="contractTable">
+          <thead>
+            <tr>
+              <th scope="col">JSON field</th>
               <th scope="col">Type</th>
               <th scope="col">Rules</th>
             </tr>
@@ -139,49 +192,166 @@ export default function AgentDocsPage() {
           </tbody>
         </table>
         <p>
-          Unknown fields are rejected. Keep the source text canonical: direction is only a
-          creative preference and does not override template, safety, placement, or length
+          Unknown fields are rejected. The source input remains canonical; creative
+          direction cannot override catalog, safety, placement, or caption-length
           constraints.
         </p>
       </section>
 
       <section aria-labelledby="response">
-        <h2 id="response">Response</h2>
+        <h2 id="response">Response and media</h2>
         <pre className="codeBlock"><code>{responseExample}</code></pre>
         <table className="contractTable">
           <thead>
-            <tr>
-              <th scope="col">Field</th>
-              <th scope="col">Meaning</th>
-            </tr>
+            <tr><th scope="col">Field</th><th scope="col">Meaning</th></tr>
           </thead>
           <tbody>
             <tr>
               <td><code className="inlineCode">status</code></td>
-              <td><code className="inlineCode">"ok"</code> or <code className="inlineCode">"no_fit"</code>.</td>
+              <td>
+                <code className="inlineCode">&quot;ok&quot;</code> or{" "}
+                <code className="inlineCode">&quot;no_fit&quot;</code>.
+              </td>
             </tr>
             <tr>
               <td><code className="inlineCode">memes</code></td>
-              <td>A bounded array of generated memes; empty for <code className="inlineCode">"no_fit"</code>.</td>
+              <td>A bounded array of 1–5 assets, or an empty array for no-fit.</td>
             </tr>
             <tr>
               <td><code className="inlineCode">memes[].id</code></td>
-              <td>The generated meme identifier. Its current format is provisional.</td>
+              <td>
+                A compact opaque asset ID beginning with{" "}
+                <code className="inlineCode">asset_</code>.
+              </td>
             </tr>
             <tr>
               <td><code className="inlineCode">memes[].image_url</code></td>
-              <td>A rendered-image URL. It is currently relative; production will return an absolute HTTPS URL.</td>
+              <td>An absolute HTTPS URL on the MemeDrop API origin.</td>
             </tr>
             <tr>
-              <td><code className="inlineCode">memes[].alt_text</code></td>
-              <td>Short accessible description for the rendered meme.</td>
-            </tr>
-            <tr>
-              <td><code className="inlineCode">memes[].caption</code></td>
-              <td>Flattened caption text in the template’s region order.</td>
+              <td><code className="inlineCode">memes[].expires_at</code></td>
+              <td>The asset&apos;s 30-day expiry timestamp.</td>
             </tr>
           </tbody>
         </table>
+        <p>
+          Media is private. Fetch <code className="inlineCode">image_url</code> with
+          the same account&apos;s Bearer credential; generic object paths do not serve
+          generated agent images.
+        </p>
+        <pre className="codeBlock"><code>{mediaExample}</code></pre>
+      </section>
+
+      <section aria-labelledby="credits">
+        <h2 id="credits">Credits and idempotent replay</h2>
+        <ul>
+          <li>
+            A new generation reserves one credit. It commits only after at least one
+            rendered asset and its durable record are stored successfully.
+          </li>
+          <li>
+            No-fit, provider, rendering, storage, cancellation, and persistence
+            failures release the reservation. A successful request costs one credit
+            even when it returns multiple requested assets.
+          </li>
+          <li>
+            Repeating the same body and{" "}
+            <code className="inlineCode">Idempotency-Key</code> returns the existing
+            terminal result without generating or charging again. Reusing that key
+            with a different body returns{" "}
+            <code className="inlineCode">idempotency_conflict</code>.
+          </li>
+          <li>
+            A replay while work is active returns{" "}
+            <code className="inlineCode">idempotency_in_progress</code>. A successful
+            replay after its media expires returns{" "}
+            <code className="inlineCode">asset_expired</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="errors">
+        <h2 id="errors">Stable errors</h2>
+        <p>Machine errors use this JSON envelope:</p>
+        <pre className="codeBlock"><code>{errorExample}</code></pre>
+        <table className="contractTable">
+          <thead>
+            <tr><th scope="col">HTTP</th><th scope="col">Codes</th><th scope="col">Action</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>400</td>
+              <td><code className="inlineCode">invalid_input</code></td>
+              <td>Correct the headers or body; do not retry unchanged.</td>
+            </tr>
+            <tr>
+              <td>401</td>
+              <td>
+                <code className="inlineCode">authentication_failed</code>,{" "}
+                <code className="inlineCode">install_auth_not_supported</code>
+              </td>
+              <td>Use a valid operator-issued Bearer credential.</td>
+            </tr>
+            <tr>
+              <td>402</td>
+              <td><code className="inlineCode">insufficient_credits</code></td>
+              <td>Ask the private-beta operator to grant more credits.</td>
+            </tr>
+            <tr>
+              <td>409</td>
+              <td>
+                <code className="inlineCode">idempotency_conflict</code>,{" "}
+                <code className="inlineCode">idempotency_in_progress</code>
+              </td>
+              <td>Fix a conflict, or briefly wait and poll the in-progress request.</td>
+            </tr>
+            <tr>
+              <td>429</td>
+              <td><code className="inlineCode">rate_limited</code></td>
+              <td>Back off with jitter before retrying the same request and key.</td>
+            </tr>
+            <tr>
+              <td>500</td>
+              <td>
+                <code className="inlineCode">render_failure</code>,{" "}
+                <code className="inlineCode">storage_failure</code>,{" "}
+                <code className="inlineCode">asset_persistence_failure</code>,{" "}
+                <code className="inlineCode">internal_failure</code>
+              </td>
+              <td>The credit is released. The same key replays the terminal error.</td>
+            </tr>
+            <tr>
+              <td>504</td>
+              <td><code className="inlineCode">provider_timeout</code></td>
+              <td>The credit is released. Back off; a new attempt requires a new key.</td>
+            </tr>
+            <tr>
+              <td>404 / 410</td>
+              <td>
+                <code className="inlineCode">asset_not_found</code>,{" "}
+                <code className="inlineCode">asset_expired</code>
+              </td>
+              <td>Stop fetching that media URL.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section aria-labelledby="retries">
+        <h2 id="retries">Timeouts, rate limits, and retries</h2>
+        <p>
+          Use a client timeout of at least 30 seconds. If the connection outcome is
+          unknown, retry the exact validated body with the same idempotency key. This
+          recovers a completed response without a second charge. Do not create a new key
+          merely because a client timed out.
+        </p>
+        <p>
+          For <code className="inlineCode">idempotency_in_progress</code> or{" "}
+          <code className="inlineCode">rate_limited</code>, use bounded exponential
+          backoff with jitter and keep the same key. A terminal provider or generation
+          failure is replayed under its original key; use a new key only when you
+          intentionally want a new generation attempt.
+        </p>
       </section>
 
       <section aria-labelledby="examples">
@@ -192,44 +362,8 @@ export default function AgentDocsPage() {
         <pre className="codeBlock"><code>{pythonExample}</code></pre>
       </section>
 
-      <section aria-labelledby="current-behavior">
-        <h2 id="current-behavior">Current behavior and limits</h2>
-        <ul>
-          <li>The route can return at most five rendered memes per request.</li>
-          <li>
-            In the current local/default configuration, it does not require an API key. When the
-            legacy install-ID switch is enabled, it requires an{" "}
-            <code className="inlineCode">x-memedrop-install-id</code> UUID header. That header is
-            not the planned external-agent authentication mechanism.
-          </li>
-          <li>
-            Current input validation failures return HTTP 400. A complete, versioned machine-error
-            contract is not published yet.
-          </li>
-          <li>
-            Requests are rate limited by the API runtime. Per-agent limits and retry-safe
-            idempotency are still in development, so clients should not retry blindly.
-          </li>
-          <li>
-            The production API will be hosted at{" "}
-            <code className="inlineCode">https://memedropapi.moyezrabbani.dev</code>; it is a
-            planned base URL, not a current public integration target.
-          </li>
-        </ul>
-      </section>
-
-      <section aria-labelledby="planned-contract">
-        <h2 id="planned-contract">What will change before public launch</h2>
-        <p>
-          The public release will add API-key issuance and rotation, tenant-scoped limits, compact
-          public IDs, one-charge idempotent retries, documented credit behavior, stable errors,
-          absolute HTTPS asset URLs, and a 30-day generated-image lifecycle. This page will be
-          updated and versioned when those behaviors are live and contract-tested.
-        </p>
-      </section>
-
       <footer className="contentFooter">
-        Questions about the current integration surface? Contact{" "}
+        To request private-beta access or operator support, contact{" "}
         <a href="mailto:moyezrabbani.work@gmail.com">moyezrabbani.work@gmail.com</a>.
       </footer>
     </main>

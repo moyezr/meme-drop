@@ -16,7 +16,9 @@ from memedrop_api.services.generated_asset_retention import (
     DEFAULT_CLAIM_TIMEOUT,
     ClaimedGeneratedAsset,
     GeneratedAssetCleanupMetrics,
+    GeneratedAssetMaintenanceService,
     GeneratedAssetRetentionService,
+    StaleGenerationReconciliationFailure,
 )
 
 
@@ -62,6 +64,19 @@ class RecordingStorage:
         return True
 
 
+class FakeStaleGenerationReconciler:
+    def __init__(self, reconciled: int = 0, error: Exception | None = None) -> None:
+        self.reconciled = reconciled
+        self.error = error
+        self.calls = 0
+
+    async def reconcile_stale_generations(self) -> int:
+        self.calls += 1
+        if self.error is not None:
+            raise self.error
+        return self.reconciled
+
+
 def _claim(
     *,
     asset_id: str = "asset_one",
@@ -82,6 +97,8 @@ async def test_cleanup_deletes_only_claimed_exact_keys_and_reports_content_free_
         metrics=GeneratedAssetCleanupMetrics(
             retryable_expired_assets=3,
             oldest_retryable_expiry=_now() - timedelta(minutes=2, seconds=4),
+            blocked_expired_assets=2,
+            oldest_blocked_expiry=_now() - timedelta(minutes=7),
         ),
     )
     storage = RecordingStorage()
@@ -100,6 +117,8 @@ async def test_cleanup_deletes_only_claimed_exact_keys_and_reports_content_free_
     assert report.failed == 0
     assert report.remaining_retryable_assets == 3
     assert report.oldest_retryable_lag_seconds == 124
+    assert report.blocked_expired_assets == 2
+    assert report.oldest_blocked_lag_seconds == 420
     assert repository.claim_calls == [
         {
             "as_of": _now(),
@@ -108,6 +127,37 @@ async def test_cleanup_deletes_only_claimed_exact_keys_and_reports_content_free_
             "claim_timeout": DEFAULT_CLAIM_TIMEOUT,
         }
     ]
+
+
+async def test_maintenance_combines_retention_and_bounded_stale_credit_reconciliation() -> None:
+    repository = FakeRetentionRepository(
+        claims=[],
+        metrics=GeneratedAssetCleanupMetrics(0, None),
+    )
+    reconciliation = FakeStaleGenerationReconciler(reconciled=3)
+    maintenance = GeneratedAssetMaintenanceService(
+        GeneratedAssetRetentionService(repository, RecordingStorage(), now=_now),
+        reconciliation,
+    )
+
+    report = await maintenance.cleanup_expired_assets()
+
+    assert report.stale_generations_reconciled == 3
+    assert reconciliation.calls == 1
+
+
+async def test_maintenance_preserves_a_safe_stale_reconciliation_failure_category() -> None:
+    repository = FakeRetentionRepository(
+        claims=[],
+        metrics=GeneratedAssetCleanupMetrics(0, None),
+    )
+    maintenance = GeneratedAssetMaintenanceService(
+        GeneratedAssetRetentionService(repository, RecordingStorage(), now=_now),
+        FakeStaleGenerationReconciler(error=OSError("database unavailable")),
+    )
+
+    with pytest.raises(StaleGenerationReconciliationFailure):
+        await maintenance.cleanup_expired_assets()
 
 
 async def test_cleanup_marks_invalid_persisted_key_as_non_retryable_without_storage_call() -> None:
@@ -219,7 +269,7 @@ def test_claim_query_skips_fresh_pending_and_reclaims_stale_pending_under_attemp
     assert "generated_assets.last_deletion_attempt_at <= '2026-08-24 11:45:00+00:00'" in sql
 
 
-def test_cleanup_metrics_include_only_stale_retryable_pending_assets() -> None:
+def test_cleanup_metrics_separate_retryable_and_blocked_expired_assets() -> None:
     statement = _cleanup_metrics_statement(
         as_of=_now(),
         max_deletion_attempts=5,
@@ -232,11 +282,33 @@ def test_cleanup_metrics_include_only_stale_retryable_pending_assets() -> None:
         )
     )
 
-    assert "count(generated_assets.id)" in sql
-    assert "min(generated_assets.expires_at)" in sql
+    assert sql.count("count(generated_assets.id) FILTER") == 2
+    assert sql.count("min(generated_assets.expires_at) FILTER") == 2
     assert "generated_assets.deletion_state = 'pending'" in sql
     assert "generated_assets.deletion_attempts < 5" in sql
     assert "generated_assets.last_deletion_attempt_at <= '2026-08-24 11:45:00+00:00'" in sql
+    assert "generated_assets.deletion_attempts >= 5" in sql
+    assert "generated_assets.deletion_error_code IN ('invalid_object_key')" in sql
+    assert "generated_assets.deletion_state IN ('active', 'failed')" in sql
+
+
+def test_claim_query_never_reclaims_stale_pending_at_max_attempts() -> None:
+    statement = _claim_expired_assets_statement(
+        as_of=_now(),
+        batch_size=10,
+        max_deletion_attempts=5,
+        claim_timeout=timedelta(minutes=15),
+    )
+    sql = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+
+    pending_branch = sql[sql.index("generated_assets.deletion_state = 'pending'") :]
+    assert "generated_assets.deletion_attempts < 5" in pending_branch
+    assert "generated_assets.deletion_attempts >= 5" not in pending_branch
 
 
 async def test_unexpected_storage_programming_errors_remain_visible() -> None:

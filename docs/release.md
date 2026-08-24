@@ -11,13 +11,27 @@ From a clean checkout:
 ```sh
 npm ci
 uv sync --project apps/api --frozen
-npm run release:dry-run
-npm run quality:backend-image
+MEMEDROP_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedrop_readiness \
+MEMEDROP_TEST_REDIS_URL=redis://localhost:6379/0 \
+  npm run quality:deployment-readiness
 ```
 
-CI runs the same release dry-run and Docker smoke. `quality:security` permits only the exact,
-time-limited dependency risks described in `QUALITY.md`; review them again before their 2026-09-01
-expiry.
+`quality:deployment-readiness` is the single repository-owned release-candidate gate. It accepts
+only loopback PostgreSQL and Redis test URLs, requires a disposable database name containing
+`test`, `integration`, or `readiness`, suppresses product-provider and storage credentials,
+and composes static analysis, deterministic tests, all workspace builds, the built API smoke, the
+blocking benchmark, suggestion, rendering, and dataset-plan tuning gates, the full Alembic and
+data-service integration gate, the backend image smoke, and locked dependency security audits. The
+static build is reused by the API process smoke instead of rebuilding it.
+
+This command does not provision infrastructure, call Tavily or OpenRouter, validate production
+secrets, deploy, inspect hosted services, or validate extension-store metadata. `release:candidate`
+remains the operator-facing packaging and final production-configuration gate; `launch:status`
+tracks hosted, legal, domain, and store-launch inputs. CI runs the deterministic constituent gates
+in parallel jobs and provides a fresh empty pgvector database for the integration job.
+
+`quality:security` permits only the exact, time-limited dependency risks described in `QUALITY.md`;
+review them again before their 2026-09-01 expiry.
 
 ## 2. Supabase
 

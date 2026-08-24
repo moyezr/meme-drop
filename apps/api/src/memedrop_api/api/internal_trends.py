@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import hmac
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Protocol
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from redis.exceptions import RedisError
 
 from memedrop_api.config import Settings
+from memedrop_api.services.trend_cron import CronLock, is_authorized_cron_request
 from memedrop_api.services.trend_runtime import (
     TrendRefreshConfigurationError,
     TrendRefreshFailed,
@@ -21,26 +20,9 @@ from memedrop_api.services.trend_runtime import (
 LOGGER = logging.getLogger("memedrop.api.internal_trends")
 
 
-class TrendRefreshLock(Protocol):
-    async def acquire(self) -> str | None: ...
-
-    async def release(self, token: str) -> bool: ...
-
-
 TrendRefreshRunner = Callable[[Settings], Awaitable[TrendRefreshReport]]
 
 router = APIRouter(tags=["internal"])
-
-
-def is_authorized_cron_request(authorization: str | None, expected_secret: str | None) -> bool:
-    """Validate Vercel's bearer token without exposing comparison timing."""
-
-    if not authorization or not expected_secret:
-        return False
-    scheme, separator, token = authorization.partition(" ")
-    return bool(separator) and scheme.casefold() == "bearer" and hmac.compare_digest(
-        token, expected_secret
-    )
 
 
 @router.get("/internal/cron/trends/refresh", include_in_schema=False)
@@ -58,7 +40,7 @@ async def scheduled_trend_refresh(request: Request) -> JSONResponse:
             content={"status": "unavailable", "reason": "trends_disabled"},
         )
 
-    lock: TrendRefreshLock | None = request.app.state.trend_refresh_lock
+    lock: CronLock | None = request.app.state.trend_refresh_lock
     runner: TrendRefreshRunner = request.app.state.trend_refresh_runner
     if lock is None:
         return JSONResponse(

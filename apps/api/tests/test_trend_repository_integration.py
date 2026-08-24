@@ -15,6 +15,7 @@ from memedrop_api.db import (
     TrendObservationRecord,
     TrendSnapshotRecord,
 )
+from memedrop_api.services.trend_embeddings import trend_card_embedding_fingerprint
 from memedrop_api.trend_repository import SqlAlchemyTrendRepository
 from memedrop_api.trends import (
     TrendCard,
@@ -58,9 +59,109 @@ async def test_trend_repository_is_idempotent_and_snapshots_are_repeatable(
         query_fingerprint="b" * 64,
     )
     try:
-        stored = await repository.upsert_card(card, embedding=[1.0] + [0.0] * 1_535)
-        unchanged = await repository.upsert_card(card, embedding=[1.0] + [0.0] * 1_535)
+        fingerprint = trend_card_embedding_fingerprint(card)
+        stored = await repository.upsert_card(
+            card,
+            embedding=[1.0] + [0.0] * 1_535,
+            embedding_model="google/gemini-embedding-2",
+            embedding_fingerprint=fingerprint,
+        )
+        unchanged = await repository.upsert_card(
+            card,
+            embedding=[1.0] + [0.0] * 1_535,
+            embedding_model="google/gemini-embedding-2",
+            embedding_fingerprint=fingerprint,
+        )
         assert stored.version == unchanged.version == 1
+        assert await repository.list_stale_embedding_ids(
+            {card.id: fingerprint}, model="google/gemini-embedding-2"
+        ) == set()
+        assert await repository.list_stale_embedding_ids(
+            {card.id: fingerprint}, model="provider/new-embedding-space"
+        ) == {card.id}
+
+        await repository.upsert_card(card.model_copy(update={"momentum": 0.1}))
+        assert await repository.list_stale_embedding_ids(
+            {card.id: fingerprint}, model="google/gemini-embedding-2"
+        ) == set()
+
+        semantic_change = card.model_copy(
+            update={"premise": "A changed premise requires a fresh semantic vector."}
+        )
+        semantic_stored = await repository.upsert_card(semantic_change)
+        changed_fingerprint = trend_card_embedding_fingerprint(semantic_change)
+        assert await repository.list_stale_embedding_ids(
+            {card.id: changed_fingerprint}, model="google/gemini-embedding-2"
+        ) == {card.id}
+        assert (
+            await repository.store_card_embeddings(
+                [
+                    (
+                        card.id,
+                        [0.5] + [0.0] * 1_535,
+                        changed_fingerprint,
+                        semantic_stored.version,
+                    )
+                ],
+                model="google/gemini-embedding-2",
+            )
+            == 1
+        )
+        assert (
+            await repository.store_card_embeddings(
+                [
+                    (
+                        card.id,
+                        [0.5] + [0.0] * 1_535,
+                        changed_fingerprint,
+                        semantic_stored.version,
+                    )
+                ],
+                model="google/gemini-embedding-2",
+            )
+            == 0
+        )
+        assert await repository.list_stale_embedding_ids(
+            {card.id: changed_fingerprint}, model="google/gemini-embedding-2"
+        ) == set()
+
+        raced_card = semantic_change.model_copy(
+            update={"premise": "A concurrent semantic change wins the race."}
+        )
+        raced_stored = await repository.upsert_card(raced_card)
+        assert raced_stored.version > semantic_stored.version
+        assert (
+            await repository.store_card_embeddings(
+                [
+                    (
+                        card.id,
+                        [0.25] + [0.0] * 1_535,
+                        changed_fingerprint,
+                        semantic_stored.version,
+                    )
+                ],
+                model="google/gemini-embedding-2",
+            )
+            == 0
+        )
+        assert await repository.list_stale_embedding_ids(
+            {card.id: trend_card_embedding_fingerprint(raced_card)},
+            model="google/gemini-embedding-2",
+        ) == {card.id}
+        assert (
+            await repository.store_card_embeddings(
+                [
+                    (
+                        card.id,
+                        [1.0] + [0.0] * 1_535,
+                        trend_card_embedding_fingerprint(raced_card),
+                        raced_stored.version,
+                    )
+                ],
+                model="google/gemini-embedding-2",
+            )
+            == 1
+        )
 
         first = await repository.record_observation(first_observation)
         replay = await repository.record_observation(first_observation)
@@ -73,10 +174,35 @@ async def test_trend_repository_is_idempotent_and_snapshots_are_repeatable(
 
         matches = await repository.search_active_by_embedding(
             [1.0] + [0.0] * 1_535,
+            model="google/gemini-embedding-2",
+            eligible_card_versions={card.id: raced_stored.version},
             as_of=NOW,
             limit=5,
         )
         assert card.id in {match.card.id for match in matches}
+        assert await repository.search_active_by_embedding(
+            [1.0] + [0.0] * 1_535,
+            model="google/gemini-embedding-2",
+            eligible_card_versions={card.id: semantic_stored.version},
+            as_of=NOW,
+            limit=5,
+        ) == []
+        assert await repository.search_active_by_embedding(
+            [1.0] + [0.0] * 1_535,
+            model="provider/different-embedding-space",
+            eligible_card_versions={card.id: raced_stored.version},
+            as_of=NOW,
+            limit=5,
+        ) == []
+        assert await repository.search_active_by_embedding(
+            [1.0] + [0.0] * 1_535,
+            model="google/gemini-embedding-2",
+            eligible_card_versions={
+                trend_id_for_key("not-in-published-snapshot"): 1
+            },
+            as_of=NOW,
+            limit=5,
+        ) == []
 
         staged_snapshot = await repository.stage_snapshot([stored], created_at=NOW)
         assert staged_snapshot.published_at is None
@@ -95,9 +221,7 @@ async def test_trend_repository_is_idempotent_and_snapshots_are_repeatable(
         async with database.session() as session, session.begin():
             await session.execute(delete(TrendSnapshotRecord))
             await session.execute(
-                delete(TrendObservationRecord).where(
-                    TrendObservationRecord.trend_id == card.id
-                )
+                delete(TrendObservationRecord).where(TrendObservationRecord.trend_id == card.id)
             )
             await session.execute(delete(TrendCardRecord).where(TrendCardRecord.id == card.id))
 

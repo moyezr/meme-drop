@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "contract-check": "node scripts/check-agent-contract.mjs",
+    "build": "npm run contract-check && next build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
