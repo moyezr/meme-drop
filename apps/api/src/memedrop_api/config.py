@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlparse
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_ALLOWED_ORIGINS = (
@@ -18,6 +18,7 @@ DEFAULT_STORAGE_PATH = Path("/tmp/memedrop-storage")
 DEFAULT_DOWNLOAD_PATH = Path("/tmp/memedrop-downloads")
 DEVELOPMENT_BUCKET = "meme-drop-dev"
 PRODUCTION_BUCKET = "meme-drop-prod"
+CronSecret = Annotated[str, StringConstraints(strip_whitespace=True, min_length=16, max_length=512)]
 
 
 class Settings(BaseSettings):
@@ -98,6 +99,24 @@ class Settings(BaseSettings):
         validation_alias="MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS",
         ge=0,
         le=60,
+    )
+    trend_cron_secret: CronSecret | None = Field(
+        default=None,
+        validation_alias=AliasChoices("CRON_SECRET", "MEMEDROP_TREND_CRON_SECRET"),
+        exclude=True,
+        repr=False,
+    )
+    trend_refresh_lock_ttl_seconds: int = Field(
+        default=3_600,
+        validation_alias="MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS",
+        ge=60,
+        le=3_600,
+    )
+    trend_snapshot_max_age_seconds: int = Field(
+        default=28_800,
+        validation_alias="MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS",
+        ge=3_600,
+        le=86_400,
     )
     api_rate_limit_window_ms: int = Field(
         default=60_000, validation_alias="MEMEDROP_RATE_LIMIT_WINDOW_MS", gt=0
@@ -250,4 +269,17 @@ class Settings(BaseSettings):
                 raise ValueError("MEMEDROP_STORAGE_BACKEND must be s3 in production")
             if self.rate_limit_store != "redis":
                 raise ValueError("MEMEDROP_RATE_LIMIT_STORE must be redis in production")
+            if self.trends_enabled:
+                missing_trend_settings = [
+                    name
+                    for name, value in (
+                        ("TAVILY_API_KEY", self.tavily_api_key),
+                        ("CRON_SECRET", self.trend_cron_secret),
+                    )
+                    if not value
+                ]
+                if missing_trend_settings:
+                    raise ValueError(
+                        "production trend refresh requires " + ", ".join(missing_trend_settings)
+                    )
         return self

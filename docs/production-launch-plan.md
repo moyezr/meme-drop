@@ -70,11 +70,13 @@ diagnose latency, quality, cost, and availability regressions.
 - [x] Change the pulse profile from a six-hour cadence to a four-hour cadence after the safe-failure
   work is deployed. The expected schedule is approximately 771 basic searches per 30 days, leaving
   approximately 129 credits for retries under the 900-credit ceiling.
-- [ ] Add a protected, idempotent cron entry point suitable for Vercel Cron Jobs. It must authenticate
-  the scheduler, use deterministic UTC scan buckets, and prevent overlapping executions.
-- [ ] Configure the Vercel cron schedule and document its deployment variables.
-- [ ] Add stale-snapshot monitoring and an alert when no usable trend snapshot has been published
-  within the expected window.
+- [x] Add a protected, idempotent cron entry point suitable for Vercel Cron Jobs. It authenticates
+  the scheduler, uses deterministic UTC scan buckets, and prevents overlapping executions.
+- [x] Configure the Vercel cron schedule and document its deployment variables, including the
+  Vercel Pro requirement for four-hour schedules.
+- [~] Add stale-snapshot monitoring: `/health` returns HTTP 503 with content-free snapshot age
+  details when no usable snapshot has been published within the eight-hour window. Configure the
+  production uptime monitor to alert on that non-200 response during deployment.
 - [ ] Run a real refresh and verify the full path: Tavily discovery, OpenRouter enrichment,
   PostgreSQL cards and observations, embeddings, immutable snapshot, Redis publication, and bounded
   prompt retrieval.

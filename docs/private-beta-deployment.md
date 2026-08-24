@@ -101,6 +101,14 @@ OPENROUTER_APP_NAME=MemeDrop
 OPENROUTER_SUGGESTION_MODEL=google/gemini-3.7-flash
 OPENROUTER_CAPTION_MODEL=google/gemini-3.7-flash
 OPENROUTER_AUTO_TAG_MODEL=google/gemini-3.7-flash
+OPENROUTER_TREND_MODEL=google/gemini-3.7-flash
+
+# Enable only after the Redis serving index and the Vercel Cron secret are configured.
+MEMEDROP_TRENDS_ENABLED=true
+TAVILY_API_KEY=<tavily-key>
+CRON_SECRET=<long-random-secret>
+MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS=3600
+MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS=28800
 
 MEMEDROP_CORS_ORIGINS=chrome-extension://<final-extension-id>
 MEMEDROP_RATE_LIMIT_STORE=redis
@@ -127,6 +135,13 @@ The API also recognizes Vercel's system-provided `VERCEL_ENV=production` when `M
 absent, but setting `MEMEDROP_ENV=production` explicitly keeps local preflight and hosted runtime
 configuration identical. Ensure **Automatically expose System Environment Variables** remains
 enabled in the Vercel project.
+
+When `MEMEDROP_TRENDS_ENABLED=true`, set the same `CRON_SECRET` in the API project and rely on the
+checked-in `apps/api/vercel.json` schedule. Vercel calls the protected endpoint with a bearer token
+and schedules in UTC. The configured four-hour cadence requires Vercel Pro; Vercel Hobby supports
+daily schedules only, so use Pro or an equivalent external scheduler. Monitor `GET /health` and
+alert on HTTP 503: trend-enabled health checks become 503 when the latest published trend snapshot
+is missing, empty, or older than eight hours by default.
 
 With those variables loaded into an operator shell:
 

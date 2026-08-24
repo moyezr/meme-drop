@@ -11,7 +11,7 @@ from memedrop_api.config import (
 
 
 def test_development_defaults_are_safe_and_usable() -> None:
-    settings = Settings(database_url="postgresql://localhost/memedrop")
+    settings = Settings(database_url="postgresql://localhost/memedrop", _env_file=None)
 
     assert settings.is_production is False
     assert settings.port == 3001
@@ -31,6 +31,7 @@ def test_legacy_shared_model_variable_is_rejected() -> None:
         Settings(
             database_url="postgresql://localhost/memedrop",
             legacy_openrouter_meme_model="old-shared-model",
+            _env_file=None,
         )
 
 
@@ -84,6 +85,7 @@ def test_configuration_errors_do_not_echo_secret_inputs() -> None:
             cors_origins_value="chrome-extension://abcdefghijklmnopabcdefghijklmnop",
             storage_backend="s3",
             s3_bucket_name="meme-drop-dev",
+            _env_file=None,
         )
 
     message = str(captured.value)
@@ -96,11 +98,13 @@ def test_joint_provider_latency_preference_has_a_bounded_positive_value() -> Non
         Settings(
             database_url="postgresql://localhost/memedrop",
             joint_provider_preferred_p90_latency_seconds=0,
+            _env_file=None,
         )
     with pytest.raises(ValidationError):
         Settings(
             database_url="postgresql://localhost/memedrop",
             joint_provider_preferred_p90_latency_seconds=30.1,
+            _env_file=None,
         )
 
 
@@ -111,6 +115,7 @@ def test_production_requires_openrouter_key() -> None:
             database_url="postgresql://localhost/memedrop",
             openrouter_api_key="",
             cors_origins_value="chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+            _env_file=None,
         )
 
 
@@ -120,6 +125,7 @@ def test_production_requires_explicit_non_wildcard_cors() -> None:
             node_env="production",
             database_url="postgresql://localhost/memedrop",
             openrouter_api_key="secret",
+            _env_file=None,
         )
 
     with pytest.raises(ValidationError, match="must not include"):
@@ -128,6 +134,7 @@ def test_production_requires_explicit_non_wildcard_cors() -> None:
             database_url="postgresql://localhost/memedrop",
             openrouter_api_key="secret",
             cors_origins_value="*",
+            _env_file=None,
         )
 
 
@@ -146,6 +153,7 @@ def test_production_configuration_is_accepted() -> None:
         s3_region="ap-south-1",
         s3_access_key_id="access-key",
         s3_secret_access_key="secret-key",
+        _env_file=None,
     )
 
     assert settings.is_production is True
@@ -159,12 +167,14 @@ def test_redis_rate_limit_store_requires_a_redis_url() -> None:
         Settings(
             database_url="postgresql://localhost/memedrop",
             rate_limit_store="redis",
+            _env_file=None,
         )
 
     settings = Settings(
         database_url="postgresql://localhost/memedrop",
         rate_limit_store="redis",
         redis_url="redis://localhost:6379/0",
+        _env_file=None,
     )
 
     assert settings.redis_url == "redis://localhost:6379/0"
@@ -175,12 +185,14 @@ def test_s3_configuration_requires_credentials_and_environment_bucket() -> None:
         Settings(
             database_url="postgresql://localhost/memedrop",
             storage_backend="s3",
+            _env_file=None,
         )
 
     with pytest.raises(ValidationError, match="must be meme-drop-dev"):
         Settings(
             database_url="postgresql://localhost/memedrop",
             s3_bucket_name="meme-drop-prod",
+            _env_file=None,
         )
 
     with pytest.raises(ValidationError, match="valid storage endpoint URL"):
@@ -192,6 +204,7 @@ def test_s3_configuration_requires_credentials_and_environment_bucket() -> None:
             s3_region="ap-south-1",
             s3_access_key_id="access-key",
             s3_secret_access_key="secret-key",
+            _env_file=None,
         )
 
 
@@ -200,6 +213,7 @@ def test_legacy_bucket_variable_is_rejected() -> None:
         Settings(
             database_url="postgresql://localhost/memedrop",
             legacy_storage_bucket="meme-drop-dev",
+            _env_file=None,
         )
 
 
@@ -226,4 +240,50 @@ def test_production_requires_s3_storage() -> None:
             database_url="postgresql://localhost/memedrop",
             openrouter_api_key="secret",
             cors_origins_value="chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+            _env_file=None,
         )
+
+
+def test_production_trends_require_a_secret_without_echoing_it() -> None:
+    values = {
+        "node_env": "production",
+        "database_url": "postgresql://localhost/memedrop",
+        "openrouter_api_key": "openrouter-secret",
+        "tavily_api_key": "tavily-secret",
+        "cors_origins_value": "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+        "rate_limit_store": "redis",
+        "redis_url": "rediss://default:secret@redis.internal:6379/0",
+        "storage_backend": "s3",
+        "s3_bucket_name": "meme-drop-prod",
+        "s3_endpoint": "https://project.storage.supabase.co/storage/v1/s3",
+        "s3_region": "ap-south-1",
+        "s3_access_key_id": "access-key",
+        "s3_secret_access_key": "storage-secret",
+        "trends_enabled": True,
+        "_env_file": None,
+    }
+
+    with pytest.raises(ValidationError, match="CRON_SECRET") as captured:
+        Settings(**values)
+
+    assert "tavily-secret" not in str(captured.value)
+    configured_secret = "cron-secret-0123456789"
+    configured = Settings(**(values | {"trend_cron_secret": configured_secret}))
+    assert configured_secret not in repr(configured)
+
+
+def test_cron_secret_has_a_bounded_deployment_safe_length() -> None:
+    for invalid_secret in ("x" * 15, "x" * 513):
+        with pytest.raises(ValidationError):
+            Settings(
+                database_url="postgresql://localhost/memedrop",
+                trend_cron_secret=invalid_secret,
+                _env_file=None,
+            )
+
+    settings = Settings(
+        database_url="postgresql://localhost/memedrop",
+        trend_cron_secret="x" * 16,
+        _env_file=None,
+    )
+    assert settings.trend_cron_secret == "x" * 16

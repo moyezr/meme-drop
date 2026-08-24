@@ -70,6 +70,22 @@ weekly profiles idempotently skip until their cadence advances. For isolated run
 estimated 771 basic searches per 30 days before retries; the PostgreSQL ledger still enforces the
 900-credit ceiling across workers and retries.
 
+In production, Vercel Cron calls `GET /internal/cron/trends/refresh` every four hours in UTC. It
+must be given `CRON_SECRET`; Vercel sends it as `Authorization: Bearer $CRON_SECRET`, and the API
+rejects missing or mismatched values without running the job. A Redis lease prevents overlapping or
+duplicate scheduler deliveries from doing provider work; the one-hour lease bounds a stuck worker,
+and an overlap returns a successful
+`{"status":"skipped","reason":"in_progress"}` result. The included four-hour Vercel schedule
+requires Vercel Pro. Vercel Hobby permits daily cron schedules only, so use a Pro project or an
+equivalent external scheduler before enabling production trends.
+
+`/health` remains the monitoring endpoint. When trends are enabled, it also reports the latest
+published snapshot's content-free age and returns HTTP 503 when no snapshot exists, it contains no
+serving cards, or it is older than `MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS` (eight hours by
+default). Alert on any non-200
+health response. Production trend refresh requires `TAVILY_API_KEY`, `OPENROUTER_API_KEY`,
+`REDIS_URL`, and `CRON_SECRET`; keep all four in the deployment secret store.
+
 ## Development
 
 From the repository root:
