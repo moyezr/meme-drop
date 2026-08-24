@@ -21,6 +21,9 @@ to a task in this plan.
   production launch. Normal suggestions will continue to use verified templates only.
 - Tavily is the trend-discovery provider. Trend enrichment and caption generation use
   `google/gemini-3.7-flash` through OpenRouter.
+- Trend-card and query embeddings use the embedding-specific `google/gemini-embedding-2` model
+  through OpenRouter with 1,536 dimensions. Caption, suggestion, enrichment, and annotation calls
+  remain on `google/gemini-3.7-flash`; MemeDrop does not call Google directly.
 - Recurring trend ingestion should be scheduled with Vercel Cron Jobs unless runtime measurements
   show that the job cannot fit safely within the chosen Vercel plan's execution limits.
 - The public agent contract is `POST /api/v1/memes/generate`. Its required request body remains as
@@ -87,9 +90,9 @@ relevant trend card without adding more than the existing bounded prompt allowan
 
 ### P0 — Harden the agent meme-generation API
 
-- [ ] Treat the existing `POST /api/v1/memes/generate` implementation as a vertical slice and audit
+- [~] Treat the existing `POST /api/v1/memes/generate` implementation as a vertical slice and audit
   every dependency for production behavior rather than creating a second endpoint.
-- [ ] Preserve the minimal contract:
+- [x] Preserve the minimal contract:
 
   ```json
   {
@@ -97,22 +100,25 @@ relevant trend card without adding more than the existing bounded prompt allowan
   }
   ```
 
-- [ ] Keep optional `direction` and `count` controls under `options`, with strict size and range
+- [x] Keep optional `direction` and `count` controls under `options`, with strict size and range
   bounds and unknown-field rejection.
-- [ ] Define a compact ID specification with typed prefixes and sufficient entropy. The generator
+- [x] Define a compact ID specification with typed prefixes and sufficient entropy. The generator
   must use a cryptographically secure random source, have deterministic validation, and retry on a
   database uniqueness conflict.
-- [ ] Decide the migration boundary for existing UUID-backed browser/install data. Do not rewrite
-  existing identifiers until the affected tables, foreign keys, URLs, and rollback plan are
-  explicitly inventoried.
-- [ ] Use compact IDs for new agent accounts, API keys, credit-ledger entries, generation records,
+- [x] Decide the migration boundary for existing UUID-backed browser/install data. Existing UUID
+  records remain unchanged for the initial agent launch. Any future rewrite requires an explicit
+  inventory of the affected tables, foreign keys, URLs, and rollback plan.
+- [x] Use compact IDs for new agent accounts, API keys, credit-ledger entries, generation records,
   and generated assets.
-- [ ] Add API-key authentication for agent routes. Store only a one-way hash of each secret; retain
-  a short public key identifier for lookup, display, rotation, and audit.
-- [ ] Support credential creation, naming, rotation, revocation, and last-used metadata.
+- [~] Add API-key authentication for agent routes. The credential service and tenant-scoped
+  persistence are complete; route enforcement is in progress. Store only a one-way hash of each
+  secret; retain a short public key identifier for lookup, display, rotation, and audit.
+- [~] Support credential creation, naming, rotation, revocation, and last-used metadata. The
+  transactional service is complete; operator and dashboard entry points remain.
 - [ ] Enforce tenant-scoped rate limits and credit limits. An install ID must not be accepted as
   authentication for an external production agent.
-- [ ] Add request idempotency so a caller retry cannot create a second charge or duplicate asset.
+- [~] Add request idempotency so a caller retry cannot create a second charge or duplicate asset.
+  Atomic generation and ledger behavior is complete; route and asset replay are in progress.
 - [ ] Define stable machine-readable errors for invalid input, invalid credentials, insufficient
   credits, rate limiting, provider timeout, `no_fit`, and internal failure.
 - [ ] Return an absolute HTTPS `image_url` using the production API origin.
@@ -130,14 +136,13 @@ charged or stored twice.
 
 ### P0 — Build credits, accounting, and unit economics
 
-- [ ] Model credit balances as an append-only integer ledger rather than a mutable floating-point
+- [x] Model credit balances as an append-only integer ledger rather than a mutable floating-point
   balance. Every adjustment must have a reason, actor, timestamp, and idempotency identity.
-- [ ] Implement atomic reserve, commit, and release behavior around generation so concurrent
+- [x] Implement atomic reserve, commit, and release behavior around generation so concurrent
   requests cannot overspend an account.
-- [?] Decide exactly when a credit is consumed: request accepted, model call attempted, at least one
-  meme successfully returned, or another explicitly documented outcome.
-- [?] Decide whether `no_fit`, deterministic fallback, provider failure, and idempotent replay cost
-  credits.
+- [x] Consume one credit only when at least one finished meme asset is durably recorded and returned.
+- [x] `no_fit`, provider or internal failure, cancellation, and matching idempotent replay are free.
+  A deterministic fallback that successfully returns a finished asset consumes one credit.
 - [ ] Record internal per-generation cost without storing raw prompt text: OpenRouter model and
   tokens, rendering/storage cost estimate, Tavily allocation, infrastructure allocation, and
   payment-processing allowance.
@@ -156,17 +161,19 @@ twice.
 
 ### P0 — Enforce the 30-day generated-image lifecycle
 
-- [ ] Add a durable generated-asset record containing compact ID, owning account, object key,
+- [x] Add a durable generated-asset record containing compact ID, owning account, object key,
   content type, content hash, created time, expiry time, generation ID, and deletion state.
-- [ ] Set `expires_at` to 30 days after successful generation.
+- [x] Set `expires_at` to 30 days after successful generation.
 - [ ] Prevent cross-tenant asset enumeration and access.
 - [ ] Define cache headers and URL behavior before and after expiry.
-- [ ] Add a protected, idempotent cleanup job suitable for Vercel Cron Jobs.
-- [ ] Delete expired objects from the correct environment bucket in bounded batches, then record
+- [~] Add a protected, idempotent cleanup job suitable for Vercel Cron Jobs. The bounded,
+  retry-safe cleanup service is complete; protected routing and scheduling are in progress.
+- [~] Delete expired objects from the correct environment bucket in bounded batches, then record
   deletion success. Retry failures without losing the durable expiry record.
 - [ ] Ensure idempotent generation does not extend retention unless that behavior is explicitly
   selected and accounted for.
-- [ ] Add storage-volume, deletion-lag, and cleanup-failure metrics.
+- [~] Add storage-volume, deletion-lag, and cleanup-failure metrics. Cleanup backlog count and oldest
+  retryable lag are implemented; production metrics export and alerting remain.
 - [ ] Document the 30-day policy in the API docs and privacy policy.
 
 Done when: every generated object is attributable to one account and generation, becomes
@@ -175,8 +182,8 @@ operations.
 
 ### P1 — Ship agent documentation and management UI
 
-- [ ] Create `apps/landing` route `/docs`.
-- [ ] Publish the minimal quickstart first: authentication, one curl request, one TypeScript
+- [x] Create `apps/landing` route `/docs`.
+- [~] Publish the minimal quickstart first: authentication, one curl request, one TypeScript
   example, one Python example, response schema, credit behavior, retention, errors, rate limits,
   idempotency, and production base URL.
 - [ ] Generate or validate documentation examples against the shared API contract in CI.
@@ -230,10 +237,10 @@ documented flow.
 
 ### P1 — Publish privacy and operational policies
 
-- [ ] Add the landing route `/privacy-policy` with an initial disclosure covering submitted text,
+- [x] Add the landing route `/privacy-policy` with an initial disclosure covering submitted text,
   generated images, API/account metadata, OpenRouter and Tavily processing, object storage,
   operational logs, billing data, and the 30-day generated-image retention period.
-- [ ] Add a real privacy/support contact.
+- [x] Add a real privacy/support contact.
 - [ ] Verify and document the actual retention configured at Vercel, PostgreSQL, Redis, OpenRouter,
   Tavily, object storage, analytics, and the payment provider.
 - [ ] Define account deletion, data export, API-key revocation, and billing-record retention.
@@ -268,10 +275,11 @@ quality gates, and catalog growth does not regress relevance, readability, safet
 
 ## Open architecture and product decisions
 
-- [?] Compact ID alphabet, length, prefixes, and whether IDs are globally unique or unique within a
-  record type.
-- [?] Scope and timing of replacing existing UUID-based install/browser identities.
-- [?] Credit-consumption semantics for `no_fit`, fallback, and provider failure.
+- [x] Compact IDs use typed prefixes plus 22 characters from a 57-character non-ambiguous,
+  URL-safe alphabet. They provide more than 128 bits of CSPRNG entropy and are unique per table.
+- [x] Existing UUID-based install/browser identities are not rewritten for the initial agent launch.
+- [x] Credit-consumption semantics: charge only a successful durable asset; release for `no_fit` or
+  failure; charge a successful deterministic fallback; never recharge a matching replay.
 - [?] Credit package sizes, price, tax treatment, refunds, expiry, and target gross margin.
 - [?] Payment provider and supported countries/currencies.
 - [?] Whether generated image URLs require authenticated access, signed access, or unguessable
