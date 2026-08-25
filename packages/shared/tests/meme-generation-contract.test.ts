@@ -23,7 +23,7 @@ test("the agent-facing response contains ready-to-use memes", () => {
     memes: [
       {
         id: "asset_23456789ABCDEFGHJKLMNP",
-        image_url: "https://memedropapi.moyezrabbani.dev/api/v1/memes/assets/asset_23456789ABCDEFGHJKLMNP",
+        image_url: "https://api.memedrop.moyezrabbani.dev/api/v1/memes/assets/asset_23456789ABCDEFGHJKLMNP",
         expires_at: "2026-09-23T12:00:00Z",
       },
     ],

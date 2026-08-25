@@ -94,7 +94,7 @@ Supply real production values through `.env.prod` locally and Vercel's productio
 ```text
 MEMEDROP_ENV=production
 DATABASE_URL=<supabase-transaction-pooler-url>
-MEMEDROP_API_PUBLIC_ORIGIN=https://memedropapi.moyezrabbani.dev
+MEMEDROP_API_PUBLIC_ORIGIN=https://api.memedrop.moyezrabbani.dev
 
 OPENROUTER_API_KEY=<production-key>
 OPENROUTER_SITE_URL=https://<production-api-origin>

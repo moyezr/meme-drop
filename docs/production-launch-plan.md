@@ -56,7 +56,7 @@ security audits. It deliberately does not make provider calls or validate hosted
 - Meme generation consumes MemeDrop credits. Customers can purchase additional credits.
 - Production origins are:
   - Frontend: `https://memedrop.moyezrabbani.dev`
-  - API: `https://memedropapi.moyezrabbani.dev`
+  - API: `https://api.memedrop.moyezrabbani.dev`
 - The landing application will host an initial privacy-policy page at `/privacy-policy`. Its text
   may evolve as providers, billing, retention, and account behavior are finalized.
 
@@ -258,7 +258,7 @@ telemetry without reading user content, and automated limits bound financial exp
 - [ ] Provision managed PostgreSQL with pgvector, managed Redis, OpenRouter credentials, Tavily
   credentials, and the manually created `meme-drop-prod` bucket.
 - [ ] Configure the frontend origin as `https://memedrop.moyezrabbani.dev`.
-- [ ] Configure the API origin as `https://memedropapi.moyezrabbani.dev`.
+- [ ] Configure the API origin as `https://api.memedrop.moyezrabbani.dev`.
 - [ ] Configure OpenRouter attribution and all returned media URLs for the API origin.
 - [ ] Apply migrations using a direct or session-pooler connection and use the transaction pooler
   for runtime traffic where appropriate.

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/docs/" },
 };
 
-const apiOrigin = "https://memedropapi.moyezrabbani.dev";
+const apiOrigin = "https://api.memedrop.moyezrabbani.dev";
 
 const curlExample = [
   "curl --request POST " + apiOrigin + "/api/v1/memes/generate \\",

@@ -336,7 +336,7 @@ def test_cleanup_claim_timeout_cannot_expire_before_distributed_lock() -> None:
 
 
 def test_production_requires_the_canonical_https_api_origin() -> None:
-    with pytest.raises(ValidationError, match="must be https://memedropapi.moyezrabbani.dev"):
+    with pytest.raises(ValidationError, match="must be https://api.memedrop.moyezrabbani.dev"):
         make_settings(
             node_env="production",
             api_public_origin="https://other.example.net",

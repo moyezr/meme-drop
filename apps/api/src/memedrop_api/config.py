@@ -18,7 +18,7 @@ DEFAULT_STORAGE_PATH = Path("/tmp/memedrop-storage")
 DEFAULT_DOWNLOAD_PATH = Path("/tmp/memedrop-downloads")
 DEVELOPMENT_BUCKET = "meme-drop-dev"
 PRODUCTION_BUCKET = "meme-drop-prod"
-PRODUCTION_API_ORIGIN = "https://memedropapi.moyezrabbani.dev"
+PRODUCTION_API_ORIGIN = "https://api.memedrop.moyezrabbani.dev"
 CronSecret = Annotated[str, StringConstraints(strip_whitespace=True, min_length=16, max_length=512)]
 
 

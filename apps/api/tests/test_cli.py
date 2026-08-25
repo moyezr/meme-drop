@@ -28,7 +28,7 @@ def valid_environment() -> dict[str, str]:
         "DATABASE_URL": "postgresql://memedrop:secret@db.internal:5432/memedrop",
         "OPENROUTER_API_KEY": "a-secure-production-api-key",
         "OPENROUTER_SITE_URL": "https://api.memedrop.app",
-        "MEMEDROP_API_PUBLIC_ORIGIN": "https://memedropapi.moyezrabbani.dev",
+        "MEMEDROP_API_PUBLIC_ORIGIN": "https://api.memedrop.moyezrabbani.dev",
         "OPENROUTER_APP_NAME": "MemeDrop",
         "OPENROUTER_SUGGESTION_MODEL": "google/gemini-3.7-flash",
         "OPENROUTER_CAPTION_MODEL": "google/gemini-3.7-flash",

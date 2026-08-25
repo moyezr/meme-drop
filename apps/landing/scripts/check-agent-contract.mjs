@@ -20,7 +20,7 @@ function rejectText(source, text, label) {
 }
 
 for (const text of [
-  "https://memedropapi.moyezrabbani.dev",
+  "https://api.memedrop.moyezrabbani.dev",
   "Authorization",
   "Bearer",
   "Idempotency-Key",

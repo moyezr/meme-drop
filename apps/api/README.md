@@ -284,7 +284,7 @@ instructions:
 
 Generated media URLs are absolute and require the same Bearer credential. Their expiry is thirty
 days after generation. Configure `MEMEDROP_API_PUBLIC_ORIGIN=http://localhost:3001` locally and
-the exact HTTPS API origin (`https://memedropapi.moyezrabbani.dev`) in production. Generic
+the exact HTTPS API origin (`https://api.memedrop.moyezrabbani.dev`) in production. Generic
 `/memes/generated/agents/...` paths intentionally do not serve generated agent images.
 
 If no verified suggestion can be rendered, the endpoint still returns HTTP 200 with an explicit
