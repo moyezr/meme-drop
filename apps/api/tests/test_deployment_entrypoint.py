@@ -1,4 +1,5 @@
 import json
+import sys
 import tomllib
 from pathlib import Path
 
@@ -18,6 +19,7 @@ def test_vercel_uses_automatic_root_entrypoint_detection() -> None:
 
     assert "vercel" not in configuration.get("tool", {})
     assert (project_root / "app.py").is_file()
+    assert str(project_root / "src") in sys.path
 
 
 def test_vercel_crons_keep_trends_current_and_clean_generated_assets_daily() -> None:
