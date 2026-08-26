@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "installCommand": "uv sync --frozen --no-dev",
+  "buildCommand": "uv run python -c \"from app import app\"",
   "crons": [
     {
       "path": "/internal/cron/trends/refresh",
