@@ -32,7 +32,9 @@ def test_vercel_crons_keep_trends_current_and_clean_generated_assets_daily() -> 
     assert config["$schema"] == "https://openapi.vercel.sh/vercel.json"
     assert config["framework"] == "fastapi"
     assert config["installCommand"] == "uv sync --frozen --no-dev"
-    assert config["buildCommand"] == 'uv run python -c "from app import app"'
+    assert config["buildCommand"] == (
+        'uv run memedrop-validate-production-env && uv run python -c "from app import app"'
+    )
     assert config["regions"] == ["sin1"]
     assert config["crons"] == [
         {"path": "/internal/cron/trends/refresh", "schedule": "0 2 * * *"},

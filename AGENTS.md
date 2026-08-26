@@ -56,6 +56,10 @@ Storage and secrets rules:
 - Never auto-create, empty, or delete buckets.
 - Never expose S3 access keys to the extension or landing page.
 - Keep secrets in ignored `.env` files or deployment secret stores.
+- Treat production secret synchronization as one-way from the ignored operator file to the
+  deployment store. Never run `vercel env pull` into `.env.prod` or another operator-owned source
+  file: Vercel Sensitive values are write-only and pulls replace plaintext with opaque references.
+  Pull only into a fresh disposable path when inspection is necessary.
 - Update `.env.example` and deployment docs when configuration changes.
 
 Testing and docs:

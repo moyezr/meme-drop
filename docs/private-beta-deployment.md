@@ -184,6 +184,17 @@ npm run storage:check
 npm run storage:latency
 ```
 
+The Vercel build runs `memedrop-validate-production-env` before importing the application. A
+missing, placeholder, malformed, or unsafe production value therefore blocks promotion instead of
+replacing the last healthy deployment. This is structural validation: database and Redis
+connectivity are reported by `/health`; storage is verified by the bounded storage checks above.
+Do not validate Tavily by issuing a search during startup because that consumes a credit, and do
+not make application liveness depend on OpenRouter availability.
+
+Production secret synchronization is one-way. Push values from the ignored operator environment
+to Vercel, but never run `vercel env pull` with `.env.prod` as its destination. Sensitive values are
+write-only and are returned as opaque references rather than their original plaintext.
+
 The latency probe writes, reads, and deletes one temporary `_health/` object. Confirm cleanup in the
 bucket afterward.
 

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "fastapi",
   "installCommand": "uv sync --frozen --no-dev",
-  "buildCommand": "uv run python -c \"from app import app\"",
+  "buildCommand": "uv run memedrop-validate-production-env && uv run python -c \"from app import app\"",
   "regions": ["sin1"],
   "crons": [
     {

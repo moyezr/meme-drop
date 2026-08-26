@@ -59,6 +59,22 @@ async def test_health_reports_degraded(settings: Settings) -> None:
     assert response.json() == {"status": "degraded", "db": False}
 
 
+async def test_health_reports_database_and_rate_limiter_failures_together(
+    settings: Settings,
+) -> None:
+    async def unavailable() -> bool:
+        return False
+
+    app = create_app(settings, readiness_check=unavailable)
+    app.state.rate_limiter_ready = False
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "degraded", "db": False, "rate_limiter": False}
+
+
 async def test_rate_limiter_startup_failure_preserves_liveness_and_fails_closed(
     settings: Settings,
 ) -> None:
