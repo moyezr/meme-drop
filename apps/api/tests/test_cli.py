@@ -49,7 +49,7 @@ def valid_environment() -> dict[str, str]:
         "MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE": "100",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS": "900",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS": "900",
-        "MEMEDROP_CORS_ORIGINS": "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+        "MEMEDROP_CORS_ORIGINS": "https://memedrop.moyezrabbani.dev",
         "MEMEDROP_RATE_LIMIT_STORE": "redis",
         "REDIS_URL": "rediss://default:secret@redis.internal:6379/0",
         "MEMEDROP_REQUIRE_INSTALL_ID": "true",

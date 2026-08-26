@@ -114,10 +114,11 @@ project do not share runtime code or environment merely because they come from o
 
 ## 4. Extension release
 
-Create a Chrome Web Store draft to obtain the final 32-character extension ID, then set:
+Create a Chrome Web Store draft to obtain the final 32-character extension ID, then append its
+origin to the web origin already allowed by the API:
 
 ```text
-MEMEDROP_CORS_ORIGINS=chrome-extension://<published-extension-id>
+MEMEDROP_CORS_ORIGINS=https://memedrop.moyezrabbani.dev,chrome-extension://<published-extension-id>
 VITE_API_BASE_URL=https://<production-api-origin>
 ```
 

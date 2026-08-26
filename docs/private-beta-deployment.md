@@ -80,11 +80,17 @@ VITE_API_BASE_URL=https://<production-api-origin> npm run build:extension:releas
 npm run package:extension:release
 ```
 
-Create a Chrome Web Store draft and upload the package to obtain the final 32-character extension
-ID. Then configure the API with:
+The agent API can launch before the Chrome Web Store draft exists. Initially allow the production
+web origin:
 
 ```text
-MEMEDROP_CORS_ORIGINS=chrome-extension://<final-extension-id>
+MEMEDROP_CORS_ORIGINS=https://memedrop.moyezrabbani.dev
+```
+
+Once the draft provides the final 32-character extension ID, append its origin:
+
+```text
+MEMEDROP_CORS_ORIGINS=https://memedrop.moyezrabbani.dev,chrome-extension://<final-extension-id>
 ```
 
 ## 5. Configure and validate the API environment
@@ -121,7 +127,7 @@ MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE=100
 MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS=900
 MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS=900
 
-MEMEDROP_CORS_ORIGINS=chrome-extension://<final-extension-id>
+MEMEDROP_CORS_ORIGINS=https://memedrop.moyezrabbani.dev
 MEMEDROP_RATE_LIMIT_STORE=redis
 REDIS_URL=<managed-rediss-url>
 MEMEDROP_REQUIRE_INSTALL_ID=true

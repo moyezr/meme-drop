@@ -721,9 +721,6 @@ def production_env_findings(
     origins = [item.strip() for item in value("MEMEDROP_CORS_ORIGINS").split(",") if item.strip()]
     if "*" in origins:
         errors.append("MEMEDROP_CORS_ORIGINS must not include *.")
-    chrome_origins = [item for item in origins if item.startswith("chrome-extension://")]
-    if not chrome_origins:
-        errors.append("MEMEDROP_CORS_ORIGINS must include the final Chrome extension origin.")
     for origin in origins:
         parsed = urlparse(origin)
         if parsed.scheme not in {"https", "chrome-extension"} or not parsed.hostname:
