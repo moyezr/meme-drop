@@ -1,10 +1,23 @@
 from __future__ import annotations
 
+from typing import NoReturn
+
 import httpx
 
 from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 from memedrop_api.services.trend_monitoring import TrendSnapshotStatus
+
+
+class UnavailableRateLimiter:
+    async def setup(self) -> NoReturn:
+        raise ConnectionError("rate limiter unavailable")
+
+    async def consume(self, key: str, window_ms: int, maximum: int) -> bool:
+        raise AssertionError("unavailable rate limiter must fail closed before consume")
+
+    async def close(self) -> None:
+        return None
 
 
 async def test_live_does_not_call_readiness(settings: Settings) -> None:
@@ -44,6 +57,32 @@ async def test_health_reports_degraded(settings: Settings) -> None:
 
     assert response.status_code == 503
     assert response.json() == {"status": "degraded", "db": False}
+
+
+async def test_rate_limiter_startup_failure_preserves_liveness_and_fails_closed(
+    settings: Settings,
+) -> None:
+    async def ready() -> bool:
+        return True
+
+    app = create_app(
+        settings,
+        readiness_check=ready,
+        rate_limiter=UnavailableRateLimiter(),
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            live = await client.get("/live")
+            health = await client.get("/health")
+            protected = await client.get("/api/v1/memes/browse")
+
+    assert live.status_code == 200
+    assert live.json() == {"status": "ok"}
+    assert health.status_code == 503
+    assert health.json() == {"status": "degraded", "db": True, "rate_limiter": False}
+    assert protected.status_code == 503
+    assert protected.json() == {"error": "Service unavailable"}
 
 
 async def test_health_returns_alertable_status_for_a_stale_trend_snapshot(

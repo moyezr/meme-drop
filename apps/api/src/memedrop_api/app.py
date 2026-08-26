@@ -185,7 +185,11 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         try:
-            await limiter.setup()
+            try:
+                await limiter.setup()
+            except Exception:
+                app.state.rate_limiter_ready = False
+                LOGGER.exception("Rate limiter setup failed")
             yield
         finally:
             if default_gateway is not None:
@@ -213,6 +217,7 @@ def create_app(
     app.state.store = backend_store
     app.state.catalog_draft_store = catalog_store
     app.state.rate_limiter = limiter
+    app.state.rate_limiter_ready = True
     app.state.readiness_check = readiness_check or app_database.is_ready
     app.state.download_image = download_image_service or download_image
     app.state.auto_tag_meme = auto_tag_service or auto_tag_meme
@@ -273,28 +278,40 @@ def create_app(
                 expensive = route_key in EXPENSIVE_ROUTES
                 client_ip = request.client.host if request.client else None
                 client_key = rate_limit_client_key(request.headers, client_ip)
-                allowed = await limiter.consume(
-                    f"{client_key}:{route_key}",
-                    app_settings.expensive_rate_limit_window_ms
-                    if expensive
-                    else app_settings.api_rate_limit_window_ms,
-                    app_settings.expensive_rate_limit_max
-                    if expensive
-                    else app_settings.api_rate_limit_max,
-                )
-                if not allowed:
+                if not app.state.rate_limiter_ready:
                     if path == "/api/v1/memes/generate":
                         response = JSONResponse(
-                            status_code=429,
-                            content={"error": {"code": "rate_limited"}},
+                            status_code=503,
+                            content={"error": {"code": "temporarily_unavailable"}},
                         )
                     else:
                         response = JSONResponse(
-                            status_code=429,
-                            content={"error": "Too many requests"},
+                            status_code=503,
+                            content={"error": "Service unavailable"},
                         )
                 else:
-                    response = await call_next(request)
+                    allowed = await limiter.consume(
+                        f"{client_key}:{route_key}",
+                        app_settings.expensive_rate_limit_window_ms
+                        if expensive
+                        else app_settings.api_rate_limit_window_ms,
+                        app_settings.expensive_rate_limit_max
+                        if expensive
+                        else app_settings.api_rate_limit_max,
+                    )
+                    if not allowed:
+                        if path == "/api/v1/memes/generate":
+                            response = JSONResponse(
+                                status_code=429,
+                                content={"error": {"code": "rate_limited"}},
+                            )
+                        else:
+                            response = JSONResponse(
+                                status_code=429,
+                                content={"error": "Too many requests"},
+                            )
+                    else:
+                        response = await call_next(request)
             else:
                 response = await call_next(request)
         except Exception:

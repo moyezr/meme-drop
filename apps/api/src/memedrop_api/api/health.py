@@ -24,6 +24,10 @@ async def readiness(request: Request, response: Response) -> dict[str, object]:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {"status": "degraded", "db": False}
 
+    if not request.app.state.rate_limiter_ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "degraded", "db": True, "rate_limiter": False}
+
     trend_snapshot_check: TrendSnapshotCheck | None = request.app.state.trend_snapshot_check
     if trend_snapshot_check is None:
         return {"status": "ok", "db": True}
