@@ -97,6 +97,9 @@ MEMEDROP_CORS_ORIGINS=https://memedrop.moyezrabbani.dev,chrome-extension://<fina
 
 Supply real production values through `.env.prod` locally and Vercel's production secret store:
 
+The checked-in Vercel configuration runs the API in Singapore (`sin1`) beside the Supabase and S3
+services in `ap-southeast-1`; keep managed Redis in the same region.
+
 ```text
 MEMEDROP_ENV=production
 DATABASE_URL=<supabase-transaction-pooler-url>

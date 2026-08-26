@@ -3,6 +3,7 @@
   "framework": "fastapi",
   "installCommand": "uv sync --frozen --no-dev",
   "buildCommand": "uv run python -c \"from app import app\"",
+  "regions": ["sin1"],
   "crons": [
     {
       "path": "/internal/cron/trends/refresh",
