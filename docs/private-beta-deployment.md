@@ -232,6 +232,20 @@ issuance and rotation stdout as secret-bearing, and disable or protect terminal 
 and command auditing around those operations. MemeDrop persists only the credential hash and cannot
 recover the plaintext secret.
 
+After storing the credential, exercise the same black-box path an external agent uses. This checks
+hosted readiness, the minimal generation contract, idempotent replay, authenticated media delivery,
+bounded response handling, and the 30-day expiry timestamp without importing backend code:
+
+```sh
+MEMEDROP_API_BASE_URL=https://api.memedrop.moyezrabbani.dev \
+MEMEDROP_API_KEY=<issued-agent-credential> \
+npm run smoke:agent -- --confirm-generation
+```
+
+One successful new run consumes one credit; its immediate replay must not consume another. Confirm
+the final balance with the content-free `agent:admin status` command. The smoke report deliberately
+omits the input and credential.
+
 Use these explicit commands for key lifecycle changes:
 
 ```sh

@@ -161,6 +161,9 @@ relevant trend card without adding more than the existing bounded prompt allowan
 - [x] Add provider-free end-to-end boundary tests covering authentication, credit debit, idempotent
   replay, model success/failure, rendering, object persistence, and media retrieval. A live hosted
   provider smoke remains an external deployment check.
+- [x] Add an independent black-box smoke agent under `apps/smoke-agent`. It uses only the public
+  HTTPS contract, verifies hosted readiness before spending a credit, replays the exact request,
+  downloads private media with the caller credential, and emits no request input or secret.
 - [x] Add contract checks shared by the FastAPI implementation, TypeScript types, and published
   docs.
 

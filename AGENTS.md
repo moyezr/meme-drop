@@ -6,6 +6,8 @@ MemeDrop is a Turborepo monorepo with these workspaces:
 - `apps/catalog`: React/Vite local-only catalog annotation workbench; keep storage credentials and promotion actions server-side.
 - `apps/extension`: React/Vite/Tailwind Chrome extension.
 - `apps/landing`: statically exported Next.js site.
+- `apps/smoke-agent`: black-box TypeScript client for the public agent API; it must interact only
+  through documented HTTPS routes and never import backend internals or access persistence directly.
 - `packages/shared`: shared TypeScript contracts and meme-template manifests.
 - `tools/template-tools`: catalog QA, benchmark, review, and promotion tooling.
 
@@ -29,6 +31,7 @@ npm run dev:api
 npm run dev:catalog
 npm run dev:extension
 npm run dev:landing
+npm run smoke:agent -- --confirm-generation
 npm run typecheck
 npm test
 npm run lint
@@ -56,6 +59,8 @@ Storage and secrets rules:
 - Never auto-create, empty, or delete buckets.
 - Never expose S3 access keys to the extension or landing page.
 - Keep secrets in ignored `.env` files or deployment secret stores.
+- The smoke agent reads `MEMEDROP_API_KEY` only from its environment. Never accept it as a CLI
+  argument, print it, persist it, or forward it to an origin other than `MEMEDROP_API_BASE_URL`.
 - Treat production secret synchronization as one-way from the ignored operator file to the
   deployment store. Never run `vercel env pull` into `.env.prod` or another operator-owned source
   file: Vercel Sensitive values are write-only and pulls replace plaintext with opaque references.

@@ -13,6 +13,7 @@ This is a Turborepo monorepo, but its applications deploy independently:
 | `apps/template-pipeline` | Idempotent template discovery, media ingest, and machine draft annotation | Local development only |
 | `apps/extension` | React/Vite Chrome extension for X | Chrome Web Store package |
 | `apps/landing` | Static Next.js marketing site | Vercel project rooted at `apps/landing` |
+| `apps/smoke-agent` | Black-box TypeScript consumer of the public agent API | Local/CI smoke tooling |
 | `packages/shared` | TypeScript API contracts and template manifests | workspace dependency |
 | `tools/template-tools` | Offline catalog QA and evaluation tools | local/CI tooling |
 
@@ -92,6 +93,18 @@ npm run db:migrate
 npm run storage:check
 npm run storage:latency
 ```
+
+Authenticated agent API smoke:
+
+```sh
+MEMEDROP_API_BASE_URL=https://api.memedrop.moyezrabbani.dev \
+MEMEDROP_API_KEY=<issued-agent-credential> \
+npm run smoke:agent -- --confirm-generation
+```
+
+The smoke agent calls only public HTTPS routes, repeats the exact generation request to verify
+idempotency, and downloads returned private media with the same Bearer credential. A successful new
+run consumes one credit. See `apps/smoke-agent/README.md` for safe custom-input options.
 
 Recommendation and catalog quality:
 
