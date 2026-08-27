@@ -75,9 +75,9 @@ network supports it.
 
 Import this GitHub repository twice.
 
-Landing project:
+Web project:
 
-- Root Directory: `apps/landing`
+- Root Directory: `apps/web`
 - Framework: Next.js
 - Build Command: leave at the Next.js default (`npm run build`)
 - Output Directory: leave unset/default; `next.config.ts` enables static export and Vercel detects

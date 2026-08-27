@@ -5,7 +5,7 @@ MemeDrop is a Turborepo monorepo with these workspaces:
 - `apps/api`: self-contained FastAPI backend with its own Python metadata, migrations, runtime data, and tests.
 - `apps/catalog`: React/Vite local-only catalog annotation workbench; keep storage credentials and promotion actions server-side.
 - `apps/extension`: React/Vite/Tailwind Chrome extension.
-- `apps/landing`: statically exported Next.js site.
+- `apps/web`: Next.js marketing, documentation, and customer dashboard application.
 - `apps/smoke-agent`: black-box TypeScript client for the public agent API; it must interact only
   through documented HTTPS routes and never import backend internals or access persistence directly.
 - `packages/shared`: shared TypeScript contracts and meme-template manifests.
@@ -18,7 +18,7 @@ Tooling defaults:
 - Node.js 22.12+ and npm 11 for the monorepo.
 - Python 3.13 and uv for `apps/api` only.
 - Keep dependency locks exact.
-- TypeScript 7.x everywhere except `apps/landing`, which stays on 6.x for now.
+- TypeScript 7.x everywhere except `apps/web`, which stays on 6.x for now.
 - `@types/node` stays on major 22.
 - Prefer direct code and avoid new abstractions without a current second use case.
 
@@ -30,7 +30,7 @@ uv sync --project apps/api --frozen
 npm run dev:api
 npm run dev:catalog
 npm run dev:extension
-npm run dev:landing
+npm run dev:web
 npm run smoke:agent -- --confirm-generation
 npm run typecheck
 npm test

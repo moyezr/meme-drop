@@ -49,15 +49,15 @@ security audits. It deliberately does not make provider calls or validate hosted
   small as possible: an agent supplies `input`; optional controls stay under `options`.
 - New agent-facing records will use compact, application-generated IDs rather than UUIDs. IDs must
   remain collision-resistant, non-sequential, URL-safe, and safe to expose publicly.
-- Developer documentation will be hosted by the landing application at `/docs`.
-- The landing application will eventually include a management dashboard for API keys, credits,
+- Developer documentation will be hosted by the web application at `/docs`.
+- The web application will include a management dashboard for API keys, credits,
   usage, billing, and account administration.
 - Agent-generated images expire after 30 days.
 - Meme generation consumes MemeDrop credits. Customers can purchase additional credits.
 - Production origins are:
   - Frontend: `https://memedrop.moyezrabbani.dev`
   - API: `https://api.memedrop.moyezrabbani.dev`
-- The landing application will host an initial privacy-policy page at `/privacy-policy`. Its text
+- The web application will host an initial privacy-policy page at `/privacy-policy`. Its text
   may evolve as providers, billing, retention, and account behavior are finalized.
 
 ## Launch definition
@@ -221,7 +221,7 @@ operations.
 
 ### P1 — Ship agent documentation and management UI
 
-- [x] Create `apps/landing` route `/docs`.
+- [x] Create `apps/web` route `/docs`.
 - [x] Publish the minimal quickstart first: authentication, one curl request, one TypeScript
   example, one Python example, response schema, credit behavior, retention, errors, rate limits,
   idempotency, and production base URL.

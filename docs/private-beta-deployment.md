@@ -40,9 +40,9 @@ or S3 credentials in the landing page, extension, or any `VITE_*` variable.
 
 Import the repository twice.
 
-Landing project:
+Web project:
 
-- Root Directory: `apps/landing`
+- Root Directory: `apps/web`
 - Framework: Next.js
 - Build Command: leave at the Next.js default (`npm run build`)
 - Output Directory: leave unset/default; `next.config.ts` enables static export and Vercel detects
@@ -51,7 +51,7 @@ Landing project:
 
 Do not set the Vercel Output Directory to `out`. With the Next.js framework preset, that override
 causes Vercel to look for `out/routes-manifest.json`, even though Next.js correctly writes the
-framework manifest to `.next/routes-manifest.json`. The repository's `apps/landing/vercel.json`
+framework manifest to `.next/routes-manifest.json`. The repository's `apps/web/vercel.json`
 keeps automatic output detection enabled.
 
 API project:

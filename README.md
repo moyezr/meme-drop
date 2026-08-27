@@ -12,7 +12,7 @@ This is a Turborepo monorepo, but its applications deploy independently:
 | `apps/catalog` | React/Vite internal catalog annotation workbench | Local development only |
 | `apps/template-pipeline` | Idempotent template discovery, media ingest, and machine draft annotation | Local development only |
 | `apps/extension` | React/Vite Chrome extension for X | Chrome Web Store package |
-| `apps/landing` | Static Next.js marketing site | Vercel project rooted at `apps/landing` |
+| `apps/web` | Next.js marketing, docs, and customer application | Vercel project rooted at `apps/web` |
 | `apps/smoke-agent` | Black-box TypeScript consumer of the public agent API | Local/CI smoke tooling |
 | `packages/shared` | TypeScript API contracts and template manifests | workspace dependency |
 | `tools/template-tools` | Offline catalog QA and evaluation tools | local/CI tooling |
@@ -60,7 +60,7 @@ Run the applications in separate terminals:
 npm run dev:api
 npm run dev:catalog
 npm run dev:extension
-npm run dev:landing
+npm run dev:web
 ```
 
 FastAPI listens on `http://localhost:3001`; the catalog workbench opens at
@@ -170,7 +170,7 @@ and must live in ignored env files or the FastAPI project's secret store.
 
 Create two independent Vercel projects from this repository:
 
-1. Landing project: Root Directory `apps/landing`.
+1. Web project: Root Directory `apps/web`.
 2. API project: Root Directory `apps/api`.
 
 The API workspace owns its Python lockfile, migrations, catalog, and `app.py` entrypoint. Apply
