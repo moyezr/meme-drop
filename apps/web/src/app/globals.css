@@ -330,6 +330,238 @@ video {
   font-weight: 600;
 }
 
+.authPage {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 32px 20px;
+  background: var(--surface-soft);
+}
+
+.authCard {
+  width: min(100%, 460px);
+  padding: 40px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgba(60, 64, 67, 0.12);
+}
+
+.authBrand,
+.dashboardBrand {
+  color: var(--ink);
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.authCard h1 {
+  margin: 32px 0 12px;
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.authCard > p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.authActions {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.authButton {
+  width: 100%;
+  padding: 13px 18px;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  background: var(--ink);
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+
+.authButton:hover {
+  background: #343434;
+}
+
+.authButton:focus-visible,
+.textButton:focus-visible,
+.dashboardNav a:focus-visible,
+.authCard a:focus-visible {
+  outline: 3px solid rgba(26, 115, 232, 0.35);
+  outline-offset: 3px;
+}
+
+.authNotice {
+  margin-top: 28px;
+  padding: 14px 16px;
+  border: 1px solid #f6c26b;
+  border-radius: 10px;
+  background: #fff8e6;
+  color: #684d13 !important;
+}
+
+.authFinePrint {
+  margin: 24px 0 0;
+  font-size: 13px;
+}
+
+.authFinePrint a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dashboardShell {
+  min-height: 100vh;
+  background: var(--surface-soft);
+}
+
+.dashboardHeader {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 max(24px, calc((100vw - 1200px) / 2));
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.dashboardIdentity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.textButton {
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.textButton:hover {
+  background: var(--surface-soft);
+}
+
+.dashboardBody {
+  display: grid;
+  width: min(100% - 48px, 1200px);
+  margin: 0 auto;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 56px;
+  padding: 48px 0 80px;
+}
+
+.dashboardNav {
+  display: flex;
+  align-self: start;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dashboardNav a,
+.dashboardNav span {
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dashboardNav a[aria-current="page"] {
+  background: #e8f0fe;
+  color: #174ea6;
+}
+
+.dashboardNav span[aria-disabled="true"] {
+  opacity: 0.55;
+}
+
+.dashboardMain {
+  min-width: 0;
+}
+
+.dashboardIntro {
+  max-width: 700px;
+}
+
+.eyebrow {
+  margin-bottom: 12px;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboardIntro h1 {
+  margin-bottom: 16px;
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(38px, 5vw, 58px);
+  font-weight: 720;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+}
+
+.dashboardIntro > p:last-child {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.dashboardGrid {
+  display: grid;
+  margin-top: 38px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboardCard {
+  min-height: 190px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.dashboardCard h2 {
+  margin: 0 0 10px;
+  font-size: 19px;
+}
+
+.dashboardCard p {
+  min-height: 72px;
+  margin-bottom: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.statusPill {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f1f3f4;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
 @media (max-width: 720px) {
   .hero {
     width: min(100% - 24px, 1180px);
@@ -381,5 +613,41 @@ video {
   .contractTable {
     display: block;
     overflow-x: auto;
+  }
+
+  .authCard {
+    padding: 30px 24px;
+  }
+
+  .dashboardHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 20px 24px;
+  }
+
+  .dashboardIdentity {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboardBody {
+    width: min(100% - 32px, 1200px);
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding-top: 32px;
+  }
+
+  .dashboardNav {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .dashboardNav a,
+  .dashboardNav span {
+    white-space: nowrap;
+  }
+
+  .dashboardGrid {
+    grid-template-columns: 1fr;
   }
 }
