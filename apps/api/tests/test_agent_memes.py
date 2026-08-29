@@ -40,8 +40,8 @@ from memedrop_api.services.suggestion_engine import SuggestionRun, SuggestionTim
 
 
 class FakeCredentials:
-    def __init__(self, account_id: str, api_key_id: str) -> None:
-        self.principal = AuthenticatedAgent(account_id, api_key_id)
+    def __init__(self, user_id: str, api_key_id: str) -> None:
+        self.principal = AuthenticatedAgent(user_id, api_key_id)
 
     async def authenticate_bearer(self, authorization: str | None) -> AuthenticatedAgent:
         structured_credential = f"Bearer {self.principal.api_key_id}.{'a' * 43}"
@@ -55,26 +55,26 @@ class FakeAssets:
         self.assets: list[AgentGeneratedAsset] = []
         self.expired = False
 
-    async def list_for_generation(self, *, account_id: str, generation_id: str, **_: object):
+    async def list_for_generation(self, *, user_id: str, generation_id: str, **_: object):
         if self.expired:
             return []
         return [
             asset
             for asset in self.assets
-            if asset.agent_account_id == account_id and asset.generation_id == generation_id
+            if asset.user_id == user_id and asset.generation_id == generation_id
         ]
 
-    async def get_for_serving(self, *, account_id: str, asset_id: str, **_: object):
+    async def get_for_serving(self, *, user_id: str, asset_id: str, **_: object):
         if self.expired:
             raise GeneratedAssetExpired("expired")
         for asset in self.assets:
-            if asset.agent_account_id == account_id and asset.id == asset_id:
+            if asset.user_id == user_id and asset.id == asset_id:
                 return asset
         raise GeneratedAssetNotFound("not found")
 
-    async def has_any_for_generation(self, *, account_id: str, generation_id: str) -> bool:
+    async def has_any_for_generation(self, *, user_id: str, generation_id: str) -> bool:
         return any(
-            asset.agent_account_id == account_id and asset.generation_id == generation_id
+            asset.user_id == user_id and asset.generation_id == generation_id
             for asset in self.assets
         )
 
@@ -89,7 +89,7 @@ class FakeCredits:
         self.settlements: list[GenerationStatus] = []
 
     async def begin_generation(
-        self, *, account_id: str, idempotency_key: str, request_fingerprint: str, **_: object
+        self, *, user_id: str, idempotency_key: str, request_fingerprint: str, **_: object
     ) -> GenerationResult:
         if idempotency_key in self.generations:
             if self.fingerprints[idempotency_key] != request_fingerprint:
@@ -105,20 +105,20 @@ class FakeCredits:
             create_public_id(PublicIdKind.GENERATION).value,
             GenerationStatus.PROCESSING,
             None,
-            CreditBalance(account_id, self.credits),
+            CreditBalance(user_id, self.credits),
         )
         self.generations[idempotency_key] = generation
         self.fingerprints[idempotency_key] = request_fingerprint
         return generation
 
     async def complete_generation_with_assets(
-        self, *, account_id: str, generation_id: str, assets: tuple[GenerationAssetInput, ...]
+        self, *, user_id: str, generation_id: str, assets: tuple[GenerationAssetInput, ...]
     ) -> GenerationCompletion:
         self.completions += 1
         records = tuple(
             DurableGenerationAsset(
                 id=create_public_id(PublicIdKind.ASSET).value,
-                agent_account_id=account_id,
+                user_id=user_id,
                 generation_id=generation_id,
                 object_key=asset.object_key,
                 content_type=asset.content_type,
@@ -130,7 +130,7 @@ class FakeCredits:
         self.assets.assets.extend(
             AgentGeneratedAsset(
                 id=record.id,
-                agent_account_id=record.agent_account_id,
+                user_id=record.user_id,
                 generation_id=record.generation_id,
                 object_key=record.object_key,
                 content_type=record.content_type,
@@ -143,7 +143,7 @@ class FakeCredits:
             generation_id,
             GenerationStatus.SUCCEEDED,
             None,
-            CreditBalance(account_id, self.credits),
+            CreditBalance(user_id, self.credits),
         )
         for key, value in self.generations.items():
             if value.id == generation_id:
@@ -153,7 +153,7 @@ class FakeCredits:
     async def settle_generation(
         self,
         *,
-        account_id: str,
+        user_id: str,
         generation_id: str,
         outcome: GenerationStatus,
         failure_code: str | None = None,
@@ -163,7 +163,7 @@ class FakeCredits:
         if outcome is not GenerationStatus.SUCCEEDED:
             self.credits += 1
         settled = GenerationResult(
-            generation_id, outcome, failure_code, CreditBalance(account_id, self.credits)
+            generation_id, outcome, failure_code, CreditBalance(user_id, self.credits)
         )
         for key, value in self.generations.items():
             if value.id == generation_id:
@@ -224,7 +224,7 @@ class KeyAttemptRateLimiter:
 def rendered_asset(generation_id: str | None = None) -> RenderedAgentAsset:
     generation = generation_id or "gen_placeholder"
     return RenderedAgentAsset(
-        object_key=f"generated/agents/{generation}/1-finished.webp",
+        object_key=f"generated/users/{generation}/1-finished.webp",
         content_type="image/webp",
         content_hash="a" * 64,
     )
@@ -238,7 +238,7 @@ def app_harness(
     credits: int = 1,
     rate_limiter: MemoryRateLimitStore | RecordingRateLimiter | None = None,
 ):
-    account_id = create_public_id(PublicIdKind.AGENT_ACCOUNT).value
+    user_id = create_public_id(PublicIdKind.USER).value
     api_key_id = create_public_id(PublicIdKind.API_KEY).value
     assets = FakeAssets()
     credit_service = FakeCredits(assets, credits=credits)
@@ -247,7 +247,7 @@ def app_harness(
         settings,
         storage=storage,
         rate_limiter=rate_limiter or MemoryRateLimitStore(),  # type: ignore[arg-type]
-        agent_credentials=FakeCredentials(account_id, api_key_id),  # type: ignore[arg-type]
+        agent_credentials=FakeCredentials(user_id, api_key_id),  # type: ignore[arg-type]
         agent_generation_credits=credit_service,  # type: ignore[arg-type]
         agent_generated_asset_store=assets,
         agent_meme_service=generator,  # type: ignore[arg-type]
@@ -296,7 +296,7 @@ async def test_success_is_durable_absolute_and_replay_does_no_work(
     assert first.status_code == second.status_code == 200
     assert first.json() == second.json()
     meme = first.json()["memes"][0]
-    assert meme["id"].startswith("asset_")
+    assert meme["id"].startswith("a_")
     assert meme["image_url"].startswith("http://localhost:3001/api/v1/memes/assets/")
     assert "caption" not in meme and "alt_text" not in meme
     assert generator.calls == 1
@@ -488,12 +488,12 @@ async def test_unexpected_parallel_render_failure_deletes_every_attempted_object
 
     service = AgentMemeService(Suggestions(), storage, renderer)  # type: ignore[arg-type]
     generation_id = create_public_id(PublicIdKind.GENERATION).value
-    account_id = create_public_id(PublicIdKind.AGENT_ACCOUNT).value
+    user_id = create_public_id(PublicIdKind.USER).value
     with pytest.raises(RuntimeError, match="unexpected storage bug"):
         await service.generate(
             "private source text",
             generation_id=generation_id,
-            agent_account_id=account_id,
+            customer_user_id=user_id,
             user_id=uuid4(),
             direction=None,
             count=2,
@@ -501,6 +501,6 @@ async def test_unexpected_parallel_render_failure_deletes_every_attempted_object
 
     assert len(storage.deleted) == 2
     assert all(
-        path.startswith(f"/memes/generated/agents/{account_id}/{generation_id}/")
+        path.startswith(f"/memes/generated/users/{user_id}/{generation_id}/")
         for path in storage.deleted
     )

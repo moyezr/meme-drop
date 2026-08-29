@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
       <aside className="notice" aria-label="Pre-launch policy status">
         <p>
           <strong>Private-beta notice.</strong> MemeDrop is not yet a public, self-service API.
-          Agent accounts, one-way-hashed credentials, credits, authenticated generation, and
+          User-owned one-way-hashed credentials, credits, authenticated generation, and
           30-day generated-asset cleanup are implemented. Production provider retention,
           infrastructure logging, payment, and billing settings still require hosted verification.
         </p>
@@ -64,7 +64,7 @@ export default function PrivacyPolicyPage() {
         <h3>Generated media</h3>
         <p>
           MemeDrop stores rendered meme images in the configured object-storage service so they can
-          be returned to the authenticated account. Each durable generated asset expires 30 days
+          be returned to the authenticated user. Each durable generated asset expires 30 days
           after generation. Expired media is no longer served; a protected daily cleanup job deletes
           its exact stored object and keeps failures visible for operator retry. Rendered pixels
           necessarily contain the generated caption even though caption text is not stored as a
@@ -82,10 +82,10 @@ export default function PrivacyPolicyPage() {
         </p>
         <h3>Account, API, and billing data</h3>
         <p>
-          Private-beta agent accounts, API keys, and credit ledgers are available through an
-          operator-only workflow. MemeDrop stores account and key names, compact IDs, categorical
-          status, key-use and lifecycle timestamps, credit-ledger attribution, and generation/asset
-          lifecycle metadata. API-key secrets are shown once at issuance and stored only as
+          Private-beta users, API keys, and credit transactions are available through an
+          operator-only workflow. MemeDrop stores compact IDs, key names, key-use and revocation
+          timestamps, signed credit movements, and generation/asset lifecycle metadata.
+          API-key secrets are shown once at issuance and stored only as
           one-way SHA-256 hashes. Payments, recharging, and self-service billing are not implemented;
           the future payment processor and billing-record retention remain to be determined.
         </p>
@@ -140,14 +140,14 @@ export default function PrivacyPolicyPage() {
           Generated images expire 30 days after successful generation. Authenticated media access
           stops at expiry, and the implemented scheduled cleanup deletes exact stored objects in
           bounded batches. Retryable and blocked cleanup backlogs remain visible to operators so a
-          deletion failure does not disappear silently. Durable account, key, credit-ledger, and
+          deletion failure does not disappear silently. Durable user, key, credit-transaction, and
           categorical generation records are retained for private-beta operations and auditing.
         </p>
         <p>
           Final hosted retention periods for application and infrastructure logs, PostgreSQL,
           Redis, OpenRouter, Tavily, analytics, and object storage still require verification.
           Billing retention is not yet applicable because payments are not implemented. API keys
-          can be revoked by an operator; account self-service, early asset deletion, and a
+          can be revoked by an operator; full account self-service, early asset deletion, and a
           generated-content complaint workflow remain pending. Contact us for a request.
         </p>
       </section>

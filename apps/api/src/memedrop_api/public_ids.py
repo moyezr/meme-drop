@@ -13,17 +13,16 @@ from enum import StrEnum
 
 # Excludes visually ambiguous characters (0/O, 1/I/l) while remaining URL-safe.
 PUBLIC_ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-PUBLIC_ID_TOKEN_LENGTH = 22
+PUBLIC_ID_TOKEN_LENGTH = 12
 
 
 class PublicIdKind(StrEnum):
     """The record kinds that receive compact IDs in the agent platform."""
 
-    AGENT_ACCOUNT = "acct"
-    API_KEY = "key"
-    LEDGER_ENTRY = "led"
-    GENERATION = "gen"
-    ASSET = "asset"
+    USER = "u"
+    API_KEY = "k"
+    GENERATION = "g"
+    ASSET = "a"
 
 
 class PublicIdError(ValueError):
@@ -44,9 +43,9 @@ class PublicId:
 def create_public_id(kind: PublicIdKind) -> PublicId:
     """Create a non-sequential, URL-safe public ID for ``kind``.
 
-    Twenty-two characters from a 57-character alphabet provide more than 128
-    bits of entropy. ``secrets.choice`` draws from the operating system's
-    cryptographically secure random source and avoids modulo bias.
+    Twelve characters from a 57-character alphabet provide about 70 bits of
+    entropy. Database uniqueness plus bounded insert retries handle the already
+    remote collision case without making every public identifier oversized.
     """
 
     if not isinstance(kind, PublicIdKind):
@@ -56,9 +55,7 @@ def create_public_id(kind: PublicIdKind) -> PublicId:
     return PublicId(kind=kind, value=f"{kind}_{token}")
 
 
-def parse_public_id(
-    value: str, *, expected_kind: PublicIdKind | None = None
-) -> PublicId:
+def parse_public_id(value: str, *, expected_kind: PublicIdKind | None = None) -> PublicId:
     """Strictly parse a public ID without normalizing or accepting aliases."""
 
     if not isinstance(value, str):

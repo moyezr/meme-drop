@@ -22,7 +22,7 @@ const curlExample = [
 const mediaExample = [
   "curl --output meme.webp \\",
   '  --header "Authorization: Bearer $MEMEDROP_API_KEY" \\',
-  '  "' + apiOrigin + '/api/v1/memes/assets/asset_23456789ABCDEFGHJKLMNP"',
+  '  "' + apiOrigin + '/api/v1/memes/assets/a_23456789ABCD"',
 ].join("\n");
 
 const typeScriptExample = [
@@ -72,8 +72,8 @@ const responseExample = JSON.stringify(
     status: "ok",
     memes: [
       {
-        id: "asset_23456789ABCDEFGHJKLMNP",
-        image_url: apiOrigin + "/api/v1/memes/assets/asset_23456789ABCDEFGHJKLMNP",
+        id: "a_23456789ABCD",
+        image_url: apiOrigin + "/api/v1/memes/assets/a_23456789ABCD",
         expires_at: "2026-09-23T12:00:00Z",
       },
     ],
@@ -105,7 +105,7 @@ export default function AgentDocsPage() {
         <h1>Agent API</h1>
         <p className="pageIntro">
           Give MemeDrop one piece of context and get a finished, captioned meme. The
-          private-beta API uses a small authenticated request, one-charge idempotency,
+          private-beta API uses a small authenticated request, retry-safe idempotency,
           and durable media that expires after 30 days.
         </p>
       </header>
@@ -221,7 +221,7 @@ export default function AgentDocsPage() {
               <td><code className="inlineCode">memes[].id</code></td>
               <td>
                 A compact opaque asset ID beginning with{" "}
-                <code className="inlineCode">asset_</code>.
+                <code className="inlineCode">a_</code> followed by 12 Base58 characters.
               </td>
             </tr>
             <tr>
@@ -236,7 +236,7 @@ export default function AgentDocsPage() {
         </table>
         <p>
           Media is private. Fetch <code className="inlineCode">image_url</code> with
-          the same account&apos;s Bearer credential; generic object paths do not serve
+          the same user&apos;s Bearer credential; generic object paths do not serve
           generated agent images.
         </p>
         <pre className="codeBlock"><code>{mediaExample}</code></pre>
@@ -246,13 +246,13 @@ export default function AgentDocsPage() {
         <h2 id="credits">Credits and idempotent replay</h2>
         <ul>
           <li>
-            A new generation reserves one credit. It commits only after at least one
-            rendered asset and its durable record are stored successfully.
+            A new generation reserves the requested <code className="inlineCode">count</code>
+            of credits before provider work begins.
           </li>
           <li>
             No-fit, provider, rendering, storage, cancellation, and persistence
-            failures release the reservation. A successful request costs one credit
-            even when it returns multiple requested assets.
+            failures refund the full reservation. A successful request costs one credit
+            per durable returned meme; any unused reservation is refunded.
           </li>
           <li>
             Repeating the same body and{" "}
@@ -318,12 +318,12 @@ export default function AgentDocsPage() {
                 <code className="inlineCode">asset_persistence_failure</code>,{" "}
                 <code className="inlineCode">internal_failure</code>
               </td>
-              <td>The credit is released. The same key replays the terminal error.</td>
+              <td>The full reservation is refunded. The same key replays the terminal error.</td>
             </tr>
             <tr>
               <td>504</td>
               <td><code className="inlineCode">provider_timeout</code></td>
-              <td>The credit is released. Back off; a new attempt requires a new key.</td>
+              <td>The full reservation is refunded. Back off; a new attempt requires a new key.</td>
             </tr>
             <tr>
               <td>404 / 410</td>

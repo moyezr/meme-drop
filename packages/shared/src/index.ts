@@ -9,6 +9,20 @@ export type {
 
 export type { User } from "./types/user.js";
 
+export {
+  PUBLIC_ID_ALPHABET,
+  PUBLIC_ID_TOKEN_LENGTH,
+  isPublicId,
+} from "./types/public-id.js";
+export type {
+  PublicIdPrefix,
+  PublicId,
+  UserId,
+  ApiKeyId,
+  GenerationId,
+  AssetId,
+} from "./types/public-id.js";
+
 export type {
   MemeGenerateOptions,
   MemeGenerateRequest,

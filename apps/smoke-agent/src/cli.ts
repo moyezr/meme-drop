@@ -17,7 +17,10 @@ interface Arguments {
 async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2));
   if (!args.confirmGeneration) {
-    fail("confirmation_required", "Pass --confirm-generation because a successful run consumes one credit.");
+    fail(
+      "confirmation_required",
+      "Pass --confirm-generation because each durable returned meme consumes one credit.",
+    );
   }
   const apiBaseUrl = process.env.MEMEDROP_API_BASE_URL?.trim();
   const apiKey = process.env.MEMEDROP_API_KEY?.trim();

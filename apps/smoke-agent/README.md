@@ -6,7 +6,7 @@ does not import the FastAPI application, connect to PostgreSQL or Redis, or acce
 
 The smoke verifies:
 
-1. `/live` and `/health` are ready before spending a credit;
+1. `/live` and `/health` are ready before spending credits;
 2. the minimal generation request succeeds or returns a valid `no_fit` result;
 3. replaying the exact body and idempotency key returns the identical terminal response; and
 4. every returned private image is downloadable with the same agent credential, is bounded in
@@ -20,8 +20,9 @@ MEMEDROP_API_KEY=<issued-agent-credential> \
 npm run smoke:agent -- --confirm-generation
 ```
 
-A successful new run consumes one credit. The immediate replay uses the same idempotency key and
-must not generate or charge again. The report intentionally omits the request input and credential.
+Each durable meme returned by a successful new run consumes one credit, so `--count 3` can consume
+up to three credits. The immediate replay uses the same required idempotency key and must not
+generate or charge again. The report intentionally omits the request input and credential.
 
 For a custom scenario, prefer standard input so source text does not appear in the process list:
 

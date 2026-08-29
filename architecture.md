@@ -62,10 +62,11 @@ backend is FastAPI only; no Fastify runtime remains.
 `apps/smoke-agent` behaves like an external customer integration even though its source is kept in
 the monorepo. It calls only `/live`, `/health`, `POST /api/v1/memes/generate`, and the authenticated
 `image_url` returned by that endpoint. It cannot import backend services, query PostgreSQL or Redis,
-or read object storage. Before sending a generation that can consume one credit, it requires an
-explicit operator confirmation and verifies hosted readiness. It then replays the exact request and
-idempotency key and fetches media only when its origin and compact asset path match the configured
-API origin. Reports contain IDs, categories, sizes, and timings, never source input or credentials.
+or read object storage. Before sending a generation that can consume one credit per durable returned
+meme, it requires an explicit operator confirmation and verifies hosted readiness. It then replays
+the exact request and required idempotency key and fetches media only when its origin and compact
+asset path match the configured API origin. Reports contain IDs, categories, sizes, and timings,
+never source input or credentials.
 
 ## Request and media flow
 

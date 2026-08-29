@@ -103,8 +103,9 @@ npm run smoke:agent -- --confirm-generation
 ```
 
 The smoke agent calls only public HTTPS routes, repeats the exact generation request to verify
-idempotency, and downloads returned private media with the same Bearer credential. A successful new
-run consumes one credit. See `apps/smoke-agent/README.md` for safe custom-input options.
+idempotency, and downloads returned private media with the same Bearer credential. Each durable
+meme returned by a new run consumes one credit; its replay consumes none. See
+`apps/smoke-agent/README.md` for safe custom-input options.
 
 Recommendation and catalog quality:
 

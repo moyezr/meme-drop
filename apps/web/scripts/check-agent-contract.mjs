@@ -24,13 +24,21 @@ for (const text of [
   "Authorization",
   "Bearer",
   "Idempotency-Key",
-  "asset_23456789ABCDEFGHJKLMNP",
+  "a_23456789ABCD",
+  "followed by 12 Base58 characters",
   "image_url",
   "expires_at",
   "no_fit",
   "30 days",
+  "one credit",
+  "per durable returned meme",
+  "full reservation is refunded",
 ]) {
   requireText(docs, text, "agent docs");
+}
+
+for (const text of ["one-charge idempotency", "The credit is released"]) {
+  rejectText(docs, text, "agent docs");
 }
 
 const stableErrorCodes = [
@@ -80,4 +88,4 @@ for (const text of [
   requireText(privacy, text, "privacy policy");
 }
 
-console.log("Landing agent contract assertions passed.");
+console.log("Web agent contract assertions passed.");

@@ -211,18 +211,19 @@ Do not run either operation during a Vercel build or function startup. Confirm t
 pgvector extension exist, meme rows were created, original images and thumbnails are in
 `meme-drop-prod`, and nothing was written to `meme-drop-dev`.
 
-### Bootstrap a private-beta agent account
+### Bootstrap a private-beta user
 
-Account provisioning is an explicit operator operation against the migrated production database.
-Create the account, copy its returned compact ID, issue one API key, grant the agreed beta credits,
-and inspect the content-free result:
+User provisioning is an explicit operator operation against the migrated production database.
+Create the user with the stable identity-provider subject that Auth.js will use, copy the returned
+compact ID, issue one API key, grant the agreed beta credits, and inspect the content-free result:
 
 ```sh
-npm run agent:admin -- account-create --name "Acme beta" --confirm
-npm run agent:admin -- key-issue --account-id acct_... --name "Production" --confirm
-npm run agent:admin -- credits-grant --account-id acct_... --credits 25 \
-  --idempotency-key acme-initial-20260824 --actor operator:moyez --confirm
-npm run agent:admin -- status --account-id acct_...
+npm run agent:admin -- user-create --auth-provider github \
+  --auth-subject <provider-user-id> --email <customer-email> --confirm
+npm run agent:admin -- key-issue --user-id u_... --name "Production" --confirm
+npm run agent:admin -- credits-grant --user-id u_... --credits 25 \
+  --idempotency-key beta-initial-20260828 --confirm
+npm run agent:admin -- status --user-id u_...
 ```
 
 The issue response is the only time the full Bearer credential is available. Put it directly in an
@@ -242,26 +243,23 @@ MEMEDROP_API_KEY=<issued-agent-credential> \
 npm run smoke:agent -- --confirm-generation
 ```
 
-One successful new run consumes one credit; its immediate replay must not consume another. Confirm
-the final balance with the content-free `agent:admin status` command. The smoke report deliberately
-omits the input and credential.
+Each durable meme returned by a successful new run consumes one credit; its immediate replay must
+not consume more. Confirm the final balance with the content-free `agent:admin status` command. The
+smoke report deliberately omits the input and credential.
 
 Use these explicit commands for key lifecycle changes:
 
 ```sh
-npm run agent:admin -- key-rotate --account-id acct_... --key-id key_... \
-  --name "Production replacement" --reason scheduled_rotation \
-  --actor operator:moyez --confirm
-npm run agent:admin -- key-revoke --account-id acct_... --key-id key_... \
-  --reason operator_request --actor operator:moyez --confirm
+npm run agent:admin -- key-rotate --user-id u_... --key-id k_... \
+  --name "Production replacement" --confirm
+npm run agent:admin -- key-revoke --user-id u_... --key-id k_... --confirm
 ```
 
 Rotation prints its replacement credential exactly once. Every mutation requires `--confirm`.
-Within one account, credit-grant retries must reuse the same idempotency key and amount; a changed
-amount or actor fails, and every intended grant needs a unique operator key. The required `--actor`
-is stored as bounded operator attribution in the immutable credit ledger. The status command returns
-only operator-safe account/key names, IDs, categorical states, timestamps, and the credit balance.
-It does not return credentials, request content, captions, or generated media metadata.
+For one user, credit-grant retries must reuse the same idempotency key and amount; changing the
+amount conflicts, and every intended grant needs a new operator key. The status command returns only
+operator-safe user/key metadata, IDs, timestamps, and the credit balance. It does not return
+credentials, request content, captions, or generated media metadata.
 
 ### Confirm daily generated-media maintenance
 
@@ -271,7 +269,7 @@ stale-generation credit reconciliation under one `CRON_SECRET`-authenticated Red
 a reviewed adjustment. Its report includes `stale_generations_reconciled`; a 503
 `generation_reconciliation` result requires operator investigation before the next delivery.
 
-For a stale request, the service derives only its compact account-and-generation object prefix,
+For a stale request, the service derives only its compact user-and-generation object prefix,
 lists at most the fixed five-result output limit plus one object, and deletes only keys returned beneath
 that prefix. An overflow, listing, or deletion error leaves the request processing and its credit
 reserved for a retry; it never performs a bucket-wide scan or deletion.

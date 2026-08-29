@@ -55,7 +55,7 @@ async def generate_meme(
     authorization: Annotated[str | None, Header()] = None,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> GenerateMemeResponse | JSONResponse:
-    """Reserve one credit, generate bounded images, and settle only durable output."""
+    """Reserve the requested count and settle one credit per durable output."""
 
     if request.headers.get("x-memedrop-install-id"):
         return _error(401, "install_auth_not_supported")
@@ -75,7 +75,7 @@ async def generate_meme(
     if not idempotency_key:
         return _error(400, "invalid_input")
     allowed = await limiter.consume(
-        f"agent:{principal.agent_account_id}:{_AGENT_GENERATION_ROUTE}",
+        f"agent:{principal.user_id}:{_AGENT_GENERATION_ROUTE}",
         settings.expensive_rate_limit_window_ms,
         settings.expensive_rate_limit_max,
     )
@@ -85,10 +85,11 @@ async def generate_meme(
     credits = cast(AgentGenerationCreditService, request.app.state.agent_generation_credits)
     try:
         generation = await credits.begin_generation(
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             api_key_id=principal.api_key_id,
             idempotency_key=idempotency_key,
             request_fingerprint=_request_fingerprint(body),
+            requested_count=body.options.count,
         )
     except IdempotencyConflict:
         return _error(409, "idempotency_conflict")
@@ -106,15 +107,15 @@ async def generate_meme(
         rendered_assets = await generator.generate(
             body.input,
             generation_id=generation.id,
-            agent_account_id=principal.agent_account_id,
-            user_id=_agent_suggestion_user_id(principal.agent_account_id),
+            customer_user_id=principal.user_id,
+            user_id=_agent_suggestion_user_id(principal.user_id),
             direction=body.options.direction,
             count=body.options.count,
         )
     except asyncio.CancelledError:
         await _release_after_abort(
             credits,
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             generation_id=generation.id,
             outcome=GenerationStatus.CANCELLED,
             failure_code="request_cancelled",
@@ -123,7 +124,7 @@ async def generate_meme(
     except AgentMemeGenerationFailure as error:
         await _release_after_abort(
             credits,
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             generation_id=generation.id,
             outcome=GenerationStatus.FAILED,
             failure_code=error.code,
@@ -132,7 +133,7 @@ async def generate_meme(
     except TimeoutError:
         await _release_after_abort(
             credits,
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             generation_id=generation.id,
             outcome=GenerationStatus.FAILED,
             failure_code="provider_timeout",
@@ -141,7 +142,7 @@ async def generate_meme(
     except Exception:
         await _release_after_abort(
             credits,
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             generation_id=generation.id,
             outcome=GenerationStatus.FAILED,
             failure_code="internal_failure",
@@ -150,7 +151,7 @@ async def generate_meme(
 
     if not rendered_assets:
         await credits.settle_generation(
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             generation_id=generation.id,
             outcome=GenerationStatus.NO_FIT,
         )
@@ -158,7 +159,7 @@ async def generate_meme(
 
     try:
         completion = await credits.complete_generation_with_assets(
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             generation_id=generation.id,
             assets=tuple(
                 GenerationAssetInput(
@@ -173,7 +174,7 @@ async def generate_meme(
         await _delete_rendered_objects(request, rendered_assets)
         await _release_after_abort(
             credits,
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             generation_id=generation.id,
             outcome=GenerationStatus.CANCELLED,
             failure_code="request_cancelled",
@@ -183,7 +184,7 @@ async def generate_meme(
         await _delete_rendered_objects(request, rendered_assets)
         await _release_after_abort(
             credits,
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             generation_id=generation.id,
             outcome=GenerationStatus.FAILED,
             failure_code="asset_persistence_failure",
@@ -211,7 +212,7 @@ async def serve_generated_asset(
     assets = cast(AgentGeneratedAssetStore, request.app.state.agent_generated_asset_store)
     try:
         asset = await assets.get_for_serving(
-            account_id=principal.agent_account_id,
+            user_id=principal.user_id,
             asset_id=asset_id,
         )
     except GeneratedAssetExpired:
@@ -246,12 +247,12 @@ async def _replay_response(
         code = _failed_generation_code(generation.failure_code)
         return _error(504 if code == "provider_timeout" else 500, code)
     durable_assets = await assets.list_for_generation(
-        account_id=generation.balance.agent_account_id,
+        user_id=generation.balance.user_id,
         generation_id=generation.id,
     )
     if not durable_assets:
         if await assets.has_any_for_generation(
-            account_id=generation.balance.agent_account_id,
+            user_id=generation.balance.user_id,
             generation_id=generation.id,
         ):
             return _error(410, "asset_expired")
@@ -274,10 +275,10 @@ def _request_fingerprint(body: GenerateMemeRequest) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def _agent_suggestion_user_id(agent_account_id: str) -> UUID:
+def _agent_suggestion_user_id(customer_user_id: str) -> UUID:
     """Use a stable internal UUID for legacy suggestion feedback boundaries."""
 
-    return uuid5(NAMESPACE_URL, f"memedrop-agent:{agent_account_id}")
+    return uuid5(NAMESPACE_URL, f"memedrop-user:{customer_user_id}")
 
 
 def _public_asset(
@@ -307,7 +308,7 @@ async def _delete_rendered_objects(
 async def _release_after_abort(
     credits: AgentGenerationCreditService,
     *,
-    account_id: str,
+    user_id: str,
     generation_id: str,
     outcome: GenerationStatus,
     failure_code: str,
@@ -316,7 +317,7 @@ async def _release_after_abort(
 
     try:
         await credits.settle_generation(
-            account_id=account_id,
+            user_id=user_id,
             generation_id=generation_id,
             outcome=outcome,
             failure_code=failure_code,

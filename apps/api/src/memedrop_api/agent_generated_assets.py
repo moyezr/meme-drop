@@ -30,7 +30,7 @@ class AgentGeneratedAsset:
     """The minimal durable data required to authorize and serve one image."""
 
     id: str
-    agent_account_id: str
+    user_id: str
     generation_id: str
     object_key: str
     content_type: str
@@ -42,14 +42,14 @@ class AgentGeneratedAssetStore(Protocol):
     """Persistence operations required by the agent generation HTTP boundary."""
 
     async def list_for_generation(
-        self, *, account_id: str, generation_id: str, as_of: datetime | None = None
+        self, *, user_id: str, generation_id: str, as_of: datetime | None = None
     ) -> list[AgentGeneratedAsset]: ...
 
     async def get_for_serving(
-        self, *, account_id: str, asset_id: str, as_of: datetime | None = None
+        self, *, user_id: str, asset_id: str, as_of: datetime | None = None
     ) -> AgentGeneratedAsset: ...
 
-    async def has_any_for_generation(self, *, account_id: str, generation_id: str) -> bool: ...
+    async def has_any_for_generation(self, *, user_id: str, generation_id: str) -> bool: ...
 
 
 class SqlAlchemyAgentGeneratedAssetStore:
@@ -65,7 +65,7 @@ class SqlAlchemyAgentGeneratedAssetStore:
         self._now = now or (lambda: datetime.now(UTC))
 
     async def list_for_generation(
-        self, *, account_id: str, generation_id: str, as_of: datetime | None = None
+        self, *, user_id: str, generation_id: str, as_of: datetime | None = None
     ) -> list[AgentGeneratedAsset]:
         current = _require_aware(as_of or self._now())
         async with self._database.session() as session:
@@ -73,7 +73,7 @@ class SqlAlchemyAgentGeneratedAssetStore:
                 await session.scalars(
                     select(GeneratedAsset)
                     .where(
-                        GeneratedAsset.agent_account_id == account_id,
+                        GeneratedAsset.user_id == user_id,
                         GeneratedAsset.generation_id == generation_id,
                         GeneratedAsset.deletion_state == "active",
                         GeneratedAsset.expires_at > current,
@@ -84,14 +84,14 @@ class SqlAlchemyAgentGeneratedAssetStore:
         return [_asset_record(row) for row in rows]
 
     async def get_for_serving(
-        self, *, account_id: str, asset_id: str, as_of: datetime | None = None
+        self, *, user_id: str, asset_id: str, as_of: datetime | None = None
     ) -> AgentGeneratedAsset:
         current = _require_aware(as_of or self._now())
         async with self._database.session() as session:
             row = await session.scalar(
                 select(GeneratedAsset).where(
                     GeneratedAsset.id == asset_id,
-                    GeneratedAsset.agent_account_id == account_id,
+                    GeneratedAsset.user_id == user_id,
                 )
             )
         if row is None:
@@ -100,11 +100,11 @@ class SqlAlchemyAgentGeneratedAssetStore:
             raise GeneratedAssetExpired("generated asset is expired")
         return _asset_record(row)
 
-    async def has_any_for_generation(self, *, account_id: str, generation_id: str) -> bool:
+    async def has_any_for_generation(self, *, user_id: str, generation_id: str) -> bool:
         async with self._database.session() as session:
             row = await session.scalar(
                 select(GeneratedAsset.id).where(
-                    GeneratedAsset.agent_account_id == account_id,
+                    GeneratedAsset.user_id == user_id,
                     GeneratedAsset.generation_id == generation_id,
                 )
             )
@@ -114,7 +114,7 @@ class SqlAlchemyAgentGeneratedAssetStore:
 def _asset_record(row: GeneratedAsset) -> AgentGeneratedAsset:
     return AgentGeneratedAsset(
         id=row.id,
-        agent_account_id=row.agent_account_id,
+        user_id=row.user_id,
         generation_id=row.generation_id,
         object_key=row.object_key,
         content_type=row.content_type,

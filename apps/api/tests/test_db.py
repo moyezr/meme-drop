@@ -27,6 +27,7 @@ def test_postgres_urls_use_async_psycopg_driver() -> None:
 
 def test_database_models_preserve_existing_table_names() -> None:
     assert set(Base.metadata.tables) == {
+        "install_users",
         "users",
         "memes",
         "user_memes",
@@ -38,10 +39,9 @@ def test_database_models_preserve_existing_table_names() -> None:
         "trend_scan_queries",
         "trend_credit_periods",
         "trend_credit_reservations",
-        "agent_accounts",
-        "agent_api_keys",
-        "agent_generations",
-        "credit_ledger_entries",
+        "api_keys",
+        "generations",
+        "credit_transactions",
         "generated_assets",
     }
 

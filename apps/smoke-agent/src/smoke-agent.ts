@@ -5,7 +5,7 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_JSON_BYTES = 1_000_000;
 const MAX_IMAGE_BYTES = 15_000_000;
 const MAX_EXPIRY_WINDOW_MS = 31 * 24 * 60 * 60 * 1_000;
-const ASSET_ID = /^asset_[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22}$/;
+const ASSET_ID = /^a_[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{12}$/;
 
 export interface SmokeAgentOptions {
   apiBaseUrl: string;

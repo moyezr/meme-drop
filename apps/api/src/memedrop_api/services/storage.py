@@ -94,15 +94,15 @@ def validate_object_key(object_key: str) -> str:
     return key
 
 
-def generated_agent_object_prefix(*, account_id: str, generation_id: str) -> str:
+def generated_agent_object_prefix(*, user_id: str, generation_id: str) -> str:
     """Return the only prefix eligible for stale agent-generation cleanup."""
 
     try:
-        account = parse_public_id(account_id, expected_kind=PublicIdKind.AGENT_ACCOUNT).value
+        user = parse_public_id(user_id, expected_kind=PublicIdKind.USER).value
         generation = parse_public_id(generation_id, expected_kind=PublicIdKind.GENERATION).value
     except PublicIdError as error:
         raise GeneratedAgentObjectCleanupError("invalid generation cleanup identity") from error
-    return f"generated/agents/{account}/{generation}/"
+    return f"generated/users/{user}/{generation}/"
 
 
 class GeneratedAgentObjectCleaner:
@@ -116,8 +116,13 @@ class GeneratedAgentObjectCleaner:
         self.storage = storage
         self.max_objects = max_objects
 
-    async def cleanup_generation_objects(self, *, account_id: str, generation_id: str) -> None:
-        prefix = generated_agent_object_prefix(account_id=account_id, generation_id=generation_id)
+    async def cleanup_generation_objects(
+        self,
+        *,
+        user_id: str,
+        generation_id: str,
+    ) -> None:
+        prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
         keys = await self.storage.list_object_keys(prefix, limit=self.max_objects + 1)
         if len(keys) > self.max_objects:
             raise GeneratedAgentObjectLimitExceeded("generation cleanup object limit exceeded")

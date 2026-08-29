@@ -17,14 +17,13 @@ from alembic.config import Config
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from memedrop_api.agent_account_repository import SqlAlchemyAgentCredentialRepository
 from memedrop_api.agent_credentials import (
-    AgentAccountRecord,
-    AgentAccountStatus,
     AgentCredentialError,
     AgentCredentialService,
     ApiKeyRecord,
     IssuedApiKey,
+    UserCredentialStatus,
+    UserRecord,
 )
 from memedrop_api.agent_generation_credits import (
     AgentGenerationCreditError,
@@ -32,7 +31,7 @@ from memedrop_api.agent_generation_credits import (
     CreditBalance,
 )
 from memedrop_api.config import PRODUCTION_API_ORIGIN, PRODUCTION_BUCKET, Settings
-from memedrop_api.db import Database, Meme, User
+from memedrop_api.db import Database, InstallUser, Meme
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.storage import (
     MemeStorage,
@@ -41,6 +40,7 @@ from memedrop_api.services.storage import (
 )
 from memedrop_api.services.thumbnails import THUMBNAIL_CONTENT_TYPE, make_thumbnail
 from memedrop_api.services.usage_feedback import load_usage_feedback
+from memedrop_api.user_repository import SqlAlchemyUserRepository
 
 DEV_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 PLACEHOLDER_HOSTS = {
@@ -69,29 +69,27 @@ class RemoteTemplate(TypedDict):
 
 
 class AgentCredentialAdministrator(Protocol):
-    async def create_account(self, *, name: str) -> AgentAccountRecord: ...
+    async def create_user(
+        self, *, auth_provider: str, auth_subject: str, email: str | None = None
+    ) -> UserRecord: ...
 
-    async def account_status(self, *, account_id: str) -> AgentAccountStatus: ...
+    async def user_status(self, *, user_id: str) -> UserCredentialStatus: ...
 
-    async def issue_api_key(self, *, account_id: str, name: str) -> IssuedApiKey: ...
+    async def issue_api_key(self, *, user_id: str, name: str) -> IssuedApiKey: ...
 
     async def rotate_api_key(
         self,
         *,
-        account_id: str,
+        user_id: str,
         key_id: str,
         name: str,
-        reason: str,
-        actor: str,
     ) -> IssuedApiKey: ...
 
     async def revoke_api_key(
         self,
         *,
-        account_id: str,
+        user_id: str,
         key_id: str,
-        reason: str,
-        actor: str,
     ) -> ApiKeyRecord: ...
 
 
@@ -99,13 +97,12 @@ class AgentCreditAdministrator(Protocol):
     async def grant_credits(
         self,
         *,
-        account_id: str,
+        user_id: str,
         credits: int,
         grant_idempotency_key: str,
-        operator_actor_id: str | None = None,
     ) -> CreditBalance: ...
 
-    async def balance(self, *, account_id: str) -> CreditBalance: ...
+    async def balance(self, *, user_id: str) -> CreditBalance: ...
 
 
 def db_init() -> None:
@@ -127,8 +124,7 @@ def db_seed_memes() -> None:
     settings = Settings()  # type: ignore[call-arg]
     inserted, migrated, skipped = asyncio.run(seed_meme_catalog(settings))
     print(
-        f"[MemeDrop] Meme catalog seeded: inserted={inserted} "
-        f"migrated={migrated} skipped={skipped}"
+        f"[MemeDrop] Meme catalog seeded: inserted={inserted} migrated={migrated} skipped={skipped}"
     )
 
 
@@ -150,13 +146,9 @@ async def seed_meme_catalog(settings: Settings) -> tuple[int, int, int]:
                         )
                     )
                 )
-                migrated = await migrate_legacy_meme_files(
-                    settings, storage, legacy_memes
-                )
+                migrated = await migrate_legacy_meme_files(settings, storage, legacy_memes)
 
-        async with httpx.AsyncClient(
-            timeout=settings.image_download_timeout_ms / 1000
-        ) as client:
+        async with httpx.AsyncClient(timeout=settings.image_download_timeout_ms / 1000) as client:
             response = await client.get("https://api.imgflip.com/get_memes")
             response.raise_for_status()
             remote = cast(list[RemoteTemplate], response.json()["data"]["memes"])
@@ -207,9 +199,9 @@ async def seed_meme_catalog(settings: Settings) -> tuple[int, int, int]:
                     file_path = await storage.put_bytes(
                         f"catalog/{filename}",
                         image.content,
-                        content_type=image.headers.get("content-type", "image/jpeg").split(
-                            ";", 1
-                        )[0],
+                        content_type=image.headers.get("content-type", "image/jpeg").split(";", 1)[
+                            0
+                        ],
                     )
                     session.add(
                         Meme(
@@ -285,8 +277,8 @@ async def seed_development_user(settings: Settings) -> None:
     database = Database(settings.database_url)
     try:
         async with database.session() as session, session.begin():
-            statement = insert(User).values(id=DEV_USER_ID, email="dev@memedrop.local")
-            await session.execute(statement.on_conflict_do_nothing(index_elements=[User.id]))
+            statement = insert(InstallUser).values(id=DEV_USER_ID, email="dev@memedrop.local")
+            await session.execute(statement.on_conflict_do_nothing(index_elements=[InstallUser.id]))
     finally:
         await database.close()
 
@@ -312,7 +304,7 @@ def agent_admin() -> None:
     arguments = parser.parse_args()
     settings = Settings()  # type: ignore[call-arg]
     database = Database(settings.database_url)
-    credentials = AgentCredentialService(SqlAlchemyAgentCredentialRepository(database))
+    credentials = AgentCredentialService(SqlAlchemyUserRepository(database))
     credits = AgentGenerationCreditService(database)
     try:
         result = asyncio.run(
@@ -331,45 +323,42 @@ def agent_admin() -> None:
 def agent_admin_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="memedrop-agent-admin",
-        description="Administer private-beta agent accounts without exposing user content",
+        description="Administer private-beta API users without exposing user content",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
-    account_create = commands.add_parser("account-create", help="create an agent account")
-    account_create.add_argument("--name", required=True)
-    _require_confirmation(account_create)
+    user_create = commands.add_parser("user-create", help="create a customer user")
+    user_create.add_argument("--auth-provider", required=True)
+    user_create.add_argument("--auth-subject", required=True)
+    user_create.add_argument("--email")
+    _require_confirmation(user_create)
 
     key_issue = commands.add_parser("key-issue", help="issue a new API key")
-    key_issue.add_argument("--account-id", required=True)
+    key_issue.add_argument("--user-id", required=True)
     key_issue.add_argument("--name", required=True)
     _require_confirmation(key_issue)
 
     key_rotate = commands.add_parser("key-rotate", help="atomically rotate an active API key")
-    key_rotate.add_argument("--account-id", required=True)
+    key_rotate.add_argument("--user-id", required=True)
     key_rotate.add_argument("--key-id", required=True)
     key_rotate.add_argument("--name", required=True)
-    key_rotate.add_argument("--reason", required=True, type=_audit_code)
-    key_rotate.add_argument("--actor", required=True, type=_operator_actor)
     _require_confirmation(key_rotate)
 
     key_revoke = commands.add_parser("key-revoke", help="revoke an active API key")
-    key_revoke.add_argument("--account-id", required=True)
+    key_revoke.add_argument("--user-id", required=True)
     key_revoke.add_argument("--key-id", required=True)
-    key_revoke.add_argument("--reason", required=True, type=_audit_code)
-    key_revoke.add_argument("--actor", required=True, type=_operator_actor)
     _require_confirmation(key_revoke)
 
     credit_grant = commands.add_parser(
         "credits-grant", help="append an idempotent operator credit grant"
     )
-    credit_grant.add_argument("--account-id", required=True)
+    credit_grant.add_argument("--user-id", required=True)
     credit_grant.add_argument("--credits", required=True, type=_credit_count)
     credit_grant.add_argument("--idempotency-key", required=True)
-    credit_grant.add_argument("--actor", required=True, type=_operator_actor)
     _require_confirmation(credit_grant)
 
-    status = commands.add_parser("status", help="inspect content-free account status")
-    status.add_argument("--account-id", required=True)
+    status = commands.add_parser("status", help="inspect content-free user status")
+    status.add_argument("--user-id", required=True)
     return parser
 
 
@@ -380,47 +369,46 @@ async def execute_agent_admin_operation(
     credits: AgentCreditAdministrator,
 ) -> dict[str, object]:
     command = cast(str, arguments.command)
-    if command == "account-create":
-        account = await credentials.create_account(name=arguments.name)
-        return {"status": "created", "account": _account_status_json(account)}
+    if command == "user-create":
+        user = await credentials.create_user(
+            auth_provider=arguments.auth_provider,
+            auth_subject=arguments.auth_subject,
+            email=arguments.email,
+        )
+        return {"status": "created", "user": _user_status_json(user)}
     if command == "key-issue":
         issued = await credentials.issue_api_key(
-            account_id=arguments.account_id,
+            user_id=arguments.user_id,
             name=arguments.name,
         )
         return _issued_key_json(issued, status="issued")
     if command == "key-rotate":
         issued = await credentials.rotate_api_key(
-            account_id=arguments.account_id,
+            user_id=arguments.user_id,
             key_id=arguments.key_id,
             name=arguments.name,
-            reason=arguments.reason,
-            actor=arguments.actor,
         )
         return _issued_key_json(issued, status="rotated")
     if command == "key-revoke":
         key = await credentials.revoke_api_key(
-            account_id=arguments.account_id,
+            user_id=arguments.user_id,
             key_id=arguments.key_id,
-            reason=arguments.reason,
-            actor=arguments.actor,
         )
         return {"status": "revoked", "api_key": _api_key_status_json(key)}
     if command == "credits-grant":
         balance = await credits.grant_credits(
-            account_id=arguments.account_id,
+            user_id=arguments.user_id,
             credits=arguments.credits,
             grant_idempotency_key=arguments.idempotency_key,
-            operator_actor_id=arguments.actor,
         )
         return {"status": "granted", "balance": _credit_balance_json(balance)}
     if command == "status":
-        account_status = await credentials.account_status(account_id=arguments.account_id)
-        balance = await credits.balance(account_id=arguments.account_id)
+        user_status = await credentials.user_status(user_id=arguments.user_id)
+        balance = await credits.balance(user_id=arguments.user_id)
         return {
             "status": "ok",
-            "account": _account_status_json(account_status.account),
-            "api_keys": [_api_key_status_json(key) for key in account_status.api_keys],
+            "user": _user_status_json(user_status.user),
+            "api_keys": [_api_key_status_json(key) for key in user_status.api_keys],
             "balance": _credit_balance_json(balance),
         }
     raise AssertionError("argparse returned an unknown agent admin command")
@@ -453,31 +441,30 @@ def _issued_key_json(issued: IssuedApiKey, *, status: str) -> dict[str, object]:
     }
 
 
-def _account_status_json(account: AgentAccountRecord) -> dict[str, object]:
+def _user_status_json(user: UserRecord) -> dict[str, object]:
     return {
-        "id": account.id,
-        "name": account.name,
-        "status": account.status,
-        "created_at": account.created_at.isoformat(),
-        "updated_at": account.updated_at.isoformat(),
+        "id": user.id,
+        "auth_provider": user.auth_provider,
+        "auth_subject": user.auth_subject,
+        "email": user.email,
+        "credits": user.credits,
+        "created_at": user.created_at.isoformat(),
     }
 
 
 def _api_key_status_json(key: ApiKeyRecord) -> dict[str, object]:
     return {
         "id": key.id,
-        "account_id": key.agent_account_id,
+        "user_id": key.user_id,
         "name": key.name,
-        "status": key.status,
         "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
         "revoked_at": key.revoked_at.isoformat() if key.revoked_at else None,
         "created_at": key.created_at.isoformat(),
-        "updated_at": key.updated_at.isoformat(),
     }
 
 
 def _credit_balance_json(balance: CreditBalance) -> dict[str, object]:
-    return {"account_id": balance.agent_account_id, "credits": balance.credits}
+    return {"user_id": balance.user_id, "credits": balance.credits}
 
 
 def _require_confirmation(parser: argparse.ArgumentParser) -> None:
@@ -656,9 +643,7 @@ def production_env_findings(
     public_origin = value("MEMEDROP_API_PUBLIC_ORIGIN")
     validate_url("MEMEDROP_API_PUBLIC_ORIGIN", public_origin, {"https"}, errors)
     if public_origin.rstrip("/") != PRODUCTION_API_ORIGIN:
-        errors.append(
-            f"MEMEDROP_API_PUBLIC_ORIGIN must be exactly {PRODUCTION_API_ORIGIN}."
-        )
+        errors.append(f"MEMEDROP_API_PUBLIC_ORIGIN must be exactly {PRODUCTION_API_ORIGIN}.")
 
     api_key = value("OPENROUTER_API_KEY")
     if is_placeholder_value(api_key):

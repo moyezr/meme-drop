@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-08-25
+Last updated: 2026-08-28
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and decisions here as implementation progresses.
@@ -49,6 +49,10 @@ security audits. It deliberately does not make provider calls or validate hosted
   small as possible: an agent supplies `input`; optional controls stay under `options`.
 - New agent-facing records will use compact, application-generated IDs rather than UUIDs. IDs must
   remain collision-resistant, non-sequential, URL-safe, and safe to expose publicly.
+- A customer `User` directly owns API keys, credits, generations, and generated assets. Team and
+  workspace abstractions stay out until the product needs shared ownership.
+- Dashboard authentication uses Auth.js with JWT sessions. FastAPI remains the only application
+  backend and owns customer data and credit enforcement.
 - Developer documentation will be hosted by the web application at `/docs`.
 - The web application will include a management dashboard for API keys, credits,
   usage, billing, and account administration.
@@ -142,15 +146,16 @@ relevant trend card without adding more than the existing bounded prompt allowan
 - [x] Decide the migration boundary for existing UUID-backed browser/install data. Existing UUID
   records remain unchanged for the initial agent launch. Any future rewrite requires an explicit
   inventory of the affected tables, foreign keys, URLs, and rollback plan.
-- [x] Use compact IDs for new agent accounts, API keys, credit-ledger entries, generation records,
-  and generated assets.
+- [x] Use `u_`, `k_`, `g_`, and `a_` plus 12 non-ambiguous Base58 characters for public user, API
+  key, generation, and generated-asset IDs. Internal credit transactions use database identities.
 - [x] Add API-key authentication for agent routes. Store only a one-way hash of each secret; retain
   a short public key identifier for lookup, display, rotation, and audit.
 - [x] Support credential creation, naming, rotation, revocation, and last-used metadata through the
   explicit private-beta operator CLI. Self-service dashboard entry points remain a separate track.
 - [x] Enforce tenant-scoped rate limits and credit limits. An install ID must not be accepted as
   authentication for an external production agent.
-- [x] Add request idempotency so a caller retry cannot create a second charge or duplicate asset.
+- [x] Require the raw API caller to send `Idempotency-Key`; a matching retry cannot create a second
+  charge or duplicate asset, while reuse with a different request is rejected.
 - [x] Define stable machine-readable errors for invalid input, invalid credentials, insufficient
   credits, rate limiting, provider timeout, `no_fit`, and internal failure.
 - [x] Return an absolute HTTPS `image_url` using the production API origin.
@@ -162,7 +167,7 @@ relevant trend card without adding more than the existing bounded prompt allowan
   replay, model success/failure, rendering, object persistence, and media retrieval. A live hosted
   provider smoke remains an external deployment check.
 - [x] Add an independent black-box smoke agent under `apps/smoke-agent`. It uses only the public
-  HTTPS contract, verifies hosted readiness before spending a credit, replays the exact request,
+  HTTPS contract, verifies hosted readiness before spending credits, replays the exact request,
   downloads private media with the caller credential, and emits no request input or secret.
 - [x] Add contract checks shared by the FastAPI implementation, TypeScript types, and published
   docs.
@@ -173,13 +178,14 @@ charged or stored twice.
 
 ### P0 — Build credits, accounting, and unit economics
 
-- [x] Model credit balances as an append-only integer ledger rather than a mutable floating-point
-  balance. Every adjustment must have a reason, actor, timestamp, and idempotency identity.
-- [x] Implement atomic reserve, commit, and release behavior around generation so concurrent
-  requests cannot overspend an account.
-- [x] Consume one credit only when at least one finished meme asset is durably recorded and returned.
+- [x] Store each user's whole-credit balance for atomic checks and keep compact, typed credit
+  transactions for purchases, grants, generation reservations, and refunds.
+- [x] Implement atomic reserve and refund behavior around generation so concurrent requests cannot
+  overspend a user's balance.
+- [x] Consume one credit for each finished meme asset durably recorded and returned. Reserve the
+  requested count before work and refund every unused reservation during settlement.
 - [x] `no_fit`, provider or internal failure, cancellation, and matching idempotent replay are free.
-  A deterministic fallback that successfully returns a finished asset consumes one credit.
+  Each deterministic fallback asset that is successfully returned consumes one credit.
 - [ ] Record internal per-generation cost without storing raw prompt text: OpenRouter model and
   tokens, rendering/storage cost estimate, Tavily allocation, infrastructure allocation, and
   payment-processing allowance.
@@ -187,9 +193,9 @@ charged or stored twice.
   maximums.
 - [ ] Define packages, price per credit, minimum gross-margin target, free trial, expiration/refund
   rules, and abuse limits.
-- [ ] Select and integrate a payment provider only after the ledger and pricing model are reviewed.
+- [ ] Integrate Lemon Squeezy only after the credit transactions and pricing model are reviewed.
 - [ ] Add recharge webhooks with signature verification and idempotent fulfillment.
-- [ ] Add balance, ledger, and usage endpoints for the dashboard.
+- [ ] Add balance, credit-transaction, and usage endpoints for the dashboard.
 - [x] Add bounded stale-reservation reconciliation and idempotent operator grant tooling. General
   post-billing adjustments remain part of the future payment workflow.
 
@@ -199,7 +205,7 @@ twice.
 
 ### P0 — Enforce the 30-day generated-image lifecycle
 
-- [x] Add a durable generated-asset record containing compact ID, owning account, object key,
+- [x] Add a durable generated-asset record containing compact ID, owning user, object key,
   content type, content hash, created time, expiry time, generation ID, and deletion state.
 - [x] Set `expires_at` to 30 days after successful generation.
 - [x] Prevent cross-tenant asset enumeration and access.
@@ -215,7 +221,7 @@ twice.
   storage-volume aggregation, and alerting remain.
 - [x] Document the 30-day policy in the API docs and privacy policy.
 
-Done when: every generated object is attributable to one account and generation, becomes
+Done when: every generated object is attributable to one user and generation, becomes
 unavailable after its documented expiry, and is eventually removed without broad or unsafe bucket
 operations.
 
@@ -229,15 +235,16 @@ operations.
   the landing build and CI.
 - [x] Document timeout and retry guidance for agents.
 - [ ] Keep a versioned changelog and compatibility policy.
-- [ ] Design dashboard authentication and account recovery.
+- [~] Implement Auth.js JWT authentication and document account recovery through the configured
+  identity provider.
 - [ ] Build dashboard pages for API keys, remaining credits, recharge, usage history, generation
   history, asset expiry, and billing receipts.
 - [ ] Ensure dashboard data is tenant-scoped and never exposes full API secrets after creation.
 - [ ] Add accessibility, responsive-layout, empty-state, and error-state coverage.
 
 Done when: a developer unfamiliar with MemeDrop can obtain a credential and complete a successful
-generation using only `/docs`, and an account owner can manage keys and credits without database or
-operator access.
+generation using only `/docs`, and a user can manage keys and credits without database or operator
+access.
 
 ### P1 — Add production observability and abuse controls
 
@@ -246,10 +253,10 @@ operator access.
 - [ ] Track p50/p95/p99 end-to-end latency and provider latency separately.
 - [ ] Track estimated and reconciled cost per successful generation and per customer.
 - [ ] Add dashboards and alerts for elevated errors, provider timeouts, stale trends, Redis or
-  PostgreSQL failures, credit-ledger anomalies, storage cleanup lag, and unusual account usage.
+  PostgreSQL failures, credit-transaction anomalies, storage cleanup lag, and unusual user usage.
 - [ ] Confirm logs never contain raw source posts, generated captions, API secrets, signed URLs, or
   request bodies.
-- [ ] Add per-account and global circuit breakers, concurrency limits, and abuse monitoring.
+- [ ] Add per-user and global circuit breakers, concurrency limits, and abuse monitoring.
 - [ ] Define incident response, key rotation, provider outage, rollback, and credit-correction
   procedures.
 
@@ -315,17 +322,21 @@ quality gates, and catalog growth does not regress relevance, readability, safet
 
 ## Open architecture and product decisions
 
-- [x] Compact IDs use typed prefixes plus 22 characters from a 57-character non-ambiguous,
-  URL-safe alphabet. They provide more than 128 bits of CSPRNG entropy and are unique per table.
+- [x] Public IDs use `u_`, `k_`, `g_`, and `a_` plus 12 characters from a 57-character
+  non-ambiguous, URL-safe alphabet. They provide about 70 bits of CSPRNG entropy; database
+  uniqueness and bounded retry handle the remote collision case.
 - [x] Existing UUID-based install/browser identities are not rewritten for the initial agent launch.
-- [x] Credit-consumption semantics: charge only a successful durable asset; release for `no_fit` or
-  failure; charge a successful deterministic fallback; never recharge a matching replay.
+- [x] Credit-consumption semantics: charge one credit per successful durable returned asset; refund
+  unused reservations for `no_fit`, partial output, or failure; charge successful deterministic
+  fallback assets; never recharge a matching replay.
 - [?] Credit package sizes, price, tax treatment, refunds, expiry, and target gross margin.
-- [?] Payment provider and supported countries/currencies.
-- [x] Generated image URLs require the owning account's Bearer credential throughout the 30-day
+- [~] Lemon Squeezy is the planned payment provider; supported countries and currencies still need
+  verification before checkout launches.
+- [x] Generated image URLs require the owning user's Bearer credential throughout the 30-day
   retention window and return gone after expiry.
 - [?] Whether customers can explicitly delete generated images before expiry.
-- [?] Dashboard authentication provider and account model.
+- [x] Dashboard authentication uses Auth.js JWT sessions and a user-owned model without workspaces
+  or memberships.
 - [?] Initial public content-safety policy and appeal/takedown process.
 - [?] Whether the first production release is API-only, private beta, or includes the Chrome
   extension store launch.

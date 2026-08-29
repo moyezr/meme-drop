@@ -1,3 +1,5 @@
+import type { AssetId } from "./public-id.js";
+
 /** Optional creative controls for callers that want to steer the result. */
 export interface MemeGenerateOptions {
   direction?: string;
@@ -12,7 +14,7 @@ export interface MemeGenerateRequest {
 
 /** A durable generated image. The URL requires the caller's Bearer credential. */
 export interface GeneratedMeme {
-  id: string;
+  id: AssetId;
   image_url: string;
   expires_at: string;
 }

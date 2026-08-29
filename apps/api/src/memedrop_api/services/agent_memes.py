@@ -65,7 +65,7 @@ class AgentMemeService:
         content: str,
         *,
         generation_id: str,
-        agent_account_id: str,
+        customer_user_id: str,
         user_id: UUID,
         direction: str | None,
         count: int,
@@ -84,7 +84,7 @@ class AgentMemeService:
                 self._render_suggestion(
                     suggestion,
                     generation_id=generation_id,
-                    agent_account_id=agent_account_id,
+                    customer_user_id=customer_user_id,
                     ordinal=ordinal,
                     stored_object_keys=stored_object_keys,
                 )
@@ -119,7 +119,7 @@ class AgentMemeService:
         suggestion: object,
         *,
         generation_id: str,
-        agent_account_id: str,
+        customer_user_id: str,
         ordinal: int,
         stored_object_keys: list[str],
     ) -> _RenderAttempt:
@@ -142,7 +142,7 @@ class AgentMemeService:
         identity = _render_identity(source_path, overlay)
         extension = _image_extension(rendered.content_type)
         object_key = (
-            f"generated/agents/{agent_account_id}/{generation_id}/{ordinal}-{identity}.{extension}"
+            f"generated/users/{customer_user_id}/{generation_id}/{ordinal}-{identity}.{extension}"
         )
         # Register the exact prospective key before awaiting storage. If a task
         # is cancelled after the provider accepted the write but before it

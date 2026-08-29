@@ -37,7 +37,7 @@ def test_create_public_id_uses_cryptographic_random_source(monkeypatch: pytest.M
 
     public_id = create_public_id(PublicIdKind.GENERATION)
 
-    assert public_id.value == f"gen_{PUBLIC_ID_ALPHABET[0] * PUBLIC_ID_TOKEN_LENGTH}"
+    assert public_id.value == f"g_{PUBLIC_ID_ALPHABET[0] * PUBLIC_ID_TOKEN_LENGTH}"
     assert calls == PUBLIC_ID_TOKEN_LENGTH
 
 
@@ -59,10 +59,10 @@ def test_parse_public_id_round_trips_a_valid_id(kind: PublicIdKind) -> None:
         ("", "one typed prefix"),
         ("gen", "one typed prefix"),
         ("unknown_" + "a" * PUBLIC_ID_TOKEN_LENGTH, "unknown prefix"),
-        ("gen_" + "a" * (PUBLIC_ID_TOKEN_LENGTH - 1), "token is malformed"),
-        ("gen_" + "a" * (PUBLIC_ID_TOKEN_LENGTH - 1) + "_", "one typed prefix"),
-        ("gen_" + "a" * (PUBLIC_ID_TOKEN_LENGTH - 1) + "0", "token is malformed"),
-        ("GEN_" + "a" * PUBLIC_ID_TOKEN_LENGTH, "unknown prefix"),
+        ("g_" + "a" * (PUBLIC_ID_TOKEN_LENGTH - 1), "token is malformed"),
+        ("g_" + "a" * (PUBLIC_ID_TOKEN_LENGTH - 1) + "_", "one typed prefix"),
+        ("g_" + "a" * (PUBLIC_ID_TOKEN_LENGTH - 1) + "0", "token is malformed"),
+        ("G_" + "a" * PUBLIC_ID_TOKEN_LENGTH, "unknown prefix"),
     ],
 )
 def test_parse_public_id_rejects_malformed_values(value: str, message: str) -> None:

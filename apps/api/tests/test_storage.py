@@ -136,25 +136,25 @@ async def test_generation_cleanup_is_tenant_scoped_bounded_and_exact_for_local_s
     tmp_path: Path,
 ) -> None:
     storage = LocalMemeStorage(tmp_path / "storage")
-    account_id = create_public_id(PublicIdKind.AGENT_ACCOUNT).value
+    user_id = create_public_id(PublicIdKind.USER).value
     generation_id = create_public_id(PublicIdKind.GENERATION).value
     other_generation = create_public_id(PublicIdKind.GENERATION).value
-    prefix = generated_agent_object_prefix(account_id=account_id, generation_id=generation_id)
+    prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
     await storage.put_bytes(f"{prefix}one.webp", b"one")
     await storage.put_bytes(f"{prefix}two.webp", b"two")
     await storage.put_bytes(
-        f"generated/agents/{account_id}/{other_generation}/keep.webp",
+        f"generated/users/{user_id}/{other_generation}/keep.webp",
         b"keep",
     )
 
     await GeneratedAgentObjectCleaner(storage, max_objects=2).cleanup_generation_objects(
-        account_id=account_id,
+        user_id=user_id,
         generation_id=generation_id,
     )
 
     assert await storage.list_object_keys(prefix, limit=3) == []
     assert await storage.read_bytes(
-        f"/memes/generated/agents/{account_id}/{other_generation}/keep.webp"
+        f"/memes/generated/users/{user_id}/{other_generation}/keep.webp"
     ) == StoredObject(b"keep", "image/webp")
 
 
@@ -162,24 +162,24 @@ async def test_generation_cleanup_fails_closed_before_delete_when_prefix_overflo
     tmp_path: Path,
 ) -> None:
     storage = LocalMemeStorage(tmp_path / "storage")
-    account_id = create_public_id(PublicIdKind.AGENT_ACCOUNT).value
+    user_id = create_public_id(PublicIdKind.USER).value
     generation_id = create_public_id(PublicIdKind.GENERATION).value
-    prefix = generated_agent_object_prefix(account_id=account_id, generation_id=generation_id)
+    prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
     for name in ("one.webp", "two.webp", "three.webp"):
         await storage.put_bytes(f"{prefix}{name}", b"image")
 
     with pytest.raises(GeneratedAgentObjectLimitExceeded):
         await GeneratedAgentObjectCleaner(storage, max_objects=2).cleanup_generation_objects(
-            account_id=account_id,
+            user_id=user_id,
             generation_id=generation_id,
         )
 
     assert len(await storage.list_object_keys(prefix, limit=4)) == 3
 
 
-def test_generation_cleanup_identity_must_use_compact_account_and_generation_ids() -> None:
+def test_generation_cleanup_identity_must_use_compact_user_and_generation_ids() -> None:
     with pytest.raises(GeneratedAgentObjectCleanupError):
-        generated_agent_object_prefix(account_id="not-an-account", generation_id="not-a-generation")
+        generated_agent_object_prefix(user_id="not-a-user", generation_id="not-a-generation")
 
 
 async def test_local_storage_reads_bytes_with_content_type(tmp_path: Path) -> None:
@@ -233,14 +233,14 @@ async def test_s3_storage_uses_environment_bucket_for_all_operations(tmp_path: P
 async def test_s3_generation_cleanup_lists_only_one_exact_prefix_with_overflow_sentinel() -> None:
     client = FakeS3Client()
     storage = S3MemeStorage(s3_settings(), client=client)
-    account_id = create_public_id(PublicIdKind.AGENT_ACCOUNT).value
+    user_id = create_public_id(PublicIdKind.USER).value
     generation_id = create_public_id(PublicIdKind.GENERATION).value
-    prefix = generated_agent_object_prefix(account_id=account_id, generation_id=generation_id)
+    prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
     for name in ("one.webp", "two.webp"):
         await storage.put_bytes(f"{prefix}{name}", b"image")
 
     await GeneratedAgentObjectCleaner(storage, max_objects=2).cleanup_generation_objects(
-        account_id=account_id,
+        user_id=user_id,
         generation_id=generation_id,
     )
 
@@ -252,14 +252,14 @@ async def test_s3_generation_cleanup_fails_closed_when_provider_marks_listing_tr
     client = FakeS3Client()
     client.force_truncated = True
     storage = S3MemeStorage(s3_settings(), client=client)
-    account_id = create_public_id(PublicIdKind.AGENT_ACCOUNT).value
+    user_id = create_public_id(PublicIdKind.USER).value
     generation_id = create_public_id(PublicIdKind.GENERATION).value
-    prefix = generated_agent_object_prefix(account_id=account_id, generation_id=generation_id)
+    prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
     await storage.put_bytes(f"{prefix}one.webp", b"image")
 
     with pytest.raises(GeneratedAgentObjectLimitExceeded):
         await GeneratedAgentObjectCleaner(storage, max_objects=2).cleanup_generation_objects(
-            account_id=account_id,
+            user_id=user_id,
             generation_id=generation_id,
         )
 

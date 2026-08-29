@@ -5,8 +5,8 @@ import test from "node:test";
 
 import { runSmokeAgent, SmokeAgentError } from "../src/smoke-agent.js";
 
-const API_KEY = "key_23456789ABCDEFGHJKLMNP.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const ASSET_ID = "asset_23456789ABCDEFGHJKLMNP";
+const API_KEY = "k_23456789ABCD.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const ASSET_ID = "a_23456789ABCD";
 const NOW = new Date("2026-08-27T00:00:00.000Z");
 const EXPIRES_AT = "2026-09-26T00:00:00.000Z";
 

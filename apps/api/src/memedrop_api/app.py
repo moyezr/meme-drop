@@ -14,7 +14,6 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
-from memedrop_api.agent_account_repository import SqlAlchemyAgentCredentialRepository
 from memedrop_api.agent_credentials import AgentCredentialService
 from memedrop_api.agent_generated_assets import (
     AgentGeneratedAssetStore,
@@ -70,6 +69,7 @@ from memedrop_api.services.trend_index import RedisTrendIndex
 from memedrop_api.services.trend_monitoring import TrendSnapshotHealthCheck
 from memedrop_api.services.trend_runtime import refresh_trends
 from memedrop_api.trend_repository import SqlAlchemyTrendRepository
+from memedrop_api.user_repository import SqlAlchemyUserRepository
 
 LOGGER = logging.getLogger("memedrop.api")
 REQUEST_ID_HEADER = "x-request-id"
@@ -234,7 +234,7 @@ def create_app(
         generated_asset_cleanup_runner or generated_asset_maintenance_service.cleanup_expired_assets
     )
     app.state.agent_credentials = agent_credentials or AgentCredentialService(
-        SqlAlchemyAgentCredentialRepository(app_database)
+        SqlAlchemyUserRepository(app_database)
     )
     app.state.agent_generation_credits = generation_credits
     app.state.agent_generated_asset_store = (
@@ -375,7 +375,7 @@ def create_app(
 
     @app.get("/memes/{object_key:path}", include_in_schema=False)
     async def serve_meme(object_key: str) -> Response:
-        if object_key.startswith("generated/agents/"):
+        if object_key.startswith("generated/users/"):
             raise HTTPException(status_code=404, detail="Not Found")
         return await meme_storage.serve(f"/memes/{object_key}")
 
