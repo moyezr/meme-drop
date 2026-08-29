@@ -37,7 +37,7 @@ export default async function DashboardLayout({
           <a aria-current="page" href="/dashboard">
             Overview
           </a>
-          <span aria-disabled="true">API keys</span>
+          <a href="/dashboard#api-keys">API keys</a>
           <span aria-disabled="true">Usage</span>
           <span aria-disabled="true">Billing</span>
         </nav>
