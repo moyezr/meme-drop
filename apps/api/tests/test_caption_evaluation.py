@@ -97,6 +97,64 @@ async def test_live_caption_sample_rejects_unknown_case_ids(tmp_path) -> None:  
         )
 
 
+async def test_live_caption_sample_allows_an_explicit_case_override(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    benchmark_path = tmp_path / "benchmark.json"
+    benchmark_path.write_text(
+        json.dumps(
+            {
+                "cases": [
+                    {
+                        "id": "override-case",
+                        "category": "test",
+                        "tweet": "The release checklist became longer than the actual release.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    sample_path = tmp_path / "sample.json"
+    sample_path.write_text("{}", encoding="utf-8")
+
+    report = await evaluate_caption_sample(
+        benchmark_path=benchmark_path,
+        sample_path=sample_path,
+        gateway=FakeCaptionGateway(),
+        model_name="test/model",
+        case_ids=["override-case"],
+    )
+
+    assert report["summary"]["cases"] == 1  # type: ignore[index]
+
+
+async def test_live_caption_sample_does_not_replace_empty_candidates(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    benchmark_path = tmp_path / "benchmark.json"
+    benchmark_path.write_text(
+        json.dumps(
+            {
+                "cases": [
+                    {
+                        "id": "empty-catalog",
+                        "tweet": "A sufficiently long benchmark post for the test.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    sample_path = tmp_path / "sample.json"
+    sample_path.write_text('{"case_ids":["empty-catalog"]}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="at least one catalog candidate"):
+        await evaluate_caption_sample(
+            benchmark_path=benchmark_path,
+            sample_path=sample_path,
+            gateway=FakeCaptionGateway(),
+            model_name="test/model",
+            candidates=[],
+        )
+
+
 def test_live_caption_sample_uses_safe_output_names() -> None:
     assert safe_model_filename("OpenAI/GPT 5.4 Mini") == "openai-gpt-5-4-mini"
 

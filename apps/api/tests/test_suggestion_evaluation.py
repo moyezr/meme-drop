@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 from typing import cast
 
+import pytest
+
 import memedrop_api.suggestion_evaluation as suggestion_evaluation
+from memedrop_api.services.catalog import CatalogManifest, MemeCatalog
 from memedrop_api.suggestion_evaluation import (
     DEFAULT_THRESHOLDS,
     CaseResult,
@@ -15,6 +18,8 @@ from memedrop_api.suggestion_evaluation import (
     compare_ranking_baseline,
     evaluate_benchmark,
     evaluate_catalog_scale,
+    evaluate_query,
+    load_evaluation_candidates,
     percentile,
     production_candidates,
 )
@@ -172,6 +177,60 @@ def test_scale_catalog_uses_distinct_template_ids_and_a_warmed_index() -> None:
     latency = cast(dict[str, object], report["warm_ranking_latency_ms"])
     assert latency["queries"] == 2
     assert report["passed"] is True
+
+
+def test_query_report_uses_the_real_candidate_count_and_bounded_shortlist() -> None:
+    candidates = production_candidates()
+
+    report = evaluate_query("Everything is on fire but the dashboard is green.", candidates)
+
+    assert report["catalog_size"] == len(candidates)
+    shortlist = cast(list[dict[str, object]], report["shortlist"])
+    assert len(shortlist) == min(12, len(candidates))
+    assert shortlist[0]["rank"] == 1
+    assert isinstance(shortlist[0]["template_id"], str)
+
+
+def test_development_catalog_requires_explicit_draft_opt_in(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    verified = MemeCatalog.load().verified_templates[0]
+    draft = verified.model_copy(
+        update={
+            "template_id": "evaluation-draft",
+            "meme_id": None,
+            "name": "Evaluation Draft",
+            "quality": "draft",
+        }
+    )
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_text(
+        CatalogManifest(
+            version=1,
+            generated_at="2026-08-30T00:00:00Z",
+            templates=[verified, draft],
+        ).model_dump_json(),
+        encoding="utf-8",
+    )
+
+    verified_candidates = load_evaluation_candidates(catalog_path)
+    experiment_candidates = load_evaluation_candidates(catalog_path, include_drafts=True)
+
+    assert [candidate.template.template_id for candidate in verified_candidates] == [
+        verified.template_id
+    ]
+    assert {candidate.template.template_id for candidate in experiment_candidates} == {
+        verified.template_id,
+        draft.template_id,
+    }
+    with pytest.raises(ValueError, match="requires an explicit --catalog"):
+        load_evaluation_candidates(include_drafts=True)
+
+
+def test_benchmark_does_not_replace_an_explicit_empty_candidate_set(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    benchmark_path = tmp_path / "benchmark.json"
+    benchmark_path.write_text('{"cases": []}\n', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="at least one catalog candidate"):
+        evaluate_benchmark(benchmark_path, candidates=[])
 
 
 def test_benchmark_reuses_one_prebuilt_lexical_index(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
