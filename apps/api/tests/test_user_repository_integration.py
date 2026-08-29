@@ -7,7 +7,13 @@ from typing import cast
 import pytest
 from sqlalchemy import Connection, Table, func, select
 
-from memedrop_api.agent_credentials import AgentCredentialService, InvalidAuthorization
+from memedrop_api.agent_credentials import (
+    AgentCredentialService,
+    ApiKeyIdempotencyConflict,
+    ApiKeyLimitExceeded,
+    InvalidAuthorization,
+    IssuedApiKey,
+)
 from memedrop_api.db import ApiKey, Base, Database, User
 from memedrop_api.public_ids import PublicId, PublicIdKind, create_public_id
 from memedrop_api.user_repository import SqlAlchemyUserRepository
@@ -51,6 +57,66 @@ async def test_repository_issues_rotates_and_authenticates_user_key() -> None:
         assert (
             await service.authenticate_bearer(f"Bearer {replacement.credential}")
         ).user_id == user.id
+    finally:
+        await database.close()
+
+
+@pytest.mark.integration
+async def test_dashboard_key_issuance_is_concurrent_idempotent_and_bounded() -> None:
+    database = Database(_database_url())
+    try:
+        async with database.engine.begin() as connection:
+            await connection.run_sync(_create_credential_tables)
+        service = AgentCredentialService(SqlAlchemyUserRepository(database))
+        user = await service.create_user(
+            auth_provider="dashboard-test",
+            auth_subject=create_public_id(PublicIdKind.USER).value,
+        )
+        dashboard_secret = "dashboard-secret-0123456789-abcdefghijklmnopqrstuvwxyz"
+
+        results = await asyncio.gather(
+            *(
+                service.issue_dashboard_api_key(
+                    user_id=user.id,
+                    name=f"Concurrent {attempt}",
+                    idempotency_key=f"concurrent-key-{attempt}",
+                    dashboard_secret=dashboard_secret,
+                )
+                for attempt in range(6)
+            ),
+            return_exceptions=True,
+        )
+        issued = [result for result in results if isinstance(result, IssuedApiKey)]
+        rejected = [result for result in results if isinstance(result, ApiKeyLimitExceeded)]
+
+        assert len(issued) == 5
+        assert len(rejected) == 1
+
+        original = issued[0]
+        replayed = await service.issue_dashboard_api_key(
+            user_id=user.id,
+            name=original.key.name,
+            idempotency_key=f"concurrent-key-{original.key.name.removeprefix('Concurrent ')}",
+            dashboard_secret=dashboard_secret,
+        )
+        assert replayed == original
+
+        with pytest.raises(ApiKeyIdempotencyConflict):
+            await service.issue_dashboard_api_key(
+                user_id=user.id,
+                name="Conflicting name",
+                idempotency_key=f"concurrent-key-{original.key.name.removeprefix('Concurrent ')}",
+                dashboard_secret=dashboard_secret,
+            )
+
+        await service.revoke_api_key(user_id=user.id, key_id=original.key.id)
+        replacement = await service.issue_dashboard_api_key(
+            user_id=user.id,
+            name="Replacement",
+            idempotency_key="replacement-after-revoke",
+            dashboard_secret=dashboard_secret,
+        )
+        assert replacement.key.id != original.key.id
     finally:
         await database.close()
 

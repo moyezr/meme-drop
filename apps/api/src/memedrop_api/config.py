@@ -20,6 +20,14 @@ DEVELOPMENT_BUCKET = "meme-drop-dev"
 PRODUCTION_BUCKET = "meme-drop-prod"
 PRODUCTION_API_ORIGIN = "https://api.memedrop.moyezrabbani.dev"
 CronSecret = Annotated[str, StringConstraints(strip_whitespace=True, min_length=16, max_length=512)]
+DashboardTokenSecret = Annotated[str, StringConstraints(min_length=32, max_length=512)]
+_DASHBOARD_SECRET_PLACEHOLDER_MARKERS = (
+    "change-me",
+    "placeholder",
+    "dummy",
+    "test-key",
+    "your-domain",
+)
 
 
 class Settings(BaseSettings):
@@ -124,6 +132,12 @@ class Settings(BaseSettings):
     trend_cron_secret: CronSecret | None = Field(
         default=None,
         validation_alias=AliasChoices("CRON_SECRET", "MEMEDROP_TREND_CRON_SECRET"),
+        exclude=True,
+        repr=False,
+    )
+    dashboard_token_secret: DashboardTokenSecret | None = Field(
+        default=None,
+        validation_alias="MEMEDROP_DASHBOARD_TOKEN_SECRET",
         exclude=True,
         repr=False,
     )
@@ -282,6 +296,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:
+        if self.dashboard_token_secret is not None:
+            normalized_dashboard_secret = self.dashboard_token_secret.lower()
+            if any(character.isspace() for character in self.dashboard_token_secret):
+                raise ValueError("MEMEDROP_DASHBOARD_TOKEN_SECRET must not contain whitespace")
+            if any(
+                marker in normalized_dashboard_secret
+                for marker in _DASHBOARD_SECRET_PLACEHOLDER_MARKERS
+            ):
+                raise ValueError(
+                    "MEMEDROP_DASHBOARD_TOKEN_SECRET must not use a placeholder value"
+                )
         if self.legacy_openrouter_meme_model:
             raise ValueError(
                 "OPENROUTER_MEME_MODEL was removed; use OPENROUTER_SUGGESTION_MODEL and "
@@ -352,6 +377,8 @@ class Settings(BaseSettings):
                 raise ValueError("MEMEDROP_RATE_LIMIT_STORE must be redis in production")
             if not self.trend_cron_secret:
                 raise ValueError("CRON_SECRET is required in production for scheduled cleanup")
+            if not self.dashboard_token_secret:
+                raise ValueError("MEMEDROP_DASHBOARD_TOKEN_SECRET is required in production")
             if self.trends_enabled:
                 missing_trend_settings = [
                     name for name, value in (("TAVILY_API_KEY", self.tavily_api_key),) if not value

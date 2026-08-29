@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -11,6 +13,7 @@ from typing import Protocol
 from memedrop_api.public_ids import PublicIdError, PublicIdKind, parse_public_id
 
 _API_SECRET_BYTES = 32
+_IDEMPOTENCY_KEY_MAX_LENGTH = 200
 _MAX_NAME_LENGTH = 120
 
 
@@ -28,6 +31,14 @@ class UserNotFound(AgentCredentialError):
 
 class AgentApiKeyNotFound(AgentCredentialError):
     """The addressed API key does not exist or is revoked."""
+
+
+class ApiKeyIdempotencyConflict(AgentCredentialError):
+    """An issuance key was reused with different request inputs."""
+
+
+class ApiKeyLimitExceeded(AgentCredentialError):
+    """A user already has the maximum number of active API keys."""
 
 
 class PublicIdCollisionExhausted(RuntimeError):
@@ -84,6 +95,12 @@ class StoredCredential:
     secret_hash: bytes = field(repr=False)
 
 
+@dataclass(frozen=True, slots=True)
+class StoredApiKeyIssuance:
+    key: ApiKeyRecord
+    secret_hash: bytes = field(repr=False)
+
+
 class AgentCredentialRepository(Protocol):
     async def create_user(
         self, *, auth_provider: str, auth_subject: str, email: str | None
@@ -94,6 +111,15 @@ class AgentCredentialRepository(Protocol):
     async def issue_api_key(
         self, *, user_id: str, name: str, secret_hash: bytes
     ) -> ApiKeyRecord: ...
+
+    async def issue_idempotent_api_key(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        secret_hash: bytes,
+        issuance_idempotency_hash: bytes,
+    ) -> StoredApiKeyIssuance: ...
 
     async def find_active_credential(self, *, key_id: str) -> StoredCredential | None: ...
 
@@ -140,6 +166,36 @@ class AgentCredentialService:
             user_id=user_id, name=_validate_name(name), secret_hash=_hash_secret(secret)
         )
         return IssuedApiKey(key=key, secret=secret)
+
+    async def issue_dashboard_api_key(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        idempotency_key: str,
+        dashboard_secret: str,
+    ) -> IssuedApiKey:
+        """Issue or replay one deterministic dashboard credential without storing its secret."""
+
+        _validate_user_id(user_id)
+        validated_name = _validate_name(name)
+        validated_idempotency_key = _validate_idempotency_key(idempotency_key)
+        issuance_hash = _dashboard_issuance_hash(user_id, validated_idempotency_key)
+        secret = _derive_dashboard_api_secret(
+            dashboard_secret, user_id, validated_idempotency_key
+        )
+        secret_hash = _hash_secret(secret)
+        stored = await self._repository.issue_idempotent_api_key(
+            user_id=user_id,
+            name=validated_name,
+            secret_hash=secret_hash,
+            issuance_idempotency_hash=issuance_hash,
+        )
+        if stored.key.name != validated_name or not secrets.compare_digest(
+            stored.secret_hash, secret_hash
+        ):
+            raise ApiKeyIdempotencyConflict("idempotency key conflicts with an earlier issuance")
+        return IssuedApiKey(key=stored.key, secret=secret)
 
     async def authenticate_bearer(self, authorization: str | None) -> AuthenticatedAgent:
         key_id, secret = _parse_credential(parse_bearer_authorization(authorization))
@@ -203,6 +259,29 @@ def _hash_secret(secret: str) -> bytes:
     return hashlib.sha256(secret.encode("utf-8")).digest()
 
 
+def _dashboard_issuance_hash(user_id: str, idempotency_key: str) -> bytes:
+    material = (
+        b"memedrop:dashboard-api-key-issuance:v1\0"
+        + user_id.encode()
+        + b"\0"
+        + idempotency_key.encode()
+    )
+    return hashlib.sha256(material).digest()
+
+
+def _derive_dashboard_api_secret(
+    dashboard_secret: str, user_id: str, idempotency_key: str
+) -> str:
+    material = (
+        b"memedrop:dashboard-api-key-secret:v1\0"
+        + user_id.encode()
+        + b"\0"
+        + idempotency_key.encode()
+    )
+    digest = hmac.new(dashboard_secret.encode(), material, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
 def _parse_credential(credential: str) -> tuple[str, str]:
     key_id, separator, secret = credential.partition(".")
     if not separator or not key_id or not secret or "." in secret:
@@ -230,6 +309,18 @@ def _validate_key_id(key_id: str) -> None:
 
 def _validate_name(value: str) -> str:
     return _validate_identity(value, "API key name", _MAX_NAME_LENGTH)
+
+
+def _validate_idempotency_key(value: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > _IDEMPOTENCY_KEY_MAX_LENGTH
+        or any(character.isspace() for character in value)
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        raise AgentCredentialError("idempotency key must be 1 to 200 visible characters")
+    return value
 
 
 def _validate_identity(value: str, field_name: str, max_length: int) -> str:

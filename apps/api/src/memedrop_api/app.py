@@ -22,6 +22,7 @@ from memedrop_api.agent_generated_assets import (
 from memedrop_api.agent_generation_credits import AgentGenerationCreditService
 from memedrop_api.api.account import router as account_router
 from memedrop_api.api.agent_memes import router as agent_memes_router
+from memedrop_api.api.dashboard import router as dashboard_router
 from memedrop_api.api.health import ReadinessCheck, TrendSnapshotCheck
 from memedrop_api.api.health import router as health_router
 from memedrop_api.api.internal_assets import GeneratedAssetCleanupRunner
@@ -326,6 +327,9 @@ def create_app(
                     status_code=500,
                     content={"error": "Internal Server Error", "request_id": request_id},
                 )
+        if request.url.path.startswith("/api/v1/dashboard/"):
+            response.headers["Cache-Control"] = "private, no-store"
+            response.headers["Pragma"] = "no-cache"
         response.headers[REQUEST_ID_HEADER] = request_id
         return response
 
@@ -366,6 +370,8 @@ def create_app(
     app.include_router(internal_assets_router)
     app.include_router(account_router)
     app.include_router(agent_memes_router)
+    if app_settings.dashboard_token_secret is not None:
+        app.include_router(dashboard_router)
     app.include_router(library_router)
     app.include_router(memes_router)
     app.include_router(suggest_router)

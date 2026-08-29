@@ -466,6 +466,11 @@ class ApiKey(Base):
             "revoked_at IS NULL OR revoked_at >= created_at", name="api_keys_revoked_at_check"
         ),
         UniqueConstraint("secret_hash", name="uq_api_keys_secret_hash"),
+        UniqueConstraint(
+            "user_id",
+            "issuance_idempotency_hash",
+            name="uq_api_keys_user_issuance_idempotency",
+        ),
         UniqueConstraint("id", "user_id", name="uq_api_keys_id_user"),
         Index("idx_api_keys_user_created_at", "user_id", "created_at"),
     )
@@ -476,6 +481,9 @@ class ApiKey(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     name: Mapped[str] = mapped_column(String(120))
     secret_hash: Mapped[bytes] = mapped_column(LargeBinary(32))
+    issuance_idempotency_hash: Mapped[bytes | None] = mapped_column(
+        LargeBinary(32), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )

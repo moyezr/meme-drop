@@ -6,8 +6,10 @@ import pytest
 
 from memedrop_api.agent_credentials import (
     AgentCredentialService,
+    ApiKeyIdempotencyConflict,
     ApiKeyRecord,
     InvalidAuthorization,
+    StoredApiKeyIssuance,
     StoredCredential,
     UserCredentialStatus,
     UserRecord,
@@ -21,6 +23,7 @@ class FakeCredentialRepository:
     def __init__(self) -> None:
         self.users: dict[str, UserRecord] = {}
         self.keys: dict[str, tuple[ApiKeyRecord, bytes]] = {}
+        self.issuances: dict[tuple[str, bytes], str] = {}
 
     async def create_user(
         self, *, auth_provider: str, auth_subject: str, email: str | None
@@ -54,6 +57,22 @@ class FakeCredentialRepository:
         )
         self.keys[key.id] = (key, secret_hash)
         return key
+
+    async def issue_idempotent_api_key(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        secret_hash: bytes,
+        issuance_idempotency_hash: bytes,
+    ) -> StoredApiKeyIssuance:
+        identity = (user_id, issuance_idempotency_hash)
+        existing_id = self.issuances.get(identity)
+        if existing_id is not None:
+            return StoredApiKeyIssuance(*self.keys[existing_id])
+        key = await self.issue_api_key(user_id=user_id, name=name, secret_hash=secret_hash)
+        self.issuances[identity] = key.id
+        return StoredApiKeyIssuance(key, secret_hash)
 
     async def find_active_credential(self, *, key_id: str) -> StoredCredential | None:
         value = self.keys.get(key_id)
@@ -118,6 +137,30 @@ async def test_user_issues_authenticates_and_revokes_one_time_key() -> None:
     await service.revoke_api_key(user_id=user.id, key_id=issued.key.id)
     with pytest.raises(InvalidAuthorization):
         await service.authenticate_bearer(f"Bearer {issued.credential}")
+
+
+async def test_dashboard_key_issuance_replays_without_storing_the_secret() -> None:
+    repository = FakeCredentialRepository()
+    service = AgentCredentialService(repository)
+    user = await service.create_user(
+        auth_provider="github", auth_subject="github-user-1", email="dev@example.com"
+    )
+    inputs = {
+        "user_id": user.id,
+        "name": "Production",
+        "idempotency_key": "create-production-key-1",
+        "dashboard_secret": "dashboard-secret-0123456789-abcdefghijklmnopqrstuvwxyz",
+    }
+
+    issued = await service.issue_dashboard_api_key(**inputs)
+    replayed = await service.issue_dashboard_api_key(**inputs)
+
+    assert replayed == issued
+    assert len(repository.keys) == 1
+    assert issued.secret not in repr(repository.keys)
+
+    with pytest.raises(ApiKeyIdempotencyConflict):
+        await service.issue_dashboard_api_key(**{**inputs, "name": "Staging"})
 
 
 def test_api_key_hash_is_binary_and_bearer_lookup_exposes_only_public_id() -> None:

@@ -668,6 +668,13 @@ def production_env_findings(
     reject_placeholder("CRON_SECRET", cron_secret)
     if cron_secret and not 16 <= len(cron_secret) <= 512:
         errors.append("CRON_SECRET must contain 16 to 512 characters.")
+    dashboard_secret_raw = environment.get("MEMEDROP_DASHBOARD_TOKEN_SECRET", "")
+    dashboard_secret = value("MEMEDROP_DASHBOARD_TOKEN_SECRET")
+    reject_placeholder("MEMEDROP_DASHBOARD_TOKEN_SECRET", dashboard_secret)
+    if dashboard_secret_raw and any(character.isspace() for character in dashboard_secret_raw):
+        errors.append("MEMEDROP_DASHBOARD_TOKEN_SECRET must not contain whitespace.")
+    if dashboard_secret and not 32 <= len(dashboard_secret) <= 512:
+        errors.append("MEMEDROP_DASHBOARD_TOKEN_SECRET must contain 32 to 512 characters.")
 
     bounded_int("MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET", minimum=1, maximum=1_000)
     bounded_float("MEMEDROP_TREND_COLLECTION_TIMEOUT_SECONDS", minimum=0.1, maximum=30)

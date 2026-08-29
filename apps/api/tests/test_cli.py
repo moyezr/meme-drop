@@ -38,6 +38,7 @@ def valid_environment() -> dict[str, str]:
         "MEMEDROP_TRENDS_ENABLED": "true",
         "TAVILY_API_KEY": "a-secure-production-tavily-key",
         "CRON_SECRET": "a-secure-production-cron-secret",
+        "MEMEDROP_DASHBOARD_TOKEN_SECRET": "dashboard-bridge-secret-0123456789-abcdef",
         "MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET": "900",
         "MEMEDROP_TREND_COLLECTION_TIMEOUT_SECONDS": "8",
         "MEMEDROP_TREND_ENRICHMENT_TIMEOUT_SECONDS": "20",
@@ -161,6 +162,7 @@ def test_production_environment_requires_scheduled_job_and_embedding_settings() 
         "MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS",
+        "MEMEDROP_DASHBOARD_TOKEN_SECRET",
     ):
         del environment[name]
 
@@ -174,8 +176,24 @@ def test_production_environment_requires_scheduled_job_and_embedding_settings() 
         "MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS",
+        "MEMEDROP_DASHBOARD_TOKEN_SECRET",
     ):
         assert any(error.startswith(name) and "required" in error for error in errors)
+
+
+def test_production_environment_rejects_unsafe_dashboard_secrets() -> None:
+    for invalid_secret in (
+        "change-me-dashboard-secret-0123456789",
+        "dashboard bridge secret 0123456789 abcdef",
+    ):
+        environment = valid_environment()
+        environment["MEMEDROP_DASHBOARD_TOKEN_SECRET"] = invalid_secret
+
+        errors, _ = production_env_findings(environment)
+
+        assert any(
+            error.startswith("MEMEDROP_DASHBOARD_TOKEN_SECRET") for error in errors
+        )
 
 
 def test_production_environment_rejects_supabase_direct_runtime_url() -> None:

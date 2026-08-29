@@ -12,6 +12,8 @@ from memedrop_api.config import (
     Settings,
 )
 
+DASHBOARD_SECRET = "dashboard-bridge-secret-0123456789-abcdef"
+
 
 def make_settings(**overrides: Any) -> Settings:
     values: dict[str, Any] = {
@@ -43,6 +45,7 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.generated_asset_cleanup_claim_timeout_seconds == 900
     assert settings.generated_asset_cleanup_lock_ttl_seconds == 900
     assert settings.agent_generation_stale_timeout_seconds == 1_800
+    assert settings.dashboard_token_secret is None
 
 
 def test_legacy_shared_model_variable_is_rejected() -> None:
@@ -93,6 +96,7 @@ def test_vercel_environment_selects_production_when_explicit_override_is_absent(
         s3_access_key_id="access-key",
         s3_secret_access_key="secret-key",
         trend_cron_secret="cron-secret-0123456789",
+        dashboard_token_secret=DASHBOARD_SECRET,
         _env_file=None,
     )
 
@@ -182,6 +186,7 @@ def test_production_configuration_is_accepted() -> None:
         s3_access_key_id="access-key",
         s3_secret_access_key="secret-key",
         trend_cron_secret="cron-secret-0123456789",
+        dashboard_token_secret=DASHBOARD_SECRET,
         _env_file=None,
     )
 
@@ -291,6 +296,7 @@ def test_production_trends_require_a_secret_without_echoing_it() -> None:
         "s3_access_key_id": "access-key",
         "s3_secret_access_key": "storage-secret",
         "trends_enabled": True,
+        "dashboard_token_secret": DASHBOARD_SECRET,
         "_env_file": None,
     }
 
@@ -318,6 +324,7 @@ def test_production_cleanup_requires_cron_secret_even_when_trends_are_disabled()
         "s3_region": "ap-south-1",
         "s3_access_key_id": "access-key",
         "s3_secret_access_key": "storage-secret",
+        "dashboard_token_secret": DASHBOARD_SECRET,
         "_env_file": None,
     }
 
@@ -331,6 +338,27 @@ def test_cleanup_claim_timeout_cannot_expire_before_distributed_lock() -> None:
             database_url="postgresql://localhost/memedrop",
             generated_asset_cleanup_claim_timeout_seconds=899,
             generated_asset_cleanup_lock_ttl_seconds=900,
+            _env_file=None,
+        )
+
+
+def test_production_requires_dashboard_bridge_secret() -> None:
+    with pytest.raises(ValidationError, match="MEMEDROP_DASHBOARD_TOKEN_SECRET is required"):
+        make_settings(
+            node_env="production",
+            database_url="postgresql://localhost/memedrop",
+            api_public_origin=PRODUCTION_API_ORIGIN,
+            openrouter_api_key="secret",
+            cors_origins_value="chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+            rate_limit_store="redis",
+            redis_url="rediss://default:secret@redis.internal:6379/0",
+            storage_backend="s3",
+            s3_bucket_name="meme-drop-prod",
+            s3_endpoint="https://project.storage.supabase.co/storage/v1/s3",
+            s3_region="ap-south-1",
+            s3_access_key_id="access-key",
+            s3_secret_access_key="secret-key",
+            trend_cron_secret="cron-secret-0123456789",
             _env_file=None,
         )
 
@@ -358,3 +386,20 @@ def test_cron_secret_has_a_bounded_deployment_safe_length() -> None:
         _env_file=None,
     )
     assert settings.trend_cron_secret == "x" * 16
+
+
+def test_dashboard_secret_is_optional_bounded_and_redacted() -> None:
+    configured_secret = "dashboard-secret-0123456789-abcdef"
+    settings = make_settings(dashboard_token_secret=configured_secret)
+
+    assert settings.dashboard_token_secret == configured_secret
+    assert configured_secret not in repr(settings)
+    for invalid_secret in ("x" * 31, "x" * 513):
+        with pytest.raises(ValidationError):
+            make_settings(dashboard_token_secret=invalid_secret)
+    for unsafe_secret in (
+        "change-me-dashboard-secret-0123456789",
+        "dashboard bridge secret 0123456789 abcdef",
+    ):
+        with pytest.raises(ValidationError):
+            make_settings(dashboard_token_secret=unsafe_secret)

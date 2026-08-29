@@ -83,6 +83,44 @@ def _upgrade_real_0006_shape(connection: Connection, schema: str) -> None:
     )
 
 
+def _upgrade_real_0007_api_key_shape(connection: Connection, schema: str) -> None:
+    quoted_schema = connection.dialect.identifier_preparer.quote(schema)
+    connection.exec_driver_sql(f"CREATE SCHEMA {quoted_schema}")
+    connection.exec_driver_sql(f"SET LOCAL search_path TO {quoted_schema}")
+    connection.exec_driver_sql(
+        "CREATE TABLE api_keys ("
+        "id VARCHAR(14) PRIMARY KEY, "
+        "user_id VARCHAR(14) NOT NULL, "
+        "name VARCHAR(120) NOT NULL, "
+        "secret_hash BYTEA NOT NULL)"
+    )
+
+    migration = importlib.import_module(
+        "migrations.versions.20260829_0008_dashboard_api_key_idempotency"
+    )
+    with Operations.context(MigrationContext.configure(connection)):
+        migration.upgrade()
+
+    inspector = inspect(connection)
+    columns = {column["name"]: column for column in inspector.get_columns("api_keys")}
+    assert columns["issuance_idempotency_hash"]["nullable"] is True
+    unique_constraints = {
+        constraint["name"]: tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("api_keys")
+    }
+    assert unique_constraints["uq_api_keys_user_issuance_idempotency"] == (
+        "user_id",
+        "issuance_idempotency_hash",
+    )
+
+    with Operations.context(MigrationContext.configure(connection)):
+        migration.upgrade()
+        migration.downgrade()
+    assert "issuance_idempotency_hash" not in {
+        column["name"] for column in inspect(connection).get_columns("api_keys")
+    }
+
+
 @pytest.mark.integration
 async def test_0007_upgrades_a_real_0006_shaped_schema() -> None:
     database_url = os.environ.get("MEMEDROP_TEST_DATABASE_URL")
@@ -94,6 +132,23 @@ async def test_0007_upgrades_a_real_0006_shaped_schema() -> None:
     try:
         async with database.engine.begin() as connection:
             await connection.run_sync(_upgrade_real_0006_shape, schema)
+    finally:
+        async with database.engine.begin() as connection:
+            await connection.exec_driver_sql(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+        await database.close()
+
+
+@pytest.mark.integration
+async def test_0008_upgrades_a_real_0007_api_key_shape() -> None:
+    database_url = os.environ.get("MEMEDROP_TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("MEMEDROP_TEST_DATABASE_URL is not configured")
+    database = Database(database_url)
+    schema = f"test_dashboard_key_migration_{uuid4().hex}"
+    quoted_schema = database.engine.dialect.identifier_preparer.quote(schema)
+    try:
+        async with database.engine.begin() as connection:
+            await connection.run_sync(_upgrade_real_0007_api_key_shape, schema)
     finally:
         async with database.engine.begin() as connection:
             await connection.exec_driver_sql(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")

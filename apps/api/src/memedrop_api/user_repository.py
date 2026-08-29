@@ -13,8 +13,10 @@ from sqlalchemy.exc import IntegrityError
 
 from memedrop_api.agent_credentials import (
     AgentApiKeyNotFound,
+    ApiKeyLimitExceeded,
     ApiKeyRecord,
     PublicIdCollisionExhausted,
+    StoredApiKeyIssuance,
     StoredCredential,
     UserCredentialStatus,
     UserNotFound,
@@ -24,6 +26,7 @@ from memedrop_api.db import ApiKey, Database, User
 from memedrop_api.public_ids import PublicIdKind, create_public_id
 
 _MAX_PUBLIC_ID_INSERT_ATTEMPTS = 3
+_MAX_ACTIVE_API_KEYS = 5
 _Result = TypeVar("_Result")
 
 
@@ -74,20 +77,71 @@ class SqlAlchemyUserRepository:
         return UserCredentialStatus(user=_user_record(user), api_keys=keys)
 
     async def issue_api_key(self, *, user_id: str, name: str, secret_hash: bytes) -> ApiKeyRecord:
-        async def insert() -> ApiKeyRecord:
-            row = ApiKey(
-                id=create_public_id(PublicIdKind.API_KEY).value,
-                user_id=user_id,
-                name=name,
-                secret_hash=secret_hash,
-            )
+        issued = await self._issue_api_key(
+            user_id=user_id,
+            name=name,
+            secret_hash=secret_hash,
+            issuance_idempotency_hash=None,
+        )
+        return issued.key
+
+    async def issue_idempotent_api_key(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        secret_hash: bytes,
+        issuance_idempotency_hash: bytes,
+    ) -> StoredApiKeyIssuance:
+        return await self._issue_api_key(
+            user_id=user_id,
+            name=name,
+            secret_hash=secret_hash,
+            issuance_idempotency_hash=issuance_idempotency_hash,
+        )
+
+    async def _issue_api_key(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        secret_hash: bytes,
+        issuance_idempotency_hash: bytes | None,
+    ) -> StoredApiKeyIssuance:
+        async def insert() -> StoredApiKeyIssuance:
             async with self._database.session() as session, session.begin():
-                if await session.get(User, user_id) is None:
+                user = await session.scalar(
+                    select(User).where(User.id == user_id).with_for_update()
+                )
+                if user is None:
                     raise UserNotFound("user was not found")
+                if issuance_idempotency_hash is not None:
+                    existing = await session.scalar(
+                        select(ApiKey).where(
+                            ApiKey.user_id == user_id,
+                            ApiKey.issuance_idempotency_hash == issuance_idempotency_hash,
+                        )
+                    )
+                    if existing is not None:
+                        return StoredApiKeyIssuance(_key_record(existing), existing.secret_hash)
+                active_count = await session.scalar(
+                    select(func.count())
+                    .select_from(ApiKey)
+                    .where(ApiKey.user_id == user_id, ApiKey.revoked_at.is_(None))
+                )
+                if active_count is None or active_count >= _MAX_ACTIVE_API_KEYS:
+                    raise ApiKeyLimitExceeded("active API key limit reached")
+                row = ApiKey(
+                    id=create_public_id(PublicIdKind.API_KEY).value,
+                    user_id=user_id,
+                    name=name,
+                    secret_hash=secret_hash,
+                    issuance_idempotency_hash=issuance_idempotency_hash,
+                )
                 session.add(row)
                 await session.flush()
                 await session.refresh(row)
-            return _key_record(row)
+            return StoredApiKeyIssuance(_key_record(row), row.secret_hash)
 
         return await self._retry_public_id_insert("api_keys", insert)
 

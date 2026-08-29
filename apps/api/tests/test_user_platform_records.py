@@ -47,12 +47,15 @@ def test_hashes_are_fixed_binary_and_api_keys_are_minimal() -> None:
         "user_id",
         "name",
         "secret_hash",
+        "issuance_idempotency_hash",
         "created_at",
         "last_used_at",
         "revoked_at",
     }
     assert isinstance(_table(ApiKey).c.secret_hash.type, LargeBinary)
     assert cast(LargeBinary, _table(ApiKey).c.secret_hash.type).length == 32
+    assert isinstance(_table(ApiKey).c.issuance_idempotency_hash.type, LargeBinary)
+    assert cast(LargeBinary, _table(ApiKey).c.issuance_idempotency_hash.type).length == 32
     assert isinstance(_table(Generation).c.idempotency_key_hash.type, LargeBinary)
     assert isinstance(_table(Generation).c.request_fingerprint.type, LargeBinary)
 
