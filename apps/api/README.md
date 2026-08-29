@@ -314,19 +314,22 @@ Raw `input`, `options.direction`, and plaintext captions are not logged or persi
 usage metadata. The rendered image is stored so its returned URL remains usable; sensitive request
 values are hashed wherever they participate in cache identity.
 
-## Private-beta account administration
+## Private-beta user administration
 
-Private-beta accounts, API keys, and credits are managed only through the server-side operator CLI.
-Run migrations first, then create an account and use the returned compact `acct_...` ID in later
-commands:
+The authenticated dashboard provisions customer users from their GitHub or Google identity, shows
+their remaining credits, and lets them create or revoke their own API keys. The server-side operator
+CLI remains the controlled path for initial user bootstrap, credit grants, key rotation, and support
+operations. Run migrations first, then create a user with the same stable identity-provider subject
+that Auth.js supplies and use the returned compact `u_...` ID in later commands:
 
 ```sh
 npm run db:migrate
-npm run agent:admin -- account-create --name "Acme beta" --confirm
-npm run agent:admin -- key-issue --account-id acct_... --name "Production" --confirm
-npm run agent:admin -- credits-grant --account-id acct_... --credits 25 \
-  --idempotency-key acme-initial-20260824 --actor operator:moyez --confirm
-npm run agent:admin -- status --account-id acct_...
+npm run agent:admin -- user-create --auth-provider github \
+  --auth-subject <provider-user-id> --email <customer-email> --confirm
+npm run agent:admin -- key-issue --user-id u_... --name "Production" --confirm
+npm run agent:admin -- credits-grant --user-id u_... --credits 25 \
+  --idempotency-key acme-initial-20260830 --confirm
+npm run agent:admin -- status --user-id u_...
 ```
 
 `key-issue` prints the complete Bearer credential exactly once. Transfer that value directly to an
@@ -334,26 +337,25 @@ approved password manager or equivalent secret-delivery channel; do not redirect
 repository, a ticket, terminal scrollback capture, or shared logs. Treat stdout as secret-bearing for issuance and
 rotation, and ensure terminal capture, CI logs, and command auditing cannot retain it. The database
 stores only its SHA-256 hash, so the credential cannot be retrieved later. Status output contains
-only operator-safe account/key names, compact IDs, categorical states, timestamps, and the current
+only operator-safe user/key metadata, compact IDs, categorical states, timestamps, and the current
 credit balance.
 
-Rotate or revoke a key with an explicit bounded reason code and operator identity:
+Rotate or revoke a key with its owning user ID:
 
 ```sh
-npm run agent:admin -- key-rotate --account-id acct_... --key-id key_... \
-  --name "Production replacement" --reason scheduled_rotation \
-  --actor operator:moyez --confirm
-npm run agent:admin -- key-revoke --account-id acct_... --key-id key_... \
-  --reason operator_request --actor operator:moyez --confirm
+npm run agent:admin -- key-rotate --user-id u_... --key-id k_... \
+  --name "Production replacement" --confirm
+npm run agent:admin -- key-revoke --user-id u_... --key-id k_... --confirm
 ```
 
 Rotation atomically revokes the old key and prints the replacement credential exactly once.
 Every mutation requires `--confirm`. Credit grants accept 1 through 1,000,000 credits and are
-idempotent within the addressed account: replay the same `--idempotency-key` and amount for a safe
-retry, and use a unique operator key for each intended grant. Reusing that account/key pair with a
-different amount or actor fails instead of silently changing a grant. `--actor` is written as
-bounded operator attribution in the immutable credit ledger. There is intentionally no dashboard,
-payment integration, or account self-service in the private-beta workflow.
+idempotent within the addressed user: replay the same `--idempotency-key` and amount for a safe
+retry, and use a unique operator key for each intended grant. Reusing that user/key pair with a
+different amount fails instead of silently changing a grant. The dashboard shows each newly issued
+credential once, stores only its hash, caps a user at five active keys, and requires an idempotency
+key for safe issuance retries. Recharge, payment integration, usage history, generation history,
+billing receipts, and general account self-service remain outside the current private-beta slice.
 
 ## Vercel
 

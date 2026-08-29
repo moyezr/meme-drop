@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-08-28
+Last updated: 2026-08-30
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and decisions here as implementation progresses.
@@ -151,7 +151,8 @@ relevant trend card without adding more than the existing bounded prompt allowan
 - [x] Add API-key authentication for agent routes. Store only a one-way hash of each secret; retain
   a short public key identifier for lookup, display, rotation, and audit.
 - [x] Support credential creation, naming, rotation, revocation, and last-used metadata through the
-  explicit private-beta operator CLI. Self-service dashboard entry points remain a separate track.
+  explicit private-beta operator CLI and create/revoke entry points through the authenticated
+  dashboard.
 - [x] Enforce tenant-scoped rate limits and credit limits. An install ID must not be accepted as
   authentication for an external production agent.
 - [x] Require the raw API caller to send `Idempotency-Key`; a matching retry cannot create a second
@@ -195,7 +196,8 @@ charged or stored twice.
   rules, and abuse limits.
 - [ ] Integrate Lemon Squeezy only after the credit transactions and pricing model are reviewed.
 - [ ] Add recharge webhooks with signature verification and idempotent fulfillment.
-- [ ] Add balance, credit-transaction, and usage endpoints for the dashboard.
+- [x] Add the remaining-credit balance to the tenant-scoped dashboard overview.
+- [ ] Add credit-transaction and usage endpoints for the dashboard.
 - [x] Add bounded stale-reservation reconciliation and idempotent operator grant tooling. General
   post-billing adjustments remain part of the future payment workflow.
 
@@ -235,12 +237,14 @@ operations.
   the landing build and CI.
 - [x] Document timeout and retry guidance for agents.
 - [ ] Keep a versioned changelog and compatibility policy.
-- [~] Implement Auth.js JWT authentication and document account recovery through the configured
+- [x] Implement Auth.js JWT authentication and document account recovery through the configured
   identity provider.
-- [ ] Build dashboard pages for API keys, remaining credits, recharge, usage history, generation
-  history, asset expiry, and billing receipts.
-- [ ] Ensure dashboard data is tenant-scoped and never exposes full API secrets after creation.
-- [ ] Add accessibility, responsive-layout, empty-state, and error-state coverage.
+- [x] Build the tenant-scoped dashboard overview for remaining credits and API-key creation and
+  revocation. A newly issued credential is shown once and only its one-way hash is retained.
+- [x] Add accessibility, responsive-layout, loading, empty-state, and error-state coverage for the
+  current dashboard slice.
+- [ ] Add recharge, credit usage, generation history, asset expiry, billing receipts, and general
+  account self-service to the dashboard.
 
 Done when: a developer unfamiliar with MemeDrop can obtain a credential and complete a successful
 generation using only `/docs`, and a user can manage keys and credits without database or operator
@@ -367,6 +371,8 @@ raw user text, or generated captions.
 
 ## Change log
 
+- 2026-08-30: Added the authenticated dashboard bridge, remaining-credit overview, idempotent
+  one-time API-key issuance and revocation, and explicit follow-up scope for billing and history.
 - 2026-08-24: Created the production plan from the agreed trend, agent API, compact-ID, credits,
   30-day retention, documentation/dashboard, domain, privacy-page, and asynchronous catalog
   decisions.

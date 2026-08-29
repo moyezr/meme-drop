@@ -17,7 +17,6 @@ htmlcov/
 .env
 .env.*
 !.env.example
-!.env.production.example
 *.local
 .claude/
 .memedrop/

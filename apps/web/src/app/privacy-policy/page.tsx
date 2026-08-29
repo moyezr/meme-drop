@@ -147,8 +147,9 @@ export default function PrivacyPolicyPage() {
           Final hosted retention periods for application and infrastructure logs, PostgreSQL,
           Redis, OpenRouter, Tavily, analytics, and object storage still require verification.
           Billing retention is not yet applicable because payments are not implemented. API keys
-          can be revoked by an operator; full account self-service, early asset deletion, and a
-          generated-content complaint workflow remain pending. Contact us for a request.
+          can be revoked from the authenticated dashboard or by an operator; general account
+          self-service, early asset deletion, and a generated-content complaint workflow remain
+          pending. Contact us for a request.
         </p>
       </section>
 

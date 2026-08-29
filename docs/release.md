@@ -1,6 +1,6 @@
 # Production release
 
-This is the operational checklist for the independently deployed landing page, FastAPI service, and
+This is the operational checklist for the independently deployed web app, FastAPI service, and
 Chrome extension. `npm run release:dry-run` proves the repository can build and package; it does not
 prove that external services, domains, credentials, or store metadata are ready.
 
@@ -80,13 +80,18 @@ Web project:
 - Root Directory: `apps/web`
 - Framework: Next.js
 - Build Command: leave at the Next.js default (`npm run build`)
-- Output Directory: leave unset/default; `next.config.ts` enables static export and Vercel detects
-  `out/` automatically
-- Secrets: none from the backend; never copy API/S3 credentials here
+- Output Directory: leave unset/default so Vercel publishes the server-rendered `.next/` output
+- Server-only environment: Auth.js secret/provider credentials, `MEMEDROP_API_BASE_URL`, and the
+  dashboard bridge token secret; never copy database, Redis, OpenRouter, or S3 credentials here
 
-Do not override the Output Directory with `out`. The Next.js preset needs its build metadata from
-`.next/` and publishes the static `out/` export automatically. The checked-in landing
-`vercel.json` explicitly keeps automatic output detection enabled.
+Do not override the Output Directory with `out`. Auth.js and the same-origin dashboard bridge need
+Next.js server routes. `MEMEDROP_DASHBOARD_TOKEN_SECRET` must contain 32–512 characters and match
+the API deployment exactly. Keep it and `MEMEDROP_API_BASE_URL` server-only; neither may use a
+`NEXT_PUBLIC_` prefix. OAuth callback URLs end in `/api/auth/callback/github` or
+`/api/auth/callback/google` on the production web origin. The Vercel production build validates
+these values, requires at least one complete OAuth provider pair, and accepts only
+`https://api.memedrop.moyezrabbani.dev` as the dashboard API origin; local builds do not require
+deployed secrets.
 
 API project:
 
@@ -99,7 +104,10 @@ API project:
 At minimum the API needs the managed PostgreSQL and Redis URLs, OpenRouter key/model settings, final
 Chrome extension CORS origin, Redis rate limiting, required install IDs, compact/redacted logs, and
 the production Supabase S3 endpoint/region/key pair with
-`S3_BUCKET_NAME=meme-drop-prod`.
+`S3_BUCKET_NAME=meme-drop-prod`. It also needs the same
+`MEMEDROP_DASHBOARD_TOKEN_SECRET` configured in the web project. `.env.example` is for local
+development; keep the production source in the ignored `.env.prod` operator file and synchronize
+it one-way into deployment secret stores.
 
 Before deploying with those values loaded:
 

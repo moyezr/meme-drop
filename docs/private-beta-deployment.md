@@ -1,6 +1,6 @@
 # MemeDrop private-beta deployment
 
-This is the executable production sequence for the current MemeDrop architecture. The landing page,
+This is the executable production sequence for the current MemeDrop architecture. The web app,
 FastAPI service, and Chrome extension are independent deployments. Begin with private or unlisted
 testers: anonymous install IDs isolate browser data but are not strong user authentication.
 
@@ -34,7 +34,7 @@ Create these resources in nearby regions where possible:
 
 Use Supabase's transaction-pooler URL, normally port `6543`, as the Vercel `DATABASE_URL`. Use a
 direct or session-pooler connection for controlled migrations. Never put database, Redis, OpenRouter,
-or S3 credentials in the landing page, extension, or any `VITE_*` variable.
+or S3 credentials in the web app, extension, or any public-prefixed environment variable.
 
 ## 3. Create the Vercel projects
 
@@ -45,14 +45,42 @@ Web project:
 - Root Directory: `apps/web`
 - Framework: Next.js
 - Build Command: leave at the Next.js default (`npm run build`)
-- Output Directory: leave unset/default; `next.config.ts` enables static export and Vercel detects
-  `out/` automatically
-- Backend secrets: none
+- Output Directory: leave unset/default; authenticated dashboard routes require the standard
+  server-rendered `.next/` deployment
+- Server-only environment: `AUTH_SECRET`, one or both OAuth credential pairs,
+  `MEMEDROP_API_BASE_URL`, and `MEMEDROP_DASHBOARD_TOKEN_SECRET`
 
-Do not set the Vercel Output Directory to `out`. With the Next.js framework preset, that override
-causes Vercel to look for `out/routes-manifest.json`, even though Next.js correctly writes the
-framework manifest to `.next/routes-manifest.json`. The repository's `apps/web/vercel.json`
-keeps automatic output detection enabled.
+Do not set the Vercel Output Directory to `out`; the Auth.js callback, dashboard, and same-origin
+dashboard bridge are dynamic server routes. Keep every dashboard bridge value server-only: never
+prefix it with `NEXT_PUBLIC_`, serialize it into client code, or expose the short-lived internal
+assertion in a browser response.
+
+Configure the web project with:
+
+```text
+AUTH_SECRET=<independent-high-entropy-authjs-secret>
+AUTH_GITHUB_ID=<github-oauth-client-id>                 # optional provider pair
+AUTH_GITHUB_SECRET=<github-oauth-client-secret>
+AUTH_GOOGLE_ID=<google-oauth-client-id>                 # optional provider pair
+AUTH_GOOGLE_SECRET=<google-oauth-client-secret>
+MEMEDROP_API_BASE_URL=https://api.memedrop.moyezrabbani.dev
+MEMEDROP_DASHBOARD_TOKEN_SECRET=<shared-high-entropy-bridge-secret>
+```
+
+At least one complete OAuth provider pair is required. Configure its callback as
+`https://memedrop.moyezrabbani.dev/api/auth/callback/github` or
+`https://memedrop.moyezrabbani.dev/api/auth/callback/google`. The bridge token secret must contain
+32–512 trimmed, non-placeholder characters and must exactly match the API deployment value. Rotate
+it in both projects together; it is separate from `AUTH_SECRET`. During a Vercel production build,
+the web config check also requires a valid `AUTH_SECRET`, at least one complete provider pair, and
+the exact canonical API origin shown above. Local builds skip this deployed-secret check.
+
+The browser calls only the same-origin `/api/dashboard/*` handlers. Both mutation handlers reject
+cross-origin requests. API-key creation additionally requires a caller-generated, visible-ASCII
+`Idempotency-Key` of 1–200 characters so a UI retry cannot issue two credentials. The bridge
+forwards that value only to the API for the duration of the request; it must never be logged or
+persisted. A safe `x-request-id` uses 8–128 letters, digits, underscores, or hyphens; invalid values
+are discarded rather than forwarded.
 
 API project:
 
@@ -124,6 +152,7 @@ MEMEDROP_TREND_EMBEDDING_TIMEOUT_SECONDS=20
 MEMEDROP_TREND_EMBEDDING_BATCH_SIZE=32
 MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS=1
 CRON_SECRET=<long-random-secret>
+MEMEDROP_DASHBOARD_TOKEN_SECRET=<shared-high-entropy-bridge-secret>
 MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS=3600
 MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS=28800
 MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE=100
@@ -191,9 +220,11 @@ connectivity are reported by `/health`; storage is verified by the bounded stora
 Do not validate Tavily by issuing a search during startup because that consumes a credit, and do
 not make application liveness depend on OpenRouter availability.
 
-Production secret synchronization is one-way. Push values from the ignored operator environment
-to Vercel, but never run `vercel env pull` with `.env.prod` as its destination. Sensitive values are
-write-only and are returned as opaque references rather than their original plaintext.
+`.env.example` is the local development template; there is intentionally no checked-in production
+environment template. Production secret synchronization is one-way. Push values from the ignored
+`.env.prod` operator environment to Vercel, but never run `vercel env pull` with `.env.prod` as its
+destination. Sensitive values are write-only and are returned as opaque references rather than
+their original plaintext.
 
 The latency probe writes, reads, and deletes one temporary `_health/` object. Confirm cleanup in the
 bucket afterward.
