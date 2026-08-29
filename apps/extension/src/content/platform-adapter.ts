@@ -29,8 +29,10 @@ const X_COMPOSER = 'div[data-testid^="tweetTextarea_"]';
 const X_COMPOSE_DIALOG = 'div[role="dialog"]';
 const X_FILE_INPUT = 'input[data-testid="fileInput"]';
 
-const LINKEDIN_POST = '[role="listitem"]';
+const LINKEDIN_POST =
+  '[data-urn^="urn:li:activity:"], [data-urn^="urn:li:ugcPost:"], [role="listitem"]';
 const LINKEDIN_NATIVE_REPLY = 'button[aria-label="Comment"]';
+const LINKEDIN_POST_TEXT = '[data-testid="expandable-text-box"]';
 const LINKEDIN_COMPOSER =
   '[contenteditable="true"][role="textbox"][aria-label="Text editor for creating comment"]';
 const LINKEDIN_FILE_INPUT = 'input[type="file"][accept*="image"]';
@@ -89,25 +91,50 @@ export const LINKEDIN_ADAPTER: PlatformAdapter = {
     return actionGroup instanceof HTMLElement ? actionGroup : null;
   },
   extractReplySource(post, nativeReply) {
-    const candidates = Array.from(post.querySelectorAll<HTMLElement>("p"))
+    const explicitPostText = Array.from(
+      post.querySelectorAll<HTMLElement>(LINKEDIN_POST_TEXT)
+    ).find((element) => isBefore(element, nativeReply));
+    const fallbackCandidates = Array.from(post.querySelectorAll<HTMLElement>("p"))
       .filter((paragraph) => {
         if (paragraph.closest("button") || paragraph.closest("a")) return false;
         // LinkedIn renders loaded comments after the native Comment action.
         // Limit extraction to content before the action bar so an existing
         // comment can never replace the source post as recommendation input.
-        return Boolean(paragraph.compareDocumentPosition(nativeReply) & 4);
+        return isBefore(paragraph, nativeReply);
       })
       .map((paragraph) => paragraph.innerText || paragraph.textContent || "");
-    const tweetText = selectLinkedInPostText(candidates);
+    const explicitText =
+      explicitPostText?.innerText || explicitPostText?.textContent || "";
+    const tweetText = selectLinkedInPostText(
+      explicitText ? [explicitText] : fallbackCandidates
+    );
     const postHref = Array.from(post.querySelectorAll<HTMLAnchorElement>('a[href*="/feed/update/"]'))
       .map((link) => link.href)
       .find((href) => linkedinPostIdFromHref(href));
+    const postId =
+      linkedinPostIdFromUrn(post.getAttribute("data-urn")) ||
+      linkedinPostIdFromHref(postHref) ||
+      linkedinPostIdFromComponentKey(
+        post
+          .querySelector<HTMLElement>(
+            ':scope > [data-display-contents="true"] > [componentkey]'
+          )
+          ?.getAttribute("componentkey") || post.getAttribute("componentkey")
+      );
     return {
       tweetText,
-      tweetId: linkedinPostIdFromHref(postHref),
+      // Keep LinkedIn's namespace in the shared cache identity so an activity
+      // cannot collide with an X status that happens to use the same digits.
+      tweetId: linkedinPostCacheId(postId),
     };
   },
 };
+
+function isBefore(element: Element, reference: Element): boolean {
+  return Boolean(
+    element.compareDocumentPosition(reference) & Node.DOCUMENT_POSITION_FOLLOWING
+  );
+}
 
 export function getPlatformAdapter(hostname = window.location.hostname): PlatformAdapter | null {
   const normalized = hostname.toLowerCase();
@@ -141,6 +168,29 @@ export function linkedinPostIdFromHref(href: string | null | undefined): string 
   } catch {
     return null;
   }
+}
+
+export function linkedinPostIdFromUrn(urn: string | null | undefined): string | null {
+  return urn?.match(/^urn:li:(?:activity|ugcPost):(\d+)$/)?.[1] ?? null;
+}
+
+export function linkedinPostIdFromComponentKey(
+  componentKey: string | null | undefined
+): string | null {
+  if (!componentKey) return null;
+
+  // LinkedIn's current feed uses a stable 32-byte base64url post key. The
+  // list item wraps it as `expanded<key>FeedType_...`; its content child
+  // exposes the key directly. Both forms remain stable across page reloads.
+  const wrapped = componentKey.match(
+    /^expanded([A-Za-z0-9_-]{43})FeedType_[A-Z0-9_]+$/
+  )?.[1];
+  if (wrapped) return wrapped;
+  return /^[A-Za-z0-9_-]{43}$/.test(componentKey) ? componentKey : null;
+}
+
+export function linkedinPostCacheId(postId: string | null): string | null {
+  return postId ? `linkedin:${postId}` : null;
 }
 
 export function isInlineComposeSessionActive(input: {
