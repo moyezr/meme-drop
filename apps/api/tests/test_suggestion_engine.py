@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 
 import memedrop_api.services.suggestion_engine as suggestion_engine
 from memedrop_api.config import Settings
-from memedrop_api.schemas import TweetContext, UsageBatchRequest
+from memedrop_api.schemas import MAX_SOURCE_POST_LENGTH, TweetContext, UsageBatchRequest
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.suggestion_engine import (
@@ -208,7 +208,7 @@ async def test_steering_changes_the_local_retrieval_query_without_changing_autom
     assert gateway.seen_template_ids[1][0] == "this-is-fine"
 
 
-async def test_feedback_context_excludes_source_derived_terms_for_a_max_length_post() -> None:
+async def test_feedback_context_excludes_source_derived_terms_for_a_long_post() -> None:
     service, _, gateway = service_with_templates("this-is-fine")
     gateway.selections = [TemplateSelection("this-is-fine", "test selection", 0.9)]
     gateway.captions = {
@@ -218,9 +218,8 @@ async def test_feedback_context_excludes_source_derived_terms_for_a_max_length_p
         }
     }
     raw_token = "ultravioletpineapple"
-    tweet = f"{raw_token} " + "ordinary words " * 18
-    tweet = tweet[:280]
-    assert len(tweet) == 280
+    tweet = f"{raw_token} " + "ordinary words " * 80
+    assert len(tweet) > 280
 
     suggestion = (await service.get_suggestions(tweet, user_id=INSTALL_ID, limit=1))[0]
     feedback_context = suggestion["feedback_context"]
@@ -699,10 +698,22 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
         headers={"x-memedrop-install-id": str(INSTALL_ID)},
         json={"tweet_text": "Prod is down and everything is on fire", "limit": 1},
     )
+    long_post = await api_harness.client.post(
+        "/api/v1/suggest",
+        headers={"x-memedrop-install-id": str(INSTALL_ID)},
+        json={"tweet_text": "LinkedIn post content " * 100, "limit": 1},
+    )
+    oversized_post = await api_harness.client.post(
+        "/api/v1/suggest",
+        headers={"x-memedrop-install-id": str(INSTALL_ID)},
+        json={"tweet_text": "x" * (MAX_SOURCE_POST_LENGTH + 1), "limit": 1},
+    )
 
     assert invalid.status_code == 400
     assert invalid.json()["error"] == "Invalid request"
     assert valid.status_code == 200
+    assert long_post.status_code == 200
+    assert oversized_post.status_code == 400
     suggestion = valid.json()["suggestions"][0]
     assert suggestion["name"] == "This Is Fine"
     assert "tweet_context" not in suggestion

@@ -136,6 +136,29 @@ test("benchmark importer rejects duplicate existing case ids", async () => {
   );
 });
 
+test("benchmark importer rejects unbounded source posts", async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-benchmark-import-"));
+  const packPath = path.join(tmpDir, "case-pack.json");
+  const benchmarkPath = path.join(tmpDir, "benchmark.json");
+  await fs.copyFile(productionBenchmarkPath, benchmarkPath);
+  await writeCasePack(packPath, {
+    cases: [{ ...validPendingCase(), tweet: "x".repeat(20_001) }],
+  });
+
+  await assert.rejects(
+    execFileAsync(
+      "node",
+      ["--import", "tsx", importerPath, "--file", packPath, "--benchmark", benchmarkPath],
+      { cwd: rootDir }
+    ),
+    (error: unknown) => {
+      const err = error as { stdout?: string };
+      assert.match(err.stdout || "", /source post exceeds 20,000 characters/);
+      return true;
+    }
+  );
+});
+
 test("benchmark importer requires non-pending meme families to be verified", async () => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-benchmark-import-"));
   const packPath = path.join(tmpDir, "case-pack.json");

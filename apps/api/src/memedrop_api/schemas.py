@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+MAX_SOURCE_POST_LENGTH = 20_000
 
 
 class StrictModel(BaseModel):
@@ -201,7 +202,7 @@ TweetText = Annotated[
     StringConstraints(
         strip_whitespace=True,
         min_length=1,
-        max_length=280,
+        max_length=MAX_SOURCE_POST_LENGTH,
     ),
 ]
 
