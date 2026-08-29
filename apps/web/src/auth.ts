@@ -46,4 +46,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   session: { strategy: "jwt" },
   pages: { signIn: "/sign-in" },
+  callbacks: {
+    jwt({ token, account }) {
+      if (account) {
+        token.authProvider = account.provider;
+        token.providerAccountId = account.providerAccountId;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (
+        typeof token.authProvider !== "string" ||
+        typeof token.providerAccountId !== "string"
+      ) {
+        throw new Error("Authenticated session is missing provider identity claims.");
+      }
+
+      session.user.provider = token.authProvider;
+      session.user.providerAccountId = token.providerAccountId;
+      return session;
+    },
+  },
 });
