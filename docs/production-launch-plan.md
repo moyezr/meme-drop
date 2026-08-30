@@ -342,8 +342,8 @@ quality gates, and catalog growth does not regress relevance, readability, safet
 - [x] Dashboard authentication uses Auth.js JWT sessions and a user-owned model without workspaces
   or memberships.
 - [?] Initial public content-safety policy and appeal/takedown process.
-- [?] Whether the first production release is API-only, private beta, or includes the Chrome
-  extension store launch.
+- [~] Proceed with an API/web private beta independently of the Chrome Web Store. Extension store
+  submission remains deferred until developer-account enrollment succeeds and provides a final ID.
 
 ## Verification commands
 
@@ -371,6 +371,8 @@ raw user text, or generated captions.
 
 ## Change log
 
+- 2026-08-30: Confirmed the canonical API origin and privacy/support email, and deferred Chrome Web
+  Store submission without blocking an API/web private beta.
 - 2026-08-30: Added the authenticated dashboard bridge, remaining-credit overview, idempotent
   one-time API-key issuance and revocation, and explicit follow-up scope for billing and history.
 - 2026-08-24: Created the production plan from the agreed trend, agent API, compact-ID, credits,

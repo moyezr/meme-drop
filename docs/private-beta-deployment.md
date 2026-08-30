@@ -309,10 +309,9 @@ reserved for a retry; it never performs a bucket-wide scan or deletion.
 
 Before Chrome submission:
 
-- replace every placeholder in `PRIVACY.md`, including the contact email;
 - confirm provider and data-retention disclosures;
 - deploy and verify `https://memedrop.moyezrabbani.dev/privacy-policy/` without authentication;
-- configure a real support email;
+- confirm `moyezrabbani.work@gmail.com` remains the intended public support email;
 - verify the hosted page matches the release commit and canonical URL.
 
 The landing route `/privacy-policy/` is implemented and statically exported. Its hosted availability
@@ -345,7 +344,7 @@ Create real listing metadata:
 ```sh
 npm run store-listing:init -- \
   --privacy-policy-url https://memedrop.moyezrabbani.dev/privacy-policy/ \
-  --support-email <real-support-email>
+  --support-email moyezrabbani.work@gmail.com
 ```
 
 Add at least two real PNG/JPEG screenshots under `apps/extension/store-assets`; at least one must be
@@ -354,12 +353,15 @@ Add at least two real PNG/JPEG screenshots under `apps/extension/store-assets`; 
 With the production environment loaded, build and validate the exact submission artifact:
 
 ```sh
-VITE_API_BASE_URL=https://<production-api-origin> npm run release:candidate
+VITE_API_BASE_URL=https://api.memedrop.moyezrabbani.dev npm run release:candidate
 npm run launch:status
 ```
 
 Do not submit until `launch:status` has no blockers. Install and manually test the packaged artifact,
-not a development build.
+not a development build. Chrome Web Store submission is currently deferred until developer-account
+enrollment succeeds and supplies the final extension ID. Until then, production API CORS should
+allow only `https://memedrop.moyezrabbani.dev`; append the exact `chrome-extension://` origin after
+the ID exists.
 
 ## 10. Release privately and observe
 

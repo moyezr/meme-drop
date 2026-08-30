@@ -134,20 +134,25 @@ Prepare real listing metadata:
 
 ```sh
 npm run store-listing:init -- \
-  --privacy-policy-url https://<public-site>/privacy \
-  --support-email <real-support-email>
+  --privacy-policy-url https://memedrop.moyezrabbani.dev/privacy-policy/ \
+  --support-email moyezrabbani.work@gmail.com
 ```
 
 Add at least two real PNG/JPEG screenshots under `apps/extension/store-assets`; at least one must be
-`1280x800`. Replace the privacy-policy contact placeholder, host the final policy, and make provider
-and retention disclosures match production settings.
+`1280x800`. Host the final policy and make provider and retention disclosures match production
+settings.
 
 Build and validate the exact artifact submitted to Chrome:
 
 ```sh
-VITE_API_BASE_URL=https://<production-api-origin> npm run release:candidate
+VITE_API_BASE_URL=https://api.memedrop.moyezrabbani.dev npm run release:candidate
 npm run launch:status
 ```
+
+Chrome Web Store submission remains deferred until developer-account enrollment succeeds and the
+store provides the final extension ID. For an API/web private beta before then, configure
+`MEMEDROP_CORS_ORIGINS=https://memedrop.moyezrabbani.dev`; append the exact published extension
+origin only after it exists.
 
 The strict candidate checks production API configuration, store metadata/assets, suggestion quality,
 CORS, privacy placeholders, and the packaged zip. Bump the extension package and manifest versions
