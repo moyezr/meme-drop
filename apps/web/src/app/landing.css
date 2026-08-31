@@ -1,0 +1,68 @@
+.landing {
+  --landing-width: 1040px;
+  --landing-space: clamp(72px, 10vw, 120px);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.landingWidth { width: min(calc(100% - 48px), var(--landing-width)); margin-inline: auto; }
+.landingNav { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 28px; }
+.landingBrand { font-family: var(--font-display), sans-serif; font-size: 32px; line-height: 1; }
+.landingBrand span { color: var(--blue); }
+.landingNav nav, .landingFooter nav { display: flex; flex-wrap: wrap; align-items: center; gap: 28px; font-size: 13px; }
+.landingNav a:hover, .landingFooter nav a:hover, .landingTextLink:hover { color: var(--blue); }
+.landingNavCta { border: 1px solid var(--line); border-radius: 7px; padding: 7px 13px; }
+.landingHero { padding-block: 66px 0; text-align: center; }
+.landingEyebrow { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 22px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .11em; }
+.betaDot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+.landing h1 { max-width: none; margin: 0 0 24px; font-size: clamp(48px, 6.7vw, 76px); letter-spacing: -.015em; line-height: 1.02; }
+.landing h1 span { color: var(--blue); }
+.landingLead { margin: 0 auto; max-width: 510px; color: var(--muted); font-size: 16px; line-height: 1.7; }
+.landingActions { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 24px; margin-top: 28px; font-size: 13px; }
+.landingButton { display: inline-flex; align-items: center; justify-content: center; gap: 20px; padding: 11px 18px; border: 1px solid var(--blue); border-radius: 7px; background: var(--blue); color: white; font-size: 13px; font-weight: 550; }
+.landingButton:hover { background: var(--blue-hover); }
+.landingTextLink { font-weight: 550; }
+.landingTextLink span { margin-left: 8px; }
+.humorPreview { display: grid; grid-template-columns: minmax(0, 1fr) 120px minmax(0, 1fr); align-items: center; max-width: 880px; margin: 58px auto 0; text-align: left; }
+.contextCard { padding: 28px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.cardLabel { color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .1em; }
+.contextCard p { margin: 22px 0 28px; font-size: 19px; line-height: 1.55; letter-spacing: -.02em; }
+.contextSource { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
+.contextSource > span { color: var(--blue); font-family: monospace; }
+.humorConnector { display: flex; align-items: center; }
+.humorConnector > span { height: 1px; flex: 1; background: #a8c7fa; }
+.humorConnector b { display: grid; width: 46px; height: 46px; place-items: center; border: 1px solid #c4dafc; border-radius: 13px; background: #f0f6ff; color: var(--blue); font-family: var(--font-display), sans-serif; font-size: 30px; font-weight: 400; }
+.exampleMeme { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: 0 10px 30px #1f1f1f0a; }
+.exampleMeme figcaption { padding: 18px 20px; color: #202124; font-size: 17px; font-weight: 650; line-height: 1.35; }
+.exampleMeme img { display: block; width: 100%; height: auto; }
+.exampleNote { margin: 18px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
+.landingSection { padding-top: var(--landing-space); scroll-margin-top: 24px; }
+.landing h2 { margin: 0 0 14px; font-family: var(--font-display), sans-serif; font-size: clamp(36px, 4vw, 48px); font-weight: 400; line-height: 1.1; }
+.sectionDescription { max-width: 470px; margin: 0 auto; color: var(--muted); font-size: 14px; }
+.demoSection { text-align: center; }
+.demoSection .demoFrame { max-width: 800px; margin: 36px auto 0; border-radius: 14px; box-shadow: 0 16px 48px #3c404710; }
+.browserBar small { margin: 0 auto; padding-right: 48px; color: var(--muted); font-size: 10px; }
+.demoSection .browserBar { height: 35px; }
+.demoSection .browserBar span { width: 8px; height: 8px; }
+.landingFooter { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; margin-top: var(--landing-space); padding-block: 32px 40px; border-top: 1px solid var(--line); }
+.landingFooter p { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+.landing a:focus-visible, .landing button:focus-visible, .landing summary:focus-visible { outline: 3px solid #1a73e880; outline-offset: 5px; }
+@media (max-width: 720px) {
+  .landingWidth { width: calc(100% - 36px); }
+  .landingNav { gap: 12px; padding-block: 22px; }
+  .landingNav nav { gap: 16px; font-size: 12px; }
+  .landingNav nav > a:first-child { display: none; }
+  .landingBrand { font-size: 28px; }
+  .landingHero { padding-top: 44px; }
+  .landingLead { font-size: 15px; }
+  .desktopBreak { display: none; }
+  .humorPreview { max-width: 410px; grid-template-columns: minmax(0, 1fr); margin-top: 38px; }
+  .contextCard { padding: 22px; }
+  .contextCard p { font-size: 17px; margin-block: 14px; }
+  .humorConnector { width: 46px; height: 80px; flex-direction: column; justify-self: center; }
+  .humorConnector > span { width: 1px; height: auto; }
+  .humorConnector b { flex-shrink: 0; }
+  .landingFooter { flex-direction: column; }
+  .landingFooter nav { gap: 16px 22px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
