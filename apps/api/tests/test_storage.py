@@ -4,11 +4,20 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
 from memedrop_api.config import Settings
+from memedrop_api.public_ids import PublicIdKind, create_public_id
 from memedrop_api.services.storage import (
+    GeneratedAgentObjectCleaner,
+    GeneratedAgentObjectCleanupError,
+    GeneratedAgentObjectLimitExceeded,
     LocalMemeStorage,
     S3MemeStorage,
+    StorageObjectNotFoundError,
+    StorageObjectTooLargeError,
+    StoredObject,
+    generated_agent_object_prefix,
     object_key_from_public_path,
     public_path_for_key,
     validate_object_key,
@@ -19,9 +28,13 @@ class FakeBody:
     def __init__(self, content: bytes) -> None:
         self.content = content
         self.closed = False
+        self.read_amounts: list[int | None] = []
 
-    def read(self) -> bytes:
-        return self.content
+    def read(self, amount: int | None = None) -> bytes:
+        self.read_amounts.append(amount)
+        if amount is None:
+            return self.content
+        return self.content[:amount]
 
     def close(self) -> None:
         self.closed = True
@@ -31,13 +44,15 @@ class FakeS3Client:
     def __init__(self) -> None:
         self.objects: dict[tuple[str, str], bytes] = {}
         self.head_buckets: list[str] = []
+        self.reported_content_length: int | None = None
+        self.last_body: FakeBody | None = None
+        self.list_calls: list[dict[str, Any]] = []
+        self.force_truncated = False
 
     def head_bucket(self, *, Bucket: str) -> None:
         self.head_buckets.append(Bucket)
 
-    def upload_file(
-        self, source: str, bucket: str, key: str, *, ExtraArgs: dict[str, str]
-    ) -> None:
+    def upload_file(self, source: str, bucket: str, key: str, *, ExtraArgs: dict[str, str]) -> None:
         assert ExtraArgs["ContentType"].startswith("image/")
         self.objects[(bucket, key)] = Path(source).read_bytes()
 
@@ -45,17 +60,37 @@ class FakeS3Client:
         self.objects[(arguments["Bucket"], arguments["Key"])] = arguments["Body"]
 
     def get_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:
-        content = self.objects[(Bucket, Key)]
+        try:
+            content = self.objects[(Bucket, Key)]
+        except KeyError as error:
+            raise ClientError(
+                {"Error": {"Code": "NoSuchKey", "Message": "Not Found"}},
+                "GetObject",
+            ) from error
+        self.last_body = FakeBody(content)
         return {
-            "Body": FakeBody(content),
-            "ContentLength": len(content),
+            "Body": self.last_body,
+            "ContentLength": self.reported_content_length or len(content),
             "ContentType": "image/png",
         }
 
     def delete_object(self, *, Bucket: str, Key: str) -> None:
         self.objects.pop((Bucket, Key), None)
 
-def s3_settings() -> Settings:
+    def list_objects_v2(self, **arguments: Any) -> dict[str, Any]:
+        self.list_calls.append(arguments)
+        keys = sorted(
+            key
+            for bucket, key in self.objects
+            if bucket == arguments["Bucket"] and key.startswith(arguments["Prefix"])
+        )[: arguments["MaxKeys"]]
+        return {
+            "Contents": [{"Key": key} for key in keys],
+            "IsTruncated": self.force_truncated,
+        }
+
+
+def s3_settings(*, max_image_bytes: int = 8 * 1024 * 1024) -> Settings:
     return Settings(
         database_url="postgresql://localhost/test",
         storage_backend="s3",
@@ -64,12 +99,11 @@ def s3_settings() -> Settings:
         s3_region="ap-south-1",
         s3_access_key_id="access-key",
         s3_secret_access_key="secret-key",
+        max_image_bytes=max_image_bytes,
     )
 
 
-@pytest.mark.parametrize(
-    "key", ["", "/absolute.png", "../secret", "catalog/../secret", "bad\\key"]
-)
+@pytest.mark.parametrize("key", ["", "/absolute.png", "../secret", "catalog/../secret", "bad\\key"])
 def test_storage_keys_reject_unsafe_paths(key: str) -> None:
     with pytest.raises(ValueError, match="Invalid storage object key"):
         validate_object_key(key)
@@ -98,6 +132,85 @@ async def test_local_storage_moves_and_deletes_nested_files(tmp_path: Path) -> N
     assert await storage.delete(public_path) is False
 
 
+async def test_generation_cleanup_is_tenant_scoped_bounded_and_exact_for_local_storage(
+    tmp_path: Path,
+) -> None:
+    storage = LocalMemeStorage(tmp_path / "storage")
+    user_id = create_public_id(PublicIdKind.USER).value
+    generation_id = create_public_id(PublicIdKind.GENERATION).value
+    other_generation = create_public_id(PublicIdKind.GENERATION).value
+    prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
+    await storage.put_bytes(f"{prefix}one.webp", b"one")
+    await storage.put_bytes(f"{prefix}two.webp", b"two")
+    await storage.put_bytes(
+        f"generated/users/{user_id}/{other_generation}/keep.webp",
+        b"keep",
+    )
+
+    await GeneratedAgentObjectCleaner(storage, max_objects=2).cleanup_generation_objects(
+        user_id=user_id,
+        generation_id=generation_id,
+    )
+
+    assert await storage.list_object_keys(prefix, limit=3) == []
+    assert await storage.read_bytes(
+        f"/memes/generated/users/{user_id}/{other_generation}/keep.webp"
+    ) == StoredObject(b"keep", "image/webp")
+
+
+async def test_generation_cleanup_fails_closed_before_delete_when_prefix_overflows(
+    tmp_path: Path,
+) -> None:
+    storage = LocalMemeStorage(tmp_path / "storage")
+    user_id = create_public_id(PublicIdKind.USER).value
+    generation_id = create_public_id(PublicIdKind.GENERATION).value
+    prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
+    for name in ("one.webp", "two.webp", "three.webp"):
+        await storage.put_bytes(f"{prefix}{name}", b"image")
+
+    with pytest.raises(GeneratedAgentObjectLimitExceeded):
+        await GeneratedAgentObjectCleaner(storage, max_objects=2).cleanup_generation_objects(
+            user_id=user_id,
+            generation_id=generation_id,
+        )
+
+    assert len(await storage.list_object_keys(prefix, limit=4)) == 3
+
+
+def test_generation_cleanup_identity_must_use_compact_user_and_generation_ids() -> None:
+    with pytest.raises(GeneratedAgentObjectCleanupError):
+        generated_agent_object_prefix(user_id="not-a-user", generation_id="not-a-generation")
+
+
+async def test_local_storage_reads_bytes_with_content_type(tmp_path: Path) -> None:
+    storage = LocalMemeStorage(tmp_path / "storage")
+    public_path = await storage.put_bytes("catalog/reaction.png", b"image")
+
+    stored_object = await storage.read_bytes(public_path)
+
+    assert stored_object.content == b"image"
+    assert stored_object.content_type == "image/png"
+
+
+@pytest.mark.parametrize("public_path", ["/other/image.png", "/memes/../secret"])
+async def test_local_storage_rejects_invalid_public_paths(tmp_path: Path, public_path: str) -> None:
+    storage = LocalMemeStorage(tmp_path / "storage")
+
+    with pytest.raises(StorageObjectNotFoundError):
+        await storage.read_bytes(public_path)
+
+
+async def test_local_storage_rejects_missing_and_oversize_objects(tmp_path: Path) -> None:
+    storage = LocalMemeStorage(tmp_path / "storage", max_object_bytes=4)
+
+    with pytest.raises(StorageObjectNotFoundError):
+        await storage.read_bytes("/memes/catalog/missing.png")
+
+    public_path = await storage.put_bytes("catalog/large.png", b"large")
+    with pytest.raises(StorageObjectTooLargeError):
+        await storage.read_bytes(public_path)
+
+
 async def test_s3_storage_uses_environment_bucket_for_all_operations(tmp_path: Path) -> None:
     source = tmp_path / "reaction.png"
     source.write_bytes(b"image")
@@ -115,6 +228,79 @@ async def test_s3_storage_uses_environment_bucket_for_all_operations(tmp_path: P
     assert "s-maxage=86400" in response.headers["cache-control"]
     assert await storage.delete(public_path) is True
     assert client.objects == {}
+
+
+async def test_s3_generation_cleanup_lists_only_one_exact_prefix_with_overflow_sentinel() -> None:
+    client = FakeS3Client()
+    storage = S3MemeStorage(s3_settings(), client=client)
+    user_id = create_public_id(PublicIdKind.USER).value
+    generation_id = create_public_id(PublicIdKind.GENERATION).value
+    prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
+    for name in ("one.webp", "two.webp"):
+        await storage.put_bytes(f"{prefix}{name}", b"image")
+
+    await GeneratedAgentObjectCleaner(storage, max_objects=2).cleanup_generation_objects(
+        user_id=user_id,
+        generation_id=generation_id,
+    )
+
+    assert client.list_calls == [{"Bucket": "meme-drop-dev", "Prefix": prefix, "MaxKeys": 3}]
+    assert client.objects == {}
+
+
+async def test_s3_generation_cleanup_fails_closed_when_provider_marks_listing_truncated() -> None:
+    client = FakeS3Client()
+    client.force_truncated = True
+    storage = S3MemeStorage(s3_settings(), client=client)
+    user_id = create_public_id(PublicIdKind.USER).value
+    generation_id = create_public_id(PublicIdKind.GENERATION).value
+    prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
+    await storage.put_bytes(f"{prefix}one.webp", b"image")
+
+    with pytest.raises(GeneratedAgentObjectLimitExceeded):
+        await GeneratedAgentObjectCleaner(storage, max_objects=2).cleanup_generation_objects(
+            user_id=user_id,
+            generation_id=generation_id,
+        )
+
+    assert ("meme-drop-dev", f"{prefix}one.webp") in client.objects
+
+
+async def test_s3_storage_reads_bytes_with_content_type() -> None:
+    client = FakeS3Client()
+    client.objects[("meme-drop-dev", "catalog/reaction.png")] = b"image"
+    storage = S3MemeStorage(s3_settings(), client=client)
+
+    stored_object = await storage.read_bytes("/memes/catalog/reaction.png")
+
+    assert stored_object.content == b"image"
+    assert stored_object.content_type == "image/png"
+    assert client.last_body is not None
+    assert client.last_body.closed is True
+
+
+async def test_s3_storage_rejects_invalid_and_missing_public_paths() -> None:
+    client = FakeS3Client()
+    storage = S3MemeStorage(s3_settings(), client=client)
+
+    with pytest.raises(StorageObjectNotFoundError):
+        await storage.read_bytes("/other/reaction.png")
+    with pytest.raises(StorageObjectNotFoundError):
+        await storage.read_bytes("/memes/catalog/missing.png")
+
+
+async def test_s3_storage_bounds_reads_when_content_length_is_inaccurate() -> None:
+    client = FakeS3Client()
+    client.objects[("meme-drop-dev", "catalog/large.png")] = b"larger"
+    client.reported_content_length = 1
+    storage = S3MemeStorage(s3_settings(max_image_bytes=4), client=client)
+
+    with pytest.raises(StorageObjectTooLargeError):
+        await storage.read_bytes("/memes/catalog/large.png")
+
+    assert client.last_body is not None
+    assert client.last_body.read_amounts == [5]
+    assert client.last_body.closed is True
 
 
 async def test_s3_latency_check_cleans_up_probe_object() -> None:

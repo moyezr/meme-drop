@@ -9,6 +9,27 @@ export type {
 
 export type { User } from "./types/user.js";
 
+export {
+  PUBLIC_ID_ALPHABET,
+  PUBLIC_ID_TOKEN_LENGTH,
+  isPublicId,
+} from "./types/public-id.js";
+export type {
+  PublicIdPrefix,
+  PublicId,
+  UserId,
+  ApiKeyId,
+  GenerationId,
+  AssetId,
+} from "./types/public-id.js";
+
+export type {
+  MemeGenerateOptions,
+  MemeGenerateRequest,
+  GeneratedMeme,
+  MemeGenerateResponse,
+} from "./types/meme-generation.js";
+
 export type {
   TweetContext,
   FeedbackContext,
@@ -51,6 +72,8 @@ export {
 export type { TemplateLookupOptions } from "./data/template-lookup.js";
 
 export type {
+  MemeGenerateRouteRequest,
+  MemeGenerateRouteResponse,
   SuggestRequest,
   SuggestResponse,
   UsageRequest,

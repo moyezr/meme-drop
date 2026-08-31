@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import pg from "pg";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-const QWEN_PLUS_MODEL = "qwen/qwen3.6-plus";
+const GEMINI_FLASH_MODEL = "google/gemini-3.7-flash";
 
 type ManifestQuality = "verified" | "draft" | "disabled";
 
@@ -105,7 +105,7 @@ dotenv.config({ path: path.join(rootDir, ".env") });
 dotenv.config({ path: path.join(rootDir, "apps", "api", ".env"), override: true });
 
 const args = parseArgs(process.argv.slice(2));
-const model = args.model || process.env.OPENROUTER_TEMPLATE_MODEL || QWEN_PLUS_MODEL;
+const model = args.model || process.env.OPENROUTER_TEMPLATE_MODEL || GEMINI_FLASH_MODEL;
 const outputPath = path.resolve(rootDir, args.out || defaultOutputPath);
 const storagePath = resolveStoragePath(process.env.MEME_STORAGE_PATH || defaultStoragePath);
 

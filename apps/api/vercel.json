@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "installCommand": "uv sync --frozen --no-dev",
+  "buildCommand": "uv run memedrop-validate-production-env && uv run python -c \"from app import app\"",
+  "regions": ["sin1"],
+  "crons": [
+    {
+      "path": "/internal/cron/trends/refresh",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/internal/cron/assets/cleanup",
+      "schedule": "30 3 * * *"
+    }
+  ]
+}

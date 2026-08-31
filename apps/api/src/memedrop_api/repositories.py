@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlalchemy import String, and_, asc, cast, delete, desc, func, or_, select, update
 
-from memedrop_api.db import Database, Meme, UsageEvent, User, UserMeme
+from memedrop_api.db import Database, InstallUser, Meme, UsageEvent, UserMeme
 
 JsonRecord = dict[str, Any]
 
@@ -89,10 +89,10 @@ class SqlAlchemyStore:
 
     async def ensure_install_user(self, user_id: UUID) -> None:
         async with self.database.session() as session, session.begin():
-            existing = await session.get(User, user_id)
+            existing = await session.get(InstallUser, user_id)
             if existing is None:
                 session.add(
-                    User(
+                    InstallUser(
                         id=user_id,
                         email=f"install-{user_id}@anonymous.memedrop.local",
                     )
@@ -341,14 +341,14 @@ class SqlAlchemyStore:
                 delete(UserMeme).where(UserMeme.user_id == user_id).returning(UserMeme.id)
             )
             deleted_user = await session.execute(
-                delete(User)
+                delete(InstallUser)
                 .where(
                     and_(
-                        User.id == user_id,
-                        User.email == f"install-{user_id}@anonymous.memedrop.local",
+                        InstallUser.id == user_id,
+                        InstallUser.email == f"install-{user_id}@anonymous.memedrop.local",
                     )
                 )
-                .returning(User.id)
+                .returning(InstallUser.id)
             )
             return (
                 [user_meme_record(row) for row in memes],

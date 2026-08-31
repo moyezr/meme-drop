@@ -2,11 +2,11 @@
 
 ## Boundaries
 
-MemeDrop is one source repository with three deployable runtimes and one local-only internal app.
+MemeDrop is one source repository with three deployable runtimes and development-only internal apps.
 Turborepo coordinates local and CI tasks; it does not couple their deployments.
 
 ```text
-apps/landing (static Next.js)        apps/extension (Chrome/React)
+apps/web (Next.js application)       apps/extension (Chrome/React)
         separate Vercel project                |
                                                 v
                                       apps/api (FastAPI/Vercel)
@@ -15,14 +15,18 @@ apps/landing (static Next.js)        apps/extension (Chrome/React)
                             + pgvector
 
 apps/catalog (local React/Vite) -> development-only catalog API
+apps/template-pipeline (local Node CLI) -> sources + OpenRouter + meme-drop-dev
+apps/smoke-agent (local TypeScript CLI) -> public HTTPS agent API only
 ```
 
 | Workspace | Owns |
 | --- | --- |
 | `apps/api` | HTTP contract, ranking/caption services, persistence, storage, Python tests |
 | `apps/catalog` | Local human annotation workflow, visual region editor, quality checklist |
+| `apps/template-pipeline` | Development-only template discovery, machine draft annotation, and real-catalog scale fixtures |
 | `apps/extension` | X integration, service worker, suggestion UI, popup/library |
-| `apps/landing` | Public static marketing pages |
+| `apps/web` | Public marketing and docs plus the authenticated customer dashboard |
+| `apps/smoke-agent` | Black-box public agent API generation, replay, and media verification |
 | `packages/shared` | TypeScript contracts and source template manifests |
 | `tools/template-tools` | Offline dataset QA, review, benchmarks, and promotion |
 
@@ -52,6 +56,17 @@ runtime never copies development drafts or buckets during startup.
 
 `apps/api` is a standalone uv project so it can be deployed from that directory. The production
 backend is FastAPI only; no Fastify runtime remains.
+
+### Agent smoke boundary
+
+`apps/smoke-agent` behaves like an external customer integration even though its source is kept in
+the monorepo. It calls only `/live`, `/health`, `POST /api/v1/memes/generate`, and the authenticated
+`image_url` returned by that endpoint. It cannot import backend services, query PostgreSQL or Redis,
+or read object storage. Before sending a generation that can consume one credit per durable returned
+meme, it requires an explicit operator confirmation and verifies hosted readiness. It then replays
+the exact request and required idempotency key and fetches media only when its origin and compact
+asset path match the configured API origin. Reports contain IDs, categories, sizes, and timings,
+never source input or credentials.
 
 ## Request and media flow
 

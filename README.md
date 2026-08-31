@@ -10,8 +10,10 @@ This is a Turborepo monorepo, but its applications deploy independently:
 | --- | --- | --- |
 | `apps/api` | FastAPI, recommendation pipeline, PostgreSQL, object storage | Vercel project rooted at `apps/api` |
 | `apps/catalog` | React/Vite internal catalog annotation workbench | Local development only |
+| `apps/template-pipeline` | Idempotent template discovery, media ingest, and machine draft annotation | Local development only |
 | `apps/extension` | React/Vite Chrome extension for X | Chrome Web Store package |
-| `apps/landing` | Static Next.js marketing site | Vercel project rooted at `apps/landing` |
+| `apps/web` | Next.js marketing, docs, and customer application | Vercel project rooted at `apps/web` |
+| `apps/smoke-agent` | Black-box TypeScript consumer of the public agent API | Local/CI smoke tooling |
 | `packages/shared` | TypeScript API contracts and template manifests | workspace dependency |
 | `tools/template-tools` | Offline catalog QA and evaluation tools | local/CI tooling |
 
@@ -58,7 +60,7 @@ Run the applications in separate terminals:
 npm run dev:api
 npm run dev:catalog
 npm run dev:extension
-npm run dev:landing
+npm run dev:web
 ```
 
 FastAPI listens on `http://localhost:3001`; the catalog workbench opens at
@@ -76,6 +78,7 @@ npm test                      # root, API, extension, shared, and tooling tests
 npm run lint                  # Ruff and workspace lint tasks
 npm run build                 # all buildable workspaces
 npm run quality:security      # npm graph and locked Python production dependencies
+npm run quality:deployment-readiness # local-only repository release-candidate proof
 npm run release:dry-run       # CI-safe promotion, security, and extension packaging gates
 ```
 
@@ -91,6 +94,19 @@ npm run storage:check
 npm run storage:latency
 ```
 
+Authenticated agent API smoke:
+
+```sh
+MEMEDROP_API_BASE_URL=https://api.memedrop.moyezrabbani.dev \
+MEMEDROP_API_KEY=<issued-agent-credential> \
+npm run smoke:agent -- --confirm-generation
+```
+
+The smoke agent calls only public HTTPS routes, repeats the exact generation request to verify
+idempotency, and downloads returned private media with the same Bearer credential. Each durable
+meme returned by a new run consumes one credit; its replay consumes none. See
+`apps/smoke-agent/README.md` for safe custom-input options.
+
 Recommendation and catalog quality:
 
 ```sh
@@ -100,6 +116,18 @@ npm run quality:tuning
 npm run quality:dataset-plan
 npm run dataset:taste-review
 ```
+
+Large-catalog development experiment:
+
+```sh
+npm run dataset:scale:scrape -- --limit 1000
+npm run dataset:scale:annotate -- --limit 1000
+npm run dataset:scale:status
+```
+
+The scale pipeline writes only to `meme-drop-dev`, exports machine-generated drafts, and never
+bypasses human review, rendered QA, benchmark coverage, or the existing promotion gates. See
+`apps/template-pipeline/README.md` for its checkpoint, retry, and evaluation workflow.
 
 See `QUALITY.md` before changing template annotations, benchmarks, ranking, captions, or promotion
 data. The deterministic local ranker is the availability and release-quality floor even when model
@@ -143,7 +171,7 @@ and must live in ignored env files or the FastAPI project's secret store.
 
 Create two independent Vercel projects from this repository:
 
-1. Landing project: Root Directory `apps/landing`.
+1. Web project: Root Directory `apps/web`.
 2. API project: Root Directory `apps/api`.
 
 The API workspace owns its Python lockfile, migrations, catalog, and `app.py` entrypoint. Apply

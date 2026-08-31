@@ -4,12 +4,13 @@ import asyncio
 import json
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
 import memedrop_api.services.suggestion_engine as suggestion_engine
 from memedrop_api.config import Settings
-from memedrop_api.schemas import TweetContext, UsageBatchRequest
+from memedrop_api.schemas import MAX_SOURCE_POST_LENGTH, TweetContext, UsageBatchRequest
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.suggestion_engine import (
@@ -26,6 +27,7 @@ from memedrop_api.services.suggestion_engine import (
     suggestion_request_key,
     tokenize_sequence,
 )
+from memedrop_api.services.trend_index import TrendQuerySignal, TrendRetrieval
 from tests.conftest import INSTALL_ID, ApiHarness
 from tests.fakes import FakeStore
 
@@ -42,15 +44,25 @@ class FakeGateway:
         self.seen_template_ids: list[list[str]] = []
         self.seen_contexts: list[TweetContext | None] = []
         self.seen_steering_instructions: list[str | None] = []
+        self.seen_trend_cards: list[tuple[object, ...]] = []
+        self.seen_caption_trend_cards: list[tuple[object, ...]] = []
 
     async def select_and_caption(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, limit, *, context=None, steering_instruction=None
+        self,
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         self.joint_calls += 1
         self.seen_template_counts.append(len(templates))
         self.seen_template_ids.append([template.template_id for template in templates])
         self.seen_contexts.append(context)
         self.seen_steering_instructions.append(steering_instruction)
+        self.seen_trend_cards.append(tuple(trend_cards))
         if self.joint_error is not None:
             raise self.joint_error
         if self.fail_joint:
@@ -58,10 +70,22 @@ class FakeGateway:
         return JointSuggestionResult(self.selections[:limit], self.captions)
 
     async def generate_captions(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, *, context=None
+        self, tweet_text, templates, *, context=None, trend_cards=()
     ):
         self.caption_calls += 1
+        self.seen_caption_trend_cards.append(tuple(trend_cards))
         return self.captions
+
+
+class RotatingTrendRetriever:
+    def __init__(self, retrievals: list[TrendRetrieval]) -> None:
+        self.retrievals = retrievals
+        self.calls: list[tuple[TrendQuerySignal, ...]] = []
+
+    async def retrieve(self, signals):  # type: ignore[no-untyped-def]
+        self.calls.append(tuple(signals))
+        index = min(len(self.calls) - 1, len(self.retrievals) - 1)
+        return self.retrievals[index]
 
 
 def global_meme(name: str) -> dict[str, Any]:
@@ -184,7 +208,7 @@ async def test_steering_changes_the_local_retrieval_query_without_changing_autom
     assert gateway.seen_template_ids[1][0] == "this-is-fine"
 
 
-async def test_feedback_context_excludes_source_derived_terms_for_a_max_length_post() -> None:
+async def test_feedback_context_excludes_source_derived_terms_for_a_long_post() -> None:
     service, _, gateway = service_with_templates("this-is-fine")
     gateway.selections = [TemplateSelection("this-is-fine", "test selection", 0.9)]
     gateway.captions = {
@@ -194,9 +218,8 @@ async def test_feedback_context_excludes_source_derived_terms_for_a_max_length_p
         }
     }
     raw_token = "ultravioletpineapple"
-    tweet = f"{raw_token} " + "ordinary words " * 18
-    tweet = tweet[:280]
-    assert len(tweet) == 280
+    tweet = f"{raw_token} " + "ordinary words " * 80
+    assert len(tweet) > 280
 
     suggestion = (await service.get_suggestions(tweet, user_id=INSTALL_ID, limit=1))[0]
     feedback_context = suggestion["feedback_context"]
@@ -326,7 +349,13 @@ async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None, steering_instruction=None
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         model_started.set()
         await allow_model.wait()
@@ -336,6 +365,7 @@ async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
             limit,
             context=context,
             steering_instruction=steering_instruction,
+            trend_cards=trend_cards,
         )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
@@ -359,7 +389,13 @@ async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None, steering_instruction=None
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         model_started.set()
         await allow_model.wait()
@@ -369,6 +405,7 @@ async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None
             limit,
             context=context,
             steering_instruction=steering_instruction,
+            trend_cards=trend_cards,
         )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
@@ -395,7 +432,13 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
     allow_model = asyncio.Event()
 
     async def delayed_select(  # type: ignore[no-untyped-def]
-        tweet_text, templates, limit, *, context=None, steering_instruction=None
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         model_started.set()
         await allow_model.wait()
@@ -405,6 +448,7 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
             limit,
             context=context,
             steering_instruction=steering_instruction,
+            trend_cards=trend_cards,
         )
 
     gateway.select_and_caption = delayed_select  # type: ignore[method-assign]
@@ -654,10 +698,22 @@ async def test_suggestion_routes_validate_and_return_contract(api_harness: ApiHa
         headers={"x-memedrop-install-id": str(INSTALL_ID)},
         json={"tweet_text": "Prod is down and everything is on fire", "limit": 1},
     )
+    long_post = await api_harness.client.post(
+        "/api/v1/suggest",
+        headers={"x-memedrop-install-id": str(INSTALL_ID)},
+        json={"tweet_text": "LinkedIn post content " * 100, "limit": 1},
+    )
+    oversized_post = await api_harness.client.post(
+        "/api/v1/suggest",
+        headers={"x-memedrop-install-id": str(INSTALL_ID)},
+        json={"tweet_text": "x" * (MAX_SOURCE_POST_LENGTH + 1), "limit": 1},
+    )
 
     assert invalid.status_code == 400
     assert invalid.json()["error"] == "Invalid request"
     assert valid.status_code == 200
+    assert long_post.status_code == 200
+    assert oversized_post.status_code == 400
     suggestion = valid.json()["suggestions"][0]
     assert suggestion["name"] == "This Is Fine"
     assert "tweet_context" not in suggestion
@@ -741,6 +797,11 @@ async def test_caption_route_returns_overlay_and_null_for_missing_meme(
 ) -> None:
     meme = global_meme("Drake Hotline Bling")
     api_harness.store.memes = [meme]
+    gateway = FakeGateway()
+    gateway.captions = {
+        "drake-hotline-bling": {"reject": "skipping tests", "approve": "shipping safely"}
+    }
+    api_harness.app.state.suggestion_service.gateway = gateway
 
     response = await api_harness.client.post(
         "/api/v1/suggest/caption",
@@ -780,6 +841,60 @@ def test_suggestion_cache_key_hashes_and_separates_steering_instruction() -> Non
 
     assert automatic != steered
     assert instruction not in steered
+
+
+async def test_trends_are_retrieved_before_cache_and_versions_invalidate_results() -> None:
+    service, _, gateway = service_with_templates("this-is-fine")
+    gateway.selections = [TemplateSelection("this-is-fine", "current context", 0.91)]
+    gateway.captions = {
+        "this-is-fine": {
+            "speech_bubble_text": "This is current",
+            "bottom_caption": "Project Zephyr launch",
+        }
+    }
+    trend_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    card_v1 = SimpleNamespace(id=trend_id, version=1)
+    card_v2 = SimpleNamespace(id=trend_id, version=2)
+    v1 = TrendRetrieval(version="index-v1", cards=(card_v1,))  # type: ignore[arg-type]
+    v2 = TrendRetrieval(version="index-v2", cards=(card_v2,))  # type: ignore[arg-type]
+    retriever = RotatingTrendRetriever([v1, v1, v2])
+    service.trend_retriever = retriever  # type: ignore[assignment]
+
+    post = "Secret Project Zephyr launch fell over after the victory lap"
+    first = await service.get_suggestions(post, user_id=INSTALL_ID, limit=1)
+    cached = await service.get_suggestions(post, user_id=INSTALL_ID, limit=1)
+    refreshed_by_trend = await service.get_suggestions(post, user_id=INSTALL_ID, limit=1)
+
+    assert first == cached == refreshed_by_trend
+    assert len(retriever.calls) == 3
+    assert gateway.joint_calls == 2
+    assert gateway.seen_trend_cards == [(card_v1,), (card_v2,)]
+    assert all(
+        "secret project zephyr launch" not in signal.value for signal in retriever.calls[0]
+    )
+
+
+async def test_standalone_caption_generation_receives_trend_cards() -> None:
+    service, store, gateway = service_with_templates("this-is-fine")
+    meme = global_meme("This Is Fine")
+    store.memes = [meme]
+    gateway.captions = {
+        "this-is-fine": {
+            "speech_bubble_text": "Still current",
+            "bottom_caption": "The trend matched",
+        }
+    }
+    card = SimpleNamespace(
+        id=UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+        version=1,
+    )
+    retrieval = TrendRetrieval(version="index-v1", cards=(card,))  # type: ignore[arg-type]
+    service.trend_retriever = RotatingTrendRetriever([retrieval])  # type: ignore[assignment]
+
+    overlay = await service.get_tailored_overlay("A current launch joke", UUID(meme["id"]))
+
+    assert overlay is not None
+    assert gateway.seen_caption_trend_cards == [(card,)]
 
 
 def test_local_ranker_meets_benchmark_retrieval_gates() -> None:

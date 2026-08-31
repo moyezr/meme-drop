@@ -1,5 +1,15 @@
 import type { FeedbackContext, SuggestionRequest, SuggestionResult } from "./suggestion.js";
 import type { Meme, UserMeme } from "./meme.js";
+import type {
+  MemeGenerateRequest as MemeGenerateRequestBody,
+  MemeGenerateResponse,
+} from "./meme-generation.js";
+
+// POST /api/v1/memes/generate
+export interface MemeGenerateRouteRequest {
+  Body: MemeGenerateRequestBody;
+}
+export type MemeGenerateRouteResponse = MemeGenerateResponse;
 
 // POST /api/v1/suggest
 export interface SuggestRequest {

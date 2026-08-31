@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import mimetypes
 import shutil
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from time import perf_counter
 from typing import Any, Protocol
@@ -15,8 +16,37 @@ from fastapi import HTTPException
 from starlette.responses import FileResponse, Response
 
 from memedrop_api.config import Settings
+from memedrop_api.public_ids import PublicIdError, PublicIdKind, parse_public_id
 
 PUBLIC_PREFIX = "/memes/"
+DEFAULT_MAX_OBJECT_BYTES = 8 * 1024 * 1024
+MAX_GENERATED_AGENT_OBJECTS = 5
+
+
+@dataclass(frozen=True, slots=True)
+class StoredObject:
+    content: bytes
+    content_type: str
+
+
+class StorageReadError(Exception):
+    """Base error for internal storage reads."""
+
+
+class StorageObjectNotFoundError(StorageReadError):
+    """Raised when a public meme path is invalid or missing."""
+
+
+class StorageObjectTooLargeError(StorageReadError):
+    """Raised when an object exceeds the configured read limit."""
+
+
+class GeneratedAgentObjectCleanupError(RuntimeError):
+    """A generation-exact orphan cleanup could not safely complete."""
+
+
+class GeneratedAgentObjectLimitExceeded(GeneratedAgentObjectCleanupError):
+    """The prefix contains more objects than one request may create."""
 
 
 class MemeStorage(Protocol):
@@ -27,6 +57,10 @@ class MemeStorage(Protocol):
     ) -> str: ...
 
     async def delete(self, public_path: str) -> bool: ...
+
+    async def list_object_keys(self, prefix: str, *, limit: int) -> list[str]: ...
+
+    async def read_bytes(self, public_path: str) -> StoredObject: ...
 
     async def serve(self, public_path: str) -> Response: ...
 
@@ -60,9 +94,65 @@ def validate_object_key(object_key: str) -> str:
     return key
 
 
+def generated_agent_object_prefix(*, user_id: str, generation_id: str) -> str:
+    """Return the only prefix eligible for stale agent-generation cleanup."""
+
+    try:
+        user = parse_public_id(user_id, expected_kind=PublicIdKind.USER).value
+        generation = parse_public_id(generation_id, expected_kind=PublicIdKind.GENERATION).value
+    except PublicIdError as error:
+        raise GeneratedAgentObjectCleanupError("invalid generation cleanup identity") from error
+    return f"generated/users/{user}/{generation}/"
+
+
+class GeneratedAgentObjectCleaner:
+    """Delete only a bounded, tenant-and-generation-scoped orphan prefix."""
+
+    def __init__(
+        self, storage: MemeStorage, *, max_objects: int = MAX_GENERATED_AGENT_OBJECTS
+    ) -> None:
+        if not 1 <= max_objects <= MAX_GENERATED_AGENT_OBJECTS:
+            raise ValueError(f"max_objects must be between 1 and {MAX_GENERATED_AGENT_OBJECTS}")
+        self.storage = storage
+        self.max_objects = max_objects
+
+    async def cleanup_generation_objects(
+        self,
+        *,
+        user_id: str,
+        generation_id: str,
+    ) -> None:
+        prefix = generated_agent_object_prefix(user_id=user_id, generation_id=generation_id)
+        keys = await self.storage.list_object_keys(prefix, limit=self.max_objects + 1)
+        if len(keys) > self.max_objects:
+            raise GeneratedAgentObjectLimitExceeded("generation cleanup object limit exceeded")
+        if any(
+            not isinstance(key, str)
+            or key == prefix
+            or not key.startswith(prefix)
+            or _invalid_cleanup_key(key)
+            for key in keys
+        ):
+            raise GeneratedAgentObjectCleanupError(
+                "generation cleanup returned an invalid object key"
+            )
+        for key in keys:
+            await self.storage.delete(public_path_for_key(key))
+
+
+def _invalid_cleanup_key(key: str) -> bool:
+    try:
+        return validate_object_key(key) != key
+    except ValueError:
+        return True
+
+
 class LocalMemeStorage:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, max_object_bytes: int = DEFAULT_MAX_OBJECT_BYTES) -> None:
+        if max_object_bytes <= 0:
+            raise ValueError("max_object_bytes must be positive")
         self.root = root.resolve()
+        self.max_object_bytes = max_object_bytes
         self.root.mkdir(parents=True, exist_ok=True)
 
     async def put_file(self, source: Path, object_key: str) -> str:
@@ -91,6 +181,23 @@ class LocalMemeStorage:
             return True
         except FileNotFoundError:
             return False
+
+    async def list_object_keys(self, prefix: str, *, limit: int) -> list[str]:
+        directory = self._prefix_path(prefix)
+        _validate_list_limit(limit)
+        return await asyncio.to_thread(_list_local_object_keys, self.root, directory, limit)
+
+    async def read_bytes(self, public_path: str) -> StoredObject:
+        object_key = object_key_from_public_path(public_path)
+        if object_key is None:
+            raise StorageObjectNotFoundError(public_path)
+        try:
+            file_path = self._path(object_key)
+            content = await asyncio.to_thread(_read_local_bytes, file_path, self.max_object_bytes)
+        except (FileNotFoundError, ValueError) as error:
+            raise StorageObjectNotFoundError(public_path) from error
+        content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+        return StoredObject(content=content, content_type=content_type)
 
     async def serve(self, public_path: str) -> Response:
         object_key = object_key_from_public_path(public_path)
@@ -125,6 +232,13 @@ class LocalMemeStorage:
         candidate = (self.root / validate_object_key(object_key)).resolve()
         if not candidate.is_relative_to(self.root):
             raise ValueError("Storage path escaped its root")
+        return candidate
+
+    def _prefix_path(self, prefix: str) -> Path:
+        normalized = _validate_object_prefix(prefix)
+        candidate = (self.root / normalized).resolve()
+        if not candidate.is_relative_to(self.root):
+            raise ValueError("Storage prefix escaped its root")
         return candidate
 
 
@@ -171,37 +285,73 @@ class S3MemeStorage:
         object_key = object_key_from_public_path(public_path)
         if object_key is None:
             return False
-        await asyncio.to_thread(
-            self.client.delete_object, Bucket=self.bucket, Key=object_key
-        )
+        await asyncio.to_thread(self.client.delete_object, Bucket=self.bucket, Key=object_key)
         return True
 
-    async def serve(self, public_path: str) -> Response:
+    async def list_object_keys(self, prefix: str, *, limit: int) -> list[str]:
+        normalized = _validate_object_prefix(prefix)
+        _validate_list_limit(limit)
+        response = await asyncio.to_thread(
+            self.client.list_objects_v2,
+            Bucket=self.bucket,
+            Prefix=normalized,
+            MaxKeys=limit,
+        )
+        if response.get("IsTruncated") is True:
+            raise GeneratedAgentObjectLimitExceeded("storage listing exceeded the cleanup bound")
+        contents = response.get("Contents", [])
+        if not isinstance(contents, list):
+            raise GeneratedAgentObjectCleanupError("storage returned an invalid object listing")
+        keys: list[str] = []
+        for entry in contents:
+            if not isinstance(entry, dict):
+                raise GeneratedAgentObjectCleanupError("storage returned an invalid object listing")
+            key = entry.get("Key")
+            if not isinstance(key, str):
+                raise GeneratedAgentObjectCleanupError("storage returned an invalid object listing")
+            keys.append(key)
+        return keys
+
+    async def read_bytes(self, public_path: str) -> StoredObject:
         object_key = object_key_from_public_path(public_path)
         if object_key is None:
-            raise HTTPException(status_code=404, detail="Not Found")
+            raise StorageObjectNotFoundError(public_path)
         try:
             result = await asyncio.to_thread(
                 self.client.get_object, Bucket=self.bucket, Key=object_key
             )
         except ClientError as error:
-            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey"}:
-                raise HTTPException(status_code=404, detail="Not Found") from error
+            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+                raise StorageObjectNotFoundError(public_path) from error
             raise
-        if int(result.get("ContentLength", 0)) > self.max_object_bytes:
-            raise HTTPException(status_code=502, detail="Stored image is too large")
         body = result["Body"]
-        content = await asyncio.to_thread(body.read)
-        body.close()
-        if len(content) > self.max_object_bytes:
-            raise HTTPException(status_code=502, detail="Stored image is too large")
-        return Response(
+        try:
+            content_length = result.get("ContentLength")
+            if content_length is not None and int(content_length) > self.max_object_bytes:
+                raise StorageObjectTooLargeError(public_path)
+            content = await asyncio.to_thread(body.read, self.max_object_bytes + 1)
+            if len(content) > self.max_object_bytes:
+                raise StorageObjectTooLargeError(public_path)
+        finally:
+            body.close()
+        return StoredObject(
             content=content,
-            media_type=result.get("ContentType", "application/octet-stream"),
+            content_type=result.get("ContentType") or "application/octet-stream",
+        )
+
+    async def serve(self, public_path: str) -> Response:
+        try:
+            stored_object = await self.read_bytes(public_path)
+        except StorageObjectNotFoundError as error:
+            raise HTTPException(status_code=404, detail="Not Found") from error
+        except StorageObjectTooLargeError as error:
+            raise HTTPException(status_code=502, detail="Stored image is too large") from error
+        return Response(
+            content=stored_object.content,
+            media_type=stored_object.content_type,
             headers={
                 "Cache-Control": (
-                    "public, max-age=3600, s-maxage=86400, "
-                    "stale-while-revalidate=604800"
+                    "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
                 )
             },
         )
@@ -233,9 +383,7 @@ class S3MemeStorage:
             result["read_ms"] = _elapsed_ms(read_started)
         finally:
             delete_started = perf_counter()
-            await asyncio.to_thread(
-                self.client.delete_object, Bucket=self.bucket, Key=object_key
-            )
+            await asyncio.to_thread(self.client.delete_object, Bucket=self.bucket, Key=object_key)
             result["delete_ms"] = _elapsed_ms(delete_started)
         return result
 
@@ -243,7 +391,46 @@ class S3MemeStorage:
 def create_meme_storage(settings: Settings) -> MemeStorage:
     if settings.storage_backend == "s3":
         return S3MemeStorage(settings)
-    return LocalMemeStorage(settings.meme_storage_path)
+    return LocalMemeStorage(settings.meme_storage_path, max_object_bytes=settings.max_image_bytes)
+
+
+def _read_local_bytes(file_path: Path, max_object_bytes: int) -> bytes:
+    if not file_path.is_file():
+        raise FileNotFoundError(file_path)
+    if file_path.stat().st_size > max_object_bytes:
+        raise StorageObjectTooLargeError(str(file_path))
+    with file_path.open("rb") as source:
+        content = source.read(max_object_bytes + 1)
+    if len(content) > max_object_bytes:
+        raise StorageObjectTooLargeError(str(file_path))
+    return content
+
+
+def _validate_object_prefix(prefix: str) -> str:
+    if not isinstance(prefix, str) or not prefix.endswith("/"):
+        raise ValueError("Invalid storage object prefix")
+    normalized = prefix.removesuffix("/")
+    if not normalized:
+        raise ValueError("Invalid storage object prefix")
+    return f"{validate_object_key(normalized)}/"
+
+
+def _validate_list_limit(limit: int) -> None:
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+        raise ValueError("storage list limit must be positive")
+
+
+def _list_local_object_keys(root: Path, directory: Path, limit: int) -> list[str]:
+    if not directory.is_dir():
+        return []
+    keys: list[str] = []
+    for path in directory.rglob("*"):
+        if not path.is_file():
+            continue
+        keys.append(path.relative_to(root).as_posix())
+        if len(keys) >= limit:
+            break
+    return sorted(keys)
 
 
 def _elapsed_ms(started: float) -> float:

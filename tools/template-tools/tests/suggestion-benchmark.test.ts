@@ -28,6 +28,7 @@ const benchmarkAuditPath = path.join(__dirname, "..", "scripts", "validate-sugge
 const benchmark = JSON.parse(fs.readFileSync(benchmarkPath, "utf8")) as {
   cases: BenchmarkCase[];
 };
+const MAX_SOURCE_POST_LENGTH = 20_000;
 
 test("suggestion benchmark cases have enough signal for quality evaluation", () => {
   assert.ok(Array.isArray(benchmark.cases), "benchmark cases must be an array");
@@ -41,7 +42,10 @@ test("suggestion benchmark cases have enough signal for quality evaluation", () 
 
     assert.ok(testCase.category?.trim(), `${testCase.id}: category is required`);
     assert.ok(testCase.tweet.length >= 40, `${testCase.id}: tweet is too short`);
-    assert.ok(testCase.tweet.length <= 280, `${testCase.id}: tweet exceeds X post length`);
+    assert.ok(
+      testCase.tweet.length <= MAX_SOURCE_POST_LENGTH,
+      `${testCase.id}: source post exceeds 20,000 characters`
+    );
     assert.ok(testCase.expected_memes.length >= 3, `${testCase.id}: needs at least 3 expected meme families`);
     assert.ok(testCase.rejected_memes.length >= 1, `${testCase.id}: needs at least 1 rejected meme family`);
     assert.ok(testCase.keywords.length >= 3, `${testCase.id}: needs at least 3 specificity keywords`);
@@ -129,6 +133,58 @@ test("suggestion benchmark audit rejects expected and rejected overlap", async (
     (error: unknown) => {
       const err = error as { stdout?: string };
       assert.match(err.stdout || "", /meme cannot be both expected and rejected/);
+      return true;
+    }
+  );
+});
+
+test("suggestion benchmark audit rejects unbounded source posts", async () => {
+  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "memedrop-benchmark-"));
+  const badBenchmarkPath = path.join(tmpDir, "unbounded-benchmark.json");
+  await fsp.writeFile(
+    badBenchmarkPath,
+    `${JSON.stringify({
+      cases: [
+        {
+          id: "unbounded-source-post",
+          category: "bad fixture",
+          tweet: "x".repeat(MAX_SOURCE_POST_LENGTH + 1),
+          expected_memes: ["This Is Fine", "Change My Mind", "Surprised Pikachu"],
+          rejected_memes: [
+            {
+              name: "Trade Offer",
+              reason: "The source fixture is deliberately too large for bounded evaluation.",
+            },
+          ],
+          keywords: ["benchmark", "oversized", "fixture"],
+        },
+      ],
+    })}\n`
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      "node",
+      [
+        "--import",
+        "tsx",
+        benchmarkAuditPath,
+        "--file",
+        badBenchmarkPath,
+        "--min-cases",
+        "1",
+        "--min-categories",
+        "1",
+        "--min-expected-families",
+        "1",
+        "--min-rejected-families",
+        "1",
+      ],
+      { cwd: rootDir }
+    ),
+    (error: unknown) => {
+      const err = error as { stdout?: string };
+      assert.match(err.stdout || "", /source post exceeds 20,000 characters/);
       return true;
     }
   );

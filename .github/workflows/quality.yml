@@ -42,6 +42,7 @@ jobs:
           name: memedrop-extension-release
           path: .memedrop/memedrop-extension-v*.zip
           if-no-files-found: error
+          include-hidden-files: true
 
   backend-image:
     name: Backend image smoke
@@ -55,6 +56,65 @@ jobs:
 
       - name: Build and smoke backend image
         run: npm run quality:backend-image
+
+  api-integration:
+    name: API PostgreSQL and Redis integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: memedrop_integration
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d memedrop_integration"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8.8.1-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/memedrop_integration
+      MEMEDROP_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/memedrop_integration
+      MEMEDROP_TEST_REDIS_URL: redis://localhost:6379/0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup npm
+        run: npm install --global npm@11.7.0
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync --project apps/api --frozen
+
+      - name: Apply migrations and run integration tests
+        run: npm run quality:api-integration
 
   suggestion-quality:
     name: Suggestion quality gate

@@ -1,9 +1,9 @@
 # MemeDrop privacy policy draft
 
-Last updated: 2026-08-15
+Last updated: 2026-08-30
 
-This document describes the current MemeDrop implementation. It is not ready to publish until the
-contact placeholder is replaced and the final infrastructure retention settings are verified.
+This document describes the current MemeDrop implementation. Before launch, verify the final
+infrastructure retention settings and make this draft match the deployed provider accounts.
 
 ## Purpose
 
@@ -76,7 +76,8 @@ browser install from the extension. The backend exposes install-scoped export an
 Because the current identity is installation-based, data from an old or removed installation cannot
 automatically be linked to a new installation.
 
-For privacy questions or deletion help, contact: `<privacy-contact@example.com>`
+For privacy questions or deletion help, contact:
+`moyezrabbani.work@gmail.com`
 
 ## Chrome Web Store limited use
 

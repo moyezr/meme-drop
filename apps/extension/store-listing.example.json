@@ -2,8 +2,8 @@
   "single_purpose": "MemeDrop helps users create and insert meme replies on X/Twitter and LinkedIn.",
   "short_description": "Create context-aware meme replies on X and LinkedIn.",
   "detailed_description": "MemeDrop suggests relevant meme replies for posts on X/Twitter and LinkedIn, generates short readable captions, and lets users insert selected memes from the extension UI.",
-  "privacy_policy_url": "https://example.com/memedrop/privacy",
-  "support_email": "support@example.com",
+  "privacy_policy_url": "https://memedrop.moyezrabbani.dev/privacy-policy/",
+  "support_email": "moyezrabbani.work@gmail.com",
   "permission_justifications": {
     "storage": "Stores a random anonymous install ID and local extension preferences.",
     "https://x.com/*": "Runs the content script on X so users can insert selected meme replies.",

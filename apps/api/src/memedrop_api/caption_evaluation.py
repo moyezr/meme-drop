@@ -14,6 +14,7 @@ import json
 import os
 import re
 import time
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,11 +24,13 @@ from memedrop_api.services.meme_text import clean_generated_regions
 from memedrop_api.services.openrouter import OpenRouterSuggestionGateway, SuggestionModelGateway
 from memedrop_api.services.suggestion_engine import (
     MODEL_SHORTLIST_SIZE,
+    Candidate,
     LexicalCandidateIndex,
     fallback_template_selections,
 )
 from memedrop_api.suggestion_evaluation import (
     default_benchmark_path,
+    load_evaluation_candidates,
     percentile,
     production_candidates,
 )
@@ -47,27 +50,39 @@ async def evaluate_caption_sample(
     sample_path: Path,
     gateway: SuggestionModelGateway,
     model_name: str,
+    candidates: Sequence[Candidate] | None = None,
+    case_ids: Sequence[str] | None = None,
 ) -> dict[str, object]:
     benchmark, sample = load_evaluation_inputs(benchmark_path, sample_path)
     raw_cases = benchmark.get("cases")
-    case_ids = sample.get("case_ids")
-    if not isinstance(raw_cases, list) or not isinstance(case_ids, list) or not case_ids:
-        raise ValueError(
-            "Caption evaluation requires benchmark cases and a non-empty case_ids list."
-        )
+    sample_case_ids = sample.get("case_ids")
+    if not isinstance(raw_cases, list):
+        raise ValueError("Caption evaluation requires a benchmark cases array.")
     cases_by_id = {
         item["id"]: item
         for item in raw_cases
         if isinstance(item, dict) and isinstance(item.get("id"), str)
     }
-    requested_ids = [str(value) for value in case_ids]
+    if case_ids is None:
+        if not isinstance(sample_case_ids, list):
+            raise ValueError("Caption evaluation requires a sample case_ids array.")
+        requested_source: Sequence[str] = sample_case_ids
+    else:
+        requested_source = case_ids
+    if not requested_source:
+        raise ValueError("Caption evaluation requires at least one requested case id.")
+    requested_ids = [str(value) for value in requested_source]
     missing = [case_id for case_id in requested_ids if case_id not in cases_by_id]
     if missing:
         raise ValueError(f"Caption sample references unknown benchmark cases: {', '.join(missing)}")
 
-    candidates = production_candidates()
-    by_template = {candidate.template.template_id: candidate for candidate in candidates}
-    lexical_index = LexicalCandidateIndex.build(candidates)
+    ranking_candidates = production_candidates() if candidates is None else list(candidates)
+    if not ranking_candidates:
+        raise ValueError("Caption evaluation requires at least one catalog candidate.")
+    by_template = {
+        candidate.template.template_id: candidate for candidate in ranking_candidates
+    }
+    lexical_index = LexicalCandidateIndex.build(ranking_candidates)
     results: list[dict[str, object]] = []
     latencies: list[float] = []
     valid_suggestions = 0
@@ -78,7 +93,7 @@ async def evaluate_caption_sample(
         context = heuristic_tweet_context(tweet)
         shortlist = fallback_template_selections(
             tweet,
-            candidates,
+            ranking_candidates,
             MODEL_SHORTLIST_SIZE,
             lexical_index=lexical_index,
         )
@@ -185,11 +200,16 @@ async def run(arguments: argparse.Namespace) -> None:
     )
     gateway = OpenRouterSuggestionGateway(settings)
     try:
+        candidates = load_evaluation_candidates(
+            arguments.catalog, include_drafts=arguments.include_drafts
+        )
         report = await evaluate_caption_sample(
             benchmark_path=arguments.benchmark,
             sample_path=arguments.sample,
             gateway=gateway,
             model_name=settings.openrouter_suggestion_model,
+            candidates=candidates,
+            case_ids=arguments.case_id,
         )
     finally:
         await gateway.close()
@@ -213,8 +233,26 @@ def main() -> None:
     parser.add_argument("--benchmark", type=Path, default=default_benchmark_path())
     parser.add_argument("--sample", type=Path, default=DEFAULT_SAMPLE_PATH)
     parser.add_argument("--model", help="override OPENROUTER_SUGGESTION_MODEL for this sample")
+    parser.add_argument(
+        "--catalog",
+        type=Path,
+        help="load an explicit development catalog manifest",
+    )
+    parser.add_argument(
+        "--include-drafts",
+        action="store_true",
+        help="include draft templates from --catalog; never use this for a release gate",
+    )
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        help="run only this benchmark case (repeatable) instead of the fixed sample",
+    )
     parser.add_argument("--out", type=Path)
-    asyncio.run(run(parser.parse_args()))
+    arguments = parser.parse_args()
+    if arguments.include_drafts and arguments.catalog is None:
+        parser.error("--include-drafts requires an explicit --catalog")
+    asyncio.run(run(arguments))
 
 
 if __name__ == "__main__":

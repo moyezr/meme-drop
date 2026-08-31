@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlparse
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_ALLOWED_ORIGINS = (
@@ -18,6 +18,16 @@ DEFAULT_STORAGE_PATH = Path("/tmp/memedrop-storage")
 DEFAULT_DOWNLOAD_PATH = Path("/tmp/memedrop-downloads")
 DEVELOPMENT_BUCKET = "meme-drop-dev"
 PRODUCTION_BUCKET = "meme-drop-prod"
+PRODUCTION_API_ORIGIN = "https://api.memedrop.moyezrabbani.dev"
+CronSecret = Annotated[str, StringConstraints(strip_whitespace=True, min_length=16, max_length=512)]
+DashboardTokenSecret = Annotated[str, StringConstraints(min_length=32, max_length=512)]
+_DASHBOARD_SECRET_PLACEHOLDER_MARKERS = (
+    "change-me",
+    "placeholder",
+    "dummy",
+    "test-key",
+    "your-domain",
+)
 
 
 class Settings(BaseSettings):
@@ -35,19 +45,41 @@ class Settings(BaseSettings):
     )
     port: int = Field(default=3001, validation_alias="PORT", gt=0, le=65535)
     database_url: str = Field(validation_alias="DATABASE_URL", min_length=1)
-    openrouter_api_key: str | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
+    openrouter_api_key: str | None = Field(
+        default=None,
+        validation_alias="OPENROUTER_API_KEY",
+        exclude=True,
+        repr=False,
+    )
     openrouter_site_url: str = Field(
         default="http://localhost:3001", validation_alias="OPENROUTER_SITE_URL"
     )
+    api_public_origin: str = Field(
+        default="http://localhost:3001",
+        validation_alias="MEMEDROP_API_PUBLIC_ORIGIN",
+    )
     openrouter_app_name: str = Field(default="MemeDrop", validation_alias="OPENROUTER_APP_NAME")
     openrouter_suggestion_model: str = Field(
-        default="openai/gpt-5.4-mini", validation_alias="OPENROUTER_SUGGESTION_MODEL"
+        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_SUGGESTION_MODEL"
     )
     openrouter_caption_model: str = Field(
-        default="openai/gpt-5.4-mini", validation_alias="OPENROUTER_CAPTION_MODEL"
+        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_CAPTION_MODEL"
     )
     openrouter_auto_tag_model: str = Field(
-        default="qwen/qwen3.6-plus", validation_alias="OPENROUTER_AUTO_TAG_MODEL"
+        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_AUTO_TAG_MODEL"
+    )
+    openrouter_trend_model: str = Field(
+        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_TREND_MODEL"
+    )
+    openrouter_embedding_model: str = Field(
+        default="google/gemini-embedding-2",
+        validation_alias="OPENROUTER_EMBEDDING_MODEL",
+    )
+    tavily_api_key: str | None = Field(
+        default=None,
+        validation_alias="TAVILY_API_KEY",
+        exclude=True,
+        repr=False,
     )
     legacy_openrouter_meme_model: str | None = Field(
         default=None,
@@ -60,6 +92,91 @@ class Settings(BaseSettings):
         default="memory", validation_alias="MEMEDROP_RATE_LIMIT_STORE"
     )
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
+    trends_enabled: bool = Field(default=False, validation_alias="MEMEDROP_TRENDS_ENABLED")
+    trend_monthly_credit_budget: int = Field(
+        default=900,
+        validation_alias="MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET",
+        ge=1,
+        le=1_000,
+    )
+    trend_collection_timeout_seconds: float = Field(
+        default=8.0,
+        validation_alias="MEMEDROP_TREND_COLLECTION_TIMEOUT_SECONDS",
+        ge=0.1,
+        le=30,
+    )
+    trend_enrichment_timeout_seconds: float = Field(
+        default=20.0,
+        validation_alias="MEMEDROP_TREND_ENRICHMENT_TIMEOUT_SECONDS",
+        ge=0.1,
+        le=60,
+    )
+    trend_embedding_timeout_seconds: float = Field(
+        default=20.0,
+        validation_alias="MEMEDROP_TREND_EMBEDDING_TIMEOUT_SECONDS",
+        ge=0.1,
+        le=60,
+    )
+    trend_embedding_batch_size: int = Field(
+        default=32,
+        validation_alias="MEMEDROP_TREND_EMBEDDING_BATCH_SIZE",
+        ge=1,
+        le=128,
+    )
+    trend_collection_cooldown_seconds: float = Field(
+        default=1.0,
+        validation_alias="MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS",
+        ge=0,
+        le=60,
+    )
+    trend_cron_secret: CronSecret | None = Field(
+        default=None,
+        validation_alias=AliasChoices("CRON_SECRET", "MEMEDROP_TREND_CRON_SECRET"),
+        exclude=True,
+        repr=False,
+    )
+    dashboard_token_secret: DashboardTokenSecret | None = Field(
+        default=None,
+        validation_alias="MEMEDROP_DASHBOARD_TOKEN_SECRET",
+        exclude=True,
+        repr=False,
+    )
+    trend_refresh_lock_ttl_seconds: int = Field(
+        default=3_600,
+        validation_alias="MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS",
+        ge=60,
+        le=3_600,
+    )
+    generated_asset_cleanup_batch_size: int = Field(
+        default=100,
+        validation_alias="MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE",
+        ge=1,
+        le=100,
+    )
+    generated_asset_cleanup_claim_timeout_seconds: int = Field(
+        default=900,
+        validation_alias="MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS",
+        ge=60,
+        le=86_400,
+    )
+    generated_asset_cleanup_lock_ttl_seconds: int = Field(
+        default=900,
+        validation_alias="MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS",
+        ge=60,
+        le=3_600,
+    )
+    agent_generation_stale_timeout_seconds: int = Field(
+        default=1_800,
+        validation_alias="MEMEDROP_AGENT_GENERATION_STALE_TIMEOUT_SECONDS",
+        ge=300,
+        le=86_400,
+    )
+    trend_snapshot_max_age_seconds: int = Field(
+        default=28_800,
+        validation_alias="MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS",
+        ge=3_600,
+        le=86_400,
+    )
     api_rate_limit_window_ms: int = Field(
         default=60_000, validation_alias="MEMEDROP_RATE_LIMIT_WINDOW_MS", gt=0
     )
@@ -90,9 +207,7 @@ class Settings(BaseSettings):
     s3_endpoint: str | None = Field(default=None, validation_alias="S3_ENDPOINT")
     s3_region: str | None = Field(default=None, validation_alias="S3_REGION")
     s3_access_key_id: str | None = Field(default=None, validation_alias="S3_ACCESS_KEY_ID")
-    s3_secret_access_key: str | None = Field(
-        default=None, validation_alias="S3_SECRET_ACCESS_KEY"
-    )
+    s3_secret_access_key: str | None = Field(default=None, validation_alias="S3_SECRET_ACCESS_KEY")
     s3_bucket_name: str | None = Field(default=None, validation_alias="S3_BUCKET_NAME")
     legacy_storage_bucket: str | None = Field(
         default=None,
@@ -153,8 +268,45 @@ class Settings(BaseSettings):
             raise RuntimeError("S3_BUCKET_NAME is required for S3 storage")
         return self.s3_bucket_name
 
+    @property
+    def trend_redis_url(self) -> str | None:
+        """Return a usable optional trend-index endpoint without making it an app dependency."""
+
+        if not self.trends_enabled or not self.redis_url:
+            return None
+        endpoint = urlparse(self.redis_url)
+        if endpoint.scheme not in {"redis", "rediss"} or not endpoint.hostname:
+            return None
+        return self.redis_url
+
+    @property
+    def normalized_api_public_origin(self) -> str:
+        """Origin used for agent-visible media URLs, without a trailing slash."""
+
+        return self.api_public_origin.rstrip("/")
+
+    @property
+    def cron_redis_url(self) -> str | None:
+        """Return a validated Redis endpoint for scheduled job coordination."""
+
+        endpoint = urlparse(self.redis_url or "")
+        if endpoint.scheme not in {"redis", "rediss"} or not endpoint.hostname:
+            return None
+        return self.redis_url
+
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:
+        if self.dashboard_token_secret is not None:
+            normalized_dashboard_secret = self.dashboard_token_secret.lower()
+            if any(character.isspace() for character in self.dashboard_token_secret):
+                raise ValueError("MEMEDROP_DASHBOARD_TOKEN_SECRET must not contain whitespace")
+            if any(
+                marker in normalized_dashboard_secret
+                for marker in _DASHBOARD_SECRET_PLACEHOLDER_MARKERS
+            ):
+                raise ValueError(
+                    "MEMEDROP_DASHBOARD_TOKEN_SECRET must not use a placeholder value"
+                )
         if self.legacy_openrouter_meme_model:
             raise ValueError(
                 "OPENROUTER_MEME_MODEL was removed; use OPENROUTER_SUGGESTION_MODEL and "
@@ -164,9 +316,7 @@ class Settings(BaseSettings):
         if self.legacy_storage_bucket:
             raise ValueError("MEMEDROP_STORAGE_BUCKET was removed; use S3_BUCKET_NAME")
         if self.s3_bucket_name and self.s3_bucket_name != expected_bucket:
-            raise ValueError(
-                f"S3_BUCKET_NAME must be {expected_bucket} in {self.node_env}"
-            )
+            raise ValueError(f"S3_BUCKET_NAME must be {expected_bucket} in {self.node_env}")
         if self.storage_backend == "s3":
             missing = [
                 name
@@ -189,7 +339,32 @@ class Settings(BaseSettings):
             redis_endpoint = urlparse(self.redis_url or "")
             if redis_endpoint.scheme not in {"redis", "rediss"} or not redis_endpoint.hostname:
                 raise ValueError("REDIS_URL must be a valid redis:// or rediss:// URL")
+        public_origin = urlparse(self.api_public_origin)
+        allowed_public_schemes = {"https"} if self.is_production else {"http", "https"}
+        if (
+            public_origin.scheme not in allowed_public_schemes
+            or not public_origin.hostname
+            or public_origin.username
+            or public_origin.password
+            or public_origin.query
+            or public_origin.fragment
+            or public_origin.path not in {"", "/"}
+        ):
+            required_scheme = "https" if self.is_production else "http or https"
+            raise ValueError(f"MEMEDROP_API_PUBLIC_ORIGIN must be a valid {required_scheme} origin")
+        if (
+            self.generated_asset_cleanup_claim_timeout_seconds
+            < self.generated_asset_cleanup_lock_ttl_seconds
+        ):
+            raise ValueError(
+                "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS must be greater than or "
+                "equal to MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS"
+            )
         if self.is_production:
+            if self.normalized_api_public_origin != PRODUCTION_API_ORIGIN:
+                raise ValueError(
+                    f"MEMEDROP_API_PUBLIC_ORIGIN must be {PRODUCTION_API_ORIGIN} in production"
+                )
             if not self.openrouter_api_key:
                 raise ValueError("OPENROUTER_API_KEY is required in production")
             if not self.cors_origins_value.strip():
@@ -200,4 +375,16 @@ class Settings(BaseSettings):
                 raise ValueError("MEMEDROP_STORAGE_BACKEND must be s3 in production")
             if self.rate_limit_store != "redis":
                 raise ValueError("MEMEDROP_RATE_LIMIT_STORE must be redis in production")
+            if not self.trend_cron_secret:
+                raise ValueError("CRON_SECRET is required in production for scheduled cleanup")
+            if not self.dashboard_token_secret:
+                raise ValueError("MEMEDROP_DASHBOARD_TOKEN_SECRET is required in production")
+            if self.trends_enabled:
+                missing_trend_settings = [
+                    name for name, value in (("TAVILY_API_KEY", self.tavily_api_key),) if not value
+                ]
+                if missing_trend_settings:
+                    raise ValueError(
+                        "production trend refresh requires " + ", ".join(missing_trend_settings)
+                    )
         return self

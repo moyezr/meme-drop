@@ -93,10 +93,10 @@ test("store readiness validator passes template metadata in non-strict mode", as
   );
 
   assert.match(stdout, /store readiness validated/);
-  assert.match(stdout, /WARN privacy policy still contains launch placeholders/);
+  assert.match(stdout, /WARN privacy policy still contains launch placeholders: Before launch/);
 });
 
-test("store readiness validator fails strict mode on launch placeholders", async () => {
+test("store readiness validator requires final retention settings and screenshots in strict mode", async () => {
   await assert.rejects(
     execFileAsync(
       "node",
@@ -109,8 +109,11 @@ test("store readiness validator fails strict mode on launch placeholders", async
       { cwd: path.join(rootDir, "apps/extension") }
     ),
     (error) => {
-      assert.match(error.stdout || "", /ERROR privacy policy still contains launch placeholders/);
-      assert.match(error.stdout || "", /ERROR privacy_policy_url must not be an example URL/);
+      assert.match(
+        error.stdout || "",
+        /ERROR privacy policy still contains launch placeholders: Before launch/
+      );
+      assert.match(error.stdout || "", /ERROR strict store readiness requires screenshot file/);
       assert.match(error.stderr || "", /store readiness failed/);
       return true;
     }

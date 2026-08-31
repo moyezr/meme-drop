@@ -1,3 +1,5 @@
+import json
+import sys
 import tomllib
 from pathlib import Path
 
@@ -17,3 +19,24 @@ def test_vercel_uses_automatic_root_entrypoint_detection() -> None:
 
     assert "vercel" not in configuration.get("tool", {})
     assert (project_root / "app.py").is_file()
+    assert str(project_root / "src") in sys.path
+    requirements = (project_root / "requirements.txt").read_text(encoding="utf-8")
+    assert "fastapi==" in requirements
+    assert "pydantic-settings==" in requirements
+
+
+def test_vercel_crons_keep_trends_current_and_clean_generated_assets_daily() -> None:
+    project_root = Path(__file__).parents[1]
+    config = json.loads((project_root / "vercel.json").read_text(encoding="utf-8"))
+
+    assert config["$schema"] == "https://openapi.vercel.sh/vercel.json"
+    assert config["framework"] == "fastapi"
+    assert config["installCommand"] == "uv sync --frozen --no-dev"
+    assert config["buildCommand"] == (
+        'uv run memedrop-validate-production-env && uv run python -c "from app import app"'
+    )
+    assert config["regions"] == ["sin1"]
+    assert config["crons"] == [
+        {"path": "/internal/cron/trends/refresh", "schedule": "0 2 * * *"},
+        {"path": "/internal/cron/assets/cleanup", "schedule": "30 3 * * *"},
+    ]

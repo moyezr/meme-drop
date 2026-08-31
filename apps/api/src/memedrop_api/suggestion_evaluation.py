@@ -95,9 +95,14 @@ def default_baseline_path() -> Path:
     )
 
 
-def production_candidates(catalog: MemeCatalog | None = None) -> list[Candidate]:
-    """Build minimal candidates for the same verified runtime catalog as production."""
+def production_candidates(
+    catalog: MemeCatalog | None = None, *, include_drafts: bool = False
+) -> list[Candidate]:
+    """Build minimal candidates for production or an explicitly requested draft experiment."""
     loaded_catalog = catalog or MemeCatalog.load()
+    templates = (
+        loaded_catalog.draft_templates if include_drafts else loaded_catalog.verified_templates
+    )
     return [
         Candidate(
             meme_id=template.template_id,
@@ -107,8 +112,59 @@ def production_candidates(catalog: MemeCatalog | None = None) -> list[Candidate]
             is_evergreen=True,
             template=template,
         )
-        for template in loaded_catalog.verified_templates
+        for template in templates
     ]
+
+
+def load_evaluation_candidates(
+    catalog_path: Path | None = None, *, include_drafts: bool = False
+) -> list[Candidate]:
+    """Load an explicit experiment catalog without weakening release-gate defaults."""
+    if include_drafts and catalog_path is None:
+        raise ValueError("--include-drafts requires an explicit --catalog")
+    catalog = MemeCatalog.load(catalog_path) if catalog_path else MemeCatalog.load()
+    candidates = production_candidates(catalog, include_drafts=include_drafts)
+    if not candidates:
+        scope = "draft-capable" if include_drafts else "verified"
+        raise ValueError(f"Evaluation catalog has no {scope} templates.")
+    return candidates
+
+
+def evaluate_query(query: str, candidates: Sequence[Candidate]) -> dict[str, object]:
+    """Inspect one real deterministic shortlist without changing the catalog or calling a model."""
+    if not query.strip():
+        raise ValueError("Suggestion query must not be empty.")
+    ranking_candidates = list(candidates)
+    if not ranking_candidates:
+        raise ValueError("Suggestion query requires at least one catalog candidate.")
+    index_started = time.perf_counter()
+    lexical_index = LexicalCandidateIndex.build(ranking_candidates)
+    index_build_ms = (time.perf_counter() - index_started) * 1000
+    rank_started = time.perf_counter()
+    selections = fallback_template_selections(
+        query,
+        ranking_candidates,
+        min(MODEL_SHORTLIST_SIZE, len(ranking_candidates)),
+        lexical_index=lexical_index,
+    )
+    ranking_ms = (time.perf_counter() - rank_started) * 1000
+    by_id = {candidate.template.template_id: candidate for candidate in ranking_candidates}
+    return {
+        "catalog_size": len(ranking_candidates),
+        "index_build_ms": index_build_ms,
+        "ranking_ms": ranking_ms,
+        "shortlist": [
+            {
+                "rank": index + 1,
+                "template_id": selection.template_id,
+                "name": by_id[selection.template_id].name,
+                "score": selection.score,
+                "reason": selection.reason,
+            }
+            for index, selection in enumerate(selections)
+            if selection.template_id in by_id
+        ],
+    }
 
 
 def evaluate_benchmark(
@@ -123,7 +179,9 @@ def evaluate_benchmark(
     if not isinstance(raw_cases, list):
         raise ValueError("Benchmark must contain a cases array.")
 
-    ranking_candidates = list(candidates or production_candidates())
+    ranking_candidates = production_candidates() if candidates is None else list(candidates)
+    if not ranking_candidates:
+        raise ValueError("Benchmark evaluation requires at least one catalog candidate.")
     names_by_id = {
         candidate.template.template_id: normalize_template_name(candidate.name)
         for candidate in ranking_candidates
@@ -623,6 +681,20 @@ def format_report(report: dict[str, object]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate MemeDrop's local suggestion ranker")
     parser.add_argument("--benchmark", type=Path, default=default_benchmark_path())
+    parser.add_argument(
+        "--catalog",
+        type=Path,
+        help="load an explicit catalog manifest for a development scale experiment",
+    )
+    parser.add_argument(
+        "--include-drafts",
+        action="store_true",
+        help="include draft templates from --catalog; never use this for a release gate",
+    )
+    parser.add_argument(
+        "--query",
+        help="print the deterministic 12-template shortlist for one post and skip the benchmark",
+    )
     parser.add_argument("--baseline", type=Path, default=default_baseline_path())
     parser.add_argument(
         "--no-baseline",
@@ -637,10 +709,27 @@ def main() -> None:
     parser.add_argument("--json", action="store_true", help="print the complete report as JSON")
     parser.add_argument("--out", type=Path, help="write the complete JSON report to this path")
     arguments = parser.parse_args()
+    try:
+        candidates = load_evaluation_candidates(
+            arguments.catalog, include_drafts=arguments.include_drafts
+        )
+    except ValueError as error:
+        parser.error(str(error))
+    if arguments.query:
+        query_report = evaluate_query(arguments.query, candidates)
+        encoded_query = json.dumps(query_report, indent=2, sort_keys=True)
+        if arguments.out:
+            arguments.out.write_text(f"{encoded_query}\n", encoding="utf-8")
+        print(encoded_query)
+        return
     baseline_path = (
         None if arguments.no_baseline or arguments.write_baseline else arguments.baseline
     )
-    report = evaluate_benchmark(arguments.benchmark, baseline_path=baseline_path)
+    report = evaluate_benchmark(
+        arguments.benchmark,
+        candidates=candidates,
+        baseline_path=baseline_path,
+    )
     if arguments.write_baseline:
         if not report["passed"]:
             raise SystemExit("[MemeDrop] refusing to write a baseline for a failing evaluation.")

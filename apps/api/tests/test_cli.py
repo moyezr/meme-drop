@@ -28,11 +28,29 @@ def valid_environment() -> dict[str, str]:
         "DATABASE_URL": "postgresql://memedrop:secret@db.internal:5432/memedrop",
         "OPENROUTER_API_KEY": "a-secure-production-api-key",
         "OPENROUTER_SITE_URL": "https://api.memedrop.app",
+        "MEMEDROP_API_PUBLIC_ORIGIN": "https://api.memedrop.moyezrabbani.dev",
         "OPENROUTER_APP_NAME": "MemeDrop",
-        "OPENROUTER_SUGGESTION_MODEL": "openai/gpt-5.4-mini",
-        "OPENROUTER_CAPTION_MODEL": "openai/gpt-5.4-mini",
-        "OPENROUTER_AUTO_TAG_MODEL": "qwen/qwen3.6-plus",
-        "MEMEDROP_CORS_ORIGINS": "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+        "OPENROUTER_SUGGESTION_MODEL": "google/gemini-3.7-flash",
+        "OPENROUTER_CAPTION_MODEL": "google/gemini-3.7-flash",
+        "OPENROUTER_AUTO_TAG_MODEL": "google/gemini-3.7-flash",
+        "OPENROUTER_TREND_MODEL": "google/gemini-3.7-flash",
+        "OPENROUTER_EMBEDDING_MODEL": "google/gemini-embedding-2",
+        "MEMEDROP_TRENDS_ENABLED": "true",
+        "TAVILY_API_KEY": "a-secure-production-tavily-key",
+        "CRON_SECRET": "a-secure-production-cron-secret",
+        "MEMEDROP_DASHBOARD_TOKEN_SECRET": "dashboard-bridge-secret-0123456789-abcdef",
+        "MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET": "900",
+        "MEMEDROP_TREND_COLLECTION_TIMEOUT_SECONDS": "8",
+        "MEMEDROP_TREND_ENRICHMENT_TIMEOUT_SECONDS": "20",
+        "MEMEDROP_TREND_EMBEDDING_TIMEOUT_SECONDS": "20",
+        "MEMEDROP_TREND_EMBEDDING_BATCH_SIZE": "32",
+        "MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS": "1",
+        "MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS": "3600",
+        "MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS": "28800",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE": "100",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS": "900",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS": "900",
+        "MEMEDROP_CORS_ORIGINS": "https://memedrop.moyezrabbani.dev",
         "MEMEDROP_RATE_LIMIT_STORE": "redis",
         "REDIS_URL": "rediss://default:secret@redis.internal:6379/0",
         "MEMEDROP_REQUIRE_INSTALL_ID": "true",
@@ -75,6 +93,7 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
             "DATABASE_URL": "postgresql://localhost/memedrop",
             "OPENROUTER_API_KEY": "test-key",
             "OPENROUTER_SITE_URL": "http://localhost:3001",
+            "MEMEDROP_API_PUBLIC_ORIGIN": "https://api.example.com",
             "MEMEDROP_CORS_ORIGINS": "*,chrome-extension://not-real",
             "MEMEDROP_RATE_LIMIT_STORE": "memory",
             "MEMEDROP_REQUIRE_INSTALL_ID": "false",
@@ -83,6 +102,11 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
             "MEMEDROP_STORAGE_BACKEND": "local",
             "S3_BUCKET_NAME": "meme-drop-dev",
             "S3_ENDPOINT": "http://localhost:9000",
+            "CRON_SECRET": "short",
+            "MEMEDROP_TREND_EMBEDDING_BATCH_SIZE": "129",
+            "MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE": "101",
+            "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS": "899",
+            "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS": "900",
         }
     )
 
@@ -92,6 +116,10 @@ def test_production_environment_rejects_unsafe_deployment_values() -> None:
     assert any("must be production" in error for error in errors)
     assert any("placeholder" in error for error in errors)
     assert any("S3_BUCKET_NAME must be meme-drop-prod" in error for error in errors)
+    assert any("MEMEDROP_API_PUBLIC_ORIGIN must be exactly" in error for error in errors)
+    assert any("CRON_SECRET must contain" in error for error in errors)
+    assert any("MEMEDROP_TREND_EMBEDDING_BATCH_SIZE must be from" in error for error in errors)
+    assert any("CLEANUP_CLAIM_TIMEOUT_SECONDS must be greater" in error for error in errors)
 
 
 def test_production_environment_rejects_example_credentials() -> None:
@@ -100,6 +128,7 @@ def test_production_environment_rejects_example_credentials() -> None:
         {
             "DATABASE_URL": "postgresql://memedrop:change-me@db:5432/memedrop",
             "OPENROUTER_SITE_URL": "https://api.your-domain.com",
+            "MEMEDROP_API_PUBLIC_ORIGIN": "https://api.your-domain.com",
             "S3_ENDPOINT": "https://your-project-ref.storage.supabase.co/storage/v1/s3",
             "S3_REGION": "your-s3-region",
             "S3_ACCESS_KEY_ID": "change-me-s3-access-key",
@@ -113,6 +142,7 @@ def test_production_environment_rejects_example_credentials() -> None:
     for name in (
         "DATABASE_URL",
         "OPENROUTER_SITE_URL",
+        "MEMEDROP_API_PUBLIC_ORIGIN",
         "S3_ENDPOINT",
         "S3_REGION",
         "S3_ACCESS_KEY_ID",
@@ -120,6 +150,50 @@ def test_production_environment_rejects_example_credentials() -> None:
         "REDIS_URL",
     ):
         assert any(error.startswith(name) and "placeholder" in error for error in errors)
+
+
+def test_production_environment_requires_scheduled_job_and_embedding_settings() -> None:
+    environment = valid_environment()
+    for name in (
+        "OPENROUTER_EMBEDDING_MODEL",
+        "CRON_SECRET",
+        "MEMEDROP_TREND_EMBEDDING_TIMEOUT_SECONDS",
+        "MEMEDROP_TREND_EMBEDDING_BATCH_SIZE",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS",
+        "MEMEDROP_DASHBOARD_TOKEN_SECRET",
+    ):
+        del environment[name]
+
+    errors, _ = production_env_findings(environment)
+
+    for name in (
+        "OPENROUTER_EMBEDDING_MODEL",
+        "CRON_SECRET",
+        "MEMEDROP_TREND_EMBEDDING_TIMEOUT_SECONDS",
+        "MEMEDROP_TREND_EMBEDDING_BATCH_SIZE",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS",
+        "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS",
+        "MEMEDROP_DASHBOARD_TOKEN_SECRET",
+    ):
+        assert any(error.startswith(name) and "required" in error for error in errors)
+
+
+def test_production_environment_rejects_unsafe_dashboard_secrets() -> None:
+    for invalid_secret in (
+        "change-me-dashboard-secret-0123456789",
+        "dashboard bridge secret 0123456789 abcdef",
+    ):
+        environment = valid_environment()
+        environment["MEMEDROP_DASHBOARD_TOKEN_SECRET"] = invalid_secret
+
+        errors, _ = production_env_findings(environment)
+
+        assert any(
+            error.startswith("MEMEDROP_DASHBOARD_TOKEN_SECRET") for error in errors
+        )
 
 
 def test_production_environment_rejects_supabase_direct_runtime_url() -> None:

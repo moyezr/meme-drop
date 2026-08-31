@@ -5,7 +5,10 @@ import test from "node:test";
 import {
   getPlatformAdapter,
   isInlineComposeSessionActive,
+  linkedinPostCacheId,
+  linkedinPostIdFromComponentKey,
   linkedinPostIdFromHref,
+  linkedinPostIdFromUrn,
   selectLinkedInPostText,
 } from "../src/content/platform-adapter.ts";
 
@@ -43,6 +46,31 @@ test("extracts stable LinkedIn activity IDs when a canonical post link exists", 
     "1234567890"
   );
   assert.equal(linkedinPostIdFromHref("https://www.linkedin.com/feed/"), null);
+});
+
+test("extracts LinkedIn post IDs from legacy URNs and current feed component keys", () => {
+  assert.equal(
+    linkedinPostIdFromUrn("urn:li:activity:7491205106810400768"),
+    "7491205106810400768"
+  );
+  assert.equal(
+    linkedinPostIdFromUrn("urn:li:ugcPost:7491205106810400768"),
+    "7491205106810400768"
+  );
+
+  const currentFeedKey = "6RgbAyP2yOIZlcW2_g9JoK4xj2y6igP-6WjRglutlYU";
+  assert.equal(linkedinPostIdFromComponentKey(currentFeedKey), currentFeedKey);
+  assert.equal(
+    linkedinPostIdFromComponentKey(
+      `expanded${currentFeedKey}FeedType_MAIN_FEED_RELEVANCE`
+    ),
+    currentFeedKey
+  );
+  assert.equal(linkedinPostIdFromComponentKey("a-random-component-key"), null);
+  assert.equal(linkedinPostIdFromComponentKey(`${currentFeedKey}.unsafe`), null);
+  assert.equal(linkedinPostIdFromUrn(" urn:li:activity:123"), null);
+  assert.equal(linkedinPostCacheId("7491205106810400768"), "linkedin:7491205106810400768");
+  assert.equal(linkedinPostCacheId(null), null);
 });
 
 test("keeps an explicit LinkedIn reply alive while the editor mounts", () => {

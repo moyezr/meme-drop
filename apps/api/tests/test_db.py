@@ -1,4 +1,18 @@
-from memedrop_api.db import Base, database_connect_args, normalize_database_url
+from typing import cast
+
+from sqlalchemy import Table
+
+from memedrop_api.db import (
+    Base,
+    TrendCardRecord,
+    TrendCreditPeriodRecord,
+    TrendCreditReservationRecord,
+    TrendObservationRecord,
+    TrendScanQueryRecord,
+    TrendSnapshotRecord,
+    database_connect_args,
+    normalize_database_url,
+)
 
 
 def test_postgres_urls_use_async_psycopg_driver() -> None:
@@ -13,11 +27,76 @@ def test_postgres_urls_use_async_psycopg_driver() -> None:
 
 def test_database_models_preserve_existing_table_names() -> None:
     assert set(Base.metadata.tables) == {
+        "install_users",
         "users",
         "memes",
         "user_memes",
         "usage_events",
         "catalog_drafts",
+        "trend_cards",
+        "trend_observations",
+        "trend_snapshots",
+        "trend_scan_queries",
+        "trend_credit_periods",
+        "trend_credit_reservations",
+        "api_keys",
+        "generations",
+        "credit_transactions",
+        "generated_assets",
+    }
+
+
+def test_trend_tables_keep_raw_provider_content_out_of_durable_storage() -> None:
+    assert set(TrendObservationRecord.__table__.columns.keys()) == {
+        "id",
+        "trend_id",
+        "observation_key",
+        "provider",
+        "source_url",
+        "source_url_hash",
+        "source_domain",
+        "content_hash",
+        "published_at",
+        "first_seen_at",
+        "last_seen_at",
+        "seen_count",
+        "provider_score",
+        "provider_result_id",
+        "query_fingerprint",
+    }
+    assert "embedding" in TrendCardRecord.__table__.columns
+    assert "embedding_model" in TrendCardRecord.__table__.columns
+    assert "embedding_fingerprint" in TrendCardRecord.__table__.columns
+    assert any(
+        constraint.name == "trend_cards_embedding_metadata_check"
+        for constraint in cast(Table, TrendCardRecord.__table__).constraints
+    )
+    assert "cards" in TrendSnapshotRecord.__table__.columns
+    assert "raw_content" not in Base.metadata.tables["trend_observations"].columns
+
+    assert set(TrendScanQueryRecord.__table__.columns.keys()) == {
+        "scan_id",
+        "query_fingerprint",
+        "status",
+        "claimed_by",
+        "claimed_at",
+        "lease_expires_at",
+        "completed_at",
+        "attempt_count",
+        "cards_upserted",
+        "observations_stored",
+    }
+    assert "query" not in TrendScanQueryRecord.__table__.columns
+    assert set(TrendCreditPeriodRecord.__table__.columns.keys()) == {
+        "period",
+        "reserved_credits",
+        "updated_at",
+    }
+    assert set(TrendCreditReservationRecord.__table__.columns.keys()) == {
+        "reservation_id",
+        "period",
+        "credits",
+        "reserved_at",
     }
 
 

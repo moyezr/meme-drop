@@ -13,12 +13,23 @@ const generatorPath = path.join(
   "tools",
   "template-tools",
   "scripts",
-  "generate-template-manifest.ts"
+  "generate-template-manifest.ts",
 );
 
 test("generated manifests include normalized versioned retrieval metadata", async () => {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-manifest-"));
+  const tempDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), "memedrop-manifest-"),
+  );
+  const storagePath = path.join(tempDir, "memes");
   const outputPath = path.join(tempDir, "generated.json");
+  await fs.mkdir(storagePath);
+  await fs.writeFile(
+    path.join(storagePath, "seed-drake-hotline-bling.png"),
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQAAAAB0CZXLAAAANUlEQVR42u3KoQEAAAgDoOn/P+sHZgNkanLrCIIgCIIgCIIgCIIgCIIgCIIgCIIgCIIgvA4LAt8C/7gxw98AAAAASUVORK5CYII=",
+      "base64",
+    ),
+  );
 
   await execFileAsync(
     "node",
@@ -39,9 +50,9 @@ test("generated manifests include normalized versioned retrieval metadata", asyn
       cwd: rootDir,
       env: {
         ...process.env,
-        MEME_STORAGE_PATH: path.join(rootDir, "apps", "api", "data", "memes"),
+        MEME_STORAGE_PATH: storagePath,
       },
-    }
+    },
   );
 
   const manifest = JSON.parse(await fs.readFile(outputPath, "utf8")) as {

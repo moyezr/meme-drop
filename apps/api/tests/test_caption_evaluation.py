@@ -15,7 +15,14 @@ from memedrop_api.suggestion_evaluation import default_benchmark_path
 
 class FakeCaptionGateway:
     async def select_and_caption(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, limit, *, context=None, steering_instruction=None
+        self,
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context=None,
+        steering_instruction=None,
+        trend_cards=(),
     ):
         assert len(templates) <= 12
         assert context is not None
@@ -30,7 +37,7 @@ class FakeCaptionGateway:
         )
 
     async def generate_captions(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, *, context=None
+        self, tweet_text, templates, *, context=None, trend_cards=()
     ):
         return {}
 
@@ -87,6 +94,64 @@ async def test_live_caption_sample_rejects_unknown_case_ids(tmp_path) -> None:  
             sample_path=sample_path,
             gateway=FakeCaptionGateway(),
             model_name="test/model",
+        )
+
+
+async def test_live_caption_sample_allows_an_explicit_case_override(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    benchmark_path = tmp_path / "benchmark.json"
+    benchmark_path.write_text(
+        json.dumps(
+            {
+                "cases": [
+                    {
+                        "id": "override-case",
+                        "category": "test",
+                        "tweet": "The release checklist became longer than the actual release.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    sample_path = tmp_path / "sample.json"
+    sample_path.write_text("{}", encoding="utf-8")
+
+    report = await evaluate_caption_sample(
+        benchmark_path=benchmark_path,
+        sample_path=sample_path,
+        gateway=FakeCaptionGateway(),
+        model_name="test/model",
+        case_ids=["override-case"],
+    )
+
+    assert report["summary"]["cases"] == 1  # type: ignore[index]
+
+
+async def test_live_caption_sample_does_not_replace_empty_candidates(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    benchmark_path = tmp_path / "benchmark.json"
+    benchmark_path.write_text(
+        json.dumps(
+            {
+                "cases": [
+                    {
+                        "id": "empty-catalog",
+                        "tweet": "A sufficiently long benchmark post for the test.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    sample_path = tmp_path / "sample.json"
+    sample_path.write_text('{"case_ids":["empty-catalog"]}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="at least one catalog candidate"):
+        await evaluate_caption_sample(
+            benchmark_path=benchmark_path,
+            sample_path=sample_path,
+            gateway=FakeCaptionGateway(),
+            model_name="test/model",
+            candidates=[],
         )
 
 

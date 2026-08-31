@@ -1,6 +1,6 @@
 # Production release
 
-This is the operational checklist for the independently deployed landing page, FastAPI service, and
+This is the operational checklist for the independently deployed web app, FastAPI service, and
 Chrome extension. `npm run release:dry-run` proves the repository can build and package; it does not
 prove that external services, domains, credentials, or store metadata are ready.
 
@@ -11,13 +11,27 @@ From a clean checkout:
 ```sh
 npm ci
 uv sync --project apps/api --frozen
-npm run release:dry-run
-npm run quality:backend-image
+MEMEDROP_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/memedrop_readiness \
+MEMEDROP_TEST_REDIS_URL=redis://localhost:6379/0 \
+  npm run quality:deployment-readiness
 ```
 
-CI runs the same release dry-run and Docker smoke. `quality:security` permits only the exact,
-time-limited dependency risks described in `QUALITY.md`; review them again before their 2026-09-01
-expiry.
+`quality:deployment-readiness` is the single repository-owned release-candidate gate. It accepts
+only loopback PostgreSQL and Redis test URLs, requires a disposable database name containing
+`test`, `integration`, or `readiness`, suppresses product-provider and storage credentials,
+and composes static analysis, deterministic tests, all workspace builds, the built API smoke, the
+blocking benchmark, suggestion, rendering, and dataset-plan tuning gates, the full Alembic and
+data-service integration gate, the backend image smoke, and locked dependency security audits. The
+static build is reused by the API process smoke instead of rebuilding it.
+
+This command does not provision infrastructure, call Tavily or OpenRouter, validate production
+secrets, deploy, inspect hosted services, or validate extension-store metadata. `release:candidate`
+remains the operator-facing packaging and final production-configuration gate; `launch:status`
+tracks hosted, legal, domain, and store-launch inputs. CI runs the deterministic constituent gates
+in parallel jobs and provides a fresh empty pgvector database for the integration job.
+
+`quality:security` permits only the exact, time-limited dependency risks described in `QUALITY.md`;
+review them again before their 2026-09-01 expiry.
 
 ## 2. Supabase
 
@@ -61,18 +75,23 @@ network supports it.
 
 Import this GitHub repository twice.
 
-Landing project:
+Web project:
 
-- Root Directory: `apps/landing`
+- Root Directory: `apps/web`
 - Framework: Next.js
 - Build Command: leave at the Next.js default (`npm run build`)
-- Output Directory: leave unset/default; `next.config.ts` enables static export and Vercel detects
-  `out/` automatically
-- Secrets: none from the backend; never copy API/S3 credentials here
+- Output Directory: leave unset/default so Vercel publishes the server-rendered `.next/` output
+- Server-only environment: Auth.js secret/provider credentials, `MEMEDROP_API_BASE_URL`, and the
+  dashboard bridge token secret; never copy database, Redis, OpenRouter, or S3 credentials here
 
-Do not override the Output Directory with `out`. The Next.js preset needs its build metadata from
-`.next/` and publishes the static `out/` export automatically. The checked-in landing
-`vercel.json` explicitly keeps automatic output detection enabled.
+Do not override the Output Directory with `out`. Auth.js and the same-origin dashboard bridge need
+Next.js server routes. `MEMEDROP_DASHBOARD_TOKEN_SECRET` must contain 32–512 characters and match
+the API deployment exactly. Keep it and `MEMEDROP_API_BASE_URL` server-only; neither may use a
+`NEXT_PUBLIC_` prefix. OAuth callback URLs end in `/api/auth/callback/github` or
+`/api/auth/callback/google` on the production web origin. The Vercel production build validates
+these values, requires at least one complete OAuth provider pair, and accepts only
+`https://api.memedrop.moyezrabbani.dev` as the dashboard API origin; local builds do not require
+deployed secrets.
 
 API project:
 
@@ -85,7 +104,10 @@ API project:
 At minimum the API needs the managed PostgreSQL and Redis URLs, OpenRouter key/model settings, final
 Chrome extension CORS origin, Redis rate limiting, required install IDs, compact/redacted logs, and
 the production Supabase S3 endpoint/region/key pair with
-`S3_BUCKET_NAME=meme-drop-prod`.
+`S3_BUCKET_NAME=meme-drop-prod`. It also needs the same
+`MEMEDROP_DASHBOARD_TOKEN_SECRET` configured in the web project. `.env.example` is for local
+development; keep the production source in the ignored `.env.prod` operator file and synchronize
+it one-way into deployment secret stores.
 
 Before deploying with those values loaded:
 
@@ -100,10 +122,11 @@ project do not share runtime code or environment merely because they come from o
 
 ## 4. Extension release
 
-Create a Chrome Web Store draft to obtain the final 32-character extension ID, then set:
+Create a Chrome Web Store draft to obtain the final 32-character extension ID, then append its
+origin to the web origin already allowed by the API:
 
 ```text
-MEMEDROP_CORS_ORIGINS=chrome-extension://<published-extension-id>
+MEMEDROP_CORS_ORIGINS=https://memedrop.moyezrabbani.dev,chrome-extension://<published-extension-id>
 VITE_API_BASE_URL=https://<production-api-origin>
 ```
 
@@ -111,20 +134,25 @@ Prepare real listing metadata:
 
 ```sh
 npm run store-listing:init -- \
-  --privacy-policy-url https://<public-site>/privacy \
-  --support-email <real-support-email>
+  --privacy-policy-url https://memedrop.moyezrabbani.dev/privacy-policy/ \
+  --support-email moyezrabbani.work@gmail.com
 ```
 
 Add at least two real PNG/JPEG screenshots under `apps/extension/store-assets`; at least one must be
-`1280x800`. Replace the privacy-policy contact placeholder, host the final policy, and make provider
-and retention disclosures match production settings.
+`1280x800`. Host the final policy and make provider and retention disclosures match production
+settings.
 
 Build and validate the exact artifact submitted to Chrome:
 
 ```sh
-VITE_API_BASE_URL=https://<production-api-origin> npm run release:candidate
+VITE_API_BASE_URL=https://api.memedrop.moyezrabbani.dev npm run release:candidate
 npm run launch:status
 ```
+
+Chrome Web Store submission remains deferred until developer-account enrollment succeeds and the
+store provides the final extension ID. For an API/web private beta before then, configure
+`MEMEDROP_CORS_ORIGINS=https://memedrop.moyezrabbani.dev`; append the exact published extension
+origin only after it exists.
 
 The strict candidate checks production API configuration, store metadata/assets, suggestion quality,
 CORS, privacy placeholders, and the packaged zip. Bump the extension package and manifest versions

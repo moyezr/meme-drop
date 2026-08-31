@@ -8,6 +8,7 @@ from uuid import UUID
 
 import httpx
 import pytest
+from fastapi import FastAPI
 
 # Test collection imports the deployment entrypoint, which constructs Settings immediately.
 # Keep that import hermetic instead of relying on a developer's ignored apps/api/.env file.
@@ -27,6 +28,7 @@ class ApiHarness:
     client: httpx.AsyncClient
     store: FakeStore
     deleted_paths: list[str]
+    app: FastAPI
 
 
 @pytest.fixture
@@ -36,6 +38,12 @@ def settings(tmp_path: Path) -> Settings:
         meme_storage_path=tmp_path / "memes",
         image_download_path=tmp_path / "downloads",
         cors_origins_value="http://localhost:5173",
+        openrouter_api_key=None,
+        tavily_api_key=None,
+        trends_enabled=False,
+        rate_limit_store="memory",
+        redis_url=None,
+        storage_backend="local",
     )
 
 
@@ -87,7 +95,7 @@ async def api_harness(settings: Settings, tmp_path: Path) -> AsyncIterator[ApiHa
     )
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
-        yield ApiHarness(test_client, store, deleted_paths)
+        yield ApiHarness(test_client, store, deleted_paths, app)
 
 
 async def _ready() -> bool:

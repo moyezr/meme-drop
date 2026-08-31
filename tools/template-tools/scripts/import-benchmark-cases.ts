@@ -29,6 +29,8 @@ interface Finding {
   message: string;
 }
 
+const MAX_SOURCE_POST_LENGTH = 20_000;
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 const args = parseArgs(process.argv.slice(2));
@@ -134,8 +136,8 @@ function validateCases(
     if (tweet.length < 40) {
       findings.push({ case_id: caseId, message: "tweet is too short" });
     }
-    if (tweet.length > 280) {
-      findings.push({ case_id: caseId, message: "tweet exceeds X post length" });
+    if (tweet.length > MAX_SOURCE_POST_LENGTH) {
+      findings.push({ case_id: caseId, message: "source post exceeds 20,000 characters" });
     }
     if (hasPlaceholderText(tweet)) {
       findings.push({ case_id: caseId, message: "tweet still contains benchmark-stub placeholder text" });

@@ -13,6 +13,7 @@ from sqlalchemy import text
 from memedrop_api.db import Database
 
 EXPENSIVE_ROUTES = {
+    "POST /api/v1/memes/generate",
     "POST /api/v1/suggest",
     "POST /api/v1/suggest/caption",
     "POST /api/v1/library/save",
