@@ -12,13 +12,13 @@ const description =
 const mouseMemoirs = Mouse_Memoirs({
   weight: "400",
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--font-google-display",
   display: "swap",
 });
 
 const tikTokSans = TikTok_Sans({
   subsets: ["latin"],
-  variable: "--font-body",
+  variable: "--font-google-body",
   display: "swap",
   adjustFontFallback: false,
 });
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#ffffff",
+  themeColor: "#0B0B0F",
 };
 
 export default function RootLayout({
