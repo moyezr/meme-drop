@@ -44,7 +44,8 @@ Web project:
 
 - Root Directory: `apps/web`
 - Framework: Next.js
-- Build Command: leave at the Next.js default (`npm run build`)
+- Build Command: Vercel may detect Turborepo and use `turbo run build`; running
+  `npm run build` directly from `apps/web` also invokes the same web build checks.
 - Output Directory: leave unset/default; authenticated dashboard routes require the standard
   server-rendered `.next/` deployment
 - Server-only environment: `AUTH_SECRET`, one or both OAuth credential pairs,
@@ -74,6 +75,13 @@ At least one complete OAuth provider pair is required. Configure its callback as
 it in both projects together; it is separate from `AUTH_SECRET`. During a Vercel production build,
 the web config check also requires a valid `AUTH_SECRET`, at least one complete provider pair, and
 the exact canonical API origin shown above. Local builds skip this deployed-secret check.
+
+The `@memedrop/web#build` task in `turbo.json` explicitly allows these server environment
+variables through Turbo's strict environment filtering. Keep this list in sync when adding
+build-time configuration. `VERCEL_ENV` is also a cache input so a local/preview build cannot
+satisfy a production build without its configuration checks. Declaring a variable here does
+not make it public or replace configuring it in Vercel; keep secret values in the deployment
+store, never in `turbo.json`.
 
 The browser calls only the same-origin `/api/dashboard/*` handlers. Both mutation handlers reject
 cross-origin requests. API-key creation additionally requires a caller-generated, visible-ASCII

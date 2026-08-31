@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { validateProductionConfig } from "../scripts/validate-production-config.mjs";
 
@@ -34,4 +35,26 @@ test("production web configuration requires the complete bridge contract", () =>
 
 test("local builds do not require deployed secrets", () => {
   assert.deepEqual(validateProductionConfig({ NODE_ENV: "production" }), []);
+});
+
+test("the Turbo web build allows and hashes all production validation inputs", () => {
+  const turbo = JSON.parse(readFileSync(new URL("../../../turbo.json", import.meta.url), "utf8"));
+  const task = turbo.tasks["@memedrop/web#build"];
+  const googleProduction = {
+    ...validProduction,
+    AUTH_GITHUB_ID: undefined,
+    AUTH_GITHUB_SECRET: undefined,
+    AUTH_GOOGLE_ID: "google-client-id",
+    AUTH_GOOGLE_SECRET: "google-client-secret",
+  };
+  for (const environment of [validProduction, googleProduction]) {
+    for (const name of Object.keys(environment)) {
+      assert.ok(task.env.includes(name), `${name} must reach the web build and affect its cache key`);
+    }
+    const filtered = Object.fromEntries(Object.entries(environment).filter(([name]) => task.env.includes(name)));
+    assert.deepEqual(validateProductionConfig(filtered), []);
+  }
+  assert.deepEqual(task.dependsOn, ["^build"]);
+  assert.deepEqual(task.outputs, [".next/**", "!.next/cache/**"]);
+  assert.equal(turbo.globalEnv, undefined, "web secrets must stay scoped to the web build");
 });

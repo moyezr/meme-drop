@@ -5,6 +5,20 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "out/**"]
     },
+    "@memedrop/web#build": {
+      "dependsOn": ["^build"],
+      "env": [
+        "VERCEL_ENV",
+        "AUTH_SECRET",
+        "AUTH_GOOGLE_ID",
+        "AUTH_GOOGLE_SECRET",
+        "AUTH_GITHUB_ID",
+        "AUTH_GITHUB_SECRET",
+        "MEMEDROP_API_BASE_URL",
+        "MEMEDROP_DASHBOARD_TOKEN_SECRET"
+      ],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
     "@memedrop/extension#build": {
       "dependsOn": ["^build"],
       "env": ["VITE_API_BASE_URL"],
