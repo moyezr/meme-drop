@@ -194,7 +194,7 @@ charged or stored twice.
   maximums.
 - [ ] Define packages, price per credit, minimum gross-margin target, free trial, expiration/refund
   rules, and abuse limits.
-- [ ] Integrate Lemon Squeezy only after the credit transactions and pricing model are reviewed.
+- [ ] Integrate Dodo Payments only after the credit transactions and pricing model are reviewed.
 - [ ] Add recharge webhooks with signature verification and idempotent fulfillment.
 - [x] Add the remaining-credit balance to the tenant-scoped dashboard overview.
 - [ ] Add credit-transaction and usage endpoints for the dashboard.
@@ -292,6 +292,11 @@ documented flow.
   generated images, API/account metadata, OpenRouter and Tavily processing, object storage,
   operational logs, billing data, and the 30-day generated-image retention period.
 - [x] Add a real privacy/support contact.
+- [x] Add an agent-focused landing page with curated visual examples, the existing extension
+  demo, crawlable product metadata, `/llms.txt`, and public `/terms/` and `/refund-policy/` routes.
+  These pages describe the current private beta, not an enabled paid offering.
+- [ ] Approve and publish credit-pack prices, expiry, and monetary refund terms; implement and
+  verify payment fulfillment before submitting the site for live payment-provider approval.
 - [ ] Verify and document the actual retention configured at Vercel, PostgreSQL, Redis, OpenRouter,
   Tavily, object storage, analytics, and the payment provider.
 - [ ] Define account deletion, data export, API-key revocation, and billing-record retention.
@@ -334,8 +339,9 @@ quality gates, and catalog growth does not regress relevance, readability, safet
   unused reservations for `no_fit`, partial output, or failure; charge successful deterministic
   fallback assets; never recharge a matching replay.
 - [?] Credit package sizes, price, tax treatment, refunds, expiry, and target gross margin.
-- [~] Lemon Squeezy is the planned payment provider; supported countries and currencies still need
-  verification before checkout launches.
+- [~] Dodo Payments replaces Lemon Squeezy as the planned payment provider. Keep the existing
+  application credit ledger authoritative; checkout and payment fulfillment are not implemented.
+  Merchant approval, currencies, payout eligibility, and production behavior still need verification.
 - [x] Generated image URLs require the owning user's Bearer credential throughout the 30-day
   retention window and return gone after expiry.
 - [?] Whether customers can explicitly delete generated images before expiry.

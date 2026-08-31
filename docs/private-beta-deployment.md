@@ -314,9 +314,31 @@ Before Chrome submission:
 - confirm `moyezrabbani.work@gmail.com` remains the intended public support email;
 - verify the hosted page matches the release commit and canonical URL.
 
-The landing route `/privacy-policy/` is implemented and statically exported. Its hosted availability
+The landing route `/privacy-policy/` is implemented and statically prerendered. Its hosted availability
 and final provider disclosures remain external deployment checks; do not treat a successful local
 build as proof that the public URL is live.
+
+### Payment-provider website review
+
+The landing page describes the agent API and includes curated local meme examples, a finite
+context-to-meme animation with reduced-motion support, and the original extension demo.
+The examples are illustrative, not recorded API responses. Keep the extension video labeled until
+the operator replaces `/landing-video.webm`; its file is unchanged by the landing redesign.
+
+Public routes `/terms/`, `/privacy-policy/`, and `/refund-policy/`, the `/#credits` section,
+`/sitemap.xml`, and `/llms.txt` describe the current private beta. The structured data deliberately
+contains no price offer: paid checkout is not open and pack prices have not been approved.
+
+Before Dodo Payments live review:
+
+- approve and publish actual pack prices, expiry rules, and monetary refund conditions;
+- implement and test payment-to-credit fulfillment, including replay and refund cases;
+- update all availability and payment disclosures together, including `/llms.txt` and tests;
+- review template-image rights, and confirm public examples are appropriate for commercial use;
+- verify all public pages and assets on the canonical domain without authentication;
+- ensure the submitted product description matches the deployed page and working product.
+
+Reference: https://docs.dodopayments.com/miscellaneous/verification-process#preparing-your-website
 
 ## 8. Deploy and verify the API
 
