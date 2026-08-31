@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SiteFooter } from "../site-footer";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
@@ -10,7 +11,8 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <main className="contentPage">
+    <>
+    <main className="contentPage policyPage">
       <nav className="pageNav" aria-label="Primary navigation">
         <a href="/">← MemeDrop</a>
         <div className="pageNavLinks">
@@ -31,7 +33,7 @@ export default function PrivacyPolicyPage() {
           A plain-language disclosure of how the MemeDrop private beta handles information, and
           which hosted-provider and billing details remain to be finalized before public launch.
         </p>
-        <p className="policyMeta">Effective date: August 24, 2026</p>
+        <p className="policyMeta">Effective date: August 31, 2026</p>
       </header>
 
       <aside className="notice" aria-label="Pre-launch policy status">
@@ -82,12 +84,16 @@ export default function PrivacyPolicyPage() {
         </p>
         <h3>Account, API, and billing data</h3>
         <p>
-          Private-beta users, API keys, and credit transactions are available through an
-          operator-only workflow. MemeDrop stores compact IDs, key names, key-use and revocation
+          Google sign-in establishes a web session. MemeDrop uses the provider account identifier
+          and email to associate your account with its API keys and credits. The authenticated
+          dashboard shows your balance and lets you issue or revoke keys. MemeDrop stores compact
+          IDs, key names, key-use and revocation
           timestamps, signed credit movements, and generation/asset lifecycle metadata.
           API-key secrets are shown once at issuance and stored only as
           one-way SHA-256 hashes. Payments, recharging, and self-service billing are not implemented;
-          the future payment processor and billing-record retention remain to be determined.
+          Dodo Payments is the planned payment provider, but its checkout is not connected and
+          this website does not currently send payment information to it. Payment-data handling
+          and billing-record retention will be documented before paid checkout opens.
         </p>
       </section>
 
@@ -185,5 +191,7 @@ export default function PrivacyPolicyPage() {
         See the <a href="/docs/">agent documentation</a> for the current API contract.
       </footer>
     </main>
+    <SiteFooter />
+    </>
   );
 }

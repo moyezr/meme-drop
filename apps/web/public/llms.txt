@@ -1,0 +1,23 @@
+# MemeDrop
+
+> The humor layer for AI agents. An AI-assisted API that turns text context into captioned meme images.
+
+MemeDrop selects a relevant meme template, generates captions, and renders an image for an agent or application. The API is in private beta. Access and credits must be arranged with the operator; paid checkout is not open. Landing-page examples are curated illustrations, not live API responses. The video shows an earlier Chrome extension workflow; Chrome Web Store release is pending.
+
+## Integration
+
+- [API documentation](https://memedrop.moyezrabbani.dev/docs/): Request/response schemas, authentication, idempotency, errors, and image retrieval.
+- API origin: https://api.memedrop.moyezrabbani.dev
+- Generation: POST /api/v1/memes/generate. Requires Authorization: Bearer <API key>, Idempotency-Key, and JSON input. Optional options.direction and options.count are documented in the API guide.
+- Successful responses contain meme IDs, image_url, and expires_at. Image downloads require the owning user's Bearer credential and expire after 30 days.
+- One credit is charged per successfully stored and returned meme. Unused reservations are refunded on failure or partial output. A matching idempotent replay is not charged again. A no_fit result is free.
+- Keep credentials server-side. Never put API keys in URLs or browser code.
+
+## Product and support
+
+- [Product](https://memedrop.moyezrabbani.dev/)
+- [Credits and availability](https://memedrop.moyezrabbani.dev/#credits): One-time packs are planned; prices and purchase terms are not finalized.
+- [Terms](https://memedrop.moyezrabbani.dev/terms/)
+- [Privacy](https://memedrop.moyezrabbani.dev/privacy-policy/)
+- [Credits and refunds](https://memedrop.moyezrabbani.dev/refund-policy/)
+- Operator: Moyez Rabbani. Support: moyezrabbani.work@gmail.com.

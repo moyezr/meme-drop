@@ -2,11 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Mouse_Memoirs, TikTok_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import "./landing.css";
 
 const siteUrl = "https://memedrop.moyezrabbani.dev";
-const title = "MemeDrop - Context-aware meme replies for X";
+const title = "MemeDrop — The humor layer for AI agents";
 const description =
-  "MemeDrop is a Chrome extension that ranks your meme library, prepares captions, and lets you drop the right meme into X replies.";
+  "Give your AI agent a sense of humor. MemeDrop turns text context into captioned meme images through one HTTPS API. Available in private beta.";
 
 const mouseMemoirs = Mouse_Memoirs({
   weight: "400",
@@ -30,17 +31,17 @@ export const metadata: Metadata = {
   },
   description,
   applicationName: "MemeDrop",
-  authors: [{ name: "Moyez Rabani", url: "https://moyezrabani.dev" }],
-  creator: "Moyez Rabani",
+  authors: [{ name: "Moyez Rabbani", url: "https://moyezrabbani.dev" }],
+  creator: "Moyez Rabbani",
   publisher: "MemeDrop",
   alternates: {
     canonical: "/",
   },
   keywords: [
     "MemeDrop",
-    "Chrome extension",
-    "X replies",
-    "Twitter memes",
+    "AI agents",
+    "meme generation API",
+    "humor layer",
     "meme generator",
     "AI meme captions",
   ],
@@ -55,7 +56,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title,
     description,
-    creator: "@moyezrabani",
+    creator: "@MoyezRabbani",
   },
   robots: {
     index: true,
@@ -74,7 +75,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f5f1e8",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -82,33 +83,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "MemeDrop",
-    applicationCategory: "BrowserApplication",
-    operatingSystem: "Chrome",
-    description,
-    url: siteUrl,
-    author: {
-      "@type": "Person",
-      name: "Moyez Rabani",
-      url: "https://moyezrabani.dev",
-    },
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
-    },
-  };
-
   return (
     <html lang="en" className={`${mouseMemoirs.variable} ${tikTokSans.variable}`}>
       <body>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
         {children}
         <Analytics />
       </body>
