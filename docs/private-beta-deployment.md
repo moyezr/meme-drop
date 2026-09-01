@@ -348,6 +348,13 @@ Before Dodo Payments live review:
 
 Reference: https://docs.dodopayments.com/miscellaneous/verification-process#preparing-your-website
 
+For test-mode integration, use a test API key with `https://test.dodopayments.com`; test and live
+products and credentials are separate. The initial test catalog uses a one-time 100-credit pack.
+Store its `pdt_...` identifier in `DODO_PAYMENTS_CREDIT_PACK_100_PRODUCT_ID`. Do not treat the
+checkout return URL as proof of payment: credit fulfillment must wait for a signature-verified,
+idempotently processed `payment.succeeded` webhook. Configure the resulting webhook verification
+key as `DODO_PAYMENTS_WEBHOOK_KEY` before implementing fulfillment.
+
 ## 8. Deploy and verify the API
 
 Deploy the API project from the release commit after its production environment passes validation.

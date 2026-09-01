@@ -15,6 +15,16 @@ test("Auth.js uses JWT sessions without a database adapter", async () => {
   assert.match(source, /token\.providerAccountId = account\.providerAccountId/);
 });
 
+test("development loads the repository OAuth environment with an app-local override", async () => {
+  const manifest = JSON.parse(await read("../package.json"));
+  const launcher = await read("../scripts/dev.mjs");
+  assert.equal(manifest.scripts.dev, "node scripts/dev.mjs");
+  assert.match(launcher, /\.env"\), resolve\(appDirectory, "\.env\.local"\)/);
+  assert.match(launcher, /Object\.assign\(environment, parseEnv/);
+  assert.match(launcher, /env: environment/);
+  assert.doesNotMatch(launcher, /console\.(?:log|info).*environment|AUTH_SECRET/);
+});
+
 test("the web app is server-renderable and protects dashboard routes", async () => {
   const [nextConfig, dashboardLayout, authRoute] = await Promise.all([
     read("../next.config.ts"),
