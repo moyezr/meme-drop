@@ -21,6 +21,11 @@ PRODUCTION_BUCKET = "meme-drop-prod"
 PRODUCTION_API_ORIGIN = "https://api.memedrop.moyezrabbani.dev"
 CronSecret = Annotated[str, StringConstraints(strip_whitespace=True, min_length=16, max_length=512)]
 DashboardTokenSecret = Annotated[str, StringConstraints(min_length=32, max_length=512)]
+DodoSecret = Annotated[str, StringConstraints(min_length=16, max_length=512)]
+DodoProductId = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, pattern=r"^pdt_[A-Za-z0-9]{20,64}$"),
+]
 _DASHBOARD_SECRET_PLACEHOLDER_MARKERS = (
     "change-me",
     "placeholder",
@@ -140,6 +145,30 @@ class Settings(BaseSettings):
         validation_alias="MEMEDROP_DASHBOARD_TOKEN_SECRET",
         exclude=True,
         repr=False,
+    )
+    dodo_payments_environment: Literal["test_mode", "live_mode"] = Field(
+        default="test_mode",
+        validation_alias="DODO_PAYMENTS_ENVIRONMENT",
+    )
+    dodo_payments_api_key: DodoSecret | None = Field(
+        default=None,
+        validation_alias="DODO_PAYMENTS_API_KEY",
+        exclude=True,
+        repr=False,
+    )
+    dodo_payments_webhook_key: DodoSecret | None = Field(
+        default=None,
+        validation_alias="DODO_PAYMENTS_WEBHOOK_KEY",
+        exclude=True,
+        repr=False,
+    )
+    dodo_payments_credit_pack_100_product_id: DodoProductId | None = Field(
+        default=None,
+        validation_alias="DODO_PAYMENTS_CREDIT_PACK_100_PRODUCT_ID",
+    )
+    dodo_payments_return_url: str | None = Field(
+        default=None,
+        validation_alias="DODO_PAYMENTS_RETURN_URL",
     )
     trend_refresh_lock_ttl_seconds: int = Field(
         default=3_600,
@@ -286,6 +315,20 @@ class Settings(BaseSettings):
         return self.api_public_origin.rstrip("/")
 
     @property
+    def dodo_checkout_enabled(self) -> bool:
+        return bool(
+            self.dodo_payments_api_key and self.dodo_payments_credit_pack_100_product_id
+        )
+
+    @property
+    def normalized_dodo_return_url(self) -> str:
+        if self.dodo_payments_return_url:
+            return self.dodo_payments_return_url
+        if self.is_production:
+            return "https://memedrop.moyezrabbani.dev/dashboard/billing?checkout=return"
+        return "http://localhost:3000/dashboard/billing?checkout=return"
+
+    @property
     def cron_redis_url(self) -> str | None:
         """Return a validated Redis endpoint for scheduled job coordination."""
 
@@ -352,6 +395,26 @@ class Settings(BaseSettings):
         ):
             required_scheme = "https" if self.is_production else "http or https"
             raise ValueError(f"MEMEDROP_API_PUBLIC_ORIGIN must be a valid {required_scheme} origin")
+        dodo_return_url = urlparse(self.normalized_dodo_return_url)
+        is_local_return = dodo_return_url.hostname in {"localhost", "127.0.0.1", "::1"}
+        allowed_dodo_return = dodo_return_url.scheme == "https" or (
+            not self.is_production and dodo_return_url.scheme == "http" and is_local_return
+        )
+        if (
+            not allowed_dodo_return
+            or not dodo_return_url.hostname
+            or dodo_return_url.username
+            or dodo_return_url.password
+            or dodo_return_url.fragment
+        ):
+            raise ValueError("DODO_PAYMENTS_RETURN_URL must be an allowed web URL")
+        if bool(self.dodo_payments_api_key) != bool(
+            self.dodo_payments_credit_pack_100_product_id
+        ):
+            raise ValueError(
+                "DODO_PAYMENTS_API_KEY and DODO_PAYMENTS_CREDIT_PACK_100_PRODUCT_ID "
+                "must be configured together"
+            )
         if (
             self.generated_asset_cleanup_claim_timeout_seconds
             < self.generated_asset_cleanup_lock_ttl_seconds

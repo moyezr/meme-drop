@@ -46,6 +46,36 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.generated_asset_cleanup_lock_ttl_seconds == 900
     assert settings.agent_generation_stale_timeout_seconds == 1_800
     assert settings.dashboard_token_secret is None
+    assert settings.dodo_payments_environment == "test_mode"
+    assert settings.dodo_checkout_enabled is False
+    assert settings.dodo_payments_webhook_key is None
+    assert settings.dodo_payments_return_url is None
+    assert (
+        settings.normalized_dodo_return_url
+        == "http://localhost:3000/dashboard/billing?checkout=return"
+    )
+
+
+def test_dodo_checkout_configuration_is_all_or_nothing() -> None:
+    with pytest.raises(ValidationError, match="must be configured together"):
+        make_settings(dodo_payments_api_key="test_api_key_0123456789")
+
+    configured = make_settings(
+        dodo_payments_api_key="test_api_key_0123456789",
+        dodo_payments_credit_pack_100_product_id="pdt_0NmdxP8VNKdUvJyokZR9m",
+    )
+
+    assert configured.dodo_checkout_enabled is True
+
+
+def test_dodo_return_url_rejects_unsafe_values() -> None:
+    for value in (
+        "http://example.com/dashboard/billing",
+        "https://user:secret@example.com/dashboard/billing",
+        "https://example.com/dashboard/billing#paid",
+    ):
+        with pytest.raises(ValidationError, match="DODO_PAYMENTS_RETURN_URL"):
+            make_settings(dodo_payments_return_url=value)
 
 
 def test_legacy_shared_model_variable_is_rejected() -> None:
