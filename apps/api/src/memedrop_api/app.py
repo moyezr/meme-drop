@@ -34,6 +34,11 @@ from memedrop_api.api.library import router as library_router
 from memedrop_api.api.memes import router as memes_router
 from memedrop_api.api.suggest import router as suggest_router
 from memedrop_api.api.usage import router as usage_router
+from memedrop_api.billing import (
+    BillingCheckoutCreator,
+    BillingCheckoutService,
+    DodoCheckoutGateway,
+)
 from memedrop_api.catalog_workbench import CatalogDraftStore, SqlAlchemyCatalogDraftStore
 from memedrop_api.config import Settings
 from memedrop_api.db import Database
@@ -99,6 +104,7 @@ def create_app(
     agent_generation_credits: AgentGenerationCreditService | None = None,
     agent_generated_asset_store: AgentGeneratedAssetStore | None = None,
     agent_meme_service: AgentMemeService | None = None,
+    billing_checkout_service: BillingCheckoutCreator | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings()  # type: ignore[call-arg]
     meme_storage = storage or create_meme_storage(app_settings)
@@ -112,6 +118,7 @@ def create_app(
     default_trend_refresh_lock: RedisTrendRefreshLock | None = None
     default_generated_asset_cleanup_lock: RedisCronLock | None = None
     default_trend_snapshot_check: TrendSnapshotHealthCheck | None = None
+    default_billing_gateway: DodoCheckoutGateway | None = None
     trend_redis_url = app_settings.trend_redis_url
     if suggestion_service is None:
         default_gateway = OpenRouterSuggestionGateway(app_settings)
@@ -170,6 +177,24 @@ def create_app(
             meme_storage,
         ),
     )
+    if billing_checkout_service is not None:
+        checkout_service: BillingCheckoutCreator | None = billing_checkout_service
+    elif (
+        app_settings.dodo_payments_api_key and app_settings.dodo_payments_credit_pack_100_product_id
+    ):
+        default_billing_gateway = DodoCheckoutGateway(
+            api_key=app_settings.dodo_payments_api_key,
+            webhook_key=app_settings.dodo_payments_webhook_key,
+            environment=app_settings.dodo_payments_environment,
+        )
+        checkout_service = BillingCheckoutService(
+            app_database,
+            default_billing_gateway,
+            product_id=app_settings.dodo_payments_credit_pack_100_product_id,
+            return_url=app_settings.normalized_dodo_return_url,
+        )
+    else:
+        checkout_service = None
     generated_asset_maintenance_service = GeneratedAssetMaintenanceService(
         generated_asset_cleanup_service,
         generation_credits,
@@ -203,6 +228,8 @@ def create_app(
                 await default_trend_refresh_lock.close()
             if default_generated_asset_cleanup_lock is not None:
                 await default_generated_asset_cleanup_lock.close()
+            if default_billing_gateway is not None:
+                await default_billing_gateway.close()
             await limiter.close()
             await app_database.close()
 
@@ -244,6 +271,7 @@ def create_app(
     app.state.agent_meme_service = agent_meme_service or AgentMemeService(
         suggestions, meme_storage, meme_renderer or render_meme
     )
+    app.state.billing_checkout_service = checkout_service
     app.state.meme_catalog = catalog
 
     app.add_middleware(

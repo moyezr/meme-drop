@@ -42,6 +42,7 @@ def test_database_models_preserve_existing_table_names() -> None:
         "api_keys",
         "generations",
         "credit_transactions",
+        "billing_checkouts",
         "generated_assets",
     }
 

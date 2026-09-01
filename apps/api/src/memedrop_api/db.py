@@ -612,6 +612,7 @@ class BillingCheckout(Base):
     )
 
     session_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    checkout_url: Mapped[str] = mapped_column(Text)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     idempotency_key_hash: Mapped[bytes] = mapped_column(LargeBinary(32))
     pack_key: Mapped[str] = mapped_column(String(40))

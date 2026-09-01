@@ -18,6 +18,7 @@ from memedrop_api.agent_credentials import (
     UserRecord,
 )
 from memedrop_api.app import create_app
+from memedrop_api.billing import BillingCheckoutCreator, HostedCheckout
 from memedrop_api.config import Settings
 from memedrop_api.dashboard_auth import (
     DASHBOARD_ASSERTION_AUDIENCE,
@@ -27,6 +28,24 @@ from memedrop_api.dashboard_auth import (
 from memedrop_api.public_ids import PublicIdKind, create_public_id
 
 SECRET = "dashboard-secret-0123456789-abcdefghijklmnopqrstuvwxyz"
+
+
+class DashboardBillingService:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str | None, str]] = []
+
+    async def create_checkout(
+        self,
+        *,
+        user_id: str,
+        email: str | None,
+        idempotency_key: str,
+    ) -> HostedCheckout:
+        self.calls.append((user_id, email, idempotency_key))
+        return HostedCheckout(
+            "cks_test_dashboard_checkout",
+            "https://test.checkout.dodopayments.com/session/cks_test_dashboard_checkout",
+        )
 
 
 class DashboardCredentialRepository:
@@ -159,11 +178,22 @@ def _settings(settings: Settings, *, enabled: bool = True) -> Settings:
 
 
 def _client(
-    settings: Settings, repository: DashboardCredentialRepository, *, enabled: bool = True
+    settings: Settings,
+    repository: DashboardCredentialRepository,
+    *,
+    enabled: bool = True,
+    billing: BillingCheckoutCreator | None = None,
 ) -> httpx.AsyncClient:
+    configured = _settings(settings, enabled=enabled).model_copy(
+        update={
+            "dodo_payments_api_key": None,
+            "dodo_payments_credit_pack_100_product_id": None,
+        }
+    )
     app = create_app(
-        _settings(settings, enabled=enabled),
+        configured,
         agent_credentials=AgentCredentialService(repository),
+        billing_checkout_service=billing,
     )
     return httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
@@ -340,6 +370,49 @@ async def test_dashboard_rejects_missing_assertion_and_invalid_key_name(settings
     assert invalid_name.status_code == 400
     assert invalid_name.headers["cache-control"] == "private, no-store"
     assert invalid_name.headers["pragma"] == "no-cache"
+
+
+async def test_dashboard_creates_authenticated_idempotent_billing_checkout(
+    settings: Settings,
+) -> None:
+    repository = DashboardCredentialRepository()
+    billing = DashboardBillingService()
+    headers = {
+        "Authorization": f"Bearer {_token()}",
+        "Idempotency-Key": "buy-100-credits-1",
+    }
+    async with _client(settings, repository, billing=billing) as client:
+        created = await client.post("/api/v1/dashboard/billing/checkout", headers=headers)
+        invalid = await client.post(
+            "/api/v1/dashboard/billing/checkout",
+            headers={"Authorization": f"Bearer {_token()}"},
+        )
+
+    assert created.status_code == 201
+    assert created.json() == {
+        "session_id": "cks_test_dashboard_checkout",
+        "checkout_url": (
+            "https://test.checkout.dodopayments.com/session/cks_test_dashboard_checkout"
+        ),
+    }
+    user = next(iter(repository.users.values()))
+    assert billing.calls == [(user.id, "developer@example.com", "buy-100-credits-1")]
+    assert invalid.status_code == 400
+
+
+async def test_dashboard_checkout_is_explicitly_unavailable_without_dodo(
+    settings: Settings,
+) -> None:
+    async with _client(settings, DashboardCredentialRepository()) as client:
+        response = await client.post(
+            "/api/v1/dashboard/billing/checkout",
+            headers={
+                "Authorization": f"Bearer {_token()}",
+                "Idempotency-Key": "unconfigured-checkout",
+            },
+        )
+
+    assert response.status_code == 503
 
 
 async def test_dashboard_and_agent_credentials_are_not_interchangeable(settings: Settings) -> None:

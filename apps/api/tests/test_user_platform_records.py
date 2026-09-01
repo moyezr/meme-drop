@@ -92,6 +92,7 @@ def test_billing_checkouts_keep_server_owned_purchase_identity() -> None:
     table = _table(BillingCheckout)
     constraints = _names(table.constraints)
     assert table.c.session_id.primary_key is True
+    assert "checkout_url" in table.c
     assert isinstance(table.c.idempotency_key_hash.type, LargeBinary)
     assert cast(LargeBinary, table.c.idempotency_key_hash.type).length == 32
     assert "uq_billing_checkouts_user_idempotency" in constraints
