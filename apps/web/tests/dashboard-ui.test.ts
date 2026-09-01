@@ -44,13 +44,24 @@ test("created and revoked key metadata merge without duplicates", () => {
 });
 
 test("dashboard UI covers loading, errors, empty keys, one-time secrets, and mobile layout", async () => {
-  const [page, client, styles] = await Promise.all([
+  const [page, apiKeysPage, client, overview, navigation, layout, styles] = await Promise.all([
     readFile(new URL("../src/app/dashboard/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/dashboard/api-keys/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/app/dashboard/dashboard-client.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/dashboard/dashboard-overview-client.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/dashboard/dashboard-navigation.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/dashboard/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/app/globals.css", import.meta.url), "utf8"),
   ]);
 
   assert.doesNotMatch(page, /Coming next|does not connect/);
+  assert.match(page, /DashboardOverviewClient/);
+  assert.match(apiKeysPage, /ApiKeysClient/);
+  assert.doesNotMatch(layout, /#api-keys/);
+  assert.match(layout, /DashboardNavigation/);
+  assert.match(navigation, /usePathname/);
+  assert.match(navigation, /href: "\/dashboard\/api-keys"/);
+  assert.match(navigation, /aria-current=\{pathname === link\.href \? "page"/);
   for (const text of [
     "Loading your account",
     "Account data is unavailable",
@@ -59,7 +70,7 @@ test("dashboard UI covers loading, errors, empty keys, one-time secrets, and mob
     "aria-live",
     "role=\"alert\"",
   ]) {
-    assert.match(client, new RegExp(text));
+    assert.match(client + overview, new RegExp(text));
   }
   assert.match(client, /pendingIssuance/);
   assert.match(client, /Idempotency-Key/);

@@ -1,74 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import {
+  dashboardRequestHeaders,
   dashboardResponseError,
   mergeDashboardApiKey,
-  type DashboardOverview,
+  readableDashboardDate,
   type IssuedDashboardApiKey,
   type RevokedDashboardApiKey,
 } from "./dashboard-data";
+import { useDashboardOverview } from "./use-dashboard-overview";
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-function requestId(): string {
-  return `web_${crypto.randomUUID().replaceAll("-", "")}`;
-}
-
-function requestHeaders(): HeadersInit {
-  return { "x-request-id": requestId() };
-}
-
-function readableDate(value: string | null): string {
-  if (!value) return "Never";
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? "Unknown" : dateFormatter.format(date);
-}
-
-export function DashboardClient() {
-  const [overview, setOverview] = useState<DashboardOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function ApiKeysClient() {
+  const { overview, setOverview, loading, error, setError, loadOverview } = useDashboardOverview();
   const [keyName, setKeyName] = useState("");
   const [creating, setCreating] = useState(false);
   const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
   const [issuedCredential, setIssuedCredential] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const pendingIssuance = useRef<{ name: string; idempotencyKey: string } | null>(null);
-
-  const loadOverview = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/dashboard/overview", {
-        cache: "no-store",
-        headers: requestHeaders(),
-        signal,
-      });
-      if (response.status === 401) {
-        window.location.assign("/sign-in");
-        return;
-      }
-      if (!response.ok) {
-        throw await dashboardResponseError(response);
-      }
-      setOverview((await response.json()) as DashboardOverview);
-    } catch (caught) {
-      if (caught instanceof DOMException && caught.name === "AbortError") return;
-      setError(caught instanceof Error ? caught.message : "The dashboard could not be loaded.");
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void loadOverview(controller.signal);
-    return () => controller.abort();
-  }, [loadOverview]);
 
   async function createApiKey(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,7 +41,7 @@ export function DashboardClient() {
         method: "POST",
         cache: "no-store",
         headers: {
-          ...requestHeaders(),
+          ...dashboardRequestHeaders(),
           "Content-Type": "application/json",
           "Idempotency-Key": issuance.idempotencyKey,
         },
@@ -135,7 +85,7 @@ export function DashboardClient() {
       const response = await fetch(`/api/dashboard/api-keys/${keyId}/revoke`, {
         method: "POST",
         cache: "no-store",
-        headers: requestHeaders(),
+        headers: dashboardRequestHeaders(),
       });
       if (response.status === 401) {
         window.location.assign("/sign-in");
@@ -200,27 +150,7 @@ export function DashboardClient() {
         </div>
       ) : null}
 
-      <section className="dashboardSummary" aria-label="Account overview">
-        <article className="dashboardMetric">
-          <span>Available credits</span>
-          <strong>{overview.user.credits.toLocaleString()}</strong>
-          <small>One credit per durable returned meme</small>
-        </article>
-        <article className="dashboardMetric">
-          <span>Active API keys</span>
-          <strong>{activeKeyCount}</strong>
-          <small>{5 - activeKeyCount} remaining before the active-key limit</small>
-        </article>
-        <article className="dashboardMetric">
-          <span>Developer account</span>
-          <strong className="dashboardAccountValue">
-            {overview.user.email ?? overview.user.id}
-          </strong>
-          <small>Created {readableDate(overview.user.created_at)}</small>
-        </article>
-      </section>
-
-      <section className="dashboardPanel" id="api-keys" aria-labelledby="api-keys-title">
+      <section className="dashboardPanel dashboardPanelFirst" aria-labelledby="api-keys-title">
         <div className="dashboardPanelHeader">
           <div>
             <p className="eyebrow">Credentials</p>
@@ -310,11 +240,11 @@ export function DashboardClient() {
                     <dl>
                       <div>
                         <dt>Created</dt>
-                        <dd>{readableDate(apiKey.created_at)}</dd>
+                        <dd>{readableDashboardDate(apiKey.created_at)}</dd>
                       </div>
                       <div>
                         <dt>Last used</dt>
-                        <dd>{readableDate(apiKey.last_used_at)}</dd>
+                        <dd>{readableDashboardDate(apiKey.last_used_at)}</dd>
                       </div>
                     </dl>
                     <div className="apiKeyAction">

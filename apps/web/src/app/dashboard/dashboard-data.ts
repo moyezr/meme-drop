@@ -25,6 +25,21 @@ export interface RevokedDashboardApiKey {
   api_key: DashboardApiKey;
 }
 
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+export function dashboardRequestHeaders(): HeadersInit {
+  return { "x-request-id": `web_${crypto.randomUUID().replaceAll("-", "")}` };
+}
+
+export function readableDashboardDate(value: string | null): string {
+  if (!value) return "Never";
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? "Unknown" : dateFormatter.format(date);
+}
+
 const ERROR_MESSAGES: Record<string, string> = {
   authentication_required: "Your session has expired. Sign in again to continue.",
   dashboard_request_invalid: "Check the request and try again.",

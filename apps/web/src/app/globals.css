@@ -635,6 +635,10 @@ video {
   background: var(--color-bg);
 }
 
+.dashboardPanelFirst {
+  margin-top: 38px;
+}
+
 .dashboardPanelHeader {
   display: flex;
   align-items: flex-start;
@@ -862,6 +866,12 @@ video {
   color: var(--color-text-secondary);
   font-size: 14px;
   line-height: 1.55;
+}
+
+.dashboardCard a {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .statusPill {

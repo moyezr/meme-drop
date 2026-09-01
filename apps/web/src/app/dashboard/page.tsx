@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DashboardClient } from "./dashboard-client";
+import { DashboardOverviewClient } from "./dashboard-overview-client";
 
 export const metadata: Metadata = {
   title: "Developer dashboard",
@@ -18,7 +18,7 @@ export default function DashboardPage() {
           MemeDrop.
         </p>
       </div>
-      <DashboardClient />
+      <DashboardOverviewClient />
     </main>
   );
 }

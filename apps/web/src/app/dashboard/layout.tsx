@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, signOut } from "../../auth";
+import { DashboardNavigation } from "./dashboard-navigation";
 
 export default async function DashboardLayout({
   children,
@@ -33,14 +34,7 @@ export default async function DashboardLayout({
       </header>
 
       <div className="dashboardBody">
-        <nav className="dashboardNav" aria-label="Dashboard navigation">
-          <a aria-current="page" href="/dashboard">
-            Overview
-          </a>
-          <a href="/dashboard#api-keys">API keys</a>
-          <span aria-disabled="true">Usage</span>
-          <span aria-disabled="true">Billing</span>
-        </nav>
+        <DashboardNavigation />
         {children}
       </div>
     </div>
