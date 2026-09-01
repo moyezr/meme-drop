@@ -587,6 +587,44 @@ class CreditTransaction(Base):
     )
 
 
+class BillingCheckout(Base):
+    """Server-owned identity for one Dodo-hosted credit-pack checkout."""
+
+    __tablename__ = "billing_checkouts"
+    __table_args__ = (
+        CheckConstraint("credits > 0", name="billing_checkouts_credits_check"),
+        CheckConstraint(
+            "status IN ('pending', 'paid')",
+            name="billing_checkouts_status_check",
+        ),
+        CheckConstraint(
+            "(status = 'pending' AND payment_id IS NULL AND paid_at IS NULL) OR "
+            "(status = 'paid' AND payment_id IS NOT NULL AND paid_at IS NOT NULL)",
+            name="billing_checkouts_payment_state_check",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key_hash",
+            name="uq_billing_checkouts_user_idempotency",
+        ),
+        UniqueConstraint("payment_id", name="uq_billing_checkouts_payment_id"),
+        Index("idx_billing_checkouts_user_created_at", "user_id", "created_at"),
+    )
+
+    session_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    idempotency_key_hash: Mapped[bytes] = mapped_column(LargeBinary(32))
+    pack_key: Mapped[str] = mapped_column(String(40))
+    product_id: Mapped[str] = mapped_column(String(80))
+    credits: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'pending'"))
+    payment_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
 class GeneratedAsset(Base):
     """A generated object with explicit ownership and retention/deletion state."""
 

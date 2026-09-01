@@ -121,6 +121,39 @@ def _upgrade_real_0007_api_key_shape(connection: Connection, schema: str) -> Non
     }
 
 
+def _upgrade_real_0008_billing_shape(connection: Connection, schema: str) -> None:
+    quoted_schema = connection.dialect.identifier_preparer.quote(schema)
+    connection.exec_driver_sql(f"CREATE SCHEMA {quoted_schema}")
+    connection.exec_driver_sql(f"SET LOCAL search_path TO {quoted_schema}")
+    connection.exec_driver_sql("CREATE TABLE users (id VARCHAR(14) PRIMARY KEY)")
+
+    migration = importlib.import_module(
+        "migrations.versions.20260902_0009_billing_checkouts"
+    )
+    with Operations.context(MigrationContext.configure(connection)):
+        migration.upgrade()
+
+    inspector = inspect(connection)
+    assert "billing_checkouts" in inspector.get_table_names()
+    columns = {column["name"]: column for column in inspector.get_columns("billing_checkouts")}
+    assert columns["session_id"]["nullable"] is False
+    assert columns["payment_id"]["nullable"] is True
+    unique_constraints = {
+        constraint["name"]: tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("billing_checkouts")
+    }
+    assert unique_constraints["uq_billing_checkouts_user_idempotency"] == (
+        "user_id",
+        "idempotency_key_hash",
+    )
+    assert unique_constraints["uq_billing_checkouts_payment_id"] == ("payment_id",)
+
+    with Operations.context(MigrationContext.configure(connection)):
+        migration.upgrade()
+        migration.downgrade()
+    assert "billing_checkouts" not in inspect(connection).get_table_names()
+
+
 @pytest.mark.integration
 async def test_0007_upgrades_a_real_0006_shaped_schema() -> None:
     database_url = os.environ.get("MEMEDROP_TEST_DATABASE_URL")
@@ -149,6 +182,23 @@ async def test_0008_upgrades_a_real_0007_api_key_shape() -> None:
     try:
         async with database.engine.begin() as connection:
             await connection.run_sync(_upgrade_real_0007_api_key_shape, schema)
+    finally:
+        async with database.engine.begin() as connection:
+            await connection.exec_driver_sql(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+        await database.close()
+
+
+@pytest.mark.integration
+async def test_0009_adds_durable_billing_checkout_identity() -> None:
+    database_url = os.environ.get("MEMEDROP_TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("MEMEDROP_TEST_DATABASE_URL is not configured")
+    database = Database(database_url)
+    schema = f"test_billing_checkout_migration_{uuid4().hex}"
+    quoted_schema = database.engine.dialect.identifier_preparer.quote(schema)
+    try:
+        async with database.engine.begin() as connection:
+            await connection.run_sync(_upgrade_real_0008_billing_shape, schema)
     finally:
         async with database.engine.begin() as connection:
             await connection.exec_driver_sql(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")

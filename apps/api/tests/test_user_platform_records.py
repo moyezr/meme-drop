@@ -4,7 +4,15 @@ from typing import Any, cast
 
 from sqlalchemy import BigInteger, LargeBinary, String, Table
 
-from memedrop_api.db import ApiKey, CreditTransaction, GeneratedAsset, Generation, InstallUser, User
+from memedrop_api.db import (
+    ApiKey,
+    BillingCheckout,
+    CreditTransaction,
+    GeneratedAsset,
+    Generation,
+    InstallUser,
+    User,
+)
 from memedrop_api.public_ids import PublicIdKind, parse_public_id
 
 
@@ -78,3 +86,14 @@ def test_generation_and_assets_are_owned_directly_by_users() -> None:
     assert "reserved_credits" in _table(Generation).c
     assert "user_id" in _table(GeneratedAsset).c
     assert "agent_account_id" not in _table(GeneratedAsset).c
+
+
+def test_billing_checkouts_keep_server_owned_purchase_identity() -> None:
+    table = _table(BillingCheckout)
+    constraints = _names(table.constraints)
+    assert table.c.session_id.primary_key is True
+    assert isinstance(table.c.idempotency_key_hash.type, LargeBinary)
+    assert cast(LargeBinary, table.c.idempotency_key_hash.type).length == 32
+    assert "uq_billing_checkouts_user_idempotency" in constraints
+    assert "uq_billing_checkouts_payment_id" in constraints
+    assert "billing_checkouts_payment_state_check" in constraints
