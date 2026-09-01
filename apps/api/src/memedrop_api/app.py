@@ -34,9 +34,11 @@ from memedrop_api.api.library import router as library_router
 from memedrop_api.api.memes import router as memes_router
 from memedrop_api.api.suggest import router as suggest_router
 from memedrop_api.api.usage import router as usage_router
+from memedrop_api.api.webhooks import router as webhooks_router
 from memedrop_api.billing import (
     BillingCheckoutCreator,
     BillingCheckoutService,
+    BillingWebhookProcessor,
     DodoCheckoutGateway,
 )
 from memedrop_api.catalog_workbench import CatalogDraftStore, SqlAlchemyCatalogDraftStore
@@ -105,6 +107,7 @@ def create_app(
     agent_generated_asset_store: AgentGeneratedAssetStore | None = None,
     agent_meme_service: AgentMemeService | None = None,
     billing_checkout_service: BillingCheckoutCreator | None = None,
+    billing_webhook_service: BillingWebhookProcessor | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings()  # type: ignore[call-arg]
     meme_storage = storage or create_meme_storage(app_settings)
@@ -192,9 +195,21 @@ def create_app(
             default_billing_gateway,
             product_id=app_settings.dodo_payments_credit_pack_100_product_id,
             return_url=app_settings.normalized_dodo_return_url,
+            webhook_verifier=(
+                default_billing_gateway if app_settings.dodo_payments_webhook_key else None
+            ),
         )
     else:
         checkout_service = None
+    if billing_webhook_service is not None:
+        webhook_service: BillingWebhookProcessor | None = billing_webhook_service
+    elif (
+        isinstance(checkout_service, BillingCheckoutService)
+        and app_settings.dodo_payments_webhook_key
+    ):
+        webhook_service = checkout_service
+    else:
+        webhook_service = None
     generated_asset_maintenance_service = GeneratedAssetMaintenanceService(
         generated_asset_cleanup_service,
         generation_credits,
@@ -272,6 +287,7 @@ def create_app(
         suggestions, meme_storage, meme_renderer or render_meme
     )
     app.state.billing_checkout_service = checkout_service
+    app.state.billing_webhook_service = webhook_service
     app.state.meme_catalog = catalog
 
     app.add_middleware(
@@ -404,6 +420,7 @@ def create_app(
     app.include_router(memes_router)
     app.include_router(suggest_router)
     app.include_router(usage_router)
+    app.include_router(webhooks_router)
     if not app_settings.is_production:
         app.include_router(internal_catalog_router)
 

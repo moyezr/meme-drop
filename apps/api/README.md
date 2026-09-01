@@ -354,8 +354,30 @@ idempotent within the addressed user: replay the same `--idempotency-key` and am
 retry, and use a unique operator key for each intended grant. Reusing that user/key pair with a
 different amount fails instead of silently changing a grant. The dashboard shows each newly issued
 credential once, stores only its hash, caps a user at five active keys, and requires an idempotency
-key for safe issuance retries. Recharge, payment integration, usage history, generation history,
-billing receipts, and general account self-service remain outside the current private-beta slice.
+key for safe issuance retries.
+
+When Dodo test-mode configuration is present, authenticated customers can create the configured
+one-time 100-credit checkout through `POST /api/v1/dashboard/billing/checkout`. The API stores the
+checkout-to-user identity before returning Dodo's hosted URL. `POST /api/v1/webhooks/dodo` verifies
+the raw request with Dodo's Standard Webhooks signing key and grants credits only for a matching
+`payment.succeeded` session, product, quantity, and metadata. The payment ID is the durable ledger
+identity, so webhook retries cannot grant the pack twice. Do not grant credits from the browser
+return URL or an unsigned payload.
+
+Local test mode requires these values in the ignored root `.env`:
+
+```sh
+DODO_PAYMENTS_ENVIRONMENT=test_mode
+DODO_PAYMENTS_API_KEY=<test-mode API key>
+DODO_PAYMENTS_WEBHOOK_KEY=<test-mode endpoint signing key>
+DODO_PAYMENTS_CREDIT_PACK_100_PRODUCT_ID=<test-mode one-time product ID>
+DODO_PAYMENTS_RETURN_URL=http://localhost:3000/dashboard/billing?checkout=return
+```
+
+Use an HTTPS tunnel such as ngrok for provider delivery to `/api/v1/webhooks/dodo`. The endpoint
+accepts signed payloads only and caps the raw body at 256 KiB. Live sales, payment refunds, usage
+and generation history, billing receipts, and general account self-service remain outside the
+current private-beta slice.
 
 ## Vercel
 
