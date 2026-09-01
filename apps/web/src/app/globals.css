@@ -874,6 +874,29 @@ video {
   font-weight: 700;
 }
 
+.billingAvailability {
+  padding: 26px;
+}
+
+.billingAvailability h3 {
+  margin: 0 0 10px;
+  font-size: 19px;
+}
+
+.billingAvailability p {
+  max-width: 620px;
+  margin-bottom: 18px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.billingAvailability a {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .statusPill {
   display: inline-block;
   padding: 5px 9px;

@@ -44,9 +44,11 @@ test("created and revoked key metadata merge without duplicates", () => {
 });
 
 test("dashboard UI covers loading, errors, empty keys, one-time secrets, and mobile layout", async () => {
-  const [page, apiKeysPage, client, overview, navigation, layout, styles] = await Promise.all([
+  const [page, apiKeysPage, billingPage, billingClient, client, overview, navigation, layout, styles] = await Promise.all([
     readFile(new URL("../src/app/dashboard/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/app/dashboard/api-keys/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/dashboard/billing/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/dashboard/billing/billing-client.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/app/dashboard/dashboard-client.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/app/dashboard/dashboard-overview-client.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/app/dashboard/dashboard-navigation.tsx", import.meta.url), "utf8"),
@@ -57,10 +59,14 @@ test("dashboard UI covers loading, errors, empty keys, one-time secrets, and mob
   assert.doesNotMatch(page, /Coming next|does not connect/);
   assert.match(page, /DashboardOverviewClient/);
   assert.match(apiKeysPage, /ApiKeysClient/);
+  assert.match(billingPage, /BillingClient/);
+  assert.match(billingClient, /Self-service packs are not on sale yet/);
+  assert.doesNotMatch(billingClient, /pdt_|₹99|checkout\.dodopayments/);
   assert.doesNotMatch(layout, /#api-keys/);
   assert.match(layout, /DashboardNavigation/);
   assert.match(navigation, /usePathname/);
   assert.match(navigation, /href: "\/dashboard\/api-keys"/);
+  assert.match(navigation, /href: "\/dashboard\/billing"/);
   assert.match(navigation, /aria-current=\{pathname === link\.href \? "page"/);
   for (const text of [
     "Loading your account",
