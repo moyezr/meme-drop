@@ -49,11 +49,19 @@ class DashboardUser(BaseModel):
     created_at: datetime
 
 
+class DashboardBillingStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    checkout_enabled: bool
+    environment: str | None
+
+
 class DashboardOverview(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     user: DashboardUser
     api_keys: list[DashboardApiKey]
+    billing: DashboardBillingStatus
 
 
 class CreateApiKeyRequest(BaseModel):
@@ -90,7 +98,14 @@ async def dashboard_overview(
     credentials = _credential_service(request)
     user = await _provision_user(credentials, identity)
     current = await credentials.user_status(user_id=user.id)
-    return _overview(current)
+    checkout_enabled = request.app.state.billing_checkout_service is not None
+    return _overview(
+        current,
+        checkout_enabled=checkout_enabled,
+        billing_environment=(
+            request.app.state.settings.dodo_payments_environment if checkout_enabled else None
+        ),
+    )
 
 
 @router.post(
@@ -200,7 +215,12 @@ async def _provision_user(
     )
 
 
-def _overview(status: UserCredentialStatus) -> DashboardOverview:
+def _overview(
+    status: UserCredentialStatus,
+    *,
+    checkout_enabled: bool,
+    billing_environment: str | None,
+) -> DashboardOverview:
     return DashboardOverview(
         user=DashboardUser(
             id=status.user.id,
@@ -209,6 +229,10 @@ def _overview(status: UserCredentialStatus) -> DashboardOverview:
             created_at=status.user.created_at,
         ),
         api_keys=[_api_key(key) for key in status.api_keys],
+        billing=DashboardBillingStatus(
+            checkout_enabled=checkout_enabled,
+            environment=billing_environment,
+        ),
     )
 
 

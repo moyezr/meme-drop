@@ -182,9 +182,10 @@ def create_app(
     )
     if billing_checkout_service is not None:
         checkout_service: BillingCheckoutCreator | None = billing_checkout_service
-    elif (
-        app_settings.dodo_payments_api_key and app_settings.dodo_payments_credit_pack_100_product_id
-    ):
+    elif app_settings.dodo_checkout_enabled:
+        assert app_settings.dodo_payments_api_key is not None
+        assert app_settings.dodo_payments_webhook_key is not None
+        assert app_settings.dodo_payments_credit_pack_100_product_id is not None
         default_billing_gateway = DodoCheckoutGateway(
             api_key=app_settings.dodo_payments_api_key,
             webhook_key=app_settings.dodo_payments_webhook_key,
@@ -195,9 +196,7 @@ def create_app(
             default_billing_gateway,
             product_id=app_settings.dodo_payments_credit_pack_100_product_id,
             return_url=app_settings.normalized_dodo_return_url,
-            webhook_verifier=(
-                default_billing_gateway if app_settings.dodo_payments_webhook_key else None
-            ),
+            webhook_verifier=default_billing_gateway,
         )
     else:
         checkout_service = None

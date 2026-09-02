@@ -14,6 +14,15 @@ export interface DashboardOverview {
     created_at: string;
   };
   api_keys: DashboardApiKey[];
+  billing: {
+    checkout_enabled: boolean;
+    environment: "test_mode" | "live_mode" | null;
+  };
+}
+
+export interface DashboardCheckout {
+  session_id: string;
+  checkout_url: string;
 }
 
 export interface IssuedDashboardApiKey {
@@ -78,4 +87,19 @@ export function mergeDashboardApiKey(
     return [...apiKeys, next];
   }
   return apiKeys.map((apiKey, index) => (index === existingIndex ? next : apiKey));
+}
+
+export function validatedDodoCheckoutUrl(
+  value: string,
+  environment: "test_mode" | "live_mode" | null,
+): string {
+  const url = new URL(value);
+  const expectedHost =
+    environment === "test_mode"
+      ? "test.checkout.dodopayments.com"
+      : "checkout.dodopayments.com";
+  if (url.protocol !== "https:" || url.hostname !== expectedHost) {
+    throw new Error("MemeDrop returned an invalid checkout URL.");
+  }
+  return url.href;
 }

@@ -231,6 +231,7 @@ async def test_valid_assertion_bootstraps_and_returns_user_overview(settings: Se
             .replace("+00:00", "Z"),
         },
         "api_keys": [],
+        "billing": {"checkout_enabled": False, "environment": None},
     }
     assert list(repository.users) == [("github", "account-123")]
 

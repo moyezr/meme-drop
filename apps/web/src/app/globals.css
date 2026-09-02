@@ -897,6 +897,20 @@ video {
   font-weight: 700;
 }
 
+.billingNotice,
+.billingError {
+  margin-top: 16px;
+  margin-bottom: 0 !important;
+}
+
+.billingNotice {
+  color: var(--color-accent) !important;
+}
+
+.billingError {
+  color: var(--color-primary) !important;
+}
+
 .statusPill {
   display: inline-block;
   padding: 5px 9px;

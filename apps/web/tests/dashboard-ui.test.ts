@@ -60,8 +60,12 @@ test("dashboard UI covers loading, errors, empty keys, one-time secrets, and mob
   assert.match(page, /DashboardOverviewClient/);
   assert.match(apiKeysPage, /ApiKeysClient/);
   assert.match(billingPage, /BillingClient/);
-  assert.match(billingClient, /Self-service packs are not on sale yet/);
-  assert.doesNotMatch(billingClient, /pdt_|₹99|checkout\.dodopayments/);
+  assert.match(billingClient, /100-credit test pack/);
+  assert.match(billingClient, /Buy 100 test credits/);
+  assert.match(billingClient, /signed payment confirmation/);
+  assert.match(billingClient, /\/api\/dashboard\/billing\/checkout/);
+  assert.match(billingClient, /Idempotency-Key/);
+  assert.doesNotMatch(billingClient, /pdt_|₹99/);
   assert.doesNotMatch(layout, /#api-keys/);
   assert.match(layout, /DashboardNavigation/);
   assert.match(navigation, /usePathname/);

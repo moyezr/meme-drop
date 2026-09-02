@@ -62,10 +62,14 @@ def test_dodo_checkout_configuration_is_all_or_nothing() -> None:
 
     configured = make_settings(
         dodo_payments_api_key="test_api_key_0123456789",
+        dodo_payments_webhook_key="whsec_test_0123456789",
         dodo_payments_credit_pack_100_product_id="pdt_0NmdxP8VNKdUvJyokZR9m",
     )
 
     assert configured.dodo_checkout_enabled is True
+
+    without_fulfillment = configured.model_copy(update={"dodo_payments_webhook_key": None})
+    assert without_fulfillment.dodo_checkout_enabled is False
 
 
 def test_dodo_return_url_rejects_unsafe_values() -> None:

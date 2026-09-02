@@ -317,7 +317,9 @@ class Settings(BaseSettings):
     @property
     def dodo_checkout_enabled(self) -> bool:
         return bool(
-            self.dodo_payments_api_key and self.dodo_payments_credit_pack_100_product_id
+            self.dodo_payments_api_key
+            and self.dodo_payments_webhook_key
+            and self.dodo_payments_credit_pack_100_product_id
         )
 
     @property
