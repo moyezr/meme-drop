@@ -340,7 +340,8 @@ contains no price offer: paid checkout is not open and pack prices have not been
 Before Dodo Payments live review:
 
 - approve and publish actual pack prices, expiry rules, and monetary refund conditions;
-- implement and test payment-to-credit fulfillment, including replay and refund cases;
+- add refund handling before accepting real payments; successful payment fulfillment and replay
+  protection are implemented and verified in test mode;
 - update all availability and payment disclosures together, including `/llms.txt` and tests;
 - review template-image rights, and confirm public examples are appropriate for commercial use;
 - verify all public pages and assets on the canonical domain without authentication;
@@ -353,7 +354,9 @@ products and credentials are separate. The initial test catalog uses a one-time 
 Store its `pdt_...` identifier in `DODO_PAYMENTS_CREDIT_PACK_100_PRODUCT_ID`. Do not treat the
 checkout return URL as proof of payment: credit fulfillment must wait for a signature-verified,
 idempotently processed `payment.succeeded` webhook. Configure the resulting webhook verification
-key as `DODO_PAYMENTS_WEBHOOK_KEY` before implementing fulfillment.
+key as `DODO_PAYMENTS_WEBHOOK_KEY` before enabling checkout. The production API project must also
+receive the test API key, test product ID, `DODO_PAYMENTS_ENVIRONMENT=test_mode`, and the canonical
+dashboard return URL. Re-run the API database migrations after deploying checkout schema changes.
 
 ## 8. Deploy and verify the API
 

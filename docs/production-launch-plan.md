@@ -339,9 +339,10 @@ quality gates, and catalog growth does not regress relevance, readability, safet
   unused reservations for `no_fit`, partial output, or failure; charge successful deterministic
   fallback assets; never recharge a matching replay.
 - [?] Credit package sizes, price, tax treatment, refunds, expiry, and target gross margin.
-- [~] Dodo Payments replaces Lemon Squeezy as the planned payment provider. Keep the existing
-  application credit ledger authoritative; checkout and payment fulfillment are not implemented.
-  Merchant approval, currencies, payout eligibility, and production behavior still need verification.
+- [~] Dodo Payments replaces Lemon Squeezy as the planned payment provider. Authenticated test-mode
+  checkout, signed `payment.succeeded` fulfillment, and replay-safe credit grants are implemented;
+  the application credit ledger remains authoritative. Refund handling, live-mode merchant approval,
+  currencies, payout eligibility, and production behavior still need verification.
 - [x] Generated image URLs require the owning user's Bearer credential throughout the 30-day
   retention window and return gone after expiry.
 - [?] Whether customers can explicitly delete generated images before expiry.
