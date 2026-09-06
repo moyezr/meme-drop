@@ -20,8 +20,8 @@ class FakeLock:
         self.token = token
         self.released: list[str] = []
 
-    async def acquire(self) -> str | None:
-        return self.token
+    async def acquire(self, token: str | None = None) -> str | None:
+        return token or self.token
 
     async def release(self, token: str) -> bool:
         self.released.append(token)
@@ -129,6 +129,8 @@ async def test_cron_returns_a_bounded_operator_report_after_completion() -> None
 
     assert response.status_code == 200
     assert response.json()["status"] == "completed"
+    assert isinstance(response.json()["duration_ms"], int)
+    assert response.json()["duration_ms"] >= 0
     assert response.json()["report"]["snapshot_version"] == 1
     assert response.json()["report"]["tavily_usage"] == {
         "key_usage": 1,
@@ -145,17 +147,22 @@ async def test_redis_lock_only_releases_its_own_lease(monkeypatch: pytest.Monkey
         def __init__(self) -> None:
             self.values: dict[str, str] = {}
 
-        async def set(self, key: str, value: str, *, nx: bool, ex: int) -> bool:
-            assert nx is True
-            assert ex == 60
-            if key in self.values:
-                return False
-            self.values[key] = value
-            return True
-
-        async def eval(self, script: str, key_count: int, key: str, token: str) -> int:
+        async def eval(
+            self,
+            script: str,
+            key_count: int,
+            key: str,
+            token: str,
+            ttl_seconds: int | None = None,
+        ) -> int:
             assert "redis.call('get'" in script
             assert key_count == 1
+            if ttl_seconds is not None:
+                assert ttl_seconds == 60
+                if key not in self.values or self.values[key] == token:
+                    self.values[key] = token
+                    return 1
+                return 0
             if self.values.get(key) != token:
                 return 0
             del self.values[key]
@@ -168,8 +175,16 @@ async def test_redis_lock_only_releases_its_own_lease(monkeypatch: pytest.Monkey
 
     class FakeRedisFactory:
         @staticmethod
-        def from_url(_: str, *, decode_responses: bool) -> FakeRedis:
+        def from_url(
+            _: str,
+            *,
+            decode_responses: bool,
+            socket_connect_timeout: float,
+            socket_timeout: float,
+        ) -> FakeRedis:
             assert decode_responses is True
+            assert socket_connect_timeout == 5
+            assert socket_timeout == 5
             return redis
 
     monkeypatch.setattr("memedrop_api.services.trend_cron.Redis", FakeRedisFactory)
@@ -177,6 +192,8 @@ async def test_redis_lock_only_releases_its_own_lease(monkeypatch: pytest.Monkey
     token = await lock.acquire()
 
     assert token is not None
+    assert await lock.acquire(token) == token
+    assert await lock.acquire("other-worker-token") is None
     assert await lock.release("other-worker-token") is False
     assert redis.values
     assert await lock.release(token) is True

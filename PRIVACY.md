@@ -1,15 +1,15 @@
-# MemeDrop privacy policy draft
+# MemeDrop privacy policy
 
-Last updated: 2026-08-30
+Last updated: 2026-09-06
 
-This document describes the current MemeDrop implementation. Before launch, verify the final
-infrastructure retention settings and make this draft match the deployed provider accounts.
+This document describes the current MemeDrop private beta. Provider retention and billing details
+that are still under review will be finalized before public self-service access opens.
 
 ## Purpose
 
-MemeDrop is a Chrome extension that helps users create and insert meme replies on X and LinkedIn. It
-reads source-post or compose context only after the user explicitly invokes MemeDrop for that post.
-It is not designed to collect unrelated browsing activity.
+MemeDrop is an API, website, and Chrome extension that helps users and their AI agents create meme
+replies. The extension reads source-post or compose context only after the user explicitly invokes
+MemeDrop for that post. It is not designed to collect unrelated browsing activity.
 
 ## Data processed
 
@@ -18,6 +18,8 @@ MemeDrop processes:
 - source-post or compose text used to request a suggestion or caption;
 - optional guidance the user enters about a preferred joke direction, tone, or meme format;
 - a random anonymous install ID stored by the extension;
+- an identity-provider account identifier and email for authenticated dashboard users;
+- API-key names, one-way key hashes, key-use metadata, credit transactions, and generation records;
 - suggested meme IDs, captions, scores, and structured context such as intent, topic, or tone;
 - outcome events such as shown, clicked, inserted/used, saved, and dismissed;
 - images and tags the user chooses to save to a personal library;
@@ -54,15 +56,15 @@ Current application retention is deletion-based:
 
 - in-memory suggestion caches expire after five minutes or process termination;
 - optional guidance is cleared when the active composer closes or changes;
-- saved images and library records remain until the user deletes the item or installation data;
+- browser-library images and records remain until the user deletes the item or installation data;
+- agent-generated images expire after 30 days and are removed by a protected cleanup job;
 - structured usage events remain until the user deletes installation data;
 - the anonymous install ID remains in Chrome storage until extension data is cleared;
-- infrastructure logs follow the retention configured in the final Vercel, Supabase, and model
-  provider accounts and must be verified before publication.
+- infrastructure logs follow the retention configured in the Vercel, Supabase, and model-provider
+  accounts; those provider-specific periods are under review for public self-service access.
 
-Service providers process data only as needed to operate MemeDrop. The final published policy should
-link the applicable Vercel, Supabase, and OpenRouter privacy terms and reflect the exact production
-account settings.
+Service providers process data only as needed to operate MemeDrop. Provider-specific retention,
+training controls, subprocessors, and deletion propagation are under review for the public policy.
 
 ## Sharing
 

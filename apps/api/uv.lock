@@ -627,6 +627,7 @@ dependencies = [
     { name = "pyjwt" },
     { name = "redis", extra = ["hiredis"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "upstash-workflow" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -653,6 +654,7 @@ requires-dist = [
     { name = "pyjwt", specifier = ">=2.10.1,<3" },
     { name = "redis", extras = ["hiredis"], specifier = ">=8.0.1" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36" },
+    { name = "upstash-workflow", specifier = ">=2.0.0,<3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
 ]
 
@@ -1111,6 +1113,19 @@ wheels = [
 ]
 
 [[package]]
+name = "qstash"
+version = "3.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pyjwt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/83/0d/42c12ee57d48f8b1399e026d750c39497ba5c3a4e87ad1b8c4898e91d335/qstash-3.4.0.tar.gz", hash = "sha256:883744276820788986bd5c4386c2f244c89f10ad3720210efa65e776b11a6dea", size = 29198, upload-time = "2026-03-18T14:13:00.735Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5b/63/98dcf66ed3a9d55eba3d4dadb4876be167409fb3f74c6a9443f0b55558c8/qstash-3.4.0-py3-none-any.whl", hash = "sha256:a023737aa824b274057a34bb822c5ba3c45b1001831ff97421fbfefcfe5ff860", size = 40680, upload-time = "2026-03-18T14:12:59.885Z" },
+]
+
+[[package]]
 name = "redis"
 version = "8.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1275,6 +1290,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/92/ff/5a28bdfd8c3ebec42564ac7d0e54ca3db65044a9314a97f9564fa7a1e926/tzdata-2026.3.tar.gz", hash = "sha256:4a1518b8993086a7982523e071643f3c0e5f213e75b21318e78bcabfff9d1415", size = 198674, upload-time = "2026-07-10T08:50:37.887Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/6d/b53b99a9f2766d095985947a5782f1702cabb129a34f7a802d7197af832f/tzdata-2026.3-py2.py3-none-any.whl", hash = "sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931", size = 348168, upload-time = "2026-07-10T08:50:36.46Z" },
+]
+
+[[package]]
+name = "upstash-workflow"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "qstash" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/be/0db68f4e9622b096d401353173076d8626f1a85ab58c944839dd245853c5/upstash_workflow-2.0.0.tar.gz", hash = "sha256:243945b20df4845a27be621748edf921382f182d8b117b19aa383d7e6c004f7b", size = 30769, upload-time = "2026-08-21T15:49:31.39Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/4b/4105f31f600cda08bb511feaca8b4cde19e936ed5bac7e282e212d4ed46e/upstash_workflow-2.0.0-py3-none-any.whl", hash = "sha256:28cbaf1e6d23454623b6a18386b4884676afbca2d364a1534ca52f36deddd126", size = 43379, upload-time = "2026-08-21T15:49:30.142Z" },
 ]
 
 [[package]]

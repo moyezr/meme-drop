@@ -3,6 +3,7 @@ import path from "node:path";
 import extensionPackage from "../apps/extension/package.json" with { type: "json" };
 
 const args = parseArgs(process.argv.slice(2));
+const privateBeta = args["private-beta"] === true;
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const extensionDir = path.join(repoRoot, "apps/extension");
 const apiBaseUrl = String(args["api-base-url"] || process.env.VITE_API_BASE_URL || "");
@@ -20,23 +21,29 @@ const warnings = [];
 const ready = [];
 
 checkApiOrigin();
-checkExtensionCorsOrigin();
+if (privateBeta) {
+  checkPrivateBetaCorsOrigin();
+} else {
+  checkExtensionCorsOrigin();
+}
 checkPrivacyPolicy();
-checkStoreListing();
-checkReleasePackage();
+if (!privateBeta) {
+  checkStoreListing();
+  checkReleasePackage();
+}
 checkDatasetExpansion();
-checkIdentityModel();
+if (!privateBeta) checkIdentityModel();
 
 printSection("Ready", ready);
 printSection("Warnings", warnings);
 printSection("Blockers", blockers);
 
 if (blockers.length > 0) {
-  console.error(`[MemeDrop] launch status: blocked (${blockers.length} blockers, ${warnings.length} warnings)`);
+  console.error(`[MemeDrop] ${privateBeta ? "private beta " : ""}launch status: blocked (${blockers.length} blockers, ${warnings.length} warnings)`);
   process.exit(1);
 }
 
-console.log(`[MemeDrop] launch status: ready (${warnings.length} warnings)`);
+console.log(`[MemeDrop] ${privateBeta ? "private beta " : ""}launch status: ready (${warnings.length} warnings)`);
 
 function checkApiOrigin() {
   if (!apiBaseUrl) {
@@ -109,6 +116,42 @@ function checkExtensionCorsOrigin() {
   })) {
     ready.push("Backend CORS includes a final Chrome extension origin.");
   }
+}
+
+function checkPrivateBetaCorsOrigin() {
+  const rawOrigins = String(process.env.MEMEDROP_CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const webOrigin = String(
+    args["web-origin"] || process.env.MEMEDROP_WEB_ORIGIN || "https://memedrop.moyezrabbani.dev"
+  );
+
+  let parsedWebOrigin;
+  try {
+    parsedWebOrigin = new URL(webOrigin);
+  } catch {
+    blockers.push(`Private-beta web origin is not a valid URL: ${webOrigin}`);
+    return;
+  }
+
+  if (
+    parsedWebOrigin.protocol !== "https:" ||
+    isLocalOrPlaceholderHost(parsedWebOrigin.hostname) ||
+    parsedWebOrigin.pathname !== "/" ||
+    parsedWebOrigin.search ||
+    parsedWebOrigin.hash
+  ) {
+    blockers.push(`Private-beta web origin must be a production HTTPS origin: ${webOrigin}`);
+    return;
+  }
+
+  if (!rawOrigins.includes(parsedWebOrigin.origin)) {
+    blockers.push(`MEMEDROP_CORS_ORIGINS must include the private-beta web origin ${parsedWebOrigin.origin}.`);
+    return;
+  }
+
+  ready.push(`Backend CORS includes the private-beta web origin ${parsedWebOrigin.origin}.`);
 }
 
 function checkPrivacyPolicy() {

@@ -3,12 +3,14 @@
   "framework": "fastapi",
   "installCommand": "uv sync --frozen --no-dev",
   "buildCommand": "uv run memedrop-validate-production-env && uv run python -c \"from app import app\"",
+  "functions": {
+    "app.py": {
+      "maxDuration": 60,
+      "regions": ["sin1"]
+    }
+  },
   "regions": ["sin1"],
   "crons": [
-    {
-      "path": "/internal/cron/trends/refresh",
-      "schedule": "0 2 * * *"
-    },
     {
       "path": "/internal/cron/assets/cleanup",
       "schedule": "30 3 * * *"

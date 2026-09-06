@@ -150,9 +150,13 @@ OPENROUTER_AUTO_TAG_MODEL=google/gemini-3.7-flash
 OPENROUTER_TREND_MODEL=google/gemini-3.7-flash
 OPENROUTER_EMBEDDING_MODEL=google/gemini-embedding-2
 
-# Enable only after the Redis serving index and the Vercel Cron secret are configured.
+# Enable only after Redis and the QStash Workflow schedule are configured.
 MEMEDROP_TRENDS_ENABLED=true
 TAVILY_API_KEY=<tavily-key>
+QSTASH_URL=https://qstash.upstash.io
+QSTASH_TOKEN=<qstash-token>
+QSTASH_CURRENT_SIGNING_KEY=<qstash-current-signing-key>
+QSTASH_NEXT_SIGNING_KEY=<qstash-next-signing-key>
 MEMEDROP_TREND_MONTHLY_CREDIT_BUDGET=900
 MEMEDROP_TREND_COLLECTION_TIMEOUT_SECONDS=8
 MEMEDROP_TREND_ENRICHMENT_TIMEOUT_SECONDS=20
@@ -193,15 +197,13 @@ absent, but setting `MEMEDROP_ENV=production` explicitly keeps local preflight a
 configuration identical. Ensure **Automatically expose System Environment Variables** remains
 enabled in the Vercel project.
 
-When `MEMEDROP_TRENDS_ENABLED=true`, set the same `CRON_SECRET` in the API project and rely on the
-checked-in `apps/api/vercel.json` schedule. Vercel calls the protected endpoint with a bearer token
-and schedules in UTC. The checked-in Hobby-compatible preview schedule refreshes all profiles once
-daily at 02:00 UTC, which executes only one of the pulse profile's four-hour buckets and uses about
-321 searches per 30 days. Before launch, upgrade to Vercel Pro (or an equivalent external
-scheduler), change the trend cron expression to `0 */4 * * *`, and verify the expected roughly 771
-monthly searches remain under the 900-credit ceiling. Monitor `GET /health` and alert on HTTP 503:
-the intended launch health policy treats a missing, empty, or older-than-eight-hours snapshot as
-unhealthy, so the daily preview cadence is not the final production trend configuration.
+When `MEMEDROP_TRENDS_ENABLED=true`, create one QStash schedule with destination
+`https://api.memedrop.moyezrabbani.dev/internal/workflows/trends/refresh`, method `POST`, and cron
+expression `0 */4 * * *` in UTC. Do not add an authorization header: QStash signs deliveries and
+the Workflow SDK verifies them with the two signing keys. The workflow gives each curated query and
+embedding batch its own retried Vercel invocation, then publishes the complete snapshot atomically.
+The cadence uses roughly 771 monthly searches under the 900-credit ceiling. Monitor `GET /health`
+and alert on HTTP 503; a missing, empty, or older-than-eight-hours snapshot is unhealthy.
 
 `CRON_SECRET` is required in production even if trends are disabled because the same constant-time
 bearer authentication protects the daily generated-asset cleanup. The checked-in schedule calls
@@ -219,7 +221,14 @@ With those variables loaded into an operator shell:
 npm run quality:production-env
 npm run storage:check
 npm run storage:latency
+npm run launch:status -- --private-beta \
+  --api-base-url https://api.memedrop.moyezrabbani.dev \
+  --web-origin https://memedrop.moyezrabbani.dev
 ```
+
+The private-beta launch check validates the API origin, web-origin CORS, privacy policy, and promoted
+catalog without requiring Chrome Web Store metadata or an extension package. Continue to use the
+default `npm run launch:status` before a Chrome Web Store release.
 
 The Vercel build runs `memedrop-validate-production-env` before importing the application. A
 missing, placeholder, malformed, or unsafe production value therefore blocks promotion instead of

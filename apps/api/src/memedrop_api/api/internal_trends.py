@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
+from time import monotonic
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -60,6 +61,7 @@ async def scheduled_trend_refresh(request: Request) -> JSONResponse:
         return JSONResponse(status_code=200, content={"status": "skipped", "reason": "in_progress"})
 
     try:
+        refresh_started = monotonic()
         report = await runner(settings)
     except TrendRefreshConfigurationError:
         LOGGER.warning("Trend refresh configuration rejected")
@@ -87,7 +89,9 @@ async def scheduled_trend_refresh(request: Request) -> JSONResponse:
         except RedisError:
             LOGGER.warning("Trend refresh lease could not be released")
 
+    duration_ms = round((monotonic() - refresh_started) * 1_000)
+    LOGGER.info("Trend refresh completed", extra={"duration_ms": duration_ms})
     return JSONResponse(
         status_code=200,
-        content={"status": "completed", "report": report.as_json()},
+        content={"status": "completed", "duration_ms": duration_ms, "report": report.as_json()},
     )

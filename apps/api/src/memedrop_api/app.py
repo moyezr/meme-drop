@@ -76,6 +76,10 @@ from memedrop_api.services.trend_embeddings import OpenRouterTrendEmbedder
 from memedrop_api.services.trend_index import RedisTrendIndex
 from memedrop_api.services.trend_monitoring import TrendSnapshotHealthCheck
 from memedrop_api.services.trend_runtime import refresh_trends
+from memedrop_api.services.trend_workflow import (
+    TREND_WORKFLOW_PATH,
+    register_trend_refresh_workflow,
+)
 from memedrop_api.trend_repository import SqlAlchemyTrendRepository
 from memedrop_api.user_repository import SqlAlchemyUserRepository
 
@@ -317,6 +321,7 @@ def create_app(
                 "/health",
                 "/internal/cron/trends/refresh",
                 "/internal/cron/assets/cleanup",
+                TREND_WORKFLOW_PATH,
             }:
                 route_key = f"{request.method} {path}"
                 expensive = route_key in EXPENSIVE_ROUTES
@@ -422,6 +427,7 @@ def create_app(
     app.include_router(webhooks_router)
     if not app_settings.is_production:
         app.include_router(internal_catalog_router)
+    register_trend_refresh_workflow(app, app_settings)
 
     @app.get("/memes/{object_key:path}", include_in_schema=False)
     async def serve_meme(object_key: str) -> Response:

@@ -9,6 +9,17 @@ from typing import Protocol
 from redis.asyncio import Redis
 
 TREND_REFRESH_LOCK_KEY = "memedrop:trend-refresh:lock"
+_CRON_REDIS_TIMEOUT_SECONDS = 5.0
+_ACQUIRE_OR_RENEW_IF_OWNER = """
+if redis.call('set', KEYS[1], ARGV[1], 'NX', 'EX', ARGV[2]) then
+    return 1
+end
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    redis.call('expire', KEYS[1], ARGV[2])
+    return 1
+end
+return 0
+"""
 _RELEASE_IF_OWNER = """
 if redis.call('get', KEYS[1]) == ARGV[1] then
     return redis.call('del', KEYS[1])
@@ -18,7 +29,7 @@ return 0
 
 
 class CronLock(Protocol):
-    async def acquire(self) -> str | None: ...
+    async def acquire(self, token: str | None = None) -> str | None: ...
 
     async def release(self, token: str) -> bool: ...
 
@@ -37,17 +48,23 @@ class RedisCronLock:
         ttl_seconds: int,
         key: str = TREND_REFRESH_LOCK_KEY,
     ) -> None:
-        self._redis = Redis.from_url(redis_url, decode_responses=True)
+        self._redis = Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=_CRON_REDIS_TIMEOUT_SECONDS,
+            socket_timeout=_CRON_REDIS_TIMEOUT_SECONDS,
+        )
         self._ttl_seconds = ttl_seconds
         self._key = key
 
-    async def acquire(self) -> str | None:
-        token = token_urlsafe(32)
-        acquired = await self._redis.set(
+    async def acquire(self, token: str | None = None) -> str | None:
+        token = token or token_urlsafe(32)
+        acquired = await self._redis.eval(
+            _ACQUIRE_OR_RENEW_IF_OWNER,
+            1,
             self._key,
             token,
-            nx=True,
-            ex=self._ttl_seconds,
+            self._ttl_seconds,
         )
         return token if acquired else None
 
@@ -78,6 +95,8 @@ def is_authorized_cron_request(authorization: str | None, expected_secret: str |
     if not authorization or not expected_secret:
         return False
     scheme, separator, token = authorization.partition(" ")
-    return bool(separator) and scheme.casefold() == "bearer" and hmac.compare_digest(
-        token, expected_secret
+    return (
+        bool(separator)
+        and scheme.casefold() == "bearer"
+        and hmac.compare_digest(token, expected_secret)
     )

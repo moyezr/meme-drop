@@ -72,6 +72,23 @@ def test_dodo_checkout_configuration_is_all_or_nothing() -> None:
     assert without_fulfillment.dodo_checkout_enabled is False
 
 
+def test_qstash_configuration_is_all_or_nothing_and_secret_safe() -> None:
+    with pytest.raises(ValidationError, match="must be configured together"):
+        make_settings(qstash_token="qstash-token")
+
+    configured = make_settings(
+        qstash_url="https://qstash.upstash.io",
+        qstash_token="qstash-token",
+        qstash_current_signing_key="current-signing-key",
+        qstash_next_signing_key="next-signing-key",
+    )
+
+    assert configured.qstash_configured is True
+    assert "qstash-token" not in repr(configured)
+    assert "current-signing-key" not in repr(configured)
+    assert "next-signing-key" not in repr(configured)
+
+
 def test_dodo_return_url_rejects_unsafe_values() -> None:
     for value in (
         "http://example.com/dashboard/billing",
@@ -320,6 +337,10 @@ def test_production_trends_require_a_secret_without_echoing_it() -> None:
         "api_public_origin": PRODUCTION_API_ORIGIN,
         "openrouter_api_key": "openrouter-secret",
         "tavily_api_key": "tavily-secret",
+        "qstash_url": "https://qstash.upstash.io",
+        "qstash_token": "qstash-token",
+        "qstash_current_signing_key": "current-signing-key",
+        "qstash_next_signing_key": "next-signing-key",
         "cors_origins_value": "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
         "rate_limit_store": "redis",
         "redis_url": "rediss://default:secret@redis.internal:6379/0",

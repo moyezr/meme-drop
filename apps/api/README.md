@@ -67,7 +67,7 @@ response failure leaves the previous published PostgreSQL snapshot and Redis poi
 ```sh
 npm run db:up
 npm run db:migrate
-npm run trends:refresh
+npm run trends:refresh:local
 # Direct API-workspace entry point:
 uv run --project apps/api memedrop-trend-refresh
 ```
@@ -77,20 +77,16 @@ default refresh runs the pulse, daily, and weekly profiles together; determinist
 make repeated daily and weekly work idempotently skip until its cadence advances. For isolated
 runs, repeat `--profile pulse`, `--profile daily`, or `--profile weekly` as needed.
 
-The checked-in Hobby-compatible Vercel schedule calls `GET /internal/cron/trends/refresh` once
-daily at 02:00 UTC and therefore runs only one of the pulse profile's four-hour buckets each day. It
-uses approximately 321 basic searches per 30 days before retries. This is the current preview
-cadence, not the intended launch cadence. Before production launch, upgrade the API project to
-Vercel Pro (or use an equivalent external scheduler) and change the trend schedule to
-`0 */4 * * *`; that activates every pulse bucket and uses an estimated 771 searches per 30 days.
-The PostgreSQL ledger enforces the 900-credit ceiling in either case.
+QStash schedules `POST /internal/workflows/trends/refresh` with `0 */4 * * *` in UTC. Its signed
+Workflow requests run preflight, every curated query, each embedding batch, and atomic publication
+as separate Vercel invocations. Failed invocations retry three times. Deterministic query claims
+make delivery retries idempotent, while an owner-fenced Redis lease prevents overlapping workflows.
+The cadence uses an estimated 771 searches per 30 days, and the PostgreSQL ledger enforces the
+900-credit ceiling.
 
-The scheduled endpoint must be given `CRON_SECRET`; Vercel sends it as
-`Authorization: Bearer $CRON_SECRET`, and the API
-rejects missing or mismatched values without running the job. A Redis lease prevents overlapping or
-duplicate scheduler deliveries from doing provider work; the one-hour lease bounds a stuck worker,
-and an overlap returns a successful
-`{"status":"skipped","reason":"in_progress"}` result.
+`QSTASH_URL`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, and `QSTASH_NEXT_SIGNING_KEY` are
+server-only. The Workflow SDK verifies signatures before executing a step. `CRON_SECRET` remains
+required for the separate Vercel asset-cleanup cron and the legacy operator-only trend endpoint.
 
 ## Generated-image retention
 

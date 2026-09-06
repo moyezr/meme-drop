@@ -43,8 +43,8 @@ security audits. It deliberately does not make provider calls or validate hosted
 - Trend-card and query embeddings use the embedding-specific `google/gemini-embedding-2` model
   through OpenRouter with 1,536 dimensions. Caption, suggestion, enrichment, and annotation calls
   remain on `google/gemini-3.7-flash`; MemeDrop does not call Google directly.
-- Recurring trend ingestion should be scheduled with Vercel Cron Jobs unless runtime measurements
-  show that the job cannot fit safely within the chosen Vercel plan's execution limits.
+- Recurring trend ingestion uses QStash Workflow because the complete quality-preserving refresh
+  exceeded Vercel's 60-second function limit. Vercel still runs each bounded workflow step.
 - The public agent contract is `POST /api/v1/memes/generate`. Its required request body remains as
   small as possible: an agent supplies `input`; optional controls stay under `options`.
 - New agent-facing records will use compact, application-generated IDs rather than UUIDs. IDs must
@@ -103,11 +103,13 @@ live smoke tests remain incomplete until an operator performs and verifies those
   currently invokes all profiles once daily and uses approximately 321 searches per 30 days.
 - [x] Add a protected, idempotent cron entry point suitable for Vercel Cron Jobs. It authenticates
   the scheduler, uses deterministic UTC scan buckets, and prevents overlapping executions.
-- [~] Configure the Vercel cron schedule and document its deployment variables. The current
-  Hobby-compatible schedule runs once daily; production launch requires upgrading to Vercel Pro
-  (or an equivalent scheduler), changing the trend cron to `0 */4 * * *`, and verifying the
-  expected approximately 771 searches leave approximately 129 retry credits under the 900-credit
-  ceiling.
+- [x] Replace the single-invocation Vercel trend cron with a QStash Workflow scheduled every four
+  hours. A production measurement on 2026-09-05 reached Vercel's 60-second function limit and
+  returned HTTP 504 after successful Tavily and OpenRouter calls, so QStash must coordinate bounded
+  steps rather than call the existing full-refresh endpoint once. Each query and embedding batch
+  now runs as a signed, retried step, followed by the existing atomic snapshot-publication gate.
+  The expected approximately 771 searches leave approximately 129 retry credits under the
+  900-credit ceiling.
 - [~] Add stale-snapshot monitoring: `/health` returns HTTP 503 with content-free snapshot age
   details when no usable snapshot has been published within the eight-hour window. Configure the
   production uptime monitor to alert on that non-200 response during deployment.

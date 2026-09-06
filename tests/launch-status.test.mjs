@@ -40,6 +40,34 @@ test("launch status requires a Chrome extension CORS origin", () => {
   assert.match(result.stdout, /must include the final chrome-extension:\/\//);
 });
 
+test("private-beta launch status accepts the production web origin without Chrome store metadata", () => {
+  const result = runLaunchStatus(
+    {
+      MEMEDROP_CORS_ORIGINS: "https://memedrop.moyezrabbani.dev",
+      VITE_API_BASE_URL: "https://api.memedrop.moyezrabbani.dev",
+    },
+    ["--private-beta"]
+  );
+
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /Backend CORS includes the private-beta web origin/);
+  assert.match(result.stdout, /private beta launch status: ready/);
+  assert.doesNotMatch(result.stdout, /Store listing/);
+});
+
+test("private-beta launch status blocks when the production web origin is absent from CORS", () => {
+  const result = runLaunchStatus(
+    {
+      MEMEDROP_CORS_ORIGINS: "https://another.example.org",
+      VITE_API_BASE_URL: "https://api.memedrop.moyezrabbani.dev",
+    },
+    ["--private-beta"]
+  );
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /must include the private-beta web origin/);
+});
+
 test("launch status warns when dataset promotion plan is missing", () => {
   withPromotionPlan(null, () => {
     const result = runLaunchStatus({
@@ -97,8 +125,8 @@ test("launch status blocks approved dataset templates that are not promotion-saf
   );
 });
 
-function runLaunchStatus(env) {
-  return spawnSync(process.execPath, ["scripts/launch-status.mjs"], {
+function runLaunchStatus(env, args = []) {
+  return spawnSync(process.execPath, ["scripts/launch-status.mjs", ...args], {
     cwd: repoRoot,
     env: {
       PATH: process.env.PATH || "",

@@ -25,7 +25,7 @@ def test_vercel_uses_automatic_root_entrypoint_detection() -> None:
     assert "pydantic-settings==" in requirements
 
 
-def test_vercel_crons_keep_trends_current_and_clean_generated_assets_daily() -> None:
+def test_vercel_delegates_trends_to_qstash_and_cleans_generated_assets_daily() -> None:
     project_root = Path(__file__).parents[1]
     config = json.loads((project_root / "vercel.json").read_text(encoding="utf-8"))
 
@@ -36,7 +36,9 @@ def test_vercel_crons_keep_trends_current_and_clean_generated_assets_daily() -> 
         'uv run memedrop-validate-production-env && uv run python -c "from app import app"'
     )
     assert config["regions"] == ["sin1"]
+    assert config["functions"] == {
+        "app.py": {"maxDuration": 60, "regions": ["sin1"]}
+    }
     assert config["crons"] == [
-        {"path": "/internal/cron/trends/refresh", "schedule": "0 2 * * *"},
         {"path": "/internal/cron/assets/cleanup", "schedule": "30 3 * * *"},
     ]

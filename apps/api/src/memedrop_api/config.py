@@ -140,6 +140,22 @@ class Settings(BaseSettings):
         exclude=True,
         repr=False,
     )
+    qstash_url: str | None = Field(default=None, validation_alias="QSTASH_URL")
+    qstash_token: str | None = Field(
+        default=None, validation_alias="QSTASH_TOKEN", exclude=True, repr=False
+    )
+    qstash_current_signing_key: str | None = Field(
+        default=None,
+        validation_alias="QSTASH_CURRENT_SIGNING_KEY",
+        exclude=True,
+        repr=False,
+    )
+    qstash_next_signing_key: str | None = Field(
+        default=None,
+        validation_alias="QSTASH_NEXT_SIGNING_KEY",
+        exclude=True,
+        repr=False,
+    )
     dashboard_token_secret: DashboardTokenSecret | None = Field(
         default=None,
         validation_alias="MEMEDROP_DASHBOARD_TOKEN_SECRET",
@@ -339,6 +355,17 @@ class Settings(BaseSettings):
             return None
         return self.redis_url
 
+    @property
+    def qstash_configured(self) -> bool:
+        return all(
+            (
+                self.qstash_url,
+                self.qstash_token,
+                self.qstash_current_signing_key,
+                self.qstash_next_signing_key,
+            )
+        )
+
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:
         if self.dashboard_token_secret is not None:
@@ -349,9 +376,7 @@ class Settings(BaseSettings):
                 marker in normalized_dashboard_secret
                 for marker in _DASHBOARD_SECRET_PLACEHOLDER_MARKERS
             ):
-                raise ValueError(
-                    "MEMEDROP_DASHBOARD_TOKEN_SECRET must not use a placeholder value"
-                )
+                raise ValueError("MEMEDROP_DASHBOARD_TOKEN_SECRET must not use a placeholder value")
         if self.legacy_openrouter_meme_model:
             raise ValueError(
                 "OPENROUTER_MEME_MODEL was removed; use OPENROUTER_SUGGESTION_MODEL and "
@@ -410,13 +435,27 @@ class Settings(BaseSettings):
             or dodo_return_url.fragment
         ):
             raise ValueError("DODO_PAYMENTS_RETURN_URL must be an allowed web URL")
-        if bool(self.dodo_payments_api_key) != bool(
-            self.dodo_payments_credit_pack_100_product_id
-        ):
+        if bool(self.dodo_payments_api_key) != bool(self.dodo_payments_credit_pack_100_product_id):
             raise ValueError(
                 "DODO_PAYMENTS_API_KEY and DODO_PAYMENTS_CREDIT_PACK_100_PRODUCT_ID "
                 "must be configured together"
             )
+        qstash_values = (
+            self.qstash_url,
+            self.qstash_token,
+            self.qstash_current_signing_key,
+            self.qstash_next_signing_key,
+        )
+        if any(qstash_values) and not all(qstash_values):
+            raise ValueError(
+                "QSTASH_URL, QSTASH_TOKEN, QSTASH_CURRENT_SIGNING_KEY, and "
+                "QSTASH_NEXT_SIGNING_KEY must be configured together"
+            )
+        if self.qstash_url:
+            qstash_endpoint = urlparse(self.qstash_url)
+            allowed_qstash_schemes = {"https"} if self.is_production else {"http", "https"}
+            if qstash_endpoint.scheme not in allowed_qstash_schemes or not qstash_endpoint.hostname:
+                raise ValueError("QSTASH_URL must be a valid QStash endpoint URL")
         if (
             self.generated_asset_cleanup_claim_timeout_seconds
             < self.generated_asset_cleanup_lock_ttl_seconds
@@ -446,7 +485,15 @@ class Settings(BaseSettings):
                 raise ValueError("MEMEDROP_DASHBOARD_TOKEN_SECRET is required in production")
             if self.trends_enabled:
                 missing_trend_settings = [
-                    name for name, value in (("TAVILY_API_KEY", self.tavily_api_key),) if not value
+                    name
+                    for name, value in (
+                        ("TAVILY_API_KEY", self.tavily_api_key),
+                        ("QSTASH_URL", self.qstash_url),
+                        ("QSTASH_TOKEN", self.qstash_token),
+                        ("QSTASH_CURRENT_SIGNING_KEY", self.qstash_current_signing_key),
+                        ("QSTASH_NEXT_SIGNING_KEY", self.qstash_next_signing_key),
+                    )
+                    if not value
                 ]
                 if missing_trend_settings:
                     raise ValueError(

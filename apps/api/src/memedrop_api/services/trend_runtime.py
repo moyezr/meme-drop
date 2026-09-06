@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from urllib.parse import urlparse
+from uuid import UUID
 
 from memedrop_api.config import Settings
 from memedrop_api.db import Database
@@ -16,6 +17,7 @@ from memedrop_api.services.tavily_trends import (
     TavilyTrendCollector,
     TavilyUsage,
     TrendCollectionReport,
+    TrendFailureCategory,
     TrendSearchQuery,
     TrendSearchTopic,
 )
@@ -57,6 +59,7 @@ _MAX_INDEX_TERMS = 8
 _MAX_INDEX_ENTITIES = 4
 _MAX_INDEX_CATEGORIES = 6
 _MAX_INDEX_MECHANICS = 4
+_TREND_PUBLISH_REDIS_TIMEOUT_SECONDS = 5.0
 
 Sleep = Callable[[float], Awaitable[None]]
 
@@ -87,6 +90,24 @@ class ProfileRefreshReport:
     scan_id: str
     collection: TrendCollectionReport
 
+    def as_json(self) -> dict[str, Any]:
+        return {
+            "profile": self.profile,
+            "scan_id": self.scan_id,
+            **asdict(self.collection),
+        }
+
+    @classmethod
+    def from_json(cls, value: dict[str, Any]) -> ProfileRefreshReport:
+        collection_fields = {
+            key: item for key, item in value.items() if key not in {"profile", "scan_id"}
+        }
+        return cls(
+            profile=str(value["profile"]),
+            scan_id=str(value["scan_id"]),
+            collection=TrendCollectionReport(**collection_fields),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class TrendRefreshReport:
@@ -98,14 +119,7 @@ class TrendRefreshReport:
 
     def as_json(self) -> dict[str, Any]:
         return {
-            "profiles": [
-                {
-                    "profile": item.profile,
-                    "scan_id": item.scan_id,
-                    **asdict(item.collection),
-                }
-                for item in self.profiles
-            ],
+            "profiles": [item.as_json() for item in self.profiles],
             "active_cards": self.active_cards,
             "snapshot_version": self.snapshot_version,
             "index_version": self.index_version,
@@ -272,9 +286,7 @@ def serving_trend_cards(cards: Sequence[TrendCard]) -> tuple[TrendCard, ...]:
     return tuple(
         card
         for card in cards
-        if card.source_count >= 2
-        and card.observation_count >= 2
-        and card.confidence >= 0.55
+        if card.source_count >= 2 and card.observation_count >= 2 and card.confidence >= 0.55
     )
 
 
@@ -348,8 +360,10 @@ async def refresh_trends(
             cooldown_seconds=settings.trend_collection_cooldown_seconds,
         ),
     )
-    index = RedisTrendIndex(settings.redis_url or "")
-    embedder: OpenRouterTrendEmbedder | None = None
+    index = RedisTrendIndex(
+        settings.redis_url or "",
+        timeout_seconds=_TREND_PUBLISH_REDIS_TIMEOUT_SECONDS,
+    )
     reports: list[ProfileRefreshReport] = []
     try:
         try:
@@ -379,54 +393,11 @@ async def refresh_trends(
                 f"published snapshot ({category_text})"
             )
 
-        active_cards = serving_trend_cards(
-            await repository.list_active_cards(as_of=observed_at, limit=500)
-        )
-        embedding_fingerprints = {
-            card.id: trend_card_embedding_fingerprint(card) for card in active_cards
-        }
-        stale_embedding_ids = await repository.list_stale_embedding_ids(
-            embedding_fingerprints,
-            model=settings.openrouter_embedding_model,
-        )
-        cards_to_embed = [
-            card for card in active_cards if card.id in stale_embedding_ids
-        ]
-        if cards_to_embed:
-            embedder = OpenRouterTrendEmbedder(
-                api_key=settings.openrouter_api_key or "",
-                model=settings.openrouter_embedding_model,
-                timeout_seconds=settings.trend_embedding_timeout_seconds,
-                batch_size=settings.trend_embedding_batch_size,
-                site_url=settings.openrouter_site_url,
-                app_name=settings.openrouter_app_name,
-            )
-            try:
-                vectors = await embedder.embed_cards(cards_to_embed)
-                stored = await repository.store_card_embeddings(
-                    [
-                        (
-                            card.id,
-                            vector,
-                            embedding_fingerprints[card.id],
-                            card.version,
-                        )
-                        for card, vector in zip(cards_to_embed, vectors, strict=True)
-                    ],
-                    model=settings.openrouter_embedding_model,
-                )
-                if stored != len(cards_to_embed):
-                    raise TrendEmbeddingError("trend_embedding_persistence_conflict")
-            except TrendEmbeddingError as error:
-                raise TrendRefreshFailed(
-                    "trend card embedding failed; preserving the last published snapshot "
-                    f"({error.category})"
-                ) from None
-        snapshot = await publish_serving_snapshot(
+        snapshot, active_cards = await _embed_and_publish_trends(
+            settings,
             repository,
             index,
-            active_cards,
-            published_at=observed_at,
+            observed_at=observed_at,
         )
         index_version = f"snapshot-v{snapshot.version}"
         return TrendRefreshReport(
@@ -439,10 +410,340 @@ async def refresh_trends(
     finally:
         await collector.close()
         await enricher.close()
-        if embedder is not None:
-            await embedder.close()
         await index.close()
         await database.close()
+
+
+async def preflight_trend_refresh(settings: Settings) -> TavilyUsage:
+    """Validate provider access without consuming a search credit."""
+
+    validate_trend_refresh_settings(settings)
+    database = Database(settings.database_url)
+    store = SqlAlchemyTrendCollectionStore(database)
+    enricher = OpenRouterTrendEnricher(
+        api_key=settings.openrouter_api_key or "",
+        model=settings.openrouter_trend_model,
+        timeout_seconds=settings.trend_enrichment_timeout_seconds,
+        site_url=settings.openrouter_site_url,
+        app_name=settings.openrouter_app_name,
+    )
+    collector = TavilyTrendCollector(
+        api_key=settings.tavily_api_key or "",
+        store=store,
+        enricher=enricher,
+        config=TavilyCollectorConfig(
+            monthly_credit_budget=settings.trend_monthly_credit_budget,
+            max_queries_per_scan=1,
+            request_timeout_seconds=settings.trend_collection_timeout_seconds,
+            cooldown_seconds=0,
+        ),
+    )
+    try:
+        try:
+            return await collector.preflight()
+        except TavilyCollectionError as error:
+            raise TrendRefreshConfigurationError(
+                f"Tavily usage preflight failed ({error.category})"
+            ) from None
+    finally:
+        await collector.close()
+        await enricher.close()
+        await database.close()
+
+
+async def collect_trend_query(
+    settings: Settings,
+    *,
+    profile_name: str,
+    query_key: str,
+    observed_at: datetime,
+) -> ProfileRefreshReport:
+    """Collect and enrich one configured query as one bounded workflow step."""
+
+    validate_trend_refresh_settings(settings)
+    profile = resolve_trend_profiles((profile_name,))[0]
+    query = next((item for item in profile.queries if item.key == query_key), None)
+    if query is None:
+        raise TrendRefreshConfigurationError(
+            f"unknown trend query for profile {profile_name}: {query_key}"
+        )
+    database = Database(settings.database_url)
+    store = SqlAlchemyTrendCollectionStore(database)
+    enricher = OpenRouterTrendEnricher(
+        api_key=settings.openrouter_api_key or "",
+        model=settings.openrouter_trend_model,
+        timeout_seconds=settings.trend_enrichment_timeout_seconds,
+        site_url=settings.openrouter_site_url,
+        app_name=settings.openrouter_app_name,
+    )
+    collector = TavilyTrendCollector(
+        api_key=settings.tavily_api_key or "",
+        store=store,
+        enricher=enricher,
+        config=TavilyCollectorConfig(
+            monthly_credit_budget=settings.trend_monthly_credit_budget,
+            max_queries_per_scan=1,
+            request_timeout_seconds=settings.trend_collection_timeout_seconds,
+            cooldown_seconds=0,
+        ),
+    )
+    try:
+        collection = await collector.collect(
+            scan_id=trend_scan_id(profile, at=observed_at),
+            queries=(query,),
+        )
+        return ProfileRefreshReport(
+            profile=profile.name,
+            scan_id=trend_scan_id(profile, at=observed_at),
+            collection=collection,
+        )
+    finally:
+        await collector.close()
+        await enricher.close()
+        await database.close()
+
+
+async def list_stale_trend_embedding_ids(
+    settings: Settings,
+    *,
+    observed_at: datetime,
+) -> tuple[str, ...]:
+    """Plan the bounded embedding steps needed before publication."""
+
+    validate_trend_refresh_settings(settings)
+    database = Database(settings.database_url)
+    repository = SqlAlchemyTrendRepository(database)
+    try:
+        active_cards = serving_trend_cards(
+            await repository.list_active_cards(as_of=observed_at, limit=500)
+        )
+        embedding_fingerprints = {
+            card.id: trend_card_embedding_fingerprint(card) for card in active_cards
+        }
+        stale_ids = await repository.list_stale_embedding_ids(
+            embedding_fingerprints,
+            model=settings.openrouter_embedding_model,
+        )
+        return tuple(sorted(str(card_id) for card_id in stale_ids))
+    finally:
+        await database.close()
+
+
+async def embed_trend_card_batch(
+    settings: Settings,
+    *,
+    card_ids: Sequence[str],
+    observed_at: datetime,
+) -> int:
+    """Embed one configured-size card batch in a single workflow invocation."""
+
+    validate_trend_refresh_settings(settings)
+    if not card_ids or len(card_ids) > settings.trend_embedding_batch_size:
+        raise ValueError("trend embedding batch must contain between 1 and the configured limit")
+    parsed_ids = tuple(UUID(value) for value in card_ids)
+    if len(set(parsed_ids)) != len(parsed_ids):
+        raise ValueError("trend embedding batch card IDs must be unique")
+
+    database = Database(settings.database_url)
+    repository = SqlAlchemyTrendRepository(database)
+    embedder = OpenRouterTrendEmbedder(
+        api_key=settings.openrouter_api_key or "",
+        model=settings.openrouter_embedding_model,
+        timeout_seconds=settings.trend_embedding_timeout_seconds,
+        batch_size=settings.trend_embedding_batch_size,
+        site_url=settings.openrouter_site_url,
+        app_name=settings.openrouter_app_name,
+    )
+    try:
+        active_cards = serving_trend_cards(
+            await repository.list_active_cards(as_of=observed_at, limit=500)
+        )
+        cards_by_id = {card.id: card for card in active_cards}
+        try:
+            cards = tuple(cards_by_id[card_id] for card_id in parsed_ids)
+        except KeyError:
+            raise TrendRefreshFailed(
+                "trend embedding plan changed before publication; preserving the last snapshot"
+            ) from None
+        fingerprints = {card.id: trend_card_embedding_fingerprint(card) for card in cards}
+        try:
+            vectors = await embedder.embed_cards(cards)
+            stored = await repository.store_card_embeddings(
+                [
+                    (card.id, vector, fingerprints[card.id], card.version)
+                    for card, vector in zip(cards, vectors, strict=True)
+                ],
+                model=settings.openrouter_embedding_model,
+            )
+            if stored != len(cards):
+                raise TrendEmbeddingError("trend_embedding_persistence_conflict")
+        except TrendEmbeddingError as error:
+            raise TrendRefreshFailed(
+                "trend card embedding failed; preserving the last published snapshot "
+                f"({error.category})"
+            ) from None
+        return stored
+    finally:
+        await embedder.close()
+        await database.close()
+
+
+async def publish_trend_refresh(
+    settings: Settings,
+    *,
+    reports: Sequence[ProfileRefreshReport],
+    observed_at: datetime,
+    tavily_usage: TavilyUsage,
+) -> TrendRefreshReport:
+    """Atomically publish after collection and every planned embedding has completed."""
+
+    validate_trend_refresh_settings(settings)
+    if _all_claimed_queries_failed(reports):
+        categories = _failure_categories(reports)
+        category_text = ", ".join(categories) or "unknown"
+        raise TrendRefreshFailed(
+            "trend refresh had no successful provider queries; preserving the last "
+            f"published snapshot ({category_text})"
+        )
+    database = Database(settings.database_url)
+    repository = SqlAlchemyTrendRepository(database)
+    index = RedisTrendIndex(
+        settings.redis_url or "",
+        timeout_seconds=_TREND_PUBLISH_REDIS_TIMEOUT_SECONDS,
+    )
+    try:
+        active_cards = serving_trend_cards(
+            await repository.list_active_cards(as_of=observed_at, limit=500)
+        )
+        embedding_fingerprints = {
+            card.id: trend_card_embedding_fingerprint(card) for card in active_cards
+        }
+        stale_ids = await repository.list_stale_embedding_ids(
+            embedding_fingerprints,
+            model=settings.openrouter_embedding_model,
+        )
+        if stale_ids:
+            raise TrendRefreshFailed(
+                "trend embeddings are incomplete; preserving the last published snapshot"
+            )
+        snapshot = await publish_serving_snapshot(
+            repository,
+            index,
+            active_cards,
+            published_at=observed_at,
+        )
+        return TrendRefreshReport(
+            profiles=_aggregate_profile_reports(reports),
+            active_cards=len(active_cards),
+            snapshot_version=snapshot.version,
+            index_version=f"snapshot-v{snapshot.version}",
+            tavily_usage=tavily_usage,
+        )
+    finally:
+        await index.close()
+        await database.close()
+
+
+def _aggregate_profile_reports(
+    reports: Sequence[ProfileRefreshReport],
+) -> tuple[ProfileRefreshReport, ...]:
+    grouped: dict[str, list[ProfileRefreshReport]] = {}
+    for report in reports:
+        grouped.setdefault(report.profile, []).append(report)
+
+    aggregated: list[ProfileRefreshReport] = []
+    for profile in TREND_QUERY_PROFILES:
+        profile_reports = grouped.get(profile.name, [])
+        if not profile_reports:
+            continue
+        scan_ids = {report.scan_id for report in profile_reports}
+        if len(scan_ids) != 1:
+            raise TrendRefreshFailed("trend query reports crossed scan windows")
+        failures: dict[TrendFailureCategory, int] = {}
+        for report in profile_reports:
+            for category, count in report.collection.failure_categories.items():
+                failures[category] = failures.get(category, 0) + count
+        collections = tuple(report.collection for report in profile_reports)
+        aggregated.append(
+            ProfileRefreshReport(
+                profile=profile.name,
+                scan_id=scan_ids.pop(),
+                collection=TrendCollectionReport(
+                    requested_queries=sum(item.requested_queries for item in collections),
+                    claimed_queries=sum(item.claimed_queries for item in collections),
+                    skipped_queries=sum(item.skipped_queries for item in collections),
+                    completed_queries=sum(item.completed_queries for item in collections),
+                    failed_queries=sum(item.failed_queries for item in collections),
+                    local_credit_reservations=sum(
+                        item.local_credit_reservations for item in collections
+                    ),
+                    provider_search_credits=sum(
+                        item.provider_search_credits for item in collections
+                    ),
+                    evidence_discovered=sum(item.evidence_discovered for item in collections),
+                    cards_upserted=sum(item.cards_upserted for item in collections),
+                    observations_stored=sum(item.observations_stored for item in collections),
+                    budget_exhausted=any(item.budget_exhausted for item in collections),
+                    failure_categories=dict(sorted(failures.items())),
+                ),
+            )
+        )
+    return tuple(aggregated)
+
+
+async def _embed_and_publish_trends(
+    settings: Settings,
+    repository: SqlAlchemyTrendRepository,
+    index: RedisTrendIndex,
+    *,
+    observed_at: datetime,
+) -> tuple[TrendSnapshot, tuple[TrendCard, ...]]:
+    active_cards = serving_trend_cards(
+        await repository.list_active_cards(as_of=observed_at, limit=500)
+    )
+    embedding_fingerprints = {
+        card.id: trend_card_embedding_fingerprint(card) for card in active_cards
+    }
+    stale_embedding_ids = await repository.list_stale_embedding_ids(
+        embedding_fingerprints,
+        model=settings.openrouter_embedding_model,
+    )
+    cards_to_embed = [card for card in active_cards if card.id in stale_embedding_ids]
+    embedder: OpenRouterTrendEmbedder | None = None
+    if cards_to_embed:
+        embedder = OpenRouterTrendEmbedder(
+            api_key=settings.openrouter_api_key or "",
+            model=settings.openrouter_embedding_model,
+            timeout_seconds=settings.trend_embedding_timeout_seconds,
+            batch_size=settings.trend_embedding_batch_size,
+            site_url=settings.openrouter_site_url,
+            app_name=settings.openrouter_app_name,
+        )
+        try:
+            vectors = await embedder.embed_cards(cards_to_embed)
+            stored = await repository.store_card_embeddings(
+                [
+                    (card.id, vector, embedding_fingerprints[card.id], card.version)
+                    for card, vector in zip(cards_to_embed, vectors, strict=True)
+                ],
+                model=settings.openrouter_embedding_model,
+            )
+            if stored != len(cards_to_embed):
+                raise TrendEmbeddingError("trend_embedding_persistence_conflict")
+        except TrendEmbeddingError as error:
+            raise TrendRefreshFailed(
+                "trend card embedding failed; preserving the last published snapshot "
+                f"({error.category})"
+            ) from None
+        finally:
+            await embedder.close()
+    snapshot = await publish_serving_snapshot(
+        repository,
+        index,
+        active_cards,
+        published_at=observed_at,
+    )
+    return snapshot, active_cards
 
 
 def _all_claimed_queries_failed(reports: Sequence[ProfileRefreshReport]) -> bool:

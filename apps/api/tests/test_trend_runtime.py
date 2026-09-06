@@ -273,7 +273,8 @@ async def test_refresh_keeps_the_last_snapshot_when_every_claimed_query_fails(
             calls.append("enricher-close")
 
     class FakeIndex:
-        def __init__(self, redis_url: str) -> None:
+        def __init__(self, redis_url: str, **values: object) -> None:
+            assert values == {"timeout_seconds": 5.0}
             calls.append("index")
 
         async def close(self) -> None:
@@ -385,9 +386,7 @@ async def test_embedding_failure_preserves_the_published_snapshot(
         ) -> set[object]:
             return {card.id}
 
-        async def store_card_embeddings(
-            self, embeddings: object, *, model: str
-        ) -> int:
+        async def store_card_embeddings(self, embeddings: object, *, model: str) -> int:
             raise AssertionError("failed provider response must not persist an embedding")
 
         async def stage_snapshot(self, cards: object, *, created_at: datetime) -> TrendSnapshot:
@@ -404,7 +403,8 @@ async def test_embedding_failure_preserves_the_published_snapshot(
             calls.append("embedder-close")
 
     class FakeIndex:
-        def __init__(self, redis_url: str) -> None:
+        def __init__(self, redis_url: str, **values: object) -> None:
+            assert values == {"timeout_seconds": 5.0}
             calls.append("index")
 
         async def close(self) -> None:
