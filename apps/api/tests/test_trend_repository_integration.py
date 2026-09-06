@@ -217,6 +217,22 @@ async def test_trend_repository_is_idempotent_and_snapshots_are_repeatable(
         assert replayed_snapshot == first_snapshot
         assert await repository.get_snapshot(first_snapshot.version) == first_snapshot
         assert await repository.get_snapshot() == first_snapshot
+
+        later_publication = NOW + timedelta(hours=1)
+        refreshed_snapshot = await repository.publish_snapshot(
+            [stored],
+            created_at=later_publication,
+        )
+        assert refreshed_snapshot.version == first_snapshot.version
+        assert refreshed_snapshot.created_at == first_snapshot.created_at
+        assert refreshed_snapshot.published_at == later_publication
+        assert await repository.get_snapshot() == refreshed_snapshot
+
+        out_of_order_replay = await repository.mark_snapshot_published(
+            first_snapshot.version,
+            published_at=NOW + timedelta(minutes=30),
+        )
+        assert out_of_order_replay == refreshed_snapshot
     finally:
         async with database.session() as session, session.begin():
             await session.execute(delete(TrendSnapshotRecord))

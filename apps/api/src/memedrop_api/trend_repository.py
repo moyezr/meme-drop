@@ -485,7 +485,13 @@ class SqlAlchemyTrendRepository:
         *,
         published_at: datetime,
     ) -> TrendSnapshot:
-        """Publish a staged snapshot after its external serving pointer has switched."""
+        """Record the latest successful publication after the serving pointer switches.
+
+        Snapshot content is immutable and content-identical refreshes reuse its version. The
+        publication timestamp is therefore a last-successful-publish marker rather than only the
+        first time that content appeared. Moving it forward keeps health aligned with completed
+        refreshes while refusing an out-of-order retry that would move freshness backward.
+        """
 
         if version < 1:
             raise ValueError("version must be positive")
@@ -498,9 +504,9 @@ class SqlAlchemyTrendRepository:
             )
             if row is None:
                 raise ValueError("trend snapshot does not exist")
-            if row.published_at is None:
-                if published_at < row.created_at:
-                    raise ValueError("published_at must not precede snapshot creation")
+            if published_at < row.created_at:
+                raise ValueError("published_at must not precede snapshot creation")
+            if row.published_at is None or published_at > row.published_at:
                 row.published_at = published_at
                 await session.flush()
             return _snapshot_from_record(row)
@@ -510,7 +516,10 @@ class SqlAlchemyTrendRepository:
             TrendSnapshotRecord.published_at.is_not(None)
         )
         if version is None:
-            statement = statement.order_by(TrendSnapshotRecord.version.desc()).limit(1)
+            statement = statement.order_by(
+                TrendSnapshotRecord.published_at.desc(),
+                TrendSnapshotRecord.version.desc(),
+            ).limit(1)
         else:
             if version < 1:
                 raise ValueError("version must be positive")

@@ -37,7 +37,7 @@ class TrendSnapshotStatus:
 
 
 class TrendSnapshotHealthCheck:
-    """Read the latest immutable snapshot without touching Tavily or Redis."""
+    """Read the most recently published immutable snapshot without touching Tavily or Redis."""
 
     def __init__(self, database: Database, *, max_age_seconds: int) -> None:
         self._repository = SqlAlchemyTrendRepository(database)
