@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-08-30
+Last updated: 2026-09-06
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and decisions here as implementation progresses.
@@ -16,16 +16,10 @@ to a task in this plan.
 
 ## Current delivery boundary
 
-The current engineering goal is a deployment-ready release candidate, not a live deployment.
-Complete every repository-owned prerequisite: application behavior, migrations, environment
-contracts, release gates, tests, documentation, operational endpoints, smoke commands, and
-deployment/runbook guidance.
-
-Do not provision or mutate hosted infrastructure in this phase. Creating managed databases or
-Redis instances, creating or changing buckets, configuring domains or hosted secrets, upgrading a
-Vercel plan, installing uptime alerts, applying production migrations, deploying a release, and
-opening public access are follow-up deployment actions. Keep each one visible as an external launch
-step so we can review provider choices, costs, risks, and rollback procedures before execution.
+The API/web private-beta infrastructure and release are live. Production deployment, monitoring,
+restore and rollback drills, and a successful external-agent generation are verified. Inviting the
+first bounded tester group is a separate operator step. Chrome Web Store submission, paid checkout,
+and public self-service remain later release tracks.
 
 Repository readiness is enforced by `npm run quality:deployment-readiness`. The gate accepts only
 loopback PostgreSQL and Redis test services and a disposable test database name; clears provider and
@@ -110,9 +104,10 @@ live smoke tests remain incomplete until an operator performs and verifies those
   now runs as a signed, retried step, followed by the existing atomic snapshot-publication gate.
   The expected approximately 771 searches leave approximately 129 retry credits under the
   900-credit ceiling.
-- [~] Add stale-snapshot monitoring: `/health` returns HTTP 503 with content-free snapshot age
-  details when no usable snapshot has been published within the eight-hour window. Configure the
-  production uptime monitor to alert on that non-200 response during deployment.
+- [x] Add stale-snapshot monitoring: `/health` returns HTTP 503 with content-free snapshot age
+  details when no usable snapshot has been published within the eight-hour window. cron-job.org job
+  `8391201` checks the production endpoint every ten minutes and alerts after two failures and on
+  recovery.
 - [x] Embed active serving trend cards in bounded OpenRouter batches before snapshot publication.
   Semantic or configured-model changes invalidate stored vectors using durable model-and-document
   fingerprint metadata, unchanged cards skip recomputation, and embedding failures preserve the
@@ -120,9 +115,10 @@ live smoke tests remain incomplete until an operator performs and verifies those
 - [x] Add bounded hybrid suggestion-time retrieval. Redis lexical matches and pgvector semantic
   candidates are reranked with lifecycle and vitality signals; semantic queries are restricted to
   exact card versions in the latest published snapshot and fail open on provider or database error.
-- [ ] Run a real refresh and verify the full path: Tavily discovery, OpenRouter enrichment,
+- [x] Run a real refresh and verify the full path: Tavily discovery, OpenRouter enrichment,
   PostgreSQL cards and observations, embeddings, immutable snapshot, Redis publication, and bounded
-  prompt retrieval.
+  prompt retrieval. The signed production QStash workflow completed and published snapshot v14;
+  `/health` reports it as fresh with nine serving cards.
 
 Done when: a scheduled refresh can be replayed safely, provider failure leaves the last good index
 available, operators receive an actionable failure category, and a live suggestion can retrieve a
@@ -258,12 +254,13 @@ access.
   OpenRouter outcome, render/storage outcome, credit outcome, and trend snapshot age.
 - [ ] Track p50/p95/p99 end-to-end latency and provider latency separately.
 - [ ] Track estimated and reconciled cost per successful generation and per customer.
-- [ ] Add dashboards and alerts for elevated errors, provider timeouts, stale trends, Redis or
+- [~] Add dashboards and alerts for elevated errors, provider timeouts, stale trends, Redis or
   PostgreSQL failures, credit-transaction anomalies, storage cleanup lag, and unusual user usage.
-- [ ] Confirm logs never contain raw source posts, generated captions, API secrets, signed URLs, or
+  Private-beta health and cleanup alerts are active; broader public-launch metrics remain.
+- [x] Confirm logs never contain raw source posts, generated captions, API secrets, signed URLs, or
   request bodies.
 - [ ] Add per-user and global circuit breakers, concurrency limits, and abuse monitoring.
-- [ ] Define incident response, key rotation, provider outage, rollback, and credit-correction
+- [x] Define incident response, key rotation, provider outage, rollback, and credit-correction
   procedures.
 
 Done when: an operator can explain a failed or slow request using request ID and categorical
@@ -271,17 +268,17 @@ telemetry without reading user content, and automated limits bound financial exp
 
 ### P1 — Complete production deployment
 
-- [ ] Provision managed PostgreSQL with pgvector, managed Redis, OpenRouter credentials, Tavily
+- [x] Provision managed PostgreSQL with pgvector, managed Redis, OpenRouter credentials, Tavily
   credentials, and the manually created `meme-drop-prod` bucket.
-- [ ] Configure the frontend origin as `https://memedrop.moyezrabbani.dev`.
-- [ ] Configure the API origin as `https://api.memedrop.moyezrabbani.dev`.
-- [ ] Configure OpenRouter attribution and all returned media URLs for the API origin.
-- [ ] Apply migrations using a direct or session-pooler connection and use the transaction pooler
+- [x] Configure the frontend origin as `https://memedrop.moyezrabbani.dev`.
+- [x] Configure the API origin as `https://api.memedrop.moyezrabbani.dev`.
+- [x] Configure OpenRouter attribution and all returned media URLs for the API origin.
+- [x] Apply migrations using a direct or session-pooler connection and use the transaction pooler
   for runtime traffic where appropriate.
-- [ ] Seed verified templates and verify that production writes only to `meme-drop-prod`.
-- [ ] Run production environment, storage, migration, readiness, security, release, and end-to-end
+- [x] Seed all 49 verified templates and verify that production writes only to `meme-drop-prod`.
+- [x] Run production environment, storage, migration, readiness, security, release, and end-to-end
   smoke gates from the exact release commit.
-- [ ] Establish backups, restore testing, rollback procedure, and credential rotation.
+- [x] Establish backups, restore testing, rollback procedure, and credential rotation.
 - [ ] Start with a bounded private beta before enabling public self-service signup.
 
 Done when: both origins serve the intended applications over HTTPS, migrations and storage are
@@ -373,6 +370,7 @@ npm run storage:check
 npm run storage:latency
 npm run release:candidate
 npm run launch:status
+npm run launch:status -- --private-beta
 ```
 
 Provider-backed smoke tests must use bounded test accounts and must not print or persist secrets,
@@ -380,6 +378,9 @@ raw user text, or generated captions.
 
 ## Change log
 
+- 2026-09-06: Deployed API commit `646ec52`, verified QStash refresh, production generation and
+  cleanup, monitoring, log safety, key rotation, backup restore, and Vercel rollback. The API/web
+  private-beta gate is ready; tester invitations remain separate.
 - 2026-08-30: Confirmed the canonical API origin and privacy/support email, and deferred Chrome Web
   Store submission without blocking an API/web private beta.
 - 2026-08-30: Added the authenticated dashboard bridge, remaining-credit overview, idempotent
