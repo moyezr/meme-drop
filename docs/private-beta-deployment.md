@@ -358,19 +358,25 @@ Before Dodo Payments live review:
 
 Reference: https://docs.dodopayments.com/miscellaneous/verification-process#preparing-your-website
 
-For test-mode integration, use a test API key with `https://test.dodopayments.com`; test and live
+For isolated test or preview integration, use a test API key with
+`https://test.dodopayments.com`; test and live
 products and credentials are separate. The initial test catalog uses a one-time 100-credit pack.
 Store its `pdt_...` identifier in `DODO_PAYMENTS_CREDIT_PACK_100_PRODUCT_ID`. Do not treat the
 checkout return URL as proof of payment: credit fulfillment must wait for a signature-verified,
 idempotently processed `payment.succeeded` webhook. Configure the resulting webhook verification
-key as `DODO_PAYMENTS_WEBHOOK_KEY` before enabling checkout. The production API project must also
-receive the test API key, test product ID, `DODO_PAYMENTS_ENVIRONMENT=test_mode`, and the canonical
-dashboard return URL. Re-run the API database migrations after deploying checkout schema changes.
+key as `DODO_PAYMENTS_WEBHOOK_KEY` before enabling checkout. Keep all Dodo variables absent from the
+production API during the operator-granted private beta; add them there only for a deliberate
+payment test or later paid launch. Re-run the API database migrations after deploying checkout
+schema changes.
 
 ## 8. Deploy and verify the API
 
 Deploy the API project from the release commit after its production environment passes validation.
-Then verify:
+For the API/web private beta, verify `/live`, `/health`, the authenticated dashboard overview and key
+lifecycle, and the documented black-box agent flow. The smoke agent checks generation,
+idempotency, one-credit settlement, and authenticated media without importing backend internals.
+
+For the later extension track, also verify:
 
 ```sh
 curl -fsS https://<production-api-origin>/live
@@ -382,7 +388,7 @@ curl -X POST https://<production-api-origin>/api/v1/suggest \
   -d '{"tweet_text":"We skipped every test and deployed Friday. What could go wrong?","limit":5}'
 ```
 
-Also confirm meme media loads through `/memes/...`, `Server-Timing` is present, model timeout uses
+Confirm extension meme media loads through `/memes/...`, `Server-Timing` is present, model timeout uses
 the deterministic fallback, library save/delete works, usage events are written, and logs contain no
 raw post text, captions, secrets, signed URLs, or request bodies.
 

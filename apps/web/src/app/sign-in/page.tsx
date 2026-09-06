@@ -32,7 +32,7 @@ export default async function SignInPage() {
         </a>
         <h1 id="sign-in-title">Developer sign in</h1>
         <p>
-          Manage API keys, credits, and generation activity from one place.
+          Manage your API keys and current credit balance from one place.
         </p>
 
         {enabledAuthProviders.length > 0 ? (

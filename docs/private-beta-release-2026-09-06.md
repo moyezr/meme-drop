@@ -42,3 +42,16 @@ private-beta group. Tester invitations are intentionally outside this release.
 
 Use [`private-beta-operations.md`](private-beta-operations.md) for daily review, backup and restore,
 incident response, provider outages, credential rotation, rollback, and credit correction.
+
+## Follow-up verification — 2026-09-07
+
+- Application behavior commit `4773ca1` advances the publication time when a successful refresh
+  reuses content-identical immutable snapshot data and selects the current SQL fallback by the most
+  recent publication. This prevents healthy QStash runs from aging into a false stale alert.
+- All 499 API tests passed, including the full 26-test PostgreSQL/Redis integration selection;
+  lint, type checking, and the built API process smoke also passed.
+- A disposable Google dashboard assertion returned the production overview, issued and replayed one
+  credential idempotently, revoked it, rejected an expired assertion, and left no user or key rows.
+- Stale Dodo test variables were removed from the production API and the same source was redeployed.
+  Checkout is disabled for the private beta, matching the public terms and operator-granted credit
+  model.

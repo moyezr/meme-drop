@@ -30,8 +30,8 @@ remains the operator-facing packaging and final production-configuration gate; `
 tracks hosted, legal, domain, and store-launch inputs. CI runs the deterministic constituent gates
 in parallel jobs and provides a fresh empty pgvector database for the integration job.
 
-`quality:security` permits only the exact, time-limited dependency risks described in `QUALITY.md`;
-review them again before their 2026-09-01 expiry.
+`quality:security` has no standing exceptions. Any npm or Python advisory fails the gate and must be
+resolved before release.
 
 ## 2. Supabase
 
@@ -101,13 +101,14 @@ API project:
 - Python: 3.13 from `.python-version`
 - Environment: load the ignored `.env.prod` values into Vercel's production secret store
 
-At minimum the API needs the managed PostgreSQL and Redis URLs, OpenRouter key/model settings, final
-Chrome extension CORS origin, Redis rate limiting, required install IDs, compact/redacted logs, and
-the production Supabase S3 endpoint/region/key pair with
+At minimum the API needs the managed PostgreSQL and Redis URLs, OpenRouter key/model settings, the
+production web CORS origin, Redis rate limiting, required install IDs, compact/redacted logs, and the
+production Supabase S3 endpoint/region/key pair with
 `S3_BUCKET_NAME=meme-drop-prod`. It also needs the same
 `MEMEDROP_DASHBOARD_TOKEN_SECRET` configured in the web project. `.env.example` is for local
 development; keep the production source in the ignored `.env.prod` operator file and synchronize
-it one-way into deployment secret stores.
+it one-way into deployment secret stores. Add the final Chrome extension origin only for the later
+Web Store release.
 
 Before deploying with those values loaded:
 
@@ -115,10 +116,12 @@ Before deploying with those values loaded:
 npm run quality:production-env
 ```
 
-After deploy, verify `GET /live`, `GET /health`, one suggestion request, media loading through
-`/memes/...`, a library save/delete, account export/delete isolation, and request IDs. Check Vercel
-function duration and memory during model timeouts and image operations. The landing project and API
-project do not share runtime code or environment merely because they come from one repository.
+After an API/web private-beta deploy, verify `GET /live`, `GET /health`, the black-box agent flow,
+authenticated media, idempotent replay, one-credit settlement, dashboard overview, API-key
+issue/revoke, and request IDs. Check Vercel function duration and memory during model timeouts and
+image operations. The landing project and API project do not share runtime code or environment
+merely because they come from one repository. Legacy suggestion, library, usage, and browser-account
+checks belong to the extension release below.
 
 ## 4. Extension release
 
@@ -158,7 +161,7 @@ The strict candidate checks production API configuration, store metadata/assets,
 CORS, privacy placeholders, and the packaged zip. Bump the extension package and manifest versions
 together before a new submission.
 
-## 5. Manual production QA
+## 5. Extension production QA
 
 - Install the packaged extension, not a development build.
 - On `x.com`, verify suggestions, refresh, caption generation, click insertion, and drag/drop.
@@ -170,18 +173,22 @@ together before a new submission.
 - Measure warm and cold suggestion latency plus storage round-trip latency from production.
 - Confirm the public landing page, hosted privacy page, support contact, and API all use HTTPS.
 
-Start with private/unlisted testers. Anonymous install IDs are isolation keys, not authentication;
-broader launch requires an explicit risk decision plus abuse monitoring, or a real account/session
-model.
+Run this section only when preparing the Chrome extension track. Anonymous install IDs are isolation
+keys, not authentication; broader extension distribution requires an explicit risk decision plus
+abuse monitoring, or a real account/session model.
 
-## Current external blockers
+## Current release boundaries
 
-The repository gates pass, but release remains blocked until all of these are supplied and tested:
+The API/web private-beta prerequisites are complete: managed persistence and storage, production
+domains, OAuth and dashboard bridging, migrations and the 49-template verified catalog, QStash trend
+refresh, health and cleanup monitoring, backup/restore, credential rotation, rollback, log-safety
+review, and a charged black-box generation have all been exercised against production. Paid
+checkout is disabled; beta credits remain operator-granted. Inviting and onboarding the first small
+tester group is the next operator step and is intentionally outside this checklist.
 
-- a usable S3 secret and successful live checks for both Supabase buckets;
-- successful managed PostgreSQL and Redis connectivity plus the production migration/seed;
-- the final API origin and final Chrome Web Store extension ID/CORS origin;
-- a real privacy/support contact, hosted policy URL, verified provider log retention, listing copy,
-  and screenshots;
-- end-to-end latency and behavior checks in the chosen Vercel/Supabase regions;
-- explicit acceptance or replacement of anonymous install identity for the intended launch audience.
+The later Chrome/public/paid tracks still require the final Web Store extension ID and CORS origin,
+listing screenshots and manual X QA, measured unit economics and pricing, payment/refund approval,
+provider-retention review, broader metrics and abuse controls, content/licensing procedures, and
+public self-service policy decisions. A fresh `Dockerfile.backend` build is required only if a
+container deployment becomes a release target; the current private beta runs on Vercel's Python
+runtime.

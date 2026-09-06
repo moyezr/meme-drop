@@ -13,7 +13,12 @@ self-service remain separate release tracks.
   repeats the protected cleanup at 03:40 UTC and alerts on the first non-successful response. The
   second delivery is safe because the worker uses a Redis lease and durable PostgreSQL claims.
 - `/health` returns HTTP 503 for database, Redis rate-limiter, empty-trend, or stale-trend failures.
-  A trend snapshot older than eight hours is stale.
+  A trend snapshot not successfully published within eight hours is stale. Content-identical
+  refreshes reuse the immutable snapshot version while advancing its last successful publication
+  time.
+- Dodo checkout variables are absent from the production API. Private-beta credits are granted only
+  through the confirmed operator command, preventing public sign-ins from self-issuing provider
+  credits.
 
 Keep response capture disabled on both cron-job.org jobs. The cleanup job contains the production
 cron bearer token, so access to the cron-job.org account and API key is production access.

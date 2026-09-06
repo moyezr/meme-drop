@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and decisions here as implementation progresses.
@@ -19,7 +19,8 @@ to a task in this plan.
 The API/web private-beta infrastructure and release are live. Production deployment, monitoring,
 restore and rollback drills, and a successful external-agent generation are verified. Inviting the
 first bounded tester group is a separate operator step. Chrome Web Store submission, paid checkout,
-and public self-service remain later release tracks.
+and public self-service remain later release tracks. Production Dodo configuration is disabled, so
+beta credits can be granted only through the explicit operator flow.
 
 Repository readiness is enforced by `npm run quality:deployment-readiness`. The gate accepts only
 loopback PostgreSQL and Redis test services and a disposable test database name; clears provider and
@@ -192,8 +193,10 @@ charged or stored twice.
   maximums.
 - [ ] Define packages, price per credit, minimum gross-margin target, free trial, expiration/refund
   rules, and abuse limits.
-- [ ] Integrate Dodo Payments only after the credit transactions and pricing model are reviewed.
-- [ ] Add recharge webhooks with signature verification and idempotent fulfillment.
+- [x] Implement Dodo Payments checkout and fulfillment in test mode, with production configuration
+  disabled until the credit transactions, economics, pricing, and refund model are reviewed.
+- [x] Add signature-verified, idempotent `payment.succeeded` fulfillment for later test/live use;
+  refund handling and live-provider approval remain in the paid-launch track.
 - [x] Add the remaining-credit balance to the tenant-scoped dashboard overview.
 - [ ] Add credit-transaction and usage endpoints for the dashboard.
 - [x] Add bounded stale-reservation reconciliation and idempotent operator grant tooling. General
@@ -276,8 +279,11 @@ telemetry without reading user content, and automated limits bound financial exp
 - [x] Apply migrations using a direct or session-pooler connection and use the transaction pooler
   for runtime traffic where appropriate.
 - [x] Seed all 49 verified templates and verify that production writes only to `meme-drop-prod`.
-- [x] Run production environment, storage, migration, readiness, security, release, and end-to-end
-  smoke gates from the exact release commit.
+- [x] Run the production environment, storage, migration, static, API process, integration,
+  security, Vercel build/deploy, and end-to-end smoke gates from the release source.
+- [x] Smoke the current source and locked Python requirements in the existing backend image. A
+  fresh registry-backed `Dockerfile.backend` build remains a container-deployment gate and does not
+  block the Vercel Python runtime used for this private beta.
 - [x] Establish backups, restore testing, rollback procedure, and credential rotation.
 - [ ] Start with a bounded private beta before enabling public self-service signup.
 
@@ -378,6 +384,10 @@ raw user text, or generated captions.
 
 ## Change log
 
+- 2026-09-07: Disabled stale Dodo test configuration in production so beta credits remain
+  operator-controlled. Exercised the live dashboard assertion and key lifecycle, then fixed
+  content-identical trend publications so successful QStash refreshes advance health freshness
+  without changing immutable snapshot content.
 - 2026-09-06: Deployed API commit `646ec52`, verified QStash refresh, production generation and
   cleanup, monitoring, log safety, key rotation, backup restore, and Vercel rollback. The API/web
   private-beta gate is ready; tester invitations remain separate.
