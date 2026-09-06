@@ -42,7 +42,21 @@ npm run ops:verify-backup -- "$HOME/.memedrop/backups/<timestamp>"
 
 The verifier checks every file hash, restores the database into the fixed
 `memedrop_restore_test` database, checks the Alembic version and table inventory, and removes the
-test database. A production restore is a maintenance operation: stop writes, take one final backup,
+test database. On this macOS operator machine, move a verified snapshot into an AES-256-encrypted
+iCloud Drive archive and remove its plaintext copy with:
+
+```sh
+npm run ops:archive-backup:macos -- "$HOME/.memedrop/backups/<timestamp>"
+```
+
+The command requires the verifier's `VERIFIED` marker, stores or reuses the archive password in the
+login Keychain under `MemeDrop production backup encryption`, decrypts and inventories the finished
+archive as a check, and only then removes the plaintext snapshot. Keep at least the newest seven
+encrypted daily archives. To recover one, retrieve the password with macOS Keychain, decrypt the
+archive with the same AES-256-CBC, PBKDF2, and 600,000-iteration settings, extract it under
+`~/.memedrop/backups`, and run `ops:verify-backup` again before any production restore.
+
+A production restore is a maintenance operation: stop writes, take one final backup,
 restore into a new Supabase project first, run the same smoke checks, then change deployment secrets
 and DNS. Do not overwrite the only production database while investigating an incident. Database
 backups do not replace object backups; restore the matching `storage/` tree to `meme-drop-prod`

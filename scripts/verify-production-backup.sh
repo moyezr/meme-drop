@@ -61,6 +61,7 @@ if [[ "$table_count" -lt 18 || -z "$schema_version" || "$storage_objects" -lt 1 
   exit 1
 fi
 
+touch "$snapshot_dir/VERIFIED"
 echo "[MemeDrop] production backup verified"
 echo "schema_version=$schema_version"
 echo "tables=$table_count"

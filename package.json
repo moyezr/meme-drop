@@ -83,6 +83,7 @@
     "storage:latency": "npm run storage:latency --workspace=@memedrop/api",
     "ops:backup:production": "bash scripts/backup-production.sh",
     "ops:verify-backup": "bash scripts/verify-production-backup.sh",
+    "ops:archive-backup:macos": "bash scripts/archive-production-backup-macos.sh",
     "trends:refresh": "npm run trends:refresh --workspace=@memedrop/api --",
     "trends:refresh:local": "npm run trends:refresh --workspace=@memedrop/api --",
     "agent:admin": "npm run agent:admin --workspace=@memedrop/api --",
