@@ -37,7 +37,14 @@ class FakeCaptionGateway:
         )
 
     async def generate_captions(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, *, context=None, trend_cards=()
+        self,
+        tweet_text,
+        templates,
+        *,
+        context=None,
+        trend_cards=(),
+        steering_instruction=None,
+        timeout_ms=None,
     ):
         return {}
 

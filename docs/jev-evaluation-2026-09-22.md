@@ -47,6 +47,19 @@ a future re-ranker trial. A production trial needs a caption architecture that s
 latency budget, restores strict caption validity, preserves deterministic fallback, and is compared
 against a working joint-model baseline.
 
+The repository now contains that production-shaped trial behind
+`MEMEDROP_JEV_RERANKER_ENABLED=false`. It shares the 4.5-second inference budget, has a 1.25-second Jev
+sub-budget and process-local cooldown, and returns directly to the original local order plus reviewed
+captions after either provider fails. This implementation is rollout scaffolding; it does not change
+the recommendation or authorize enabling the flag in production.
+
+A three-case runtime-shaped smoke check exercised the integrated service against both live providers.
+Two cases completed Jev plus captioning in 3.51–3.63 seconds. One reached the shared caption deadline
+at 4.53 seconds and returned the local fallback without a second provider attempt. The original 750 ms
+Jev sub-budget timed out on all three cases, so the implementation default was raised to 1.25 seconds,
+which is consistent with the 1.24-second Jev p95 measured in the full evaluation. This sample validates
+the budget and fallback wiring only; it is too small to serve as a rollout latency gate.
+
 Run the selection experiment with:
 
 ```sh

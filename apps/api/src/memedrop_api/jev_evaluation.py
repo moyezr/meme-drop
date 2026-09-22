@@ -14,17 +14,14 @@ import json
 import os
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
-
-import httpx
 
 from memedrop_api.caption_evaluation import DEFAULT_SAMPLE_PATH, load_evaluation_inputs
 from memedrop_api.config import Settings
-from memedrop_api.services.catalog import MemeTemplate, normalize_template_name
+from memedrop_api.services.catalog import normalize_template_name
 from memedrop_api.services.context_analyzer import heuristic_tweet_context
+from memedrop_api.services.jev_reranker import TypeSafeJevReranker
 from memedrop_api.services.meme_text import clean_generated_regions
 from memedrop_api.services.openrouter import OpenRouterSuggestionGateway
 from memedrop_api.services.suggestion_engine import (
@@ -40,201 +37,14 @@ from memedrop_api.suggestion_evaluation import (
     same_family,
 )
 
-TYPESAFE_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 JEV_INPUT_PRICE_PER_MILLION_TOKENS = 0.042
-
-
-@dataclass(frozen=True)
-class JevTemplateScore:
-    template_id: str
-    fit_probability: float
-    choice_probability: float
-
-
-@dataclass(frozen=True)
-class JevRanking:
-    scores: tuple[JevTemplateScore, ...]
-    model: str
-    confidence: float
-    none_probability: float
-    input_tokens: int
-    output_tokens: int
-    latency_ms: float
-
-
-class JevRanker:
-    def __init__(
-        self,
-        api_key: str,
-        *,
-        model: str = "jev-1.13.0",
-        timeout_seconds: float = 10.0,
-        client: httpx.AsyncClient | None = None,
-    ) -> None:
-        self.api_key = api_key
-        self.model = model
-        self.timeout_seconds = timeout_seconds
-        self.client = client
-        self._owns_client = client is None
-
-    async def close(self) -> None:
-        if self._owns_client and self.client is not None:
-            await self.client.aclose()
-
-    async def rank(
-        self,
-        tweet_text: str,
-        templates: Sequence[MemeTemplate],
-    ) -> JevRanking:
-        if not templates:
-            return JevRanking((), self.model, 0.0, 1.0, 0, 0, 0.0)
-        payload = build_jev_request(tweet_text, templates, self.model)
-        client = self.client
-        if client is None:
-            client = httpx.AsyncClient(timeout=self.timeout_seconds)
-            self.client = client
-        started = time.perf_counter()
-        response = await client.post(
-            TYPESAFE_ENDPOINT,
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            json=payload,
-        )
-        response.raise_for_status()
-        latency_ms = (time.perf_counter() - started) * 1000
-        return parse_jev_response(response.json(), templates, latency_ms)
-
-
-def template_evidence(template: MemeTemplate) -> dict[str, object]:
-    return {
-        "template_id": template.template_id,
-        "name": template.name,
-        "aliases": template.aliases,
-        "joke_shapes": template.retrieval.joke_shapes,
-        "good_fit_signals": template.retrieval.positive_hints,
-        "bad_fit_signals": template.retrieval.anti_hints,
-        "caption_pattern": template.caption_guidance.pattern,
-    }
-
-
-def build_jev_request(
-    tweet_text: str, templates: Sequence[MemeTemplate], model: str
-) -> dict[str, object]:
-    context = heuristic_tweet_context(tweet_text)
-    evidence = [template_evidence(template) for template in templates]
-    questions: dict[str, object] = {
-        "best_template": {
-            "type": "choice",
-            "instructions": (
-                "Which option would make the strongest, most specific meme reply to "
-                "`source_post`? Match the social situation and comic turn. Treat "
-                "`bad_fit_signals` as exclusions. Choose `none` when every option is weak."
-            ),
-            "criteria": {
-                **{f"template_{index}": item for index, item in enumerate(evidence)},
-                "none": "None of the templates creates a specific, appropriate comic reply.",
-            },
-        }
-    }
-    for index in range(len(templates)):
-        questions[f"fit_{index}"] = {
-            "type": "noul",
-            "instructions": (
-                f"Would `templates[{index}]` create a strong and specific meme reply to "
-                "`source_post`, given `reply_context`? Judge semantic and comic fit. "
-                "A generic topical match is insufficient."
-            ),
-            "criteria": {
-                "true": (
-                    "The template's joke shape fits the post, creates a clear comic turn, and "
-                    "does not match any bad-fit signal."
-                ),
-                "false": (
-                    "The template is generic, mismatched, literal, confusing, or matches a "
-                    "bad-fit signal."
-                ),
-            },
-        }
-    return {
-        "model": model,
-        "state": {
-            "source_post": tweet_text,
-            "reply_context": context.model_dump(mode="json"),
-            "templates": evidence,
-        },
-        "questions": questions,
-    }
-
-
-def parse_jev_response(
-    payload: dict[str, Any],
-    templates: Sequence[MemeTemplate],
-    latency_ms: float,
-) -> JevRanking:
-    answers = payload.get("answers")
-    if not isinstance(answers, dict):
-        raise ValueError("TypeSafe response did not contain an answers object")
-    best = answers.get("best_template")
-    if not isinstance(best, dict):
-        raise ValueError("TypeSafe response did not contain best_template")
-    probabilities = best.get("probabilities")
-    if not isinstance(probabilities, dict):
-        raise ValueError("TypeSafe best_template did not contain probabilities")
-    scores = []
-    for index, template in enumerate(templates):
-        fit = answers.get(f"fit_{index}")
-        fit_probability = fit.get("noul", 0.0) if isinstance(fit, dict) else 0.0
-        choice_probability = probabilities.get(f"template_{index}", 0.0)
-        scores.append(
-            JevTemplateScore(
-                template_id=template.template_id,
-                fit_probability=bounded_probability(fit_probability),
-                choice_probability=bounded_probability(choice_probability),
-            )
-        )
-    original_order = {template.template_id: index for index, template in enumerate(templates)}
-    scores.sort(
-        key=lambda item: (
-            -item.fit_probability,
-            -item.choice_probability,
-            original_order[item.template_id],
-        )
-    )
-    usage = payload.get("usage")
-    usage = usage if isinstance(usage, dict) else {}
-    return JevRanking(
-        scores=tuple(scores),
-        model=str(payload.get("model", "unknown")),
-        confidence=bounded_probability(best.get("confidence", 0.0)),
-        none_probability=bounded_probability(probabilities.get("none", 0.0)),
-        input_tokens=safe_int(usage.get("input_tokens")),
-        output_tokens=safe_int(usage.get("output_tokens")),
-        latency_ms=latency_ms,
-    )
-
-
-def bounded_probability(value: object) -> float:
-    if not isinstance(value, (int, float, str, bytes, bytearray)):
-        return 0.0
-    try:
-        return max(0.0, min(1.0, float(value)))
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def safe_int(value: object) -> int:
-    if not isinstance(value, (int, float, str, bytes, bytearray)):
-        return 0
-    try:
-        return max(0, int(value))
-    except (TypeError, ValueError):
-        return 0
 
 
 async def evaluate_jev(
     *,
     benchmark_path: Path,
     sample_path: Path,
-    ranker: JevRanker,
+    ranker: TypeSafeJevReranker,
     candidates: Sequence[Candidate],
     caption_gateway: OpenRouterSuggestionGateway | None = None,
     case_ids: Sequence[str] | None = None,
@@ -282,8 +92,16 @@ async def evaluate_jev(
         templates = [
             by_id[item.template_id].template for item in local if item.template_id in by_id
         ]
-        ranking = await ranker.rank(tweet, templates)
-        latencies.append(ranking.latency_ms)
+        context = heuristic_tweet_context(tweet)
+        rerank_started = time.perf_counter()
+        ranking = await ranker.rerank(
+            tweet,
+            templates,
+            len(templates),
+            context=context,
+        )
+        rerank_latency_ms = (time.perf_counter() - rerank_started) * 1000
+        latencies.append(rerank_latency_ms)
         total_input_tokens += ranking.input_tokens
         selected_ids = [item.template_id for item in ranking.scores]
         selected_names = [normalize_template_name(by_id[item].name) for item in selected_ids]
@@ -328,7 +146,7 @@ async def evaluate_jev(
             "rejected_templates_at_top_5": rejected_top_5,
             "jev": {
                 "model": ranking.model,
-                "latency_ms": round(ranking.latency_ms, 1),
+                "latency_ms": round(rerank_latency_ms, 1),
                 "confidence": ranking.confidence,
                 "none_probability": ranking.none_probability,
                 "input_tokens": ranking.input_tokens,
@@ -340,7 +158,7 @@ async def evaluate_jev(
             captions = await caption_gateway.generate_captions(
                 tweet,
                 selected_templates,
-                context=heuristic_tweet_context(tweet),
+                context=context,
             )
             caption_latency = (time.perf_counter() - caption_started) * 1000
             caption_latencies.append(caption_latency)
@@ -414,7 +232,12 @@ async def run(arguments: argparse.Namespace) -> None:
     if not api_key:
         raise SystemExit("[MemeDrop] TYPESAFE_API_KEY is required for the Jev evaluation")
     candidates = load_evaluation_candidates(arguments.catalog)
-    ranker = JevRanker(api_key, model=arguments.model)
+    ranker = TypeSafeJevReranker(
+        api_key,
+        model=arguments.model,
+        timeout_ms=10_000,
+        cooldown_ms=0,
+    )
     caption_gateway = None
     if arguments.with_captions:
         settings = Settings(database_url=os.environ.get("DATABASE_URL", "postgresql://evaluation"))

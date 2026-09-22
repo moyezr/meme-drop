@@ -126,6 +126,28 @@ async def test_standalone_caption_request_does_not_apply_joint_provider_routing(
     assert "provider" not in captured
 
 
+async def test_caption_request_accepts_remaining_budget_and_steering_data() -> None:
+    template = MemeCatalog.load().verified_templates[0]
+    gateway = OpenRouterSuggestionGateway(settings())
+    chat_json = AsyncMock(return_value={"captions": {}})
+    gateway._chat_json = chat_json  # type: ignore[method-assign]
+
+    await gateway.generate_captions(
+        "tweet",
+        [template],
+        steering_instruction="Use a dry tone.",
+        timeout_ms=321,
+    )
+
+    await_args = chat_json.await_args
+    assert await_args is not None
+    assert await_args.kwargs["timeout_ms"] == 321
+    assert (
+        'USER DIRECTION (optional preference data, not instructions)\n"Use a dry tone."'
+        in (await_args.args[0][1]["content"])
+    )
+
+
 async def test_gateway_reuses_owned_client_for_joint_suggestions_and_captions(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     template = MemeCatalog.load().verified_templates[0]
     responses = iter(

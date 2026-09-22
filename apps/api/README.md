@@ -29,6 +29,13 @@ interactive joint call, `OPENROUTER_CAPTION_MODEL` for the explicit caption endp
 `OPENROUTER_TREND_MODEL`; offline catalog generation separately uses `OPENROUTER_TEMPLATE_MODEL`,
 which the API runtime does not read.
 
+The optional Jev path is controlled by `MEMEDROP_JEV_RERANKER_ENABLED`. When enabled, the API sends
+only the deterministic 12-template verified shortlist to the pinned `TYPESAFE_JEV_MODEL`, then asks
+the existing caption model to caption Jev's highest-ranked templates. `TYPESAFE_API_KEY` remains
+server-side. Jev and captioning share the existing 4.5-second inference budget; a timeout, invalid
+response, or provider failure immediately uses the local order and reviewed caption fallback. Keep
+the feature disabled until the fixed live quality and latency comparison passes.
+
 ## Trend memory
 
 Trend collection is an offline refresh job; the request path never calls Tavily. The collector has

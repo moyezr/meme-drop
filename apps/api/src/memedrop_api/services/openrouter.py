@@ -60,6 +60,8 @@ class SuggestionModelGateway(Protocol):
         *,
         context: TweetContext | None = None,
         trend_cards: Sequence[TrendCard] = (),
+        steering_instruction: str | None = None,
+        timeout_ms: int | None = None,
     ) -> dict[str, dict[str, str]]: ...
 
 
@@ -197,6 +199,8 @@ class OpenRouterSuggestionGateway:
         *,
         context: TweetContext | None = None,
         trend_cards: Sequence[TrendCard] = (),
+        steering_instruction: str | None = None,
+        timeout_ms: int | None = None,
     ) -> dict[str, dict[str, str]]:
         if not self.settings.openrouter_api_key or not templates:
             return {}
@@ -210,12 +214,13 @@ class OpenRouterSuggestionGateway:
                         templates,
                         context,
                         trend_cards,
+                        steering_instruction,
                     ),
                 },
             ],
             temperature=0.75,
             max_tokens=1800,
-            timeout_ms=self.settings.caption_timeout_ms,
+            timeout_ms=(timeout_ms if timeout_ms is not None else self.settings.caption_timeout_ms),
             model=self.settings.openrouter_caption_model,
         )
         captions = payload.get("captions", {})

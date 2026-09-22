@@ -19,6 +19,7 @@ from memedrop_api.repositories import BackendStore
 from memedrop_api.schemas import TweetContext
 from memedrop_api.services.catalog import MemeCatalog, MemeTemplate
 from memedrop_api.services.context_analyzer import heuristic_tweet_context
+from memedrop_api.services.jev_reranker import ShortlistReranker
 from memedrop_api.services.meme_text import (
     build_fallback_caption_set,
     build_overlay,
@@ -474,6 +475,7 @@ class SuggestionTiming:
     trend_lookup_ms: float = 0.0
     candidate_load_ms: float = 0.0
     local_rank_ms: float = 0.0
+    rerank_ms: float = 0.0
     joint_model_ms: float = 0.0
     response_assembly_ms: float = 0.0
     joint_outcome: str = "fallback"
@@ -494,6 +496,7 @@ class SuggestionTiming:
             ("trend-lookup", self.trend_lookup_ms, None),
             ("candidate-load", self.candidate_load_ms, None),
             ("local-rank", self.local_rank_ms, None),
+            ("jev-rerank", self.rerank_ms, None),
             ("joint-model", self.joint_model_ms, self.joint_outcome),
             ("response-assembly", self.response_assembly_ms, None),
             ("total", total_ms, None),
@@ -647,12 +650,14 @@ class SuggestionService:
         settings: Settings,
         *,
         trend_retriever: TrendRetriever | None = None,
+        reranker: ShortlistReranker | None = None,
     ) -> None:
         self.store = store
         self.catalog = catalog
         self.gateway = gateway
         self.settings = settings
         self.trend_retriever = trend_retriever
+        self.reranker = reranker
         self.cache: OrderedDict[str, tuple[float, list[dict[str, Any]]]] = OrderedDict()
         # A request can arrive from both the content script and a retry before the first
         # response has populated ``cache``. Keep just one computation in flight per
@@ -798,13 +803,16 @@ class SuggestionService:
             for selection in ranked
             if selection.template_id in by_template
         ]
-        joint_model_started = time.perf_counter()
+        rerank_ms = 0.0
+        joint_model_ms = 0.0
         joint_outcome = "model"
         model_selections: list[TemplateSelection] = []
         generated: dict[str, dict[str, str]] = {}
-        try:
-            if trend_cards:
-                model = await self.gateway.select_and_caption(
+        if self.reranker is not None:
+            inference_started = time.perf_counter()
+            rerank_started = time.perf_counter()
+            try:
+                reranked = await self.reranker.rerank(
                     tweet_text,
                     shortlist_templates,
                     limit,
@@ -812,33 +820,89 @@ class SuggestionService:
                     steering_instruction=steering_instruction,
                     trend_cards=trend_cards,
                 )
+            except Exception:
+                rerank_ms = elapsed_ms(rerank_started)
+                joint_outcome = "reranker_fallback"
+                LOGGER.warning("Jev reranking failed; using reviewed local fallback")
             else:
-                model = await self.gateway.select_and_caption(
-                    tweet_text,
-                    shortlist_templates,
-                    limit,
-                    context=context,
-                    steering_instruction=steering_instruction,
+                rerank_ms = elapsed_ms(rerank_started)
+                remaining_ms = self.settings.joint_suggestion_timeout_ms - elapsed_ms(
+                    inference_started
                 )
-        except TimeoutError:
-            # A bounded provider miss is an expected availability condition, not an
-            # application crash. Keep logs actionable without emitting a cancellation stack.
-            LOGGER.warning(
-                "Joint suggestion generation timed out after %dms; using reviewed local fallback",
-                self.settings.joint_suggestion_timeout_ms,
-            )
-            joint_outcome = "timeout"
-        except Exception:
-            # Do not retry captioning through the provider: a provider-level failure must
-            # immediately take the deterministic local path.
-            LOGGER.exception("Joint suggestion generation failed; using local ranking")
-            joint_outcome = "fallback"
+                reranked_templates = [
+                    by_template[selection.template_id].template
+                    for selection in reranked.selections
+                    if selection.template_id in by_template
+                ]
+                if not reranked_templates or remaining_ms < 1:
+                    joint_outcome = "reranker_fallback"
+                else:
+                    caption_started = time.perf_counter()
+                    try:
+                        generated = await self.gateway.generate_captions(
+                            tweet_text,
+                            reranked_templates,
+                            context=context,
+                            trend_cards=trend_cards,
+                            steering_instruction=steering_instruction,
+                            timeout_ms=max(1, int(remaining_ms)),
+                        )
+                    except TimeoutError:
+                        joint_outcome = "caption_timeout"
+                        LOGGER.warning(
+                            "Caption generation exhausted the shared inference budget; "
+                            "using reviewed local fallback"
+                        )
+                    except Exception:
+                        joint_outcome = "caption_fallback"
+                        LOGGER.warning(
+                            "Caption generation failed after Jev reranking; "
+                            "using reviewed local fallback"
+                        )
+                    else:
+                        model_selections = list(reranked.selections)
+                        joint_outcome = "reranked"
+                    joint_model_ms = elapsed_ms(caption_started)
         else:
-            model_selections = model.selections
-            generated = model.captions
-            if not model_selections:
+            joint_model_started = time.perf_counter()
+            try:
+                if trend_cards:
+                    model = await self.gateway.select_and_caption(
+                        tweet_text,
+                        shortlist_templates,
+                        limit,
+                        context=context,
+                        steering_instruction=steering_instruction,
+                        trend_cards=trend_cards,
+                    )
+                else:
+                    model = await self.gateway.select_and_caption(
+                        tweet_text,
+                        shortlist_templates,
+                        limit,
+                        context=context,
+                        steering_instruction=steering_instruction,
+                    )
+            except TimeoutError:
+                # A bounded provider miss is an expected availability condition, not an
+                # application crash. Keep logs actionable without emitting a cancellation stack.
+                LOGGER.warning(
+                    "Joint suggestion generation timed out after %dms; "
+                    "using reviewed local fallback",
+                    self.settings.joint_suggestion_timeout_ms,
+                )
+                joint_outcome = "timeout"
+            except Exception:
+                # Do not retry captioning through the provider: a provider-level failure must
+                # immediately take the deterministic local path.
+                LOGGER.exception("Joint suggestion generation failed; using local ranking")
                 joint_outcome = "fallback"
-        joint_model_ms = elapsed_ms(joint_model_started)
+            else:
+                model_selections = model.selections
+                generated = model.captions
+                if not model_selections:
+                    joint_outcome = "fallback"
+            joint_model_ms = elapsed_ms(joint_model_started)
         selections = fill_selections(model_selections, fallback, limit)
         selected = [
             (by_template[selection.template_id], selection)
@@ -891,6 +955,7 @@ class SuggestionService:
             trend_lookup_ms=trend_lookup_ms,
             candidate_load_ms=candidate_load_ms,
             local_rank_ms=local_rank_ms,
+            rerank_ms=rerank_ms,
             joint_model_ms=joint_model_ms,
             response_assembly_ms=elapsed_ms(response_assembly_started),
             joint_outcome=joint_outcome,
@@ -905,6 +970,7 @@ class SuggestionService:
                 "candidate_load_ms": round(timing.candidate_load_ms),
                 "trend_lookup_ms": round(timing.trend_lookup_ms),
                 "local_rank_ms": round(timing.local_rank_ms),
+                "rerank_ms": round(timing.rerank_ms),
                 "joint_model_ms": round(timing.joint_model_ms),
                 "response_assembly_ms": round(timing.response_assembly_ms),
                 "joint_outcome": timing.joint_outcome,

@@ -35,6 +35,7 @@ def valid_environment() -> dict[str, str]:
         "OPENROUTER_AUTO_TAG_MODEL": "google/gemini-3.7-flash",
         "OPENROUTER_TREND_MODEL": "google/gemini-3.7-flash",
         "OPENROUTER_EMBEDDING_MODEL": "google/gemini-embedding-2",
+        "MEMEDROP_JEV_RERANKER_ENABLED": "false",
         "MEMEDROP_TRENDS_ENABLED": "true",
         "TAVILY_API_KEY": "a-secure-production-tavily-key",
         "CRON_SECRET": "a-secure-production-cron-secret",
@@ -83,6 +84,26 @@ def test_production_environment_rejects_removed_shared_variables() -> None:
 
     assert any("OPENROUTER_MEME_MODEL was removed" in error for error in errors)
     assert any("MEMEDROP_STORAGE_BUCKET was removed" in error for error in errors)
+
+
+def test_production_environment_validates_enabled_jev_configuration() -> None:
+    environment = valid_environment()
+    environment.update(
+        {
+            "MEMEDROP_JEV_RERANKER_ENABLED": "true",
+            "TYPESAFE_API_KEY": "typesafe-production-key",
+            "TYPESAFE_JEV_MODEL": "jev-1.13.0",
+            "MEMEDROP_JEV_RERANKER_TIMEOUT_MS": "1250",
+            "MEMEDROP_JEV_RERANKER_COOLDOWN_MS": "5000",
+        }
+    )
+
+    assert production_env_findings(environment) == ([], [])
+
+    del environment["TYPESAFE_API_KEY"]
+    errors, _ = production_env_findings(environment)
+
+    assert any(error.startswith("TYPESAFE_API_KEY") and "required" in error for error in errors)
 
 
 def test_production_environment_rejects_unsafe_deployment_values() -> None:

@@ -80,6 +80,33 @@ class Settings(BaseSettings):
         default="google/gemini-embedding-2",
         validation_alias="OPENROUTER_EMBEDDING_MODEL",
     )
+    jev_reranker_enabled: bool = Field(
+        default=False,
+        validation_alias="MEMEDROP_JEV_RERANKER_ENABLED",
+    )
+    typesafe_api_key: str | None = Field(
+        default=None,
+        validation_alias="TYPESAFE_API_KEY",
+        exclude=True,
+        repr=False,
+    )
+    typesafe_jev_model: str = Field(
+        default="jev-1.13.0",
+        validation_alias="TYPESAFE_JEV_MODEL",
+        min_length=1,
+    )
+    jev_reranker_timeout_ms: int = Field(
+        default=1_250,
+        validation_alias="MEMEDROP_JEV_RERANKER_TIMEOUT_MS",
+        ge=100,
+        le=2_000,
+    )
+    jev_reranker_cooldown_ms: int = Field(
+        default=5_000,
+        validation_alias="MEMEDROP_JEV_RERANKER_COOLDOWN_MS",
+        ge=0,
+        le=60_000,
+    )
     tavily_api_key: str | None = Field(
         default=None,
         validation_alias="TAVILY_API_KEY",
@@ -368,6 +395,18 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_requirements(self) -> Settings:
+        if self.jev_reranker_enabled and not self.typesafe_api_key:
+            raise ValueError(
+                "TYPESAFE_API_KEY is required when MEMEDROP_JEV_RERANKER_ENABLED is true"
+            )
+        if (
+            self.jev_reranker_enabled
+            and self.jev_reranker_timeout_ms >= self.joint_suggestion_timeout_ms
+        ):
+            raise ValueError(
+                "MEMEDROP_JEV_RERANKER_TIMEOUT_MS must be less than "
+                "MEMEDROP_JOINT_SUGGESTION_TIMEOUT_MS"
+            )
         if self.dashboard_token_secret is not None:
             normalized_dashboard_secret = self.dashboard_token_secret.lower()
             if any(character.isspace() for character in self.dashboard_token_secret):

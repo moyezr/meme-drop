@@ -2,14 +2,21 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from memedrop_api.jev_evaluation import build_jev_request, parse_jev_response
 from memedrop_api.services.catalog import MemeCatalog
+from memedrop_api.services.context_analyzer import heuristic_tweet_context
+from memedrop_api.services.jev_reranker import build_jev_request, parse_jev_response
 
 
 def test_jev_request_uses_only_typed_decisions_over_the_bounded_shortlist() -> None:
     templates = MemeCatalog.load().verified_templates[:2]
 
-    request = build_jev_request("The deploy is on fire again.", templates, "jev-1.13.0")
+    tweet = "The deploy is on fire again."
+    request = build_jev_request(
+        tweet,
+        templates,
+        "jev-1.13.0",
+        context=heuristic_tweet_context(tweet),
+    )
 
     assert request["model"] == "jev-1.13.0"
     questions = cast(dict[str, dict[str, Any]], request["questions"])
@@ -43,7 +50,7 @@ def test_jev_response_ranks_absolute_fit_then_relative_choice() -> None:
         "usage": {"input_tokens": 321, "output_tokens": 45},
     }
 
-    ranking = parse_jev_response(response, templates, 123.4)
+    ranking = parse_jev_response(response, templates, limit=3)
 
     assert [item.template_id for item in ranking.scores] == [
         templates[1].template_id,
@@ -51,4 +58,8 @@ def test_jev_response_ranks_absolute_fit_then_relative_choice() -> None:
         templates[0].template_id,
     ]
     assert ranking.input_tokens == 321
-    assert ranking.latency_ms == 123.4
+    assert [selection.template_id for selection in ranking.selections] == [
+        templates[1].template_id,
+        templates[2].template_id,
+        templates[0].template_id,
+    ]

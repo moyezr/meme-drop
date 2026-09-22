@@ -660,6 +660,18 @@ def production_env_findings(
         "OPENROUTER_EMBEDDING_MODEL",
     ):
         reject_placeholder(name, value(name))
+    jev_enabled = value("MEMEDROP_JEV_RERANKER_ENABLED").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if jev_enabled:
+        typesafe_api_key = value("TYPESAFE_API_KEY")
+        reject_placeholder("TYPESAFE_API_KEY", typesafe_api_key)
+        reject_placeholder("TYPESAFE_JEV_MODEL", value("TYPESAFE_JEV_MODEL"))
+        bounded_int("MEMEDROP_JEV_RERANKER_TIMEOUT_MS", minimum=100, maximum=2_000)
+        bounded_int("MEMEDROP_JEV_RERANKER_COOLDOWN_MS", minimum=0, maximum=60_000)
     if value("MEMEDROP_TRENDS_ENABLED").lower() not in {"1", "true", "yes", "on"}:
         errors.append("MEMEDROP_TRENDS_ENABLED must be true for production launch.")
     tavily_api_key = value("TAVILY_API_KEY")

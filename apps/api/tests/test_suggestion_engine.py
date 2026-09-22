@@ -12,6 +12,7 @@ import memedrop_api.services.suggestion_engine as suggestion_engine
 from memedrop_api.config import Settings
 from memedrop_api.schemas import MAX_SOURCE_POST_LENGTH, TweetContext, UsageBatchRequest
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
+from memedrop_api.services.jev_reranker import JevRerankResult, JevTemplateScore
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.suggestion_engine import (
     Candidate,
@@ -46,6 +47,10 @@ class FakeGateway:
         self.seen_steering_instructions: list[str | None] = []
         self.seen_trend_cards: list[tuple[object, ...]] = []
         self.seen_caption_trend_cards: list[tuple[object, ...]] = []
+        self.seen_caption_template_ids: list[list[str]] = []
+        self.seen_caption_steering: list[str | None] = []
+        self.seen_caption_timeouts: list[int | None] = []
+        self.fail_caption = False
 
     async def select_and_caption(  # type: ignore[no-untyped-def]
         self,
@@ -70,11 +75,64 @@ class FakeGateway:
         return JointSuggestionResult(self.selections[:limit], self.captions)
 
     async def generate_captions(  # type: ignore[no-untyped-def]
-        self, tweet_text, templates, *, context=None, trend_cards=()
+        self,
+        tweet_text,
+        templates,
+        *,
+        context=None,
+        trend_cards=(),
+        steering_instruction=None,
+        timeout_ms=None,
     ):
         self.caption_calls += 1
         self.seen_caption_trend_cards.append(tuple(trend_cards))
+        self.seen_caption_template_ids.append([template.template_id for template in templates])
+        self.seen_caption_steering.append(steering_instruction)
+        self.seen_caption_timeouts.append(timeout_ms)
+        if self.fail_caption:
+            raise RuntimeError("caption model unavailable")
         return self.captions
+
+
+class FakeReranker:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.fail = False
+        self.seen_template_ids: list[list[str]] = []
+
+    async def rerank(  # type: ignore[no-untyped-def]
+        self,
+        tweet_text,
+        templates,
+        limit,
+        *,
+        context,
+        steering_instruction=None,
+        trend_cards=(),
+    ):
+        self.calls += 1
+        ids = [template.template_id for template in templates]
+        self.seen_template_ids.append(ids)
+        if self.fail:
+            raise RuntimeError("reranker unavailable")
+        reversed_ids = list(reversed(ids))
+        scores = tuple(
+            JevTemplateScore(template_id, 0.9 - index * 0.01, 0.8 - index * 0.01)
+            for index, template_id in enumerate(reversed_ids)
+        )
+        selections = tuple(
+            TemplateSelection(item.template_id, "Jev fit", item.fit_probability)
+            for item in scores[:limit]
+        )
+        return JevRerankResult(
+            selections=selections,
+            scores=scores,
+            model="jev-1.13.0",
+            confidence=0.9,
+            none_probability=0.01,
+            input_tokens=100,
+            output_tokens=10,
+        )
 
 
 class RotatingTrendRetriever:
@@ -102,7 +160,11 @@ def global_meme(name: str) -> dict[str, Any]:
     }
 
 
-def service_with_templates(*template_ids: str) -> tuple[SuggestionService, FakeStore, FakeGateway]:
+def service_with_templates(
+    *template_ids: str,
+    reranker: FakeReranker | None = None,
+    settings: Settings | None = None,
+) -> tuple[SuggestionService, FakeStore, FakeGateway]:
     catalog = MemeCatalog.load()
     selected_templates = [
         template for template in catalog.verified_templates if template.template_id in template_ids
@@ -114,9 +176,102 @@ def service_with_templates(*template_ids: str) -> tuple[SuggestionService, FakeS
         store,
         catalog,
         gateway,
-        Settings(database_url="postgresql://localhost/test"),
+        settings or Settings(database_url="postgresql://localhost/test"),
+        reranker=reranker,
     )
     return service, store, gateway
+
+
+def template_names(template_ids: list[str]) -> list[str]:
+    by_id = {
+        template.template_id: template.name for template in MemeCatalog.load().verified_templates
+    }
+    return [by_id[template_id] for template_id in template_ids]
+
+
+async def test_service_uses_jev_order_then_caption_only_generation() -> None:
+    reranker = FakeReranker()
+    service, _, gateway = service_with_templates(
+        "this-is-fine",
+        "surprised-pikachu",
+        reranker=reranker,
+    )
+
+    result = await service.get_suggestions(
+        "We deployed without tests and now production is on fire.",
+        user_id=INSTALL_ID,
+        limit=2,
+        steering_instruction="Make it dry and understated.",
+    )
+
+    expected_ids = list(reversed(reranker.seen_template_ids[0]))
+    assert reranker.calls == 1
+    assert gateway.joint_calls == 0
+    assert gateway.caption_calls == 1
+    assert gateway.seen_caption_template_ids == [expected_ids]
+    assert gateway.seen_caption_steering == ["Make it dry and understated."]
+    assert gateway.seen_caption_timeouts[0] is not None
+    assert 0 < gateway.seen_caption_timeouts[0] <= 4_500
+    assert [item["name"] for item in result] == template_names(expected_ids)
+
+
+async def test_service_uses_local_fallback_without_another_provider_after_jev_failure() -> None:
+    reranker = FakeReranker()
+    reranker.fail = True
+    service, _, gateway = service_with_templates(
+        "this-is-fine",
+        "surprised-pikachu",
+        reranker=reranker,
+    )
+
+    result = await service.get_suggestions(
+        "We deployed without tests and now production is on fire.",
+        user_id=INSTALL_ID,
+        limit=2,
+    )
+
+    expected_ids = reranker.seen_template_ids[0][:2]
+    assert gateway.joint_calls == 0
+    assert gateway.caption_calls == 0
+    assert [item["name"] for item in result] == template_names(expected_ids)
+
+
+async def test_caption_failure_after_jev_returns_original_local_order() -> None:
+    reranker = FakeReranker()
+    service, _, gateway = service_with_templates(
+        "this-is-fine",
+        "surprised-pikachu",
+        reranker=reranker,
+    )
+    gateway.fail_caption = True
+
+    result = await service.get_suggestions(
+        "We deployed without tests and now production is on fire.",
+        user_id=INSTALL_ID,
+        limit=2,
+    )
+
+    expected_ids = reranker.seen_template_ids[0][:2]
+    assert gateway.joint_calls == 0
+    assert gateway.caption_calls == 1
+    assert [item["name"] for item in result] == template_names(expected_ids)
+
+
+async def test_jev_reranking_shares_existing_suggestion_cache_and_singleflight() -> None:
+    reranker = FakeReranker()
+    service, _, _ = service_with_templates(
+        "this-is-fine",
+        "surprised-pikachu",
+        reranker=reranker,
+    )
+
+    await asyncio.gather(
+        service.get_suggestions("Production is on fire.", user_id=INSTALL_ID, limit=2),
+        service.get_suggestions("Production is on fire.", user_id=INSTALL_ID, limit=2),
+    )
+    await service.get_suggestions("Production is on fire.", user_id=INSTALL_ID, limit=2)
+
+    assert reranker.calls == 1
 
 
 async def test_service_uses_one_joint_model_call_and_context() -> None:
@@ -783,6 +938,7 @@ async def test_suggestion_route_exposes_non_sensitive_server_timing(
     for metric in (
         "candidate-load;dur=",
         "local-rank;dur=",
+        "jev-rerank;dur=",
         "joint-model;dur=",
         "response-assembly;dur=",
         "total;dur=",

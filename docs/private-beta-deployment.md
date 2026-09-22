@@ -149,6 +149,11 @@ OPENROUTER_CAPTION_MODEL=google/gemini-3.7-flash
 OPENROUTER_AUTO_TAG_MODEL=google/gemini-3.7-flash
 OPENROUTER_TREND_MODEL=google/gemini-3.7-flash
 OPENROUTER_EMBEDDING_MODEL=google/gemini-embedding-2
+MEMEDROP_JEV_RERANKER_ENABLED=false
+TYPESAFE_API_KEY=<server-side-typesafe-key>
+TYPESAFE_JEV_MODEL=jev-1.13.0
+MEMEDROP_JEV_RERANKER_TIMEOUT_MS=1250
+MEMEDROP_JEV_RERANKER_COOLDOWN_MS=5000
 
 # Enable only after Redis and the QStash Workflow schedule are configured.
 MEMEDROP_TRENDS_ENABLED=true

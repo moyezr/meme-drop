@@ -240,6 +240,13 @@ excluded from this path: their extra deliberation does not improve this bounded 
 to justify regularly exhausting the request deadline. Record live taste and latency samples before
 changing `OPENROUTER_SUGGESTION_MODEL`; deterministic tests alone cannot qualify a hosted model.
 
+The disabled-by-default Jev trial replaces step 4 with a bounded re-rank of the same 12 verified
+templates followed by caption-only generation for at most five. Both calls share the existing
+4.5-second budget. A reranker or caption failure returns immediately to the original local order and
+reviewed caption fallback, without another provider attempt. Do not enable the trial outside a
+controlled comparison until it clears the same case-level ranking baseline, strict caption contract,
+human taste review, and end-to-end p95 requirements.
+
 Model configuration is purpose-specific. `OPENROUTER_SUGGESTION_MODEL` owns the hot joint
 selection-and-caption request, `OPENROUTER_CAPTION_MODEL` owns the explicit caption endpoint,
 `OPENROUTER_AUTO_TAG_MODEL` owns saved-image vision tagging, and `OPENROUTER_TEMPLATE_MODEL` is

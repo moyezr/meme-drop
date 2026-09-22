@@ -63,6 +63,7 @@ from memedrop_api.services.generated_asset_retention import (
 )
 from memedrop_api.services.hybrid_trend_retrieval import HybridTrendRetriever
 from memedrop_api.services.image_downloader import download_image
+from memedrop_api.services.jev_reranker import ShortlistReranker, TypeSafeJevReranker
 from memedrop_api.services.meme_renderer import render_meme
 from memedrop_api.services.openrouter import OpenRouterSuggestionGateway
 from memedrop_api.services.storage import (
@@ -112,6 +113,7 @@ def create_app(
     agent_meme_service: AgentMemeService | None = None,
     billing_checkout_service: BillingCheckoutCreator | None = None,
     billing_webhook_service: BillingWebhookProcessor | None = None,
+    shortlist_reranker: ShortlistReranker | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings()  # type: ignore[call-arg]
     meme_storage = storage or create_meme_storage(app_settings)
@@ -120,6 +122,7 @@ def create_app(
     catalog_store = catalog_draft_store or SqlAlchemyCatalogDraftStore(app_database)
     catalog = MemeCatalog.load()
     default_gateway: OpenRouterSuggestionGateway | None = None
+    default_jev_reranker: TypeSafeJevReranker | None = None
     default_trend_index: RedisTrendIndex | None = None
     default_hybrid_trend_retriever: HybridTrendRetriever | None = None
     default_trend_refresh_lock: RedisTrendRefreshLock | None = None
@@ -129,6 +132,16 @@ def create_app(
     trend_redis_url = app_settings.trend_redis_url
     if suggestion_service is None:
         default_gateway = OpenRouterSuggestionGateway(app_settings)
+        active_reranker = shortlist_reranker
+        if active_reranker is None and app_settings.jev_reranker_enabled:
+            assert app_settings.typesafe_api_key is not None
+            default_jev_reranker = TypeSafeJevReranker(
+                app_settings.typesafe_api_key,
+                model=app_settings.typesafe_jev_model,
+                timeout_ms=app_settings.jev_reranker_timeout_ms,
+                cooldown_ms=app_settings.jev_reranker_cooldown_ms,
+            )
+            active_reranker = default_jev_reranker
         if trend_redis_url:
             default_trend_index = RedisTrendIndex(trend_redis_url)
             if app_settings.openrouter_api_key:
@@ -151,6 +164,7 @@ def create_app(
             default_gateway,
             app_settings,
             trend_retriever=default_hybrid_trend_retriever or default_trend_index,
+            reranker=active_reranker,
         )
     else:
         suggestions = suggestion_service
@@ -238,6 +252,8 @@ def create_app(
         finally:
             if default_gateway is not None:
                 await default_gateway.close()
+            if default_jev_reranker is not None:
+                await default_jev_reranker.close()
             if default_trend_index is not None:
                 await default_trend_index.close()
             if default_hybrid_trend_retriever is not None:

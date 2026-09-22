@@ -167,3 +167,31 @@ async def test_lifespan_closes_only_the_default_suggestion_gateway(
 
     assert gateway_factory.call_count == 1
     injected_service.close.assert_not_awaited()
+
+
+async def test_lifespan_closes_only_an_app_owned_jev_reranker(
+    settings: Settings, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    default_reranker = type("Reranker", (), {"close": AsyncMock()})()
+    reranker_factory = Mock(return_value=default_reranker)
+    monkeypatch.setattr("memedrop_api.app.TypeSafeJevReranker", reranker_factory)
+    configured = settings.model_copy(
+        update={
+            "jev_reranker_enabled": True,
+            "typesafe_api_key": "typesafe-secret",
+        }
+    )
+
+    app = create_app(configured)
+    async with app.router.lifespan_context(app):
+        pass
+
+    default_reranker.close.assert_awaited_once()
+
+    injected_reranker = type("InjectedReranker", (), {"close": AsyncMock()})()
+    app = create_app(configured, shortlist_reranker=injected_reranker)  # type: ignore[arg-type]
+    async with app.router.lifespan_context(app):
+        pass
+
+    assert reranker_factory.call_count == 1
+    injected_reranker.close.assert_not_awaited()

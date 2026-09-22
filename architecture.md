@@ -120,7 +120,8 @@ tweet context
   -> deterministic rank across the whole catalog
   -> diversified shortlist of at most 12 templates
   -> bounded comedy brief + catalog-owned visual grammar for each shortlisted template
-  -> one bounded OpenRouter selection + caption call for at most five results
+  -> optional bounded Jev re-ranking of the 12 verified candidates
+  -> caption generation for Jev's top results, or one bounded OpenRouter selection + caption call
   -> reviewed template-specific fallback when available
   -> five-or-fewer overlays + feedback context + timings
 ```
@@ -136,7 +137,7 @@ positive and anti-use cases, and contrastive examples. Caption or retrieval beha
 improve through these reviewed labels so catalog additions remain server-side data changes rather
 than extension releases.
 
-The API returns at most five user-visible suggestions. The model call has a dedicated 4.5-second
+The API returns at most five user-visible suggestions. External inference has a shared 4.5-second
 deadline. A failed call opens a short, process-local provider cooldown and immediately uses the local
 selection and a reviewed template-specific caption when one exists, rather than retrying on the
 user-visible path. The API may return fewer than five results instead of filling model omissions or
@@ -144,6 +145,12 @@ fabricating generic fallback text. Catalog candidates
 and short-lived per-install feedback scores are cached; concurrent identical requests use
 singleflight so one calculation serves all waiters. Raw post text is never logged in production;
 request and cache identifiers are logged only as short hashes.
+
+Jev re-ranking is disabled by default. When enabled, it can only reorder the verified shortlist and
+shares the same 4.5-second inference budget with caption generation. Jev and caption failures do not
+trigger another provider attempt; the request returns to the original local order and reviewed
+caption fallback. Source text and optional steering remain transient provider input and are never
+logged or persisted.
 
 `POST /api/v1/suggest` accepts an optional `steering_instruction` of at most 280 characters. The
 original post remains the source of truth for context analysis; steering may influence retrieval,

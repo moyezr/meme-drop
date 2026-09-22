@@ -37,6 +37,11 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.openrouter_auto_tag_model == "google/gemini-3.7-flash"
     assert settings.openrouter_trend_model == "google/gemini-3.7-flash"
     assert settings.openrouter_embedding_model == "google/gemini-embedding-2"
+    assert settings.jev_reranker_enabled is False
+    assert settings.typesafe_api_key is None
+    assert settings.typesafe_jev_model == "jev-1.13.0"
+    assert settings.jev_reranker_timeout_ms == 1_250
+    assert settings.jev_reranker_cooldown_ms == 5_000
     assert settings.trend_embedding_timeout_seconds == 20
     assert settings.trend_embedding_batch_size == 32
     assert settings.joint_provider_sort == "latency"
@@ -185,6 +190,27 @@ def test_joint_provider_latency_preference_has_a_bounded_positive_value() -> Non
             joint_provider_preferred_p90_latency_seconds=30.1,
             _env_file=None,
         )
+
+
+def test_jev_reranker_requires_a_secret_and_reserves_caption_budget() -> None:
+    with pytest.raises(ValidationError, match="TYPESAFE_API_KEY is required"):
+        make_settings(jev_reranker_enabled=True)
+
+    with pytest.raises(ValidationError, match="must be less than"):
+        make_settings(
+            jev_reranker_enabled=True,
+            typesafe_api_key="typesafe-secret",
+            jev_reranker_timeout_ms=1_000,
+            joint_suggestion_timeout_ms=1_000,
+        )
+
+    configured = make_settings(
+        jev_reranker_enabled=True,
+        typesafe_api_key="typesafe-secret",
+    )
+
+    assert configured.jev_reranker_enabled is True
+    assert "typesafe-secret" not in repr(configured)
 
 
 def test_production_requires_openrouter_key() -> None:
