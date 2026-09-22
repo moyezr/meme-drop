@@ -61,6 +61,7 @@
     "quality:security": "node scripts/security-audit.mjs",
     "quality:suggestions": "npm run test:suggestions --workspace=@memedrop/api && npm run eval:suggestions --workspace=@memedrop/api",
     "eval:captions": "npm run eval:captions --workspace=@memedrop/api --",
+    "eval:jev": "npm run eval:jev --workspace=@memedrop/api --",
     "quality:rendering": "npm run test --workspace=@memedrop/shared && npm run manifest:audit --workspace=@memedrop/template-tools -- --max-warnings 25",
     "quality:tuning": "npm run quality:benchmark && npm run quality:suggestions && npm run quality:rendering && npm run quality:dataset-plan",
     "launch:status": "node scripts/launch-status.mjs",

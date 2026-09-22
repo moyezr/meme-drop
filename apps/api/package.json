@@ -10,6 +10,7 @@
     "test:suggestions": "uv run pytest tests/test_caption_evaluation.py tests/test_catalog.py tests/test_context_analyzer.py tests/test_meme_text.py tests/test_openrouter.py tests/test_suggestion_engine.py tests/test_suggestion_evaluation.py -q",
     "eval:suggestions": "uv run memedrop-suggestion-eval",
     "eval:captions": "uv run --env-file ../../.env memedrop-caption-eval",
+    "eval:jev": "uv run --env-file ../../.env memedrop-jev-eval",
     "typecheck": "uv run mypy src tests",
     "lint": "uv run ruff check .",
     "format": "uv run ruff format .",
