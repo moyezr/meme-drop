@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
           A plain-language disclosure of how the MemeDrop private beta handles information, and
           which hosted-provider and billing details remain to be finalized before public launch.
         </p>
-        <p className="policyMeta">Effective date: August 31, 2026</p>
+        <p className="policyMeta">Effective date: September 3, 2026</p>
       </header>
 
       <aside className="notice" aria-label="Pre-launch policy status">
@@ -137,6 +137,16 @@ export default function PrivacyPolicyPage() {
           required by law or to protect the service, its users, or the public. A public launch will
           include verified provider-specific retention details and a complete list of material
           processors.
+        </p>
+      </section>
+
+      <section aria-labelledby="template-rights">
+        <h2 id="template-rights">Template content and copyright</h2>
+        <p>
+          Some meme templates contain third-party images or references. MemeDrop does not claim
+          ownership of that third-party material. This privacy policy explains how information is
+          processed; our <a href="/terms/">Terms of use</a> explain template rights, user
+          responsibilities, and how to report a copyright concern.
         </p>
       </section>
 

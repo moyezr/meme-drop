@@ -189,14 +189,26 @@ remaining production handoff and manual checks are in `docs/release.md`.
 
 ## Documentation
 
-- `architecture.md`: runtime boundaries and recommendation evolution
-- `QUALITY.md`: evaluation, template curation, and security gates
-- `docs/release.md`: deployment and Chrome Web Store checklist
-- `docs/private-beta-deployment.md`: end-to-end production and private-beta sequence
-- `docs/private-beta-operations.md`: monitoring, backup/restore, rollback, rotation, and incident runbooks
-- `PRIVACY.md`: current data-handling disclosure draft
-- `apps/api/README.md`: FastAPI development and Vercel notes
-- `AGENTS.md`: durable repository rules for future coding sessions
+Start coding sessions at [AGENTS.md](AGENTS.md). Read the linked topics for the task at hand;
+keep detailed rules in their owning documents.
+
+| Document | Owns |
+| --- | --- |
+| [AGENTS.md](AGENTS.md) | Short agent entry point, hard constraints, and session workflow |
+| [PROGRESS.md](PROGRESS.md) | Latest handoff, verification evidence, blockers, and next action |
+| [DECISIONS.md](DECISIONS.md) | Durable choices, rationale, sources, and reconsideration conditions |
+| [Development guide](docs/development.md) | Toolchain rules and checks required for each change |
+| [Architecture](architecture.md) | Runtime boundaries and recommendation flow |
+| [Suggestion contracts](docs/suggestion-contracts.md) | Input, cache, fallback, catalog, and rendering invariants |
+| [Quality playbook](QUALITY.md) | Evaluation, template curation, and promotion procedures |
+| [Storage and secrets](docs/storage-and-secrets.md) | Environment isolation and credential-handling rules |
+| [Launch plan](docs/production-launch-plan.md) | Product backlog, acceptance criteria, and unresolved questions |
+| [Release checklist](docs/release.md) | Repository, deployment, and Chrome Web Store gates |
+| [Private-beta deployment](docs/private-beta-deployment.md) | End-to-end production setup and beta sequence |
+| [Private-beta operations](docs/private-beta-operations.md) | Monitoring, backup/restore, rollback, rotation, and incidents |
+| [Release record](docs/private-beta-release-2026-09-06.md) | Dated production verification evidence |
+| [Privacy disclosure](PRIVACY.md) | Current data-handling disclosure draft |
+| [API README](apps/api/README.md) | FastAPI development, agent API, and Vercel notes |
 
 ## License
 

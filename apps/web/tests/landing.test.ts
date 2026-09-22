@@ -70,6 +70,9 @@ test("public policies and sitemap agree with current payment availability", asyn
   assert.match(refunds, /not a monetary refund/);
   assert.match(privacy, /Dodo Payments is the planned payment provider/);
   assert.match(privacy, /does not currently send payment information to it/);
+  assert.match(terms, /MemeDrop does not claim ownership of that third-party material/);
+  assert.match(terms, /We may restrict or remove disputed material/);
+  assert.match(privacy, /our <a href="\/terms\/">Terms of use<\/a> explain template rights/);
   for (const path of ["/terms/", "/refund-policy/", "/privacy-policy/"]) {
     assert.ok(sitemap().some((entry) => entry.url.endsWith(path)));
     assert.ok(footer.includes(`href="${path}"`));

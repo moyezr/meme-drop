@@ -1,11 +1,12 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-09-07
+Last updated: 2026-09-09 (documentation ownership; product status last recorded 2026-09-07)
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
-"humor layer for AI agents." Update task status and decisions here as implementation progresses.
-Detailed implementation notes may live beside the relevant application, but they should link back
-to a task in this plan.
+"humor layer for AI agents." Update task status and acceptance evidence here as implementation
+progresses. [PROGRESS.md](../PROGRESS.md) owns the current session handoff; [DECISIONS.md](../DECISIONS.md)
+owns accepted choices and rationale. Detailed implementation notes may live beside the relevant
+application, but they should link back to a task in this plan.
 
 ## Status legend
 
@@ -30,34 +31,10 @@ security audits. It deliberately does not make provider calls or validate hosted
 
 ## Confirmed product decisions
 
-- Template-catalog expansion is an asynchronous, independent quality track. It must not block the
-  platform, billing, trend-memory, documentation, or infrastructure work needed for an initial
-  production launch. Normal suggestions will continue to use verified templates only.
-- Tavily is the trend-discovery provider. Trend enrichment and caption generation use
-  `google/gemini-3.7-flash` through OpenRouter.
-- Trend-card and query embeddings use the embedding-specific `google/gemini-embedding-2` model
-  through OpenRouter with 1,536 dimensions. Caption, suggestion, enrichment, and annotation calls
-  remain on `google/gemini-3.7-flash`; MemeDrop does not call Google directly.
-- Recurring trend ingestion uses QStash Workflow because the complete quality-preserving refresh
-  exceeded Vercel's 60-second function limit. Vercel still runs each bounded workflow step.
-- The public agent contract is `POST /api/v1/memes/generate`. Its required request body remains as
-  small as possible: an agent supplies `input`; optional controls stay under `options`.
-- New agent-facing records will use compact, application-generated IDs rather than UUIDs. IDs must
-  remain collision-resistant, non-sequential, URL-safe, and safe to expose publicly.
-- A customer `User` directly owns API keys, credits, generations, and generated assets. Team and
-  workspace abstractions stay out until the product needs shared ownership.
-- Dashboard authentication uses Auth.js with JWT sessions. FastAPI remains the only application
-  backend and owns customer data and credit enforcement.
-- Developer documentation will be hosted by the web application at `/docs`.
-- The web application will include a management dashboard for API keys, credits,
-  usage, billing, and account administration.
-- Agent-generated images expire after 30 days.
-- Meme generation consumes MemeDrop credits. Customers can purchase additional credits.
-- Production origins are:
-  - Frontend: `https://memedrop.moyezrabbani.dev`
-  - API: `https://api.memedrop.moyezrabbani.dev`
-- The web application will host an initial privacy-policy page at `/privacy-policy`. Its text
-  may evolve as providers, billing, retention, and account behavior are finalized.
+Accepted decisions now live in [DECISIONS.md](../DECISIONS.md): runtime boundaries (D002), catalog
+quality (D003), privacy/storage (D004), customer ownership and dashboard (D005), agent contract and
+credits (D006), trend ingestion (D007), and private-beta/payment boundaries (D008). Update those
+records when a decision changes; keep implementation status and acceptance checks in this plan.
 
 ## Launch definition
 
@@ -336,26 +313,16 @@ quality gates, and catalog growth does not regress relevance, readability, safet
 
 ## Open architecture and product decisions
 
-- [x] Public IDs use `u_`, `k_`, `g_`, and `a_` plus 12 characters from a 57-character
-  non-ambiguous, URL-safe alphabet. They provide about 70 bits of CSPRNG entropy; database
-  uniqueness and bounded retry handle the remote collision case.
-- [x] Existing UUID-based install/browser identities are not rewritten for the initial agent launch.
-- [x] Credit-consumption semantics: charge one credit per successful durable returned asset; refund
-  unused reservations for `no_fit`, partial output, or failure; charge successful deterministic
-  fallback assets; never recharge a matching replay.
+Accepted choices have moved to [DECISIONS.md](../DECISIONS.md). The unresolved decisions and external
+readiness below remain part of launch planning; `in progress` does not establish production readiness.
+
 - [?] Credit package sizes, price, tax treatment, refunds, expiry, and target gross margin.
-- [~] Dodo Payments replaces Lemon Squeezy as the planned payment provider. Authenticated test-mode
-  checkout, signed `payment.succeeded` fulfillment, and replay-safe credit grants are implemented;
-  the application credit ledger remains authoritative. Refund handling, live-mode merchant approval,
-  currencies, payout eligibility, and production behavior still need verification.
-- [x] Generated image URLs require the owning user's Bearer credential throughout the 30-day
-  retention window and return gone after expiry.
+- [~] Complete Dodo refund handling and verify live-mode merchant approval, currencies, payout
+  eligibility, and production behavior. D008 records the provider choice and test-mode boundary.
 - [?] Whether customers can explicitly delete generated images before expiry.
-- [x] Dashboard authentication uses Auth.js JWT sessions and a user-owned model without workspaces
-  or memberships.
 - [?] Initial public content-safety policy and appeal/takedown process.
-- [~] Proceed with an API/web private beta independently of the Chrome Web Store. Extension store
-  submission remains deferred until developer-account enrollment succeeds and provides a final ID.
+- [~] Complete Chrome Web Store developer-account enrollment and obtain a final extension ID before
+  store submission. D008 records the independently released API/web private-beta boundary.
 
 ## Verification commands
 
@@ -384,6 +351,8 @@ raw user text, or generated captions.
 
 ## Change log
 
+- 2026-09-09: Moved accepted decisions to DECISIONS.md and linked PROGRESS.md for session continuity.
+  Existing product task statuses and historical release evidence were not reverified by this edit.
 - 2026-09-07: Disabled stale Dodo test configuration in production so beta credits remain
   operator-controlled. Exercised the live dashboard assertion and key lifecycle, then fixed
   content-identical trend publications so successful QStash refreshes advance health freshness
