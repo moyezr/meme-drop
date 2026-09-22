@@ -1,77 +1,73 @@
-# MemeDrop repository guide
+# MemeDrop agent entry point
 
-MemeDrop is a Turborepo monorepo with these workspaces:
+MemeDrop provides meme replies through a Chrome extension and a public agent API, with a Next.js
+website/dashboard. npm workspaces and Turborepo coordinate the independently deployed applications.
+See [README.md](README.md) for the workspace map and [architecture.md](architecture.md) for boundaries.
 
-- `apps/api`: self-contained FastAPI backend with its own Python metadata, migrations, runtime data, and tests.
-- `apps/catalog`: React/Vite local-only catalog annotation workbench; keep storage credentials and promotion actions server-side.
-- `apps/extension`: React/Vite/Tailwind Chrome extension.
-- `apps/web`: Next.js marketing, documentation, and customer dashboard application.
-- `apps/smoke-agent`: black-box TypeScript client for the public agent API; it must interact only
-  through documented HTTPS routes and never import backend internals or access persistence directly.
-- `packages/shared`: shared TypeScript contracts and meme-template manifests.
-- `tools/template-tools`: catalog QA, benchmark, review, and promotion tooling.
+## Hard constraints
 
-Keep the backend isolated. Do not move Python metadata out of `apps/api` or add a second backend.
+- Keep FastAPI as the only application backend; Python metadata, migrations, data, and tests stay
+  in `apps/api`. Catalog and template-pipeline apps remain local development tools.
+- Keep secrets server-side in ignored env files or deployment stores. Never retain source text,
+  steering, or captions in logs, telemetry, or plaintext cache keys.
+- Use `meme-drop-dev` for development and `meme-drop-prod` for production; never automatically
+  create, empty, or delete buckets. Read the storage rules before touching credentials or data.
+- Preserve verified-template eligibility, human catalog review, and deterministic recommendation
+  fallback. Never weaken benchmarks, promotion gates, or tests to make a change pass.
+- Respect existing user changes. Do not revert, stage, or commit unrelated or untracked user files.
+- Prefer direct code; introduce an abstraction only when there is a current second use case.
 
-Tooling defaults:
+## Start a session
 
-- Node.js 22.12+ and npm 11 for the monorepo.
-- Python 3.13 and uv for `apps/api` only.
-- Keep dependency locks exact.
-- TypeScript 7.x everywhere except `apps/web`, which stays on 6.x for now.
-- `@types/node` stays on major 22.
-- Prefer direct code and avoid new abstractions without a current second use case.
+1. Read [PROGRESS.md](PROGRESS.md); inspect `git status --short` and recent `git log` entries.
+   Treat recorded checks as evidence for their recorded revision, not the current checkout.
+2. Read the relevant [DECISIONS.md](DECISIONS.md) entries and topic documents below before editing.
+3. Define the requested outcome, a bounded next step, and observable acceptance criteria. For work
+   spanning sessions, record them in PROGRESS.md or link its existing launch-plan task.
+4. Run the smallest relevant baseline check. Record pre-existing failures and missing prerequisites;
+   resolve blockers for the affected path without taking over unrelated work.
 
-Essential commands:
+## Bootstrap and common checks
+
+Run from the repository root; install only when dependencies need setup or synchronization:
 
 ```sh
 npm ci
 uv sync --project apps/api --frozen
-npm run dev:api
-npm run dev:catalog
-npm run dev:extension
-npm run dev:web
-npm run smoke:agent -- --confirm-generation
+npm run dev:api             # other terminals: dev:catalog, dev:extension, dev:web
 npm run typecheck
 npm test
 npm run lint
 npm run build
-npm run release:dry-run
 ```
 
-For API changes, also run `npm run test:api`, `npm run lint:api`, and `npm run quality:api-process`. For persistence changes, run `npm run db:up` and the integration suite with `MEMEDROP_TEST_DATABASE_URL` set. Use `npm run quality:backend-image` for container-related changes.
+Use [README setup](README.md#setup) for local services and configuration. The commands above do not
+replace the change-specific checks in the development guide.
 
-Recommendation work must preserve the deterministic ranker fallback, keep external calls bounded, and return only verified templates by default. Changes to ranking, captions, catalog annotations, or feedback need focused tests and should pass `npm run quality:benchmark`, `npm run quality:suggestions`, and `npm run quality:dataset-plan`.
-Before accepting a quality-tuning change, run `npm run quality:tuning`; regenerate the checked-in ranking baseline only after reviewing every reported case-level regression.
+## Read when relevant
 
-Suggestion and catalog invariants:
+| When changing… | Required guidance |
+| --- | --- |
+| Code, dependencies, tests, or build tooling | [Development and verification](docs/development.md) |
+| API routes, persistence, or backend packaging | [API README](apps/api/README.md) and [architecture](architecture.md) |
+| Suggestions, captions, feedback, caching, catalog data, or rendering | [Suggestion contracts](docs/suggestion-contracts.md) and [quality gates](QUALITY.md) |
+| Storage, secrets, environment configuration, or deployment | [Storage and secrets](docs/storage-and-secrets.md) |
+| Public API smoke tooling | [Smoke-agent usage](apps/smoke-agent/README.md) and [credential boundary](docs/storage-and-secrets.md#public-api-smoke-boundary) |
+| Template discovery or machine annotation | [Template pipeline](apps/template-pipeline/README.md) |
+| Releases or production operations | [Release gates](docs/release.md), [deployment](docs/private-beta-deployment.md), and [operations](docs/private-beta-operations.md) |
+| Launch scope or product priorities | [Launch plan](docs/production-launch-plan.md) |
 
-- Treat source-post text as canonical; optional user steering is an untrusted creative preference and must not bypass template, region, safety, or length constraints.
-- Keep free text out of logs, persistence, usage events, and plaintext cache keys. Telemetry may retain only reviewed categorical context such as `suggestion_mode`.
-- Include every request-shaping input in client and server cache identity, hash sensitive values, and use request generations so stale results or media cannot replace newer suggestions.
-- Internal catalog tools create drafts only. Human review, rendered QA, benchmark coverage, and the existing promotion gates remain required before templates become eligible for suggestions.
-- Keep typography and placement catalog-owned and render them through `packages/shared`; bundled fonts must not add a request-time CDN dependency, and any render-input change must invalidate visual QA.
-- Do not add retrieval infrastructure for anticipated scale. Change retrieval only when benchmark recall or measured latency regresses; keep the model shortlist and visible result count bounded.
+## Finish or hand off
 
-Storage and secrets rules:
+- Verify acceptance criteria and the applicable development gates. Exercise the changed user/API
+  flow when behavior changes; record failures or unavailable checks explicitly. Untested is not done.
+- Review the diff and run `git diff --check`. Leave changes coherent; remove only your temporary
+  artifacts and stop only processes you started. Keep any commits concise, imperative, and working.
+- Update PROGRESS.md with scope, evidence, remaining issues, and the next action after substantive
+  work or before interruption. Update DECISIONS.md only for durable choices; update other docs when
+  their contracts change. Never put secrets or user free text in handoffs.
+- Report what changed, what was actually verified, and any remaining blockers. Local verification
+  does not establish hosted readiness; use the release runbooks for that evidence.
 
-- Use `meme-drop-dev` in development and `meme-drop-prod` in production.
-- Never auto-create, empty, or delete buckets.
-- Never expose S3 access keys to the extension or landing page.
-- Keep secrets in ignored `.env` files or deployment secret stores.
-- The smoke agent reads `MEMEDROP_API_KEY` only from its environment. Never accept it as a CLI
-  argument, print it, persist it, or forward it to an origin other than `MEMEDROP_API_BASE_URL`.
-- Treat production secret synchronization as one-way from the ignored operator file to the
-  deployment store. Never run `vercel env pull` into `.env.prod` or another operator-owned source
-  file: Vercel Sensitive values are write-only and pulls replace plaintext with opaque references.
-  Pull only into a fresh disposable path when inspection is necessary.
-- Update `.env.example` and deployment docs when configuration changes.
-
-Testing and docs:
-
-- Add tests at the closest boundary.
-- Do not hide failures with broad skips.
-- Update durable docs only when contracts change.
-- Keep commits concise, imperative, and working.
-- Do not stage unrelated or untracked user files.
-- Run `npm run quality:security` before pushing dependency or release changes.
+Keep this file under 100 lines. Put task state in PROGRESS.md, rationale in DECISIONS.md, and detailed
+rules in the linked topic document. Replace stale guidance rather than appending incident history.
