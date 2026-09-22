@@ -9,61 +9,57 @@ The [launch plan](docs/production-launch-plan.md) owns the product backlog and i
 criteria. [DECISIONS.md](DECISIONS.md) owns durable choices. Link those records instead of duplicating
 their task lists or storing conversation transcripts here.
 
-## Current checkout — 2026-09-09
+## Current checkout — 2026-09-22
 
-- Baseline commit: `3819bf6` — `Align private beta release boundary`.
-- Current task: reorganize repository guidance using the harness engineering course.
-- Status: `verified` — documentation reorganization complete; evidence below.
-- Runtime test/build status: not run in this documentation-only session. Historical checks below
-  do not certify the present checkout.
-- Startup: [README setup](README.md#setup); verification selection: [development guide](docs/development.md).
-- Pre-existing work is outside this task: edits to `apps/web/src/app/privacy-policy/page.tsx`,
-  `apps/web/src/app/terms/page.tsx`, and `apps/web/tests/landing.test.ts`; untracked `INTERVIEW_PREP.md`
-  and `apps/web/public/memedrop_og_image.png`. Preserve these and recheck git status next session.
+- Branch: `codex/evaluate-jev`, based on current `main` (`c6fb35c`).
+- Current task: evaluate and integrate TypeSafe Jev as an optional verified-shortlist reranker.
+- Status: `verified` — evaluator and disabled-by-default runtime trial are implemented; evidence is
+  recorded below. This status verifies the implementation, not production rollout readiness.
+- Startup: [README setup](README.md#setup); verification selection:
+  [development guide](docs/development.md).
 
 ## Acceptance and completed work
 
-- [x] Keep AGENTS.md below 100 lines with bootstrap, routing, hard constraints, and completion rules.
-- [x] Preserve the former guide's safeguards in linked development, suggestion, and storage topics.
-- [x] Separate session state, decision rationale, and product backlog; seed records from repository
-  evidence and identify historical verification explicitly.
-- [x] Verify links, anchors, documented commands, rule coverage, and the final documentation diff.
+- [x] Evaluate pinned `jev-1.13.0` on the fixed 104-case suggestion benchmark and record quality,
+  latency, stability, caption-contract, and estimated-cost evidence.
+- [x] Add a server-side Jev client that only receives the bounded verified shortlist and transient
+  request context, validates typed responses strictly, and applies a process-local cooldown.
+- [x] Gate runtime use behind `MEMEDROP_JEV_RERANKER_ENABLED=false` with a 1.25-second Jev sub-budget
+  inside the existing 4.5-second inference budget.
+- [x] Use Jev only to reorder templates; keep caption writing in the existing caption model.
+- [x] On Jev rejection, timeout, malformed output, or caption failure, return to the original local
+  order and reviewed fallback without another provider attempt.
+- [x] Preserve cache/singleflight behavior, verified-template eligibility, bounded steering, secret
+  handling, non-sensitive logs, app-owned client cleanup, and production environment validation.
+- [x] Document configuration, architecture, quality gates, evaluation results, and rollout limits.
 
 ## Verification evidence
 
-Checked on 2026-09-09 against the documentation changes over `3819bf6`:
+Checked on 2026-09-22 against the Jev integration before merging current `main`:
 
-- One-off `node --input-type=module` documentation audit: passed for all eight changed Markdown
-  files; local file/heading links resolve, referenced root npm scripts exist, fences are balanced,
-  and no trailing whitespace was found. AGENTS.md is 73 lines (limit: fewer than 100).
-- `git diff --check`: passed. Reviewed the tracked diff and all five newly added Markdown files.
-- Compared every rule in the former AGENTS.md with its new owning document: toolchain and test
-  requirements, recommendation/catalog gates, input/cache/privacy rules, storage and smoke-agent
-  credential boundaries, production secret synchronization, and worktree hygiene remain covered.
-- Repository-only handoff review: purpose/layout, startup, verification, current state, and decision
-  rationale are reachable from AGENTS.md. This was a document review, not a fresh-agent runtime test.
+- `npm run lint --workspace=@memedrop/api`: passed.
+- `npm run typecheck --workspace=@memedrop/api`: passed, 128 source files.
+- `npm test --workspace=@memedrop/api`: passed, 491 tests; 26 integration tests skipped.
+- Focused Jev and affected-path suite: passed, 129 tests.
+- `npm run quality:tuning`: passed after building `@memedrop/shared`; benchmark audit reported 104
+  cases with no errors or warnings, deterministic suggestion gates passed, 16 renderer/shared tests
+  passed, the verified manifest stayed within its existing 25-warning ceiling, and the promotion
+  plan had no blocked approved templates.
+- Live runtime-shaped smoke using the configured TypeSafe and OpenRouter credentials: two of three
+  fixed cases completed Jev plus captioning in 3.51–3.63 seconds; one reached the shared deadline at
+  4.53 seconds and safely returned local fallback. No source text or generated caption was logged.
+- `git diff --check`: passed before the implementation commit.
 
-No application suites or deployment checks were run because this task changes documentation only.
-No commit was created, and pre-existing user work was left untouched.
-
-## Recorded product state and unresolved work
-
-The [release record](docs/private-beta-release-2026-09-06.md) reports a verified API/web private-beta
-release on 2026-09-06 and follow-up verification on 2026-09-07. The follow-up records 499 API tests,
-26 PostgreSQL/Redis integration tests, lint, type checking, API process smoke, and live dashboard/key
-lifecycle verification. These are historical results, not checks rerun on 2026-09-09.
-
-At the latest recorded launch checkpoint, tester invitations remained an operator step; paid
-checkout, public self-service, and Chrome Web Store submission remained separate release tracks.
-Production Dodo configuration was disabled. Further metrics, billing/policy work, and catalog review
-remain in the [launch plan](docs/production-launch-plan.md). Their live status was not rechecked here.
+The full evaluation and its limitations are in
+[docs/jev-evaluation-2026-09-22.md](docs/jev-evaluation-2026-09-22.md). Jev improved top-1 selection
+from 74.0% to 92.3%, but the tested sequential path did not clear all caption-contract and latency
+gates. The runtime feature therefore remains disabled by default.
 
 ## Blockers and next action
 
-- No remaining work or blocker for this documentation task.
-- For subsequent product work, select the requested task from the launch plan, confirm its actual
-  checkout state, and record a bounded acceptance check before implementing it. Do not infer a new
-  deployment or tester-invitation task from this handoff.
+- No implementation blocker remains.
+- Do not enable Jev in production from this work alone. The next action is a controlled comparison
+  against a repaired joint-model baseline, including human caption-taste review and end-to-end p95.
 
 ## Handoff maintenance
 

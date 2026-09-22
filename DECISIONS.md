@@ -138,3 +138,21 @@ Status: accepted · Recorded: 2026-09-09
 - Reconsider when the corresponding product decisions and hosted release checks are complete.
 - Evidence: [release boundary](docs/release.md#current-release-boundaries), [release record](docs/private-beta-release-2026-09-06.md),
   and [open launch decisions](docs/production-launch-plan.md#open-architecture-and-product-decisions).
+
+## D009 — Keep Jev as an optional shortlist reranker
+
+Status: accepted · Date: 2026-09-22
+
+- Context: pinned Jev 1.13.0 improved first-choice template fit on the fixed benchmark, but it does
+  not generate captions and the sequential Jev-plus-caption path has not cleared every caption and
+  end-to-end latency gate.
+- Decision: Jev may only reorder the deterministic shortlist of at most 12 verified templates.
+  The existing caption model writes overlays for at most five results. Both calls share the current
+  4.5-second inference budget, and the integration remains disabled by default.
+- Consequence: a Jev rejection, malformed response, timeout, cooldown, or downstream caption failure
+  returns directly to the original local order and reviewed fallback. Do not make another provider
+  attempt on that request. Keep source text and steering transient and out of logs and persistence.
+- Reconsider enabling the path only after a controlled comparison against a working joint-model
+  baseline clears case-level ranking, strict caption validity, human taste, and end-to-end p95 gates.
+- Evidence: [Jev evaluation](docs/jev-evaluation-2026-09-22.md),
+  [quality gates](QUALITY.md), and [suggestion architecture](architecture.md#suggestion-pipeline).
