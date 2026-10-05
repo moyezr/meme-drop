@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Mouse_Memoirs, TikTok_Sans } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
+import { SiteAnalytics } from "./site-analytics";
 import "./globals.css";
 import "./landing.css";
 
@@ -87,7 +87,7 @@ export default function RootLayout({
     <html lang="en" className={`${mouseMemoirs.variable} ${tikTokSans.variable}`}>
       <body>
         {children}
-        <Analytics />
+        <SiteAnalytics />
       </body>
     </html>
   );

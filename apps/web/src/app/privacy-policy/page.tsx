@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
           A plain-language disclosure of how the MemeDrop private beta handles information, and
           which hosted-provider and billing details remain to be finalized before public launch.
         </p>
-        <p className="policyMeta">Effective date: September 3, 2026</p>
+        <p className="policyMeta">Effective date: October 5, 2026</p>
       </header>
 
       <aside className="notice" aria-label="Pre-launch policy status">
@@ -111,7 +111,10 @@ export default function PrivacyPolicyPage() {
           create normalized trend cards.
         </p>
         <p>
-          The website uses Vercel Analytics. Meme media is stored through the configured
+          The website uses Vercel Analytics to measure visits to public pages. Page-view URLs
+          exclude query parameters and fragments; sign-in, dashboard, API, and unknown routes
+          are excluded, and the website does not send custom analytics events.
+          Meme media is stored through the configured
           object-storage provider. These providers process data under their own terms and privacy
           notices. Their hosted production configuration, provider-side input retention, model
           training controls, log retention, deletion propagation, and subprocessors are still being
