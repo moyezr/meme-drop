@@ -46,7 +46,7 @@ def valid_environment() -> dict[str, str]:
         "MEMEDROP_TREND_EMBEDDING_BATCH_SIZE": "32",
         "MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS": "1",
         "MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS": "3600",
-        "MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS": "28800",
+        "MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS": "172800",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE": "100",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS": "900",
         "MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS": "900",
@@ -72,6 +72,15 @@ def valid_environment() -> dict[str, str]:
 
 def test_valid_production_environment_has_no_findings() -> None:
     assert production_env_findings(valid_environment()) == ([], [])
+
+
+def test_production_environment_rejects_trend_freshness_beyond_two_days() -> None:
+    environment = valid_environment()
+    environment["MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS"] = "172801"
+
+    errors, _ = production_env_findings(environment)
+
+    assert any("MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS" in error for error in errors)
 
 
 def test_production_environment_rejects_removed_shared_variables() -> None:

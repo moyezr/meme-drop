@@ -1,6 +1,6 @@
 # MemeDrop privacy policy
 
-Last updated: 2026-09-06
+Last updated: 2026-10-07
 
 This document describes the current MemeDrop private beta. Provider retention and billing details
 that are still under review will be finalized before public self-service access opens.
@@ -57,7 +57,8 @@ Current application retention is deletion-based:
 - in-memory suggestion caches expire after five minutes or process termination;
 - optional guidance is cleared when the active composer closes or changes;
 - browser-library images and records remain until the user deletes the item or installation data;
-- agent-generated images expire after 30 days and are removed by a protected cleanup job;
+- agent-generated images become inaccessible after 30 days; a protected weekly cleanup job removes
+  expired stored objects, with longer deletion delays possible for backlogs or failed retries;
 - structured usage events remain until the user deletes installation data;
 - the anonymous install ID remains in Chrome storage until extension data is cleared;
 - infrastructure logs follow the retention configured in the Vercel, Supabase, and model-provider

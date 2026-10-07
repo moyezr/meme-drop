@@ -28,7 +28,7 @@ psycopg-pool==3.3.1
 pydantic==2.13.4
 pydantic-core==2.46.4
 pydantic-settings==2.14.2
-pyjwt==2.13.0
+pyjwt==2.15.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 pyyaml==6.0.3
@@ -44,7 +44,7 @@ typing-extensions==4.16.0
 typing-inspection==0.4.2
 tzdata==2026.3 ; sys_platform == 'win32'
 upstash-workflow==2.0.0
-urllib3==2.7.0
+urllib3==2.8.0
 uvicorn==0.52.1
 uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
 watchfiles==1.2.0

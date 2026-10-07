@@ -10,7 +10,7 @@ const listingPath = path.resolve(
   String(args.file || "apps/extension/store-listing.json")
 );
 const manifestPath = path.join(extensionDir, "manifest.json");
-const privacyPath = path.join(rootDir, "PRIVACY.md");
+const privacyPath = path.resolve(rootDir, String(args["privacy-policy"] || "PRIVACY.md"));
 
 const manifest = readJson(manifestPath);
 const findings = [];

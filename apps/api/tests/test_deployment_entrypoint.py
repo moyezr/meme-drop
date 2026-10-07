@@ -25,7 +25,7 @@ def test_vercel_uses_automatic_root_entrypoint_detection() -> None:
     assert "pydantic-settings==" in requirements
 
 
-def test_vercel_delegates_trends_to_qstash_and_cleans_generated_assets_daily() -> None:
+def test_vercel_delegates_trends_to_qstash_and_cleans_generated_assets_weekly() -> None:
     project_root = Path(__file__).parents[1]
     config = json.loads((project_root / "vercel.json").read_text(encoding="utf-8"))
 
@@ -40,5 +40,5 @@ def test_vercel_delegates_trends_to_qstash_and_cleans_generated_assets_daily() -
         "app.py": {"maxDuration": 60, "regions": ["sin1"]}
     }
     assert config["crons"] == [
-        {"path": "/internal/cron/assets/cleanup", "schedule": "30 3 * * *"},
+        {"path": "/internal/cron/assets/cleanup", "schedule": "30 3 * * 0"},
     ]

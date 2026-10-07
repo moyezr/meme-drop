@@ -5,15 +5,15 @@ self-service remain separate release tracks.
 
 ## Current production controls
 
-- QStash schedule `scd_65aL78hRe3wTQPur3VQFoEJVmfVY` starts the signed trend workflow every four
-  hours. The workflow retries each bounded step three times and publishes only a complete snapshot.
+- QStash schedule `scd_65aL78hRe3wTQPur3VQFoEJVmfVY` starts the signed trend workflow daily at 00:00 UTC.
+  The workflow retries each bounded step three times and publishes only a complete snapshot.
 - cron-job.org job `8391201` calls `GET /health` every ten minutes. It alerts after two consecutive
   failures, on recovery, on automatic disablement, and seven days before TLS certificate expiry.
-- Vercel calls the idempotent generated-asset cleanup at 03:30 UTC. cron-job.org job `8393375`
-  repeats the protected cleanup at 03:40 UTC and alerts on the first non-successful response. The
+- Vercel calls the idempotent generated-asset cleanup on Sundays at 03:30 UTC. cron-job.org job `8393375`
+  repeats the protected cleanup on Sundays at 03:40 UTC and alerts on the first non-successful response. The
   second delivery is safe because the worker uses a Redis lease and durable PostgreSQL claims.
 - `/health` returns HTTP 503 for database, Redis rate-limiter, empty-trend, or stale-trend failures.
-  A trend snapshot not successfully published within eight hours is stale. Content-identical
+  A trend snapshot not successfully published within 48 hours is stale. Content-identical
   refreshes reuse the immutable snapshot version while advancing its last successful publication
   time.
 - Dodo checkout variables are absent from the production API. Private-beta credits are granted only
@@ -109,7 +109,7 @@ overwrite the operator source file.
   safety, region, or length gates.
 - **Tavily or QStash:** the last good trend snapshot remains active. Investigate before manually
   refreshing, and do not publish a partial snapshot. The health monitor alerts once the snapshot is
-  older than eight hours.
+  older than 48 hours.
 - **PostgreSQL:** stop mutations, preserve the current database, take a logical backup if it is
   reachable, and recover into a separate project from the last verified snapshot.
 - **Redis:** authenticated generation and other protected routes fail closed when the production

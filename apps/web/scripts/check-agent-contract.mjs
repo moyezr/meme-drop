@@ -80,7 +80,7 @@ for (const text of [
 for (const text of [
   "one-way SHA-256 hashes",
   "expires 30 days",
-  "protected daily cleanup job",
+  "protected weekly cleanup job",
   "implementation excludes raw submitted text",
   "provider-side input retention",
   "Payments, recharging, and self-service billing are not implemented",

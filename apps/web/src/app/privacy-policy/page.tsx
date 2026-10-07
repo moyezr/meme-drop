@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
           A plain-language disclosure of how the MemeDrop private beta handles information, and
           which hosted-provider and billing details remain to be finalized before public launch.
         </p>
-        <p className="policyMeta">Effective date: October 5, 2026</p>
+        <p className="policyMeta">Effective date: October 7, 2026</p>
       </header>
 
       <aside className="notice" aria-label="Pre-launch policy status">
@@ -67,8 +67,9 @@ export default function PrivacyPolicyPage() {
         <p>
           MemeDrop stores rendered meme images in the configured object-storage service so they can
           be returned to the authenticated user. Each durable generated asset expires 30 days
-          after generation. Expired media is no longer served; a protected daily cleanup job deletes
-          its exact stored object and keeps failures visible for operator retry. Rendered pixels
+          after generation. Expired media is no longer served; a protected weekly cleanup job deletes
+          its exact stored object and keeps failures visible for operator retry. Stored files may remain
+          for up to a week after access expires, or longer if deletion retries fail. Rendered pixels
           necessarily contain the generated caption even though caption text is not stored as a
           separate application field.
         </p>

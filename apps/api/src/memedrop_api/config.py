@@ -217,10 +217,10 @@ class Settings(BaseSettings):
         le=86_400,
     )
     trend_snapshot_max_age_seconds: int = Field(
-        default=28_800,
+        default=172_800,
         validation_alias="MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS",
         ge=3_600,
-        le=86_400,
+        le=172_800,
     )
     api_rate_limit_window_ms: int = Field(
         default=60_000, validation_alias="MEMEDROP_RATE_LIMIT_WINDOW_MS", gt=0

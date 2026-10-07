@@ -71,19 +71,19 @@ live smoke tests remain incomplete until an operator performs and verifies those
 - [x] Distinguish local credit reservations from provider-reported Tavily usage in operator output.
 - [x] Set the application monthly ceiling to 900 Tavily credits.
 - [x] Change the pulse profile from a six-hour cadence to a four-hour cadence after the safe-failure
-  work is deployed. The code supports four-hour buckets, but the checked-in Hobby preview schedule
-  currently invokes all profiles once daily and uses approximately 321 searches per 30 days.
+  work is deployed. The code supports four-hour buckets; production now invokes all
+  profiles once daily at 00:00 UTC and uses approximately 321 searches per 30 days.
 - [x] Add a protected, idempotent cron entry point suitable for Vercel Cron Jobs. It authenticates
   the scheduler, uses deterministic UTC scan buckets, and prevents overlapping executions.
-- [x] Replace the single-invocation Vercel trend cron with a QStash Workflow scheduled every four
-  hours. A production measurement on 2026-09-05 reached Vercel's 60-second function limit and
+- [x] Replace the single-invocation Vercel trend cron with a QStash Workflow, now scheduled once daily.
+  A production measurement on 2026-09-05 reached Vercel's 60-second function limit and
   returned HTTP 504 after successful Tavily and OpenRouter calls, so QStash must coordinate bounded
   steps rather than call the existing full-refresh endpoint once. Each query and embedding batch
   now runs as a signed, retried step, followed by the existing atomic snapshot-publication gate.
-  The expected approximately 771 searches leave approximately 129 retry credits under the
+  The expected approximately 321 searches leave approximately 579 retry credits under the
   900-credit ceiling.
 - [x] Add stale-snapshot monitoring: `/health` returns HTTP 503 with content-free snapshot age
-  details when no usable snapshot has been published within the eight-hour window. cron-job.org job
+  details when no usable snapshot has been published within the 48-hour window. cron-job.org job
   `8391201` checks the production endpoint every ten minutes and alerts after two failures and on
   recovery.
 - [x] Embed active serving trend cards in bounded OpenRouter batches before snapshot publication.

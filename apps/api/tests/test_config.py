@@ -45,6 +45,7 @@ def test_development_defaults_are_safe_and_usable() -> None:
     assert settings.generated_asset_cleanup_claim_timeout_seconds == 900
     assert settings.generated_asset_cleanup_lock_ttl_seconds == 900
     assert settings.agent_generation_stale_timeout_seconds == 1_800
+    assert settings.trend_snapshot_max_age_seconds == 172_800
     assert settings.dashboard_token_secret is None
     assert settings.dodo_payments_environment == "test_mode"
     assert settings.dodo_checkout_enabled is False
@@ -54,6 +55,15 @@ def test_development_defaults_are_safe_and_usable() -> None:
         settings.normalized_dodo_return_url
         == "http://localhost:3000/dashboard/billing?checkout=return"
     )
+
+
+def test_trend_freshness_allows_daily_refresh_but_rejects_more_than_two_days() -> None:
+    assert (
+        make_settings(trend_snapshot_max_age_seconds=172_800).trend_snapshot_max_age_seconds
+        == 172_800
+    )
+    with pytest.raises(ValidationError):
+        make_settings(trend_snapshot_max_age_seconds=172_801)
 
 
 def test_dodo_checkout_configuration_is_all_or_nothing() -> None:

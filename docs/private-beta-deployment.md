@@ -166,7 +166,7 @@ MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS=1
 CRON_SECRET=<long-random-secret>
 MEMEDROP_DASHBOARD_TOKEN_SECRET=<shared-high-entropy-bridge-secret>
 MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS=3600
-MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS=28800
+MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS=172800
 MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE=100
 MEMEDROP_GENERATED_ASSET_CLEANUP_CLAIM_TIMEOUT_SECONDS=900
 MEMEDROP_GENERATED_ASSET_CLEANUP_LOCK_TTL_SECONDS=900
@@ -199,15 +199,15 @@ enabled in the Vercel project.
 
 When `MEMEDROP_TRENDS_ENABLED=true`, create one QStash schedule with destination
 `https://api.memedrop.moyezrabbani.dev/internal/workflows/trends/refresh`, method `POST`, and cron
-expression `0 */4 * * *` in UTC. Do not add an authorization header: QStash signs deliveries and
+expression `0 0 * * *` in UTC. Do not add an authorization header: QStash signs deliveries and
 the Workflow SDK verifies them with the two signing keys. The workflow gives each curated query and
 embedding batch its own retried Vercel invocation, then publishes the complete snapshot atomically.
-The cadence uses roughly 771 monthly searches under the 900-credit ceiling. Monitor `GET /health`
-and alert on HTTP 503; a missing, empty, or older-than-eight-hours snapshot is unhealthy.
+The cadence uses roughly 321 searches per 30 days under the 900-credit ceiling. Monitor `GET /health`
+and alert on HTTP 503; a missing, empty, or older-than-48-hours snapshot is unhealthy.
 
 `CRON_SECRET` is required in production even if trends are disabled because the same constant-time
-bearer authentication protects the daily generated-asset cleanup. The checked-in schedule calls
-`GET /internal/cron/assets/cleanup` at 03:30 UTC. Its Redis lease and PostgreSQL claims make duplicate
+bearer authentication protects the weekly generated-asset cleanup. The checked-in schedule calls
+`GET /internal/cron/assets/cleanup` on Sundays at 03:30 UTC. Its Redis lease and PostgreSQL claims make duplicate
 deliveries safe, and its response exposes only bounded counts and deletion lag. Alert on any
 non-2xx cleanup response and on a growing `remaining_retryable_assets`,
 `oldest_retryable_lag_seconds`, `blocked_expired_assets`, or `oldest_blocked_lag_seconds` value.
@@ -309,7 +309,7 @@ amount conflicts, and every intended grant needs a new operator key. The status 
 operator-safe user/key metadata, IDs, timestamps, and the credit balance. It does not return
 credentials, request content, captions, or generated media metadata.
 
-### Confirm daily generated-media maintenance
+### Confirm weekly generated-media maintenance
 
 The protected `GET /internal/cron/assets/cleanup` schedule runs retention cleanup and
 stale-generation credit reconciliation under one `CRON_SECRET`-authenticated Redis lease. Keep

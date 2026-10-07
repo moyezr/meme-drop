@@ -683,7 +683,7 @@ def production_env_findings(
     bounded_int("MEMEDROP_TREND_EMBEDDING_BATCH_SIZE", minimum=1, maximum=128)
     bounded_float("MEMEDROP_TREND_COLLECTION_COOLDOWN_SECONDS", minimum=0, maximum=60)
     bounded_int("MEMEDROP_TREND_REFRESH_LOCK_TTL_SECONDS", minimum=60, maximum=3_600)
-    bounded_int("MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS", minimum=3_600, maximum=86_400)
+    bounded_int("MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS", minimum=3_600, maximum=172_800)
 
     bounded_int("MEMEDROP_GENERATED_ASSET_CLEANUP_BATCH_SIZE", minimum=1, maximum=100)
     cleanup_claim_timeout = bounded_int(

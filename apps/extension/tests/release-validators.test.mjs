@@ -86,9 +86,10 @@ test("store listing initializer rejects placeholder launch contacts", async () =
 });
 
 test("store readiness validator passes template metadata in non-strict mode", async () => {
+  const privacyPath = await draftPrivacyFixture();
   const { stdout } = await execFileAsync(
     "node",
-    ["scripts/validate-store-readiness.mjs", "--file", "apps/extension/store-listing.example.json"],
+    ["scripts/validate-store-readiness.mjs", "--file", "apps/extension/store-listing.example.json", "--privacy-policy", privacyPath],
     { cwd: path.join(rootDir, "apps/extension") }
   );
 
@@ -97,6 +98,7 @@ test("store readiness validator passes template metadata in non-strict mode", as
 });
 
 test("store readiness validator requires final retention settings and screenshots in strict mode", async () => {
+  const privacyPath = await draftPrivacyFixture();
   await assert.rejects(
     execFileAsync(
       "node",
@@ -105,6 +107,8 @@ test("store readiness validator requires final retention settings and screenshot
         "--strict",
         "--file",
         "apps/extension/store-listing.example.json",
+        "--privacy-policy",
+        privacyPath,
       ],
       { cwd: path.join(rootDir, "apps/extension") }
     ),
@@ -119,6 +123,14 @@ test("store readiness validator requires final retention settings and screenshot
     }
   );
 });
+
+async function draftPrivacyFixture() {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-draft-privacy-"));
+  const privacyPath = path.join(tmpDir, "PRIVACY.md");
+  const policy = await fs.readFile(path.join(rootDir, "PRIVACY.md"), "utf8");
+  await fs.writeFile(privacyPath, `${policy}\nBefore launch: finalize provider retention.\n`);
+  return privacyPath;
+}
 
 test("store readiness validator requires detailed usage event disclosure", async () => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "memedrop-listing-"));

@@ -138,3 +138,22 @@ Status: accepted · Recorded: 2026-09-09
 - Reconsider when the corresponding product decisions and hosted release checks are complete.
 - Evidence: [release boundary](docs/release.md#current-release-boundaries), [release record](docs/private-beta-release-2026-09-06.md),
   and [open launch decisions](docs/production-launch-plan.md#open-architecture-and-product-decisions).
+
+## D009 — Reduce idle production maintenance frequency
+
+Status: accepted · Date: 2026-10-07
+
+- Context: production has no customer accounts or recent customer generations, while scheduled
+  work accounts for roughly 9,000 monthly API invocations and consumes provider credits.
+- Decision: at the operator's request, run the QStash trend workflow daily at 00:00 UTC and both
+  generated-asset cleanup deliveries weekly on Sundays, at 03:30 and 03:40 UTC. Keep the health
+  monitor every ten minutes. Set trend freshness to 48 hours, preserving two scheduled intervals
+  of tolerance and stale/missing/empty snapshot failures. Keep the 900-credit ceiling and workflow
+  retry, signature, publication, and deterministic fallback safeguards.
+- Consequence: trend discovery is less current; expired media remains inaccessible at 30 days,
+  but physical deletion and stale-generation refunds can wait up to a week plus retry delays.
+  Database/object backup procedures remain separate and unchanged.
+- Reconsider cadence when testers become active or measured freshness, deletion lag, or refund
+  delay becomes unacceptable.
+- Evidence: current aggregate investigation in [PROGRESS.md](PROGRESS.md), schedule contracts in
+  [operations](docs/private-beta-operations.md), and [API maintenance](apps/api/README.md).

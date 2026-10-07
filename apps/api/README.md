@@ -77,11 +77,12 @@ default refresh runs the pulse, daily, and weekly profiles together; determinist
 make repeated daily and weekly work idempotently skip until its cadence advances. For isolated
 runs, repeat `--profile pulse`, `--profile daily`, or `--profile weekly` as needed.
 
-QStash schedules `POST /internal/workflows/trends/refresh` with `0 */4 * * *` in UTC. Its signed
+QStash schedules `POST /internal/workflows/trends/refresh` once daily at 00:00 UTC with
+`0 0 * * *`. Its signed
 Workflow requests run preflight, every curated query, each embedding batch, and atomic publication
 as separate Vercel invocations. Failed invocations retry three times. Deterministic query claims
 make delivery retries idempotent, while an owner-fenced Redis lease prevents overlapping workflows.
-The cadence uses an estimated 771 searches per 30 days, and the PostgreSQL ledger enforces the
+The cadence uses an estimated 321 searches per 30 days, and the PostgreSQL ledger enforces the
 900-credit ceiling.
 
 `QSTASH_URL`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, and `QSTASH_NEXT_SIGNING_KEY` are
@@ -91,9 +92,10 @@ required for the separate Vercel asset-cleanup cron and the legacy operator-only
 ## Generated-image retention
 
 Every durable generated asset expires 30 days after creation. Vercel Cron calls the protected
-`GET /internal/cron/assets/cleanup` route daily at 03:30 UTC using the same `CRON_SECRET` bearer
+`GET /internal/cron/assets/cleanup` route weekly on Sundays at 03:30 UTC using the same `CRON_SECRET` bearer
 authentication as trend refresh. A separate owner-fenced Redis lease prevents overlapping cleanup
-runs. Each run claims no more than 100 expired records with PostgreSQL `FOR UPDATE SKIP LOCKED`,
+runs. Expired media is never served, but stored objects and stale-generation credit reconciliation
+may wait up to a week for the next maintenance run; failures can extend that delay. Each run claims no more than 100 expired records with PostgreSQL `FOR UPDATE SKIP LOCKED`,
 deletes only the exact object key stored on each record, and retains categorical success or failure
 state for bounded retries. It never lists, empties, creates, or deletes a bucket.
 
@@ -114,7 +116,7 @@ is still considered in flight and is not reported as blocked until the configure
 
 `/health` remains the monitoring endpoint. When trends are enabled, it also reports the latest
 published snapshot's content-free age and returns HTTP 503 when no snapshot exists, it contains no
-serving cards, or it is older than `MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS` (eight hours by
+serving cards, or it is older than `MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS` (48 hours by
 default). Alert on any non-200
 health response. Production trend refresh requires `TAVILY_API_KEY`, `OPENROUTER_API_KEY`,
 `REDIS_URL`, and `CRON_SECRET`; keep all four in the deployment secret store.
@@ -298,7 +300,7 @@ commits it only after the full durable asset set is stored transactionally. `no_
 storage, cancellation, and internal failures release the reservation. A terminal idempotent replay
 returns the stored media without invoking retrieval, rendering, or storage again.
 
-The protected daily generated-asset maintenance cron also performs bounded stale-generation
+The protected weekly generated-asset maintenance cron also performs bounded stale-generation
 reconciliation. After `MEMEDROP_AGENT_GENERATION_STALE_TIMEOUT_SECONDS` (30 minutes by default),
 it holds the account and generation locks, lists at most the fixed five-result output bound plus one object
 under that exact account-and-generation prefix, and deletes only those keys. An overflow, listing,
