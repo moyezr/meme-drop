@@ -13,7 +13,8 @@ This is the current session handoff. Replace stale state; git retains history. T
 - Acceptance: live scheduler readbacks show the requested cadence; deployed `/health` uses the
   new freshness bound; applicable local gates pass; expired media still becomes inaccessible at
   30 days; the published privacy disclosure reflects weekly physical cleanup.
-- Status: local gates verified; production rollout pending. Focused baseline: 44 passed;
+- Status: completed; API/web deployments, all three scheduler cadences, health freshness,
+  and the published privacy disclosure verified. Focused baseline: 44 passed;
   updated focused boundary suite: 49 passed.
   Fresh production backup completed with 98 objects. Local readiness gate initially failed on a
   privacy contract assertion that still required daily cleanup; that assertion now matches weekly
@@ -57,7 +58,7 @@ Checked on 2026-10-07 against the configured production services:
   - API observability, last 12 hours: approximately 165 invocations and 17s CPU; 46.9% cold starts.
     The function table groups the backend under `/fastapi`. Exact request-path breakdown requires
     Pro and displayed demo data, which was excluded from findings.
-- Runtime code/runbooks show a four-hour QStash trend refresh, a ten-minute health monitor, and
+- Before this change, runtime code/runbooks showed a four-hour QStash trend refresh, a ten-minute health monitor, and
   daily primary/backup asset cleanup. Trend workflows run each of 21 curated queries as a separate
   step, including queries whose daily/weekly scan bucket has already completed. Background work is
   the leading explanation for spend with no recent customer generation; historical CPU attribution
@@ -80,12 +81,12 @@ Checked on 2026-10-07 against the configured production services:
   and one `/` request returning 404. No customer generation was present in that sample. This limited
   sample cannot rule out older unsolicited traffic. QStash delivered-log filtering for the public
   workflow URL returned no records; it did not provide a historical invocation count.
-- No spending controls were changed. Next cost-reduction work should address idle trend refresh,
-  avoid unnecessary workflow steps, and measure health-check/cold-start CPU. Any cadence or pause
-  change must account for the existing eight-hour trend-freshness readiness contract.
+- Cadence changes are now applied to the live schedulers. The ten-minute health monitor remains
+  enabled and accounts for an expected 4,320 monthly invocations. Future cost work can measure
+  health-check/cold-start CPU and avoid unnecessary workflow steps. Trend freshness is now 48 hours.
 - Hosted analytics ingestion is now observed; this does not establish broader release readiness.
-- Documentation-only handoff reviewed against captured aggregates and source contracts;
-  `git diff --check` passed. Runtime behavior did not change, so runtime suites were not run.
+- The initial investigation was read-only; the subsequent maintenance rollout is verified by
+  the local and hosted evidence below.
 
 ## Maintenance release verification
 
@@ -101,3 +102,30 @@ Checked on 2026-10-07 against the configured production services:
   restore verified in the isolated local database. Archived with the existing AES-256/Keychain
   workflow and removed the verified plaintext copy. The restore helper was temporarily adapted
   only to the isolated local port because another project owns port 5432.
+
+## Hosted maintenance rollout
+
+- Committed implementation: `af3cfb7`; deployments use a clean Git archive of that commit, excluding
+  ignored operator credentials and local artifacts. Updated the ignored production operator file
+  and Vercel production setting one-way to `MEMEDROP_TREND_SNAPSHOT_MAX_AGE_SECONDS=172800`.
+- API deployment `dpl_8oKuEWY4hb9DcbpLoLyXB864PRMr`: READY. Live project cron definitions show
+  `/internal/cron/assets/cleanup` with `30 3 * * 0` (Sundays at 03:30 UTC). Production `/health`
+  returns HTTP 200 with a fresh snapshot and the 172800-second freshness limit.
+- Existing QStash schedule `scd_65aL78hRe3wTQPur3VQFoEJVmfVY`: updated in place to `0 0 * * *`
+  and read back active with three retries. Destination, method, headers, body, and retry count
+  match the previous configuration. No duplicate schedule was created.
+- cron-job.org cleanup job `8393375`: updated in place to Sunday at 03:40 UTC and read back
+  enabled with response capture disabled. Other request, notification, and credential settings
+  were compared in memory and preserved. No cleanup or paid trend refresh was manually triggered.
+
+- Web deployment `dpl_HawmFz4L1FNG5az6GwPmEoAHa6Xj`: READY. Production landing, docs,
+  privacy policy, and sign-in routes return HTTP 200. Published privacy HTML contains weekly cleanup,
+  the preserved 30-day access expiry, and effective date October 7, 2026. API `/live` and `/health`
+  both return HTTP 200. Read back the unchanged, enabled ten-minute health monitor.
+- Next scheduled executions remain future events; no paid refresh or destructive cleanup was
+  forced for verification. Expected background invocations fall to roughly 5,100–5,200 per 30 days;
+  the unchanged health monitor still contributes 4,320. Trend refresh frequency falls by 83%.
+- Isolated test containers were stopped and removed; other projects' running services were left
+  intact. Temporary deployment archives and diagnostic files were removed after recording evidence.
+- Commits are local; production was deployed directly from the committed archive. Push the
+  implementation commit to GitHub before a future Git-based deployment to preserve this configuration.
