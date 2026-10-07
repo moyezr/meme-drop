@@ -127,5 +127,5 @@ Checked on 2026-10-07 against the configured production services:
   the unchanged health monitor still contributes 4,320. Trend refresh frequency falls by 83%.
 - Isolated test containers were stopped and removed; other projects' running services were left
   intact. Temporary deployment archives and diagnostic files were removed after recording evidence.
-- Commits are local; production was deployed directly from the committed archive. Push the
-  implementation commit to GitHub before a future Git-based deployment to preserve this configuration.
+- Implementation and rollout handoff were pushed to GitHub `main` after the direct production
+  deployment was verified, preserving the new configuration for future Git-based deployments.
