@@ -38,7 +38,14 @@ async def auto_tag_meme(
         "model": settings.openrouter_auto_tag_model,
         "temperature": 0.3,
         "max_tokens": 900,
-        "response_format": {"type": "json_object"},
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "meme_tags",
+                "strict": True,
+                "schema": AutoTagResult.model_json_schema(),
+            },
+        },
         "messages": [
             {
                 "role": "system",

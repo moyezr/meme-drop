@@ -10,7 +10,7 @@ benchmark coverage, and the existing promotion gates.
 
 ## Why annotation has two model stages
 
-OpenRouter routes both stages to `google/gemini-3.7-flash`. The vision stage returns bounded visual
+OpenRouter routes both stages to `openai/gpt-6-luna`. The vision stage returns bounded visual
 facts and normalized region proposals from pixels. The semantic stage then owns joke grammar,
 scenarios, anti-scenarios, retrieval hints, examples, safety notes, and typography constraints. It
 receives the visual facts and prior machine draft as context and is instructed to preserve the
@@ -46,7 +46,7 @@ so the cooldown occurs after every batch. HTTP 429 and transient 5xx responses u
 exponential backoff. Exhausted quota, billing, and authorization failures stop the run after the
 current wave is checkpointed, so a later invocation resumes without replacing the last valid draft.
 
-`TEMPLATE_PIPELINE_SEMANTIC_MODEL=google/gemini-3.7-flash` makes Gemini refine the semantic metadata
+`TEMPLATE_PIPELINE_SEMANTIC_MODEL=openai/gpt-6-luna` makes Luna refine the semantic metadata
 through OpenRouter. `dataset:scale:refine` includes the prior draft as editable context, preserves
 vision-owned geometry, checkpoints each wave atomically, skips drafts already refined with the same
 model/prompt/input hash, and retains the last valid draft if a refresh fails.

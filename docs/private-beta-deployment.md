@@ -144,10 +144,10 @@ MEMEDROP_API_PUBLIC_ORIGIN=https://api.memedrop.moyezrabbani.dev
 OPENROUTER_API_KEY=<production-key>
 OPENROUTER_SITE_URL=https://<production-api-origin>
 OPENROUTER_APP_NAME=MemeDrop
-OPENROUTER_SUGGESTION_MODEL=google/gemini-3.7-flash
-OPENROUTER_CAPTION_MODEL=google/gemini-3.7-flash
-OPENROUTER_AUTO_TAG_MODEL=google/gemini-3.7-flash
-OPENROUTER_TREND_MODEL=google/gemini-3.7-flash
+OPENROUTER_SUGGESTION_MODEL=openai/gpt-6-luna
+OPENROUTER_CAPTION_MODEL=openai/gpt-6-luna
+OPENROUTER_AUTO_TAG_MODEL=openai/gpt-6-luna
+OPENROUTER_TREND_MODEL=openai/gpt-6-luna
 OPENROUTER_EMBEDDING_MODEL=google/gemini-embedding-2
 
 # Enable only after Redis and the QStash Workflow schedule are configured.

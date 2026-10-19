@@ -21,7 +21,7 @@ interface SemanticAnnotation {
 export function annotationInputHash(
   record: PipelineRecord,
   visionModel: string | null,
-  semanticModel = "google/gemini-3.7-flash",
+  semanticModel = "openai/gpt-6-luna",
 ): string {
   return createHash("sha256")
     .update(

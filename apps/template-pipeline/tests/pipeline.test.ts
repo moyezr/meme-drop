@@ -79,7 +79,7 @@ test("image detection reads PNG and JPEG dimensions without trusting response he
   });
 });
 
-test("OpenRouter Gemini Flash provides pixel-derived visual facts", async () => {
+test("OpenRouter Luna provides pixel-derived visual facts", async () => {
   const record = validRecord();
   const settings = config();
   let requestedUrl = "";
@@ -111,7 +111,7 @@ test("OpenRouter Gemini Flash provides pixel-derived visual facts", async () => 
   );
 
   assert.equal(requestedUrl, "https://openrouter.ai/api/v1/chat/completions");
-  assert.equal(captured.model, "google/gemini-3.7-flash");
+  assert.equal(captured.model, "openai/gpt-6-luna");
   assert.equal(new Headers(capturedHeaders).get("authorization"), "Bearer openrouter-test-key");
   assert.equal(facts.geometry_source, "vision_model");
 });
@@ -161,7 +161,7 @@ test("state writes atomically and exports annotated records only", async () => {
   assert.equal(manifest.templates[0].quality, "draft");
 });
 
-test("OpenRouter batching uses Gemini Flash and preserves vision-owned geometry", async () => {
+test("OpenRouter batching uses Luna and preserves vision-owned geometry", async () => {
   const record = validRecord();
   const captured: Record<string, unknown> = {};
   let requestedUrl = "";
@@ -195,7 +195,7 @@ test("OpenRouter batching uses Gemini Flash and preserves vision-owned geometry"
 
   assert.equal(requestedUrl, "https://openrouter.ai/api/v1/chat/completions");
   assert.equal(new Headers(capturedHeaders).get("authorization"), "Bearer openrouter-test-key");
-  assert.equal(captured.model, "google/gemini-3.7-flash");
+  assert.equal(captured.model, "openai/gpt-6-luna");
   assert.deepEqual(captured.reasoning, { effort: "none", exclude: true });
   assert.equal(annotation.regions[0].x, record.vision!.region_proposals[0].x);
   assert.deepEqual(Object.keys(annotation.caption_guidance.good_examples[0]), ["top_caption"]);
@@ -203,7 +203,7 @@ test("OpenRouter batching uses Gemini Flash and preserves vision-owned geometry"
   assert.equal(annotation.annotation_meta.requires_human_review, true);
   assert.equal(annotation.quality, "draft");
   assert.equal(
-    annotationInputHash(record, "google/gemini-3.7-flash"),
+    annotationInputHash(record, "openai/gpt-6-luna"),
     annotation.annotation_meta.input_sha256,
   );
 });
@@ -246,7 +246,7 @@ test("OpenRouter semantic refinement uses structured JSON and preserves draft in
   assert.equal(annotation.quality, "draft");
   assert.equal(annotation.regions[0].x, record.vision!.region_proposals[0].x);
   assert.equal(
-    annotationInputHash(record, "google/gemini-3.7-flash", "google/gemini-3.7-flash"),
+    annotationInputHash(record, "openai/gpt-6-luna", "google/gemini-3.7-flash"),
     annotation.annotation_meta.input_sha256,
   );
 });
@@ -260,9 +260,9 @@ test("provider-wide quota and authorization failures halt a resumable run", () =
 
 function config(): PipelineConfig {
   return {
-    semanticModel: "google/gemini-3.7-flash",
+    semanticModel: "openai/gpt-6-luna",
     openRouterApiKey: "openrouter-test-key",
-    visionModel: "google/gemini-3.7-flash",
+    visionModel: "openai/gpt-6-luna",
     s3Endpoint: "https://s3.example.test",
     s3Region: "test",
     s3AccessKeyId: "access",

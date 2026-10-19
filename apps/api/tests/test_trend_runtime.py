@@ -85,7 +85,7 @@ def test_trend_settings_are_optional_bounded_and_secret_repr_safe() -> None:
 
     assert defaults.trends_enabled is False
     assert defaults.trend_monthly_credit_budget == 900
-    assert defaults.openrouter_trend_model == "google/gemini-3.7-flash"
+    assert defaults.openrouter_trend_model == "openai/gpt-6-luna"
     assert defaults.openrouter_embedding_model == "google/gemini-embedding-2"
     assert defaults.trend_embedding_batch_size == 32
     assert defaults.trend_redis_url is None

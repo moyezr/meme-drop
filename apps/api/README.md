@@ -55,9 +55,9 @@ suggestion and caption fallback; Tavily unavailability cannot add a request-time
 Apply the current Alembic migrations before refreshing; they create the trend memory, immutable
 snapshot, collection-claim, and monthly credit-ledger schema. Local refreshes require PostgreSQL
 with pgvector, Redis, Tavily, and OpenRouter credentials in the ignored environment files. Trend
-enrichment uses `google/gemini-3.7-flash` through OpenRouter and does not call Google's direct
-Gemini API. Before publishing a snapshot, active serving cards without a current semantic vector
-are embedded in bounded batches with `google/gemini-embedding-2` through OpenRouter. The embedding
+enrichment uses `openai/gpt-6-luna` through OpenRouter. Before publishing a snapshot, active serving
+cards without a current semantic vector are embedded in bounded batches with
+`google/gemini-embedding-2` through OpenRouter. The embedding
 document contains normalized trend-card semantics only—never Tavily evidence, excerpts, or URLs.
 Each vector stores its OpenRouter model and a SHA-256 fingerprint of that semantic document.
 Unchanged model-and-fingerprint pairs keep their existing vectors; a semantic card or configured

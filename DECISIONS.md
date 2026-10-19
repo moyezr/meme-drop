@@ -118,6 +118,7 @@ Status: accepted · Recorded: 2026-09-09
   selections are `google/gemini-3.7-flash` for suggestion/caption/enrichment/annotation and
   `google/gemini-embedding-2` with 1,536 dimensions for embeddings, all through OpenRouter rather
   than direct Google calls. Current API defaults live in [config.py](apps/api/src/memedrop_api/config.py).
+  D010 supersedes the chat/vision model selection; workflow and embedding choices remain in force.
 - Reconsider provider/model choices using measured quality, cost, and latency; a scheduler change
   must preserve bounded execution, retry safety, and publication semantics.
 - Evidence: [trend memory](apps/api/README.md#trend-memory) and [release verification](docs/private-beta-release-2026-09-06.md).
@@ -157,3 +158,22 @@ Status: accepted · Date: 2026-10-07
   delay becomes unacceptable.
 - Evidence: current aggregate investigation in [PROGRESS.md](PROGRESS.md), schedule contracts in
   [operations](docs/private-beta-operations.md), and [API maintenance](apps/api/README.md).
+
+## D010 — Select Luna for the cost-focused model migration
+
+Status: accepted · Date: 2026-10-19
+
+- Context: the operator chose `openai/gpt-6-luna` after the three-model evaluation and authorized
+  production deployment, prioritizing provider cost over DeepSeek's stronger interactive sample.
+- Decision: use Luna through OpenRouter for purpose-specific suggestion, caption, saved-image
+  tagging, trend enrichment, and offline template-model defaults. Keep independent overrides,
+  existing reasoning/deadline/token budgets, deterministic fallback, and verified-only eligibility.
+  Saved-image tagging supplies its existing strict output schema so the provider can satisfy the
+  unchanged validation contract. Human catalog promotion and rendered QA remain mandatory.
+- Consequence: the primary sample matched DeepSeek's 35/36 usable cases at roughly one-third the
+  reported interactive charges, while producing fewer valid captions and weaker family relevance.
+  This is the operator's explicit cost tradeoff, not a claim of human humor approval. Gemini
+  Embedding 2 remains unchanged; reconcile the stale local production operator embedding value
+  to the deployed setting without migrating stored vectors.
+- Reconsider on observed caption rejection, poor user feedback, provider errors, or latency/cost
+  regression. Evidence: [evaluation](docs/model-evaluation-2026-10-19.md) and rollout in PROGRESS.md.

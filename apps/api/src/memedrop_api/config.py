@@ -65,16 +65,16 @@ class Settings(BaseSettings):
     )
     openrouter_app_name: str = Field(default="MemeDrop", validation_alias="OPENROUTER_APP_NAME")
     openrouter_suggestion_model: str = Field(
-        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_SUGGESTION_MODEL"
+        default="openai/gpt-6-luna", validation_alias="OPENROUTER_SUGGESTION_MODEL"
     )
     openrouter_caption_model: str = Field(
-        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_CAPTION_MODEL"
+        default="openai/gpt-6-luna", validation_alias="OPENROUTER_CAPTION_MODEL"
     )
     openrouter_auto_tag_model: str = Field(
-        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_AUTO_TAG_MODEL"
+        default="openai/gpt-6-luna", validation_alias="OPENROUTER_AUTO_TAG_MODEL"
     )
     openrouter_trend_model: str = Field(
-        default="google/gemini-3.7-flash", validation_alias="OPENROUTER_TREND_MODEL"
+        default="openai/gpt-6-luna", validation_alias="OPENROUTER_TREND_MODEL"
     )
     openrouter_embedding_model: str = Field(
         default="google/gemini-embedding-2",

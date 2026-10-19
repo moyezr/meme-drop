@@ -44,12 +44,12 @@ export function loadConfig(overrides: Partial<PipelineConfig> = {}): PipelineCon
       overrides.semanticModel ??
       process.env.TEMPLATE_PIPELINE_SEMANTIC_MODEL ??
       process.env.OPENROUTER_TEMPLATE_MODEL ??
-      "google/gemini-3.7-flash",
+      "openai/gpt-6-luna",
     visionModel:
       overrides.visionModel ??
       process.env.TEMPLATE_PIPELINE_VISION_MODEL ??
       process.env.OPENROUTER_TEMPLATE_MODEL ??
-      "google/gemini-3.7-flash",
+      "openai/gpt-6-luna",
     s3Endpoint: required(overrides.s3Endpoint ?? process.env.S3_ENDPOINT, "S3_ENDPOINT"),
     s3Region: required(overrides.s3Region ?? process.env.S3_REGION, "S3_REGION"),
     s3AccessKeyId: required(

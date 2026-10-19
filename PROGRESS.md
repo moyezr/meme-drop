@@ -4,6 +4,108 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## Luna production migration — 2026-10-19
+
+- Requested outcome: switch the purpose-specific chat/vision model settings to
+  `openai/gpt-6-luna` and deploy the API to production. The operator explicitly chose Luna's
+  cost tradeoff after the comparative live samples and authorized production deployment.
+- Scope: runtime and offline-tool defaults/examples, explicit local and production operator
+  overrides, deployed model settings, and the saved-image tagging output schema needed for a
+  working Luna path. Preserve embeddings, cadence, budgets, strict validation, and fallback.
+- Acceptance: focused/live changed-path checks, full repository readiness and release dry-run,
+  a fresh verified/encrypted production backup, a committed clean release, production environment
+  model readback, healthy deployment, and a bounded hosted user-flow smoke. Inspect deployed
+  embedding configuration before syncing any operator-file drift. Existing progress edits and
+  evaluation reports remain intact.
+- Implementation: four runtime defaults and all offline template defaults/examples now select
+  Luna; matching ignored local/operator overrides are updated. Deployed readback confirmed Gemini
+  Embedding 2, and the stale operator-file value was reconciled to it without changing hosted
+  embeddings. Saved-image tagging now sends its existing strict JSON schema; two live fixture
+  calls returned non-fallback, valid seven-field tags. No catalog data or prompt taste changes.
+- Verification: focused baseline 67 passed; updated focused suite 68 passed and template pipeline
+  nine passed. Full `quality:deployment-readiness` passed: 479 API tests, 26 integration tests,
+  static analysis/builds, process smoke, deterministic tuning, backend image smoke, and clean npm/
+  Python audits. The first integration setup lacked schema privileges because the cached local
+  pgvector-tagged image uses Supabase roles; corrected only the disposable test container role and
+  database ownership, then reran the complete gate successfully. `release:dry-run` passed.
+- Production environment preflight passed with zero warnings. Backup `20261019T064705Z` contains
+  98 objects and 18 tables, schema `20260902_0010`; restored/verified on isolated port 55433,
+  archived with the existing AES-256/Keychain workflow, and removed the verified plaintext copy.
+  Release commit, environment synchronization, deployment, and hosted smoke are next.
+
+## Three-model evaluation rerun — 2026-10-19
+
+- Outcome: compare DeepSeek V4.1 Flash 1017, GPT-6 Luna, and Claude Haiku 5.5 now that DeepSeek
+  has eligible endpoints. Scope: development-key live fixture evaluations only; no production
+  configuration, data, catalog, privacy, or scheduler changes.
+- Acceptance: identical fixed cases and current production budgets, balanced model ordering,
+  repeated measurements of successful usable output, strict caption validity, family relevance,
+  latency and provider-reported charges; equal secondary-path checks and a qualified recommendation.
+  Human humor judgment remains separate from mechanical scores. Baseline `05a4abe`; preserve the
+  existing PROGRESS.md edits and October 17 evaluation report.
+- Completed [three-model rerun](docs/model-evaluation-2026-10-19.md): 36 primary interactive calls
+  per model with balanced ordering, identical per-case payloads apart from model, and unchanged
+  production budgets. DeepSeek/Luna each returned usable captions on 35/36 calls; Haiku 33/36.
+  DeepSeek led strict validity (82.3% versus 76.2%/76.9%), valid-caption yield (144 versus 93/120),
+  and acceptable-family coverage (34/36 versus 31/36 and 30/36). Median latency 1.76s versus
+  3.23s/3.19s. Reported primary charges: $0.02354/$0.00773/$0.02246, excluding unreturned timeout
+  charges. Prefer DeepSeek for interactive quality/speed; Luna remains the minimum-cost choice.
+- Equal exploratory price-routing pass, twelve calls each: DeepSeek fell to 8/12 usable versus
+  Luna 12/12 and Haiku 9/12. Keep latency-first routing for the DeepSeek interactive candidate.
+  Three trend fixtures passed for all models; DeepSeek/Luna trend charges were effectively tied.
+  Explicit caption cases: DeepSeek/Luna 2/2, Haiku 1/2; Luna cheaper. One-image pipeline checks
+  passed for all; image tagging still falls back for all and needs a schema/prompt repair.
+- 171 measured calls report $0.07504 in usage; eight cancelled calls have unknown returned cost.
+  All used the development key. Fixed-fixture raw results and an anonymous review sheet remain
+  ignored in `.memedrop/model-eval-20261019/`. Human humor scores remain blank; no model judge or
+  fabricated human review. No production, privacy, storage, or catalog changes were made.
+- Fresh baseline: 31 focused tests passed; deterministic 104-case benchmark and case-level
+  baseline passed, 5000-template warm p95 14.97ms. Documentation links, credential-pattern and
+  whitespace checks, anonymous-sheet identity/resource checks, the 73-line AGENTS.md limit, and
+  `git diff --check` passed. Development-key usage increased $0.07805 during the run. Next action:
+  human taste review and a purpose-specific migration with applicable tuning/release gates.
+
+## Model cost evaluation — 2026-10-17
+
+- October 19 follow-up: DeepSeek is now accessible with the existing development key. A minimal
+  probe and a JSON/reasoning/routing-compatible probe returned HTTP 200; the latter used Together.
+  Public metadata now lists fifteen endpoints versus the one observed October 17. No privacy or
+  application setting was changed. Earlier blocking is historical; DeepSeek task quality remains
+  unmeasured, and the model comparison should be completed before treating Luna as the final choice.
+- Outcome: verify current trend refresh cadence and compare the three requested OpenRouter
+  candidates against Gemini 3.7 Flash for quality, latency, compatibility, and cost.
+- Scope: read-only hosted inspection and bounded live evaluations using repository fixtures;
+  no production model, scheduler, storage, or catalog changes. Acceptance: live scheduler readback,
+  current provider pricing, comparable case-level results under existing timeouts, and a documented
+  recommendation with unverified paths and human-review requirements explicit.
+- Baseline: `05a4abe`; the pre-existing uncommitted October 13 PROGRESS.md section is preserved.
+  Focused caption evaluation, trend enrichment, and trend runtime tests: 31 passed.
+- Completed [comparison and recommendation](docs/model-evaluation-2026-10-17.md): live QStash
+  confirms daily 00:00 UTC / 05:30 IST; health is fresh, snapshot 154, five cards, 48-hour limit.
+  Production key spending before probes: $1.06505 this month, $0.029883 today. Read-only production
+  aggregates show no customer generations in 30 days; scheduled maintenance remains the leading
+  attribution. About 321 search/enrichment opportunities per 30 days at the current cadence.
+- Prefer Luna for a text-model migration: 24/24 joint cases completed versus Haiku 20/24;
+  measured p95 3.53s versus 4.51s. Luna's strictly valid-caption rate was lower (74.2% versus
+  81.4%), so this is a candidate recommendation pending human taste review, not rollout approval.
+  Both passed three trend fixtures, two explicit-caption cases, and a one-image offline pipeline
+  smoke. DeepSeek is blocked by existing account training/privacy policy, preserved unchanged;
+  Gemini joint requests reject reasoning disabled. Auto-tagging falls back for all tested models;
+  accessible finalists' diagnostics confirm response/schema mismatch requiring a prompt repair.
+- Live metadata shows Luna/Haiku $0.10/$0.50 per million uncached input/output tokens, versus
+  Gemini $0.75/$3.75. DeepSeek $0.15/$0.60 off-peak is not cheapest for uncached requests.
+  Total development-key usage today at final inspection: $0.04334; one production-key connectivity
+  probe added $0.0000072. No production settings, scheduler, privacy policy, catalogs, or storage
+  were changed. Latest published vectors use Gemini Embedding 2, while the ignored operator file
+  names OpenAI embeddings; reconcile that drift before any future deployment.
+- Deterministic fallback benchmark: all gates passed on 104 cases, no baseline regressions;
+  5000-template warm p95 14.79ms. Reports and fixture-only review artifacts remain ignored under
+  `.memedrop/model-eval-20261017/`; sanitized results and remaining rollout requirements are in
+  the linked report. Documentation local-link checks, credential-pattern inspection, the 73-line
+  AGENTS.md limit, and final diff/whitespace review passed. Next action: human taste review and
+  a purpose-specific Luna migration, beginning with trends; resolve tagging/schema and embedding
+  configuration findings before any production rollout.
+
 ## Current maintenance change — 2026-10-07
 
 - Baseline: `b19fd28` on `main`; the working tree was clean at startup.
