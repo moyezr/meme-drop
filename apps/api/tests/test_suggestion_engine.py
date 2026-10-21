@@ -3,16 +3,24 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
+import httpx
+import pytest
+
 import memedrop_api.services.suggestion_engine as suggestion_engine
 from memedrop_api.config import Settings
 from memedrop_api.schemas import MAX_SOURCE_POST_LENGTH, TweetContext, UsageBatchRequest
 from memedrop_api.services.catalog import MemeCatalog, normalize_template_name
-from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
+from memedrop_api.services.openrouter import (
+    JointSuggestionResult,
+    OpenRouterSuggestionGateway,
+    TemplateSelection,
+)
 from memedrop_api.services.suggestion_engine import (
     Candidate,
     LexicalCandidateIndex,
@@ -37,6 +45,7 @@ class FakeGateway:
         self.selections: list[TemplateSelection] = []
         self.captions: dict[str, dict[str, str]] = {}
         self.joint_calls = 0
+        self.seen_timeouts: list[int | None] = []
         self.caption_calls = 0
         self.fail_joint = False
         self.joint_error: Exception | None = None
@@ -56,8 +65,10 @@ class FakeGateway:
         context=None,
         steering_instruction=None,
         trend_cards=(),
+        timeout_ms=None,
     ):
         self.joint_calls += 1
+        self.seen_timeouts.append(timeout_ms)
         self.seen_template_counts.append(len(templates))
         self.seen_template_ids.append([template.template_id for template in templates])
         self.seen_contexts.append(context)
@@ -238,7 +249,14 @@ async def test_feedback_context_excludes_source_derived_terms_for_a_long_post() 
 
     assert parsed.events[0].tweet_context.model_dump(exclude_none=True) == feedback_context
     assert raw_token not in str(feedback_context).lower()
-    assert set(feedback_context).isdisjoint({"joke_target", "keywords"})
+    assert set(feedback_context) == {
+        "suggestion_mode",
+        "sentiment",
+        "tone",
+        "topic",
+        "intent",
+        "intensity",
+    }
 
 
 async def test_service_preserves_a_legitimate_zero_selection_score() -> None:
@@ -356,6 +374,7 @@ async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
         context=None,
         steering_instruction=None,
         trend_cards=(),
+        timeout_ms=None,
     ):
         model_started.set()
         await allow_model.wait()
@@ -396,6 +415,7 @@ async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None
         context=None,
         steering_instruction=None,
         trend_cards=(),
+        timeout_ms=None,
     ):
         model_started.set()
         await allow_model.wait()
@@ -439,6 +459,7 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
         context=None,
         steering_instruction=None,
         trend_cards=(),
+        timeout_ms=None,
     ):
         model_started.set()
         await allow_model.wait()
@@ -659,6 +680,187 @@ async def test_service_treats_joint_timeout_as_expected_fallback_without_traceba
     assert gateway.caption_calls == 0
 
 
+async def test_slow_trends_and_model_share_one_deadline_and_return_captioned_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(suggestion_engine, "SUGGESTION_TIMEOUT_MS", 180)
+    monkeypatch.setattr(suggestion_engine, "SUGGESTION_FALLBACK_RESERVE_MS", 30)
+    monkeypatch.setattr(suggestion_engine, "SUGGESTION_TREND_TIMEOUT_MS", 50)
+    service, _, gateway = service_with_templates("this-is-fine")
+    trend_cancelled = asyncio.Event()
+    model_cancelled = asyncio.Event()
+    model_budgets: list[int] = []
+
+    async def slow_trends(context: TweetContext) -> TrendRetrieval:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            trend_cancelled.set()
+        return TrendRetrieval.empty()
+
+    async def slow_model(*args: Any, **kwargs: Any) -> JointSuggestionResult:
+        model_budgets.append(kwargs["timeout_ms"])
+        try:
+            await asyncio.Event().wait()
+        finally:
+            model_cancelled.set()
+        return JointSuggestionResult([], {})
+
+    service._retrieve_trends = slow_trends  # type: ignore[method-assign]
+    gateway.select_and_caption = slow_model  # type: ignore[method-assign]
+    started = time.perf_counter()
+    run = await service.get_suggestion_run("Prod is down", user_id=INSTALL_ID, limit=1)
+
+    assert time.perf_counter() - started < 0.5
+    assert trend_cancelled.is_set() and model_cancelled.is_set()
+    assert 0 < model_budgets[0] <= 100
+    assert run.timing.joint_outcome == "timeout"
+    assert run.timing.trend_lookup_ms >= 40
+    assert run.suggestions[0]["tailored_overlay"]["regions"]
+
+
+async def test_slow_optional_feedback_is_cancelled_without_caching_a_false_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(suggestion_engine, "FEEDBACK_READ_TIMEOUT_MS", 20)
+    service, store, _ = service_with_templates("this-is-fine")
+    feedback_cancelled = asyncio.Event()
+
+    async def slow_feedback(user_id: UUID) -> dict[str, float]:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            feedback_cancelled.set()
+        return {}
+
+    store.global_meme_feedback_scores = slow_feedback  # type: ignore[method-assign]
+    result = await asyncio.wait_for(
+        service.get_suggestions("Prod is down", user_id=INSTALL_ID, limit=1),
+        timeout=0.5,
+    )
+
+    assert result[0]["tailored_overlay"]["regions"]
+    assert feedback_cancelled.is_set()
+    assert INSTALL_ID not in service._feedback_scores
+    assert INSTALL_ID not in service._feedback_score_inflight
+
+
+async def test_empty_catalog_preserves_trend_lookup_timing() -> None:
+    service, _, _ = service_with_templates()
+
+    async def delayed_trends(context: TweetContext) -> TrendRetrieval:
+        await asyncio.sleep(0.02)
+        return TrendRetrieval.empty()
+
+    service._retrieve_trends = delayed_trends  # type: ignore[method-assign]
+    run = await service.get_suggestion_run("Prod is down", user_id=INSTALL_ID)
+
+    assert run.suggestions == []
+    assert run.timing.trend_lookup_ms >= 15
+    assert run.timing.joint_model_ms == 0
+
+
+async def test_slow_required_catalog_read_returns_bounded_route_failure(
+    api_harness: ApiHarness,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(suggestion_engine, "SUGGESTION_TIMEOUT_MS", 90)
+    monkeypatch.setattr(suggestion_engine, "SUGGESTION_FALLBACK_RESERVE_MS", 30)
+    catalog_cancelled = asyncio.Event()
+
+    async def slow_catalog() -> list[dict[str, Any]]:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            catalog_cancelled.set()
+        return []
+
+    api_harness.store.list_global_memes = slow_catalog  # type: ignore[method-assign]
+    response = await asyncio.wait_for(
+        api_harness.client.post(
+            "/api/v1/suggest",
+            headers={"x-memedrop-install-id": str(INSTALL_ID)},
+            json={"tweet_text": "Prod is down"},
+        ),
+        timeout=0.5,
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {"error": "Failed to generate suggestions", "suggestions": []}
+    assert catalog_cancelled.is_set()
+    assert not api_harness.app.state.suggestion_service._inflight_suggestions
+
+
+async def test_route_provider_deadline_returns_fallback_and_preserves_cooldown(
+    api_harness: ApiHarness,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(suggestion_engine, "SUGGESTION_TIMEOUT_MS", 150)
+    monkeypatch.setattr(suggestion_engine, "SUGGESTION_FALLBACK_RESERVE_MS", 30)
+    api_harness.store.memes = [global_meme("This Is Fine")]
+    calls = 0
+    provider_cancelled = asyncio.Event()
+
+    async def slow_provider(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        try:
+            await asyncio.Event().wait()
+        finally:
+            provider_cancelled.set()
+        return httpx.Response(200, request=request)
+
+    settings = Settings(database_url="postgresql://localhost/test", openrouter_api_key="fixture")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(slow_provider)) as client:
+        service = api_harness.app.state.suggestion_service
+        service.gateway = OpenRouterSuggestionGateway(settings, client)
+        response = await asyncio.wait_for(
+            api_harness.client.post(
+                "/api/v1/suggest",
+                headers={"x-memedrop-install-id": str(INSTALL_ID)},
+                json={"tweet_text": "Prod is down"},
+            ),
+            timeout=0.5,
+        )
+        retry = await api_harness.client.post(
+            "/api/v1/suggest",
+            headers={"x-memedrop-install-id": str(INSTALL_ID)},
+            json={"tweet_text": "The dashboard is red"},
+        )
+
+    assert response.status_code == retry.status_code == 200
+    assert response.json()["suggestions"][0]["tailored_overlay"]["regions"]
+    assert "joint-model;dur=" in response.headers["server-timing"]
+    assert 'desc="timeout"' in response.headers["server-timing"]
+    assert provider_cancelled.is_set()
+    assert calls == 1
+
+
+async def test_cancelling_one_waiter_preserves_shared_suggestion_work() -> None:
+    service, _, gateway = service_with_templates("this-is-fine")
+    original_select = gateway.select_and_caption
+    model_started = asyncio.Event()
+    allow_model = asyncio.Event()
+
+    async def delayed_model(*args: Any, **kwargs: Any) -> JointSuggestionResult:
+        model_started.set()
+        await allow_model.wait()
+        return await original_select(*args, **kwargs)
+
+    gateway.select_and_caption = delayed_model  # type: ignore[method-assign]
+    first = asyncio.create_task(service.get_suggestions("Prod is down", user_id=INSTALL_ID))
+    await model_started.wait()
+    second = asyncio.create_task(service.get_suggestions("Prod is down", user_id=INSTALL_ID))
+    await asyncio.sleep(0)
+    first.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    allow_model.set()
+
+    assert (await second)[0]["tailored_overlay"]["regions"]
+    assert gateway.joint_calls == 1
+
+
 async def test_local_ranking_uses_bounded_personal_feedback() -> None:
     service, store, gateway = service_with_templates("change-my-mind", "disaster-girl")
     gateway.captions = {
@@ -869,9 +1071,7 @@ async def test_trends_are_retrieved_before_cache_and_versions_invalidate_results
     assert len(retriever.calls) == 3
     assert gateway.joint_calls == 2
     assert gateway.seen_trend_cards == [(card_v1,), (card_v2,)]
-    assert all(
-        "secret project zephyr launch" not in signal.value for signal in retriever.calls[0]
-    )
+    assert all("secret project zephyr launch" not in signal.value for signal in retriever.calls[0])
 
 
 async def test_standalone_caption_generation_receives_trend_cards() -> None:

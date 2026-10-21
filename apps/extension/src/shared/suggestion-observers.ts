@@ -2,6 +2,7 @@ export interface SuggestionRequestObserver<T> {
   onInitial?: (suggestions: T[], cacheHit: boolean) => void;
   onApiResponse?: (durationMs: number, serverTiming: string | null) => void;
   onPreview?: (suggestion: T) => void;
+  onPreviewFailure?: (suggestion: T) => void;
   onOriginal?: (suggestion: T) => void;
   onMediaFailure?: () => void;
   onMediaSettled?: () => void;
@@ -17,6 +18,7 @@ export class SuggestionRequestObservers<T> {
   private initial: { suggestions: T[]; cacheHit: boolean } | undefined;
   private apiResponse: { durationMs: number; serverTiming: string | null } | undefined;
   private readonly previews: T[] = [];
+  private readonly failedPreviews: T[] = [];
   private readonly originals: T[] = [];
   private mediaFailureCount = 0;
   private mediaSettled = false;
@@ -26,6 +28,7 @@ export class SuggestionRequestObservers<T> {
     if (this.apiResponse) observer.onApiResponse?.(this.apiResponse.durationMs, this.apiResponse.serverTiming);
     if (this.initial) observer.onInitial?.(this.initial.suggestions, this.initial.cacheHit);
     for (const suggestion of this.previews) observer.onPreview?.(suggestion);
+    for (const suggestion of this.failedPreviews) observer.onPreviewFailure?.(suggestion);
     for (const suggestion of this.originals) observer.onOriginal?.(suggestion);
     for (let index = 0; index < this.mediaFailureCount; index += 1) observer.onMediaFailure?.();
     if (this.mediaSettled) observer.onMediaSettled?.();
@@ -44,6 +47,11 @@ export class SuggestionRequestObservers<T> {
   notifyPreview(suggestion: T): void {
     this.previews.push(suggestion);
     this.forEach((observer) => observer.onPreview?.(suggestion));
+  }
+
+  notifyPreviewFailure(suggestion: T): void {
+    this.failedPreviews.push(suggestion);
+    this.forEach((observer) => observer.onPreviewFailure?.(suggestion));
   }
 
   notifyOriginal(suggestion: T): void {

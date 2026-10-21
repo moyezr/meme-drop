@@ -14,7 +14,7 @@
   "data_disclosures": {
     "tweet_text_or_compose_context": "Source-post text is sent to the backend only when generating meme suggestions or captions.",
     "anonymous_install_id": "Stored in Chrome extension storage and sent to the backend to separate saved library and usage data by browser install.",
-    "usage_events": "Sent to the backend to improve ranking quality and personalization, including shown, clicked, inserted or used, saved, and dismissed meme events.",
+    "usage_events": "Sent to the backend as shown (visible), clicked (selected), inserted (confirmed attachment), copied, saved, rejected, abandoned, and attachment_failed events, with reviewed categories, random event/impression IDs, position, and format version. Copy and ordinary closure are neutral for ranking. Legacy used and dismissed events remain exportable.",
     "saved_meme_images": "Stored when the user saves meme images to their library."
   },
   "screenshots": [

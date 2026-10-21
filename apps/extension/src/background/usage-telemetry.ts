@@ -1,4 +1,6 @@
-export type UsageAction = "shown" | "clicked" | "used" | "saved" | "dismissed";
+export type UsageAction =
+  | "shown" | "clicked" | "inserted" | "copied"
+  | "saved" | "rejected" | "abandoned" | "attachment_failed";
 export type UsageSource = "user" | "global";
 
 /**
@@ -11,41 +13,65 @@ export interface UsageEventInput {
   action: UsageAction;
   source?: UsageSource;
   feedback_context?: Record<string, unknown>;
+  impression_id?: string;
+  position?: number;
 }
 
 export interface UsageEvent {
+  event_id: string;
+  telemetry_version: 2;
+  impression_id?: string;
+  position?: number;
   meme_id: string;
   action: UsageAction;
   source?: UsageSource;
   tweet_context: Record<string, unknown>;
 }
 
-const SAFE_FEEDBACK_CONTEXT_KEYS = new Set([
-  "suggestion_mode",
-  "sentiment",
-  "tone",
-  "topic",
-  "intent",
-  "intensity",
-  "reply_style",
-  "ideal_meme_vibe",
-  "social_dynamic",
-  "humor_angle",
-]);
+// Validate values as well as keys: runtime messages are not type checked.
+const SAFE_FEEDBACK_VALUES: Record<string, ReadonlySet<string>> = {
+  suggestion_mode: new Set(["automatic", "steered"]),
+  sentiment: new Set(["positive", "negative", "neutral"]),
+  tone: new Set([
+    "sarcastic", "earnest", "rant", "celebratory", "hot-take",
+    "question", "absurdist", "wholesome", "self-deprecating",
+  ]),
+  topic: new Set([
+    "tech", "finance", "politics", "sports", "entertainment",
+    "personal", "culture", "relationships", "other",
+  ]),
+  intent: new Set([
+    "counter-argument", "agreement", "sharing-opinion", "venting",
+    "asking", "celebrating", "dunking", "self-deprecating",
+  ]),
+};
+const UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function safeFeedbackContext(values: Record<string, unknown> | undefined) {
   return Object.fromEntries(
-    Object.entries(values ?? {}).filter(([key]) => SAFE_FEEDBACK_CONTEXT_KEYS.has(key))
+    Object.entries(values ?? {}).filter(([key, value]) => {
+      if (key === "intensity") {
+        return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+      }
+      return typeof value === "string"
+        && Object.hasOwn(SAFE_FEEDBACK_VALUES, key)
+        && SAFE_FEEDBACK_VALUES[key]?.has(value);
+    })
   );
 }
 
 export function projectUsageEvent(input: UsageEventInput): UsageEvent {
   return {
+    event_id: crypto.randomUUID(),
+    telemetry_version: 2,
     meme_id: input.meme_id,
     action: input.action,
     ...(input.source ? { source: input.source } : {}),
-    // Keep the API's existing field name at the transport boundary. An empty
-    // context is valid for saved-library events and for older suggestions.
+    ...(typeof input.impression_id === "string" && UUID4.test(input.impression_id)
+      ? { impression_id: input.impression_id } : {}),
+    ...(Number.isInteger(input.position) && input.position! >= 1 && input.position! <= 5
+      ? { position: input.position } : {}),
+    // Keep the API's existing field name at the transport boundary.
     tweet_context: safeFeedbackContext(input.feedback_context),
   };
 }
@@ -75,8 +101,8 @@ export class UsageTelemetryQueue {
     this.sendBatch = options.sendBatch;
     this.flushDelayMs = options.flushDelayMs ?? 350;
     this.maxBatchSize = options.maxBatchSize ?? 50;
-    this.onError = options.onError ?? ((error, attempt) => {
-      console.error(`[MemeDrop] Usage batch failed (attempt ${attempt}/2):`, error);
+    this.onError = options.onError ?? ((_error, attempt) => {
+      console.error(`[MemeDrop] Usage batch failed (attempt ${attempt}/2)`);
     });
   }
 

@@ -32,6 +32,7 @@ async def load_usage_feedback(
           LEFT JOIN user_memes um ON um.id = u.user_meme_id
          WHERE u.created_at > NOW() - make_interval(days => :days)
            AND COALESCE(u.global_meme_id, u.user_meme_id) IS NOT NULL
+           AND u.tweet_context->>'telemetry_version' = '2'
          GROUP BY 1, 2, 3, 4
         """
     )
@@ -62,20 +63,25 @@ def summarize_usage_feedback(
                 "used": 0,
                 "saved": 0,
                 "dismissed": 0,
+                "copied": 0,
+                "abandoned": 0,
+                "attachment_failed": 0,
             },
         )
         action = row["action"]
         count = int(row["events"])
-        if action in {"suggested", "shown"}:
+        if action == "shown":
             item["shown"] += count
         elif action == "clicked":
             item["clicked"] += count
-        elif action in {"used", "inserted"}:
+        elif action == "inserted":
             item["used"] += count
         elif action == "saved":
             item["saved"] += count
-        elif action == "dismissed":
+        elif action == "rejected":
             item["dismissed"] += count
+        elif action in {"copied", "abandoned", "attachment_failed"}:
+            item[action] += count
 
     items = []
     for item in grouped.values():
@@ -84,6 +90,10 @@ def summarize_usage_feedback(
         item["use_rate"] = round(item["used"] / denominator, 3)
         item["save_rate"] = round(item["saved"] / denominator, 3)
         item["dismissal_rate"] = round(item["dismissed"] / denominator, 3)
+        item["inserted"] = item["used"]
+        item["rejected"] = item["dismissed"]
+        item["attachment_rate"] = item["use_rate"]
+        item["rejection_rate"] = item["dismissal_rate"]
         item["quality_signal"] = classify_signal(item, minimum_shown)
         items.append(item)
     rank = {"promote": 4, "review": 3, "watch": 2, "insufficient_data": 1}
@@ -96,6 +106,7 @@ def summarize_usage_feedback(
         )
     )
     return {
+        "telemetry_version": 2,
         "generated_at": datetime.now(UTC).isoformat(),
         "lookback_days": lookback_days,
         "minimum_shown": minimum_shown,
@@ -109,7 +120,18 @@ def summarize_usage_feedback(
     }
 
 
-ACTION_TOTALS = ("shown", "clicked", "used", "saved", "dismissed")
+ACTION_TOTALS = (
+    "shown",
+    "clicked",
+    "used",
+    "saved",
+    "dismissed",
+    "copied",
+    "abandoned",
+    "attachment_failed",
+    "inserted",
+    "rejected",
+)
 
 
 def classify_signal(item: dict[str, Any], minimum_shown: int) -> str:

@@ -4,6 +4,84 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## Suggestion production rollout — 2026-10-21
+
+- Requested outcome: commit/push the deadline, measurement, feedback and privacy changes through
+  GitHub `moyezr`, restore `moyez-dev`, apply production migration first, deploy API/privacy,
+  build the production extension, and verify live X/LinkedIn suggestions and native attachment.
+  Preserve unrelated historical progress edits and the local assessment artifact.
+- Acceptance: fresh release gates and verified encrypted production backup; migration readback
+  before any Git-triggered deployment; healthy API/web from the committed release; production
+  extension package with confirmed live suggestion/attachment and corrected event evidence;
+  no published social replies; active GitHub account restored to `moyez-dev`.
+- Preflight: production configuration passed without warnings; existing API/web deployments and
+  healthy snapshot 156 recorded for rollback. Backup `20261021T093724Z` contains 99 objects and
+  18 tables at schema `20260902_0010`; restored/verified on isolated port 55433, encrypted with the
+  existing AES-256/Keychain workflow, and the verified plaintext copy removed.
+- Fresh release gates exposed Vite, certifi, and Pillow advisories. Update the affected locks to
+  patched Vite 8.3.5, certifi 2026.10.19, and Pillow 13.0.0 without exceptions. Extension manifest/
+  package advance together to 0.0.2; the package-test fixture now follows that version dynamically.
+- Fresh full readiness passed with 499 API tests, 28 integration tests, all static/build/process/
+  image/tuning gates, and clean npm/Python audits after those dependency updates. Release dry-run
+  packaging also passed. Commit and migration are next; deployment follows migration readback.
+- No production schema, deployment configuration, or application changes have been made yet.
+
+## Suggestion deadline, measurements, and feedback — 2026-10-21
+
+- Requested outcome: implement the assessment's deadline and measurement fixes, correct feedback
+  semantics, and verify the suggestion flow. Baseline `149d4b7`; preserve the existing progress
+  edits and untracked October 19 assessment. Parallel agents own server budgets, feedback
+  contract/persistence, and browser rendering/attachment behavior; integration and docs stay here.
+- Bounded scope: one total server suggestion budget with fallback reserve and client transport
+  margin; timings from explicit request to visible captioned preview and confirmed insertion;
+  visible-impression, confirmed-insertion, clipboard, explicit-negative, and neutral-abandonment
+  events with safe metadata and retry deduplication. No prompt/model, catalog, platform expansion,
+  production deployment, or new analytics service.
+- Acceptance: slow optional enrichment/provider cannot outlast the client before fallback;
+  stale responses/media never update the active request; displayed timing waits for actual render;
+  insertion requires native attachment confirmation; copying/closing are not positive/negative
+  training signals; retried events count once. Verify focused and full repository gates plus a
+  real Chromium suggestion/attachment fixture flow and PostgreSQL persistence integration.
+- Implemented: five-second service budget/250ms fallback reserve; remaining model allowance capped
+  at 4.5s; optional trend/feedback capped at 1.25s/1s; 6.5s client deadline including body reads.
+  Provider timeout still opens cooldown; caller cancellation preserves shared inference. Browser
+  diagnostics separate bytes from foreground-visible decoded caption previews and confirmed native
+  attachments, with empty/failure/cancellation outcomes and no fabricated cache status.
+- Feedback version 2 emits visible `shown`, selection `clicked`, confirmed `inserted`, `copied`,
+  explicit `rejected`, neutral `abandoned`, `attachment_failed`, and `saved`. Copy/ordinary close
+  do not imply insertion/rejection. PostgreSQL primary-key conflict handling deduplicates random
+  tenant-scoped event identities before library increments; legacy records remain exportable but
+  no longer train corrected ranking/reports. Only six reviewed context categories persist, plus
+  random impression identity, bounded position, and version. No source/caption text is retained.
+- Migration `20261021_0011` widens the historical event-action constraint, with a matching ORM
+  check. It does not rewrite rows. Apply it before the API and then extension rollout. Verified
+  on a second disposable database: fresh upgrade, downgrade refusal preserving a corrected event,
+  and successful downgrade/re-upgrade after removing only that synthetic fixture. The first
+  manual fixture lacked the required install email; corrected the fixture and reran successfully.
+- Verification: original API suggestion/config baseline 68 passed, extension baseline 61 passed.
+  Full `quality:deployment-readiness` passed: 499 API tests plus 28 real PostgreSQL/Redis
+  integration tests, all workspace typechecks/tests/lint/builds, FastAPI process and Docker image
+  smoke, deterministic tuning/dataset/render gates, and clean npm/Python security audits. The first
+  concurrent run exceeded the unchanged scale latency ceiling; isolated rerun passed at 16.013ms,
+  and the complete sequential rerun passed at 15.500ms (50ms ceiling), with no ranking changes.
+- Final `quality:static` passed after the last cache-diagnostic/privacy changes; extension now
+  69 tests, all passing. Store-readiness disclosure validation passed after naming the corrected
+  outcomes and legacy compatibility; existing disclosure gates remain and now require new outcomes.
+  Privacy sources, architecture, contracts, D011, and launch task are aligned. Final diff/link/
+  anchor checks passed; AGENTS.md remains 73 lines. Pre-existing edits are preserved; no commits.
+- `quality:suggestion-browser` / final packaged Chromium smoke passed nine scenarios through real
+  loopback FastAPI with a stubbed provider: X/LinkedIn render+confirmed insert, unconfirmed upload
+  copied only, neutral close, hanging trend/provider fallback, native Reply without inference,
+  catalog failure, broken media without false impressions, and ignored late navigation results.
+  Synthetic fixture screenshots were visually inspected. CI now runs this provider-free flow.
+  Local run used an existing full Chromium executable via `MEMEDROP_CHROMIUM_EXECUTABLE`;
+  normal/CI setup installs Playwright Chromium. No remote platform traffic or live model calls.
+- Status: requested local implementation/verification complete. No hosted deployment, production
+  data, credentials, model/prompt, or catalog changes. Diagnostics remain local; no new analytics
+  service. Test containers/processes started here were removed; unrelated services stayed intact.
+  Next action: review/commit the coherent change, then controlled migration/API/extension and privacy
+  page rollout with real X/LinkedIn DOM QA. Local fixtures do not establish hosted compatibility.
+
 ## Luna production migration — 2026-10-19
 
 - Requested outcome: switch the purpose-specific chat/vision model settings to

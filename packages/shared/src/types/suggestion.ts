@@ -1,4 +1,5 @@
 export interface FeedbackContext {
+  suggestion_mode?: "automatic" | "steered";
   sentiment: "positive" | "negative" | "neutral";
   tone:
     | "sarcastic"
@@ -30,13 +31,13 @@ export interface FeedbackContext {
     | "dunking"
     | "self-deprecating";
   intensity: number;
+}
+
+export interface TweetContext extends FeedbackContext {
   reply_style: string;
   ideal_meme_vibe: string;
   social_dynamic: string;
   humor_angle: string;
-}
-
-export interface TweetContext extends FeedbackContext {
   /** Internal caption-generation detail; never send this with usage telemetry. */
   joke_target: string;
   core_claim: string;

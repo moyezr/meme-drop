@@ -5,13 +5,17 @@
  */
 export interface SuggestionPerformanceSnapshot {
   suggestion_count: number;
-  cache_hit: boolean;
+  cache_hit?: boolean;
   api_response_ms?: number;
-  first_preview_ready_ms?: number;
-  all_previews_ready_ms?: number;
-  ready_to_attach_ms?: number;
+  first_preview_bytes_ms?: number;
+  all_preview_bytes_ms?: number;
+  all_original_bytes_ms?: number;
   media_settled_ms?: number;
   media_failure_count: number;
+  first_usable_preview_ms?: number;
+  all_usable_previews_ms?: number;
+  preview_render_failure_count: number;
+  preview_state?: "pending" | "usable" | "empty" | "failed" | "cancelled";
   server_timing?: Record<string, number>;
 }
 
@@ -37,7 +41,7 @@ export function parseServerTimingHeader(header: string | null): Record<string, n
 export class SuggestionPerformanceTracker {
   private readonly startedAt: number;
   private suggestionCount = 0;
-  private cacheHit = false;
+  private cacheHit: boolean | undefined;
   private apiResponseMs: number | undefined;
   private firstPreviewReadyMs: number | undefined;
   private allPreviewsReadyMs: number | undefined;
@@ -45,14 +49,19 @@ export class SuggestionPerformanceTracker {
   private mediaSettledMs: number | undefined;
   private mediaFailureCount = 0;
   private serverTiming: Record<string, number> | undefined;
+  private previewState: SuggestionPerformanceSnapshot["preview_state"];
+  private firstUsablePreviewMs: number | undefined;
+  private allUsablePreviewsMs: number | undefined;
+  private previewRenderFailureCount = 0;
+  private readonly usablePreviewIds = new Set<string>();
   private readonly previewIds = new Set<string>();
   private readonly originalIds = new Set<string>();
 
-  constructor(private readonly now: Clock = () => performance.now()) {
-    this.startedAt = now();
+  constructor(private readonly now: Clock = () => performance.now(), startedAt = now()) {
+    this.startedAt = startedAt;
   }
 
-  setSuggestions(suggestionCount: number, cacheHit = false): void {
+  setSuggestions(suggestionCount: number, cacheHit?: boolean): void {
     this.suggestionCount = Math.max(0, suggestionCount);
     this.cacheHit = cacheHit;
   }
@@ -76,6 +85,26 @@ export class SuggestionPerformanceTracker {
     if (this.originalIds.size >= this.suggestionCount) this.readyToAttachMs ??= this.elapsed();
   }
 
+  startBrowserRequest(): void {
+    this.previewState = "pending";
+  }
+
+  markPreviewState(state: NonNullable<SuggestionPerformanceSnapshot["preview_state"]>): void {
+    this.previewState = state;
+  }
+
+  markUsablePreview(memeId: string): void {
+    if (this.suggestionCount === 0 || this.usablePreviewIds.has(memeId)) return;
+    this.usablePreviewIds.add(memeId);
+    this.previewState = "usable";
+    this.firstUsablePreviewMs ??= this.elapsed();
+    if (this.usablePreviewIds.size >= this.suggestionCount) this.allUsablePreviewsMs ??= this.elapsed();
+  }
+
+  markPreviewRenderFailure(): void {
+    this.previewRenderFailureCount += 1;
+  }
+
   markMediaFailure(): void {
     this.mediaFailureCount += 1;
   }
@@ -87,18 +116,22 @@ export class SuggestionPerformanceTracker {
   snapshot(): SuggestionPerformanceSnapshot {
     return {
       suggestion_count: this.suggestionCount,
-      cache_hit: this.cacheHit,
+      ...(this.cacheHit === undefined ? {} : { cache_hit: this.cacheHit }),
       media_failure_count: this.mediaFailureCount,
+      preview_render_failure_count: this.previewRenderFailureCount,
+      ...(this.previewState ? { preview_state: this.previewState } : {}),
+      ...(this.firstUsablePreviewMs === undefined ? {} : { first_usable_preview_ms: this.firstUsablePreviewMs }),
+      ...(this.allUsablePreviewsMs === undefined ? {} : { all_usable_previews_ms: this.allUsablePreviewsMs }),
       ...(this.apiResponseMs === undefined ? {} : { api_response_ms: this.apiResponseMs }),
       ...(this.firstPreviewReadyMs === undefined
         ? {}
-        : { first_preview_ready_ms: this.firstPreviewReadyMs }),
+        : { first_preview_bytes_ms: this.firstPreviewReadyMs }),
       ...(this.allPreviewsReadyMs === undefined
         ? {}
-        : { all_previews_ready_ms: this.allPreviewsReadyMs }),
+        : { all_preview_bytes_ms: this.allPreviewsReadyMs }),
       ...(this.readyToAttachMs === undefined
         ? {}
-        : { ready_to_attach_ms: this.readyToAttachMs }),
+        : { all_original_bytes_ms: this.readyToAttachMs }),
       ...(this.mediaSettledMs === undefined ? {} : { media_settled_ms: this.mediaSettledMs }),
       ...(this.serverTiming ? { server_timing: this.serverTiming } : {}),
     };

@@ -28,6 +28,7 @@ satisfy its constituent checks without rerunning them on the same unchanged code
 | Documentation only | Review instructions against code/scripts, check local links and anchors, verify AGENTS.md remains under 100 lines, and run `git diff --check`. Runtime suites are unnecessary unless behavior or configuration also changes. |
 | Application, shared, or tooling code | Focused boundary tests, then `npm run typecheck`, `npm test`, `npm run lint`, and `npm run build`. |
 | API | Also `npm run test:api`, `npm run lint:api`, and `npm run quality:api-process`. |
+| Extension suggestion timing, rendering, or attachment | Also `npm run quality:suggestion-browser`; see [browser setup and scope](../QUALITY.md#latency-and-availability). |
 | Persistence or migrations | Also start local services with `npm run db:up` and run migrations/integration tests against a disposable database as below. |
 | Containers | Also `npm run quality:backend-image` (Docker required). |
 | Ranking, captions, catalog annotations, or feedback | Focused tests plus `npm run quality:benchmark`, `npm run quality:suggestions`, and `npm run quality:dataset-plan`. Read [QUALITY.md](../QUALITY.md). |

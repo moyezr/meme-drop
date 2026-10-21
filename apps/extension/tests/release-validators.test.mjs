@@ -5,6 +5,7 @@ import os from "node:os";
 import test from "node:test";
 import { promisify } from "node:util";
 import path from "node:path";
+import extensionPackage from "../package.json" with { type: "json" };
 
 const execFileAsync = promisify(execFile);
 const rootDir = path.resolve(import.meta.dirname, "..", "..", "..");
@@ -150,6 +151,8 @@ test("store readiness validator requires detailed usage event disclosure", async
     (error) => {
       assert.match(error.stdout || "", /usage_events disclosure must disclose shown meme feedback events/);
       assert.match(error.stdout || "", /usage_events disclosure must disclose clicked meme feedback events/);
+      assert.match(error.stdout || "", /usage_events disclosure must disclose copied meme feedback events/);
+      assert.match(error.stdout || "", /usage_events disclosure must disclose attachment_failed meme feedback events/);
       assert.match(error.stderr || "", /store readiness failed/);
       return true;
     }
@@ -367,7 +370,7 @@ function releaseManifest() {
     manifest_version: 3,
     name: "MemeDrop",
     description: "Instantly reply with the perfect meme on X and LinkedIn",
-    version: "0.0.1",
+    version: extensionPackage.version,
     permissions: ["storage"],
     host_permissions: [
       "https://x.com/*",

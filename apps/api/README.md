@@ -210,7 +210,11 @@ catalog is no slower than 50ms.
 
 `POST /api/v1/suggest` always returns at most five results. The service scores the full verified
 catalog locally, diversifies a 12-template shortlist, and makes at most one joint OpenRouter request
-to select and caption the user-visible results. That request has a 4.5-second deadline; failure opens
+to select and caption the user-visible results. Service work has a five-second total budget with
+250ms reserved for fallback/assembly. Optional trend and feedback reads are capped at 1.25 seconds
+and one second; inference receives the remaining allowance up to 4.5 seconds. The extension's
+6.5-second request deadline includes the body read and leaves transport headroom. The service clock
+excludes middleware, startup, and network time. Model failure opens
 a short per-process cooldown and returns deterministic selection/captions without a retry. Candidate
 and feedback reads run in parallel when cold, caches avoid repeat reads, and singleflight merges
 concurrent identical requests. `Server-Timing` reports non-sensitive stage durations; clients should
@@ -219,7 +223,17 @@ use thumbnail URLs for fast card rendering and prefetch the original image for a
 The request may include `steering_instruction` as a trimmed 1-280 character creative preference.
 The service keeps source-post context analysis separate, hashes steering into cache identity, and
 passes it to OpenRouter as untrusted JSON data. It is not returned, persisted, or logged. Safe
-feedback contains only `suggestion_mode` so automatic and steered outcome rates can be compared.
+feedback includes only reviewed mode/sentiment/tone/topic/intent/intensity categories; raw direction,
+source-derived anchors, and arbitrary text hints never enter new feedback persistence.
+
+Usage endpoints accept version 2 events with random `event_id` (required), optional random
+`impression_id`, and position 1–5. `inserted` means native-confirmed attachment; `copied`,
+`abandoned`, and `attachment_failed` are neutral. Only version 2 events feed learning and feedback
+reports. Legacy event shapes remain accepted/exportable. Concurrent retry deduplication uses the
+existing usage-event primary key scoped to the install identity. Apply migration `20261021_0011`
+before deploying the API and then the new extension; it widens the existing action constraint
+without rewriting records. Downgrade refuses when new-action records would violate the old
+constraint rather than deleting them.
 
 The same request includes the already-computed comedy brief plus each template's visual grammar,
 joke shapes, ordered region roles, physical text limits, and contrastive examples. It asks the model

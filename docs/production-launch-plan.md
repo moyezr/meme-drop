@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-09-09 (documentation ownership; product status last recorded 2026-09-07)
+Last updated: 2026-10-21 (suggestion observability task; other product status retains its recorded evidence)
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and acceptance evidence here as implementation
@@ -233,6 +233,12 @@ access.
 - [ ] Emit structured, redacted metrics for request count, latency, status, `no_fit`, fallback,
   OpenRouter outcome, render/storage outcome, credit outcome, and trend snapshot age.
 - [ ] Track p50/p95/p99 end-to-end latency and provider latency separately.
+- [~] Correct browser suggestion deadlines, local measurements, and outcome feedback. The October
+  21 implementation bounds service work, separates visible captioned previews/native-confirmed
+  attachments from byte arrivals/copies, and adds version 2 retry-safe feedback. Local acceptance
+  includes packaged Chromium fixture flows and PostgreSQL integration; hosted rollout and real
+  X/LinkedIn DOM QA remain separate. Apply `20261021_0011` before API then extension deployment.
+  Verification is recorded in [PROGRESS.md](../PROGRESS.md).
 - [ ] Track estimated and reconciled cost per successful generation and per customer.
 - [~] Add dashboards and alerts for elevated errors, provider timeouts, stale trends, Redis or
   PostgreSQL failures, credit-transaction anomalies, storage cleanup lag, and unusual user usage.

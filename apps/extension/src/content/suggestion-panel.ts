@@ -14,6 +14,9 @@ import {
 import type { MemeTextOverlay } from "@memedrop/shared";
 import { drawMemeTextOverlay } from "@memedrop/shared/overlay-renderer";
 import { ensureMemeOverlayFonts } from "./overlay-fonts";
+import { SuggestionPerformanceTracker, roundDuration } from "../shared/suggestion-performance";
+import { fetchMediaBlobWithTimeout } from "../shared/media-fetch";
+import { attachmentImageSnapshot, waitForNativeAttachment } from "./attachment-confirmation";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const IMAGE_PLACEHOLDER =
@@ -49,6 +52,8 @@ interface Suggestion {
   source: "user" | "global";
   tweet_text?: string;
   feedback_context?: Record<string, unknown>;
+  impression_id?: string;
+  position?: number;
 }
 
 let panelHost: HTMLDivElement | null = null;
@@ -57,12 +62,40 @@ let isDragging = false;
 let dragListenersInstalled = false;
 let dragOffset = { x: 0, y: 0 };
 let currentSuggestions: Suggestion[] = [];
-let usedSuggestionIds = new Set<string>();
+let selectedSuggestionIds = new Set<string>();
 let shownSuggestionIds = new Set<string>();
 let insertingSuggestionId: string | null = null;
 let currentSteeringInstruction = "";
 let steeringEditorOpen = false;
 let preferredComposerTarget: Element | null = null;
+let panelGeneration = 0;
+const previewObservers = new Map<Element, IntersectionObserver>();
+const failedPreviewIds = new Set<string>();
+
+function disconnectPreviewObservers() {
+  for (const observer of previewObservers.values()) observer.disconnect();
+  previewObservers.clear();
+}
+let browserPerformance: SuggestionPerformanceTracker | null = null;
+let insertionInFlight = false;
+
+export function beginSuggestionRequest(startedAt = performance.now()) {
+  hidePanel();
+  browserPerformance = new SuggestionPerformanceTracker(() => performance.now(), startedAt);
+  browserPerformance.startBrowserRequest();
+  reportBrowserPerformance();
+}
+
+function reportBrowserPerformance() {
+  if (!browserPerformance) return;
+  const diagnostics = browserPerformance.snapshot();
+  console.debug("[MemeDrop] browser suggestion performance", diagnostics);
+  window.dispatchEvent(new CustomEvent("memedrop:suggestion-browser-performance", { detail: diagnostics }));
+}
+
+function isCurrentSuggestion(suggestion: Suggestion, generation: number) {
+  return generation === panelGeneration && currentSuggestions.includes(suggestion) && isPanelVisible();
+}
 
 export function setSuggestionComposerTarget(target: Element | null) {
   preferredComposerTarget = target;
@@ -457,6 +490,13 @@ function createPanel(): { host: HTMLDivElement; shadow: ShadowRoot } {
   style.textContent = PANEL_STYLES;
   shadow.appendChild(style);
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    for (const [card, observer] of previewObservers) {
+      observer.unobserve(card);
+      observer.observe(card);
+    }
+  });
   document.body.appendChild(host);
   return { host, shadow };
 }
@@ -583,9 +623,17 @@ function renderLoading() {
 
 function renderSuggestions(suggestions: Suggestion[]) {
   if (!shadowRoot) return;
-  currentSuggestions = limitSuggestions(suggestions);
+  disconnectPreviewObservers();
+  const generation = ++panelGeneration;
+  currentSuggestions = limitSuggestions(suggestions).map((suggestion, index) => ({
+    ...suggestion, impression_id: crypto.randomUUID(), position: index + 1,
+  }));
+  browserPerformance?.setSuggestions(currentSuggestions.length);
+  failedPreviewIds.clear();
+  if (currentSuggestions.length === 0) browserPerformance?.markPreviewState("empty");
+  reportBrowserPerformance();
   insertingSuggestionId = null;
-  usedSuggestionIds.clear();
+  selectedSuggestionIds.clear();
   shownSuggestionIds.clear();
 
   const existing = shadowRoot.querySelector(".panel");
@@ -638,12 +686,13 @@ function renderSuggestions(suggestions: Suggestion[]) {
       card.draggable = true;
       card.tabIndex = 0;
       card.setAttribute("role", "button");
+      card.setAttribute("aria-disabled", "true");
       card.setAttribute("aria-label", `Use ${s.name || "meme"}`);
 
       const img = document.createElement("img");
-      img.src = getBestImageSrc(s);
+      img.src = s.tailored_overlay?.enabled && !s.tailored_image_data_url ? IMAGE_PLACEHOLDER : getBestImageSrc(s);
       img.alt = s.name;
-      img.loading = "lazy";
+      img.loading = s.position === 1 ? "eager" : "lazy";
       img.draggable = false;
 
       const reason = document.createElement("div");
@@ -678,19 +727,16 @@ function renderSuggestions(suggestions: Suggestion[]) {
       if (name.textContent) card.appendChild(name);
       card.appendChild(cardOverlay);
 
-      if (s.preview_image_data_url) {
-        if (s.tailored_overlay?.enabled) {
-          void showTailoredPreview(s, img);
-        } else {
-          img.src = s.preview_image_data_url;
-        }
+      if (s.preview_image_data_url || s.tailored_image_data_url) {
+        void showUsablePreview(s, img, generation);
       }
 
       card.addEventListener("click", (e) => {
         e.stopPropagation();
-        logSuggestionUsage(s, "clicked");
-        insertMemeIntoComposer(s).catch((err) => {
-          console.error("[MemeDrop] Insert from suggestion failed:", err);
+        if (img.dataset.usable !== "true" || insertionInFlight || insertingSuggestionId !== null) return;
+        insertMemeIntoComposer(s).catch(() => {
+          if (!isCurrentSuggestion(s, generation)) return;
+          logSuggestionUsage(s, "attachment_failed");
           showToast("Could not attach meme", "error");
         });
       });
@@ -702,6 +748,10 @@ function renderSuggestions(suggestions: Suggestion[]) {
       });
 
       card.addEventListener("dragstart", (e) => {
+        if (img.dataset.usable !== "true" || insertionInFlight || insertingSuggestionId !== null) {
+          e.preventDefault();
+          return;
+        }
         if (!e.dataTransfer) return;
         e.stopPropagation();
         e.dataTransfer.effectAllowed = "copy";
@@ -735,7 +785,6 @@ function renderSuggestions(suggestions: Suggestion[]) {
       });
 
       strip.appendChild(card);
-      logSuggestionUsage(s, "shown");
     }
 
     panel.appendChild(header);
@@ -799,9 +848,11 @@ function dismissPanel(e: Event) {
 }
 
 async function insertMemeIntoComposer(suggestion: Suggestion) {
+  if (insertionInFlight || insertingSuggestionId !== null) return;
+  const generation = panelGeneration;
+  selectedSuggestionIds.add(suggestion.meme_id);
+  logSuggestionUsage(suggestion, "clicked");
   const selectedAt = performance.now();
-  let fullRenderMs = 0;
-  let attachMs = 0;
   setCardBusy(suggestion.meme_id, true, "Preparing caption...");
 
   try {
@@ -812,40 +863,21 @@ async function insertMemeIntoComposer(suggestion: Suggestion) {
       }
     }
 
-    if (suggestion.tailored_overlay?.enabled && !suggestion.tailored_image_data_url) {
-      setCardBusy(suggestion.meme_id, true, "Rendering meme...");
-      const renderStartedAt = performance.now();
-      suggestion.tailored_image_data_url = await renderTailoredMemeDataUrl(suggestion).catch(
-        () => null
-      );
-      fullRenderMs = Math.max(0, Math.round((performance.now() - renderStartedAt) * 10) / 10);
-    }
-
-    setCardBusy(suggestion.meme_id, true, "Attaching to X...");
-    const attachStartedAt = performance.now();
-    try {
-      await insertMemeByUrl({
-        imageUrl: suggestion.image_url,
-        imageDataUrl: suggestion.image_data_url ?? null,
-        tailoredImageDataUrl: suggestion.tailored_image_data_url ?? null,
-        tailoredOverlay: suggestion.tailored_overlay ?? null,
-        memeId: suggestion.meme_id,
-        source: suggestion.source,
-      });
-    } finally {
-      attachMs = Math.max(0, Math.round((performance.now() - attachStartedAt) * 10) / 10);
-    }
+    if (!isCurrentSuggestion(suggestion, generation)) return;
+    setCardBusy(suggestion.meme_id, true, `Attaching to ${getPlatformAdapter()?.displayName || "composer"}...`);
+    await insertMemeByUrl({
+      imageUrl: suggestion.image_url,
+      imageDataUrl: suggestion.image_data_url ?? null,
+      tailoredImageDataUrl: suggestion.tailored_image_data_url ?? null,
+      tailoredOverlay: suggestion.tailored_overlay ?? null,
+      memeId: suggestion.meme_id,
+      source: suggestion.source,
+      suggestion,
+      generation,
+      selectionStartedAt: selectedAt,
+    });
   } finally {
-    window.dispatchEvent(
-      new CustomEvent("memedrop:suggestion-attach-performance", {
-        detail: {
-          full_render_ms: fullRenderMs,
-          attach_ms: attachMs,
-          selected_total_ms: Math.max(0, Math.round((performance.now() - selectedAt) * 10) / 10),
-        },
-      })
-    );
-    setCardBusy(suggestion.meme_id, false);
+    if (generation === panelGeneration) setCardBusy(suggestion.meme_id, false);
   }
 }
 
@@ -886,6 +918,9 @@ type InsertMemeInput = {
   memeId?: string;
   source?: "user" | "global";
   composerTarget?: Element | null;
+  suggestion?: Suggestion;
+  generation?: number;
+  selectionStartedAt?: number;
 };
 
 /**
@@ -902,48 +937,65 @@ async function toPngFile(blob: Blob, filename = "meme.png"): Promise<File> {
   }
 
   const bitmap = await createImageBitmap(blob);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas 2d context unavailable");
-  ctx.drawImage(bitmap, 0, 0);
-
-  const pngBlob: Blob = await new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("toBlob returned null"))),
-      "image/png"
-    );
-  });
-
-  return new File([pngBlob], filename, { type: "image/png" });
-}
-
-async function renderTailoredMemeDataUrl(suggestion: Suggestion): Promise<string> {
-  if (suggestion.tailored_image_data_url) return suggestion.tailored_image_data_url;
-  const overlay = suggestion.tailored_overlay;
-  if (!overlay?.enabled || overlay.regions.length === 0) {
-    return suggestion.image_data_url || suggestion.image_url;
-  }
-
-  return renderMemeWithOverlay(suggestion.image_url, suggestion.image_data_url, overlay);
-}
-
-async function showTailoredPreview(suggestion: Suggestion, img: HTMLImageElement) {
-  if (!suggestion.tailored_overlay?.enabled) return;
-
   try {
-    const previewDataUrl = await renderMemeWithOverlay(
-      suggestion.preview_image_url || suggestion.image_url,
-      suggestion.preview_image_data_url,
-      suggestion.tailored_overlay,
-      PREVIEW_MAX_DIMENSION
-    );
-    if (currentSuggestions.some((item) => item.meme_id === suggestion.meme_id)) {
-      img.src = previewDataUrl;
-    }
-  } catch (err) {
-    console.warn("[MemeDrop] Tailored meme preview failed:", err);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2d context unavailable");
+    ctx.drawImage(bitmap, 0, 0);
+
+    const pngBlob: Blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("toBlob returned null"))),
+        "image/png"
+      );
+    });
+
+    return new File([pngBlob], filename, { type: "image/png" });
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function showUsablePreview(suggestion: Suggestion, img: HTMLImageElement, generation = panelGeneration) {
+  try {
+    const source = suggestion.tailored_image_data_url || (suggestion.tailored_overlay?.enabled
+      ? await renderMemeWithOverlay(
+          suggestion.preview_image_url || suggestion.image_url,
+          suggestion.preview_image_data_url,
+          suggestion.tailored_overlay,
+          PREVIEW_MAX_DIMENSION
+        )
+      : suggestion.preview_image_data_url);
+    await Promise.resolve();
+    if (!source || !isCurrentSuggestion(suggestion, generation) || !img.isConnected) return;
+    img.src = source;
+    await img.decode();
+    // Wait for a frame after decode before observing what the user can see.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    if (!isCurrentSuggestion(suggestion, generation) || !img.isConnected) return;
+    img.dataset.usable = "true";
+    const card = img.closest<HTMLElement>(".meme-card");
+    if (!card) return;
+    card.setAttribute("aria-disabled", "false");
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.5 || document.visibilityState !== "visible") continue;
+        if (!isCurrentSuggestion(suggestion, generation)) return;
+        browserPerformance?.markUsablePreview(suggestion.meme_id);
+        logSuggestionUsage(suggestion, "shown");
+        reportBrowserPerformance();
+        observer.disconnect();
+        previewObservers.delete(card);
+      }
+    }, { threshold: 0.5 });
+    previewObservers.get(card)?.disconnect();
+    previewObservers.set(card, observer);
+    observer.observe(card);
+  } catch {
+    if (!isCurrentSuggestion(suggestion, generation)) return;
+    markSuggestionPreviewFailed(suggestion.meme_id);
   }
 }
 
@@ -979,230 +1031,116 @@ async function renderMemeWithOverlay(
   }
 }
 
-/** Hand the rendered file to the active platform's native upload pipeline. */
-async function attachViaFileInput(
-  file: File,
-  composerTarget?: Element | null
-): Promise<boolean> {
-  const platform = getPlatformAdapter();
-  if (!platform) return false;
-  const scope = findComposerScope(platform, composerTarget);
-  let scopedInputs = Array.from(
-    scope.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput)
-  );
-  let allInputs = Array.from(
-    document.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput)
-  );
-
-  // LinkedIn mounts its hidden image input only after the user opens the
-  // comment photo control. The suggestion card click remains the explicit
-  // user action; activating the native control only prepares its uploader.
-  if (
-    scopedInputs.length === 0 &&
-    (allInputs.length === 0 || platform.id === "linkedin")
-  ) {
-    const activatorSelector = platform.selectors.fileInputActivator;
-    const activator = activatorSelector
-      ? scope.querySelector<HTMLButtonElement>(activatorSelector) ||
-        document.querySelector<HTMLButtonElement>(activatorSelector)
-      : null;
-    if (activator) {
-      activator.click();
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      scopedInputs = Array.from(
-        scope.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput)
-      );
-      allInputs = Array.from(
-        document.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput)
-      );
-    }
+/** Use only the intended composer; an unrelated input cannot confirm success. */
+function findComposerScope(platform: PlatformAdapter, preferredTarget?: Element | null): Element | null {
+  if (preferredTarget) {
+    if (!preferredTarget.isConnected) return null;
+    const preferredScope = preferredTarget.closest(platform.selectors.composeScope);
+    return preferredScope?.querySelector(platform.selectors.composer) ? preferredScope : null;
   }
-
-  // Fallback lookup: any image-accepting file input nearby.
-  const candidates =
-    scopedInputs.length > 0
-      ? scopedInputs
-      : allInputs.length > 0
-        ? preferComposeScopeElements(platform, allInputs)
-      : Array.from(
-          document.querySelectorAll<HTMLInputElement>('input[type="file"]')
-        ).filter((input) => (input.accept || "").includes("image"));
-
-  const enabledCandidates = candidates.filter((input) => input.isConnected && !input.disabled);
-  if (enabledCandidates.length === 0) return false;
-
-  // Prefer one that is currently in the DOM *and* not disabled. Most X
-  // layouts only have one composer open at a time, but reply-from-feed
-  // modals can coexist with an inline composer — pick the last one since
-  // that's typically the most recently opened.
-  const input = enabledCandidates[enabledCandidates.length - 1];
-
-  const dt = new DataTransfer();
-  dt.items.add(file);
-  // `files` is a read-only FileList on the prototype, but setting it on the
-  // instance works in Chromium and is the standard trick used across the
-  // extension community.
-  input.files = dt.files;
-
-  input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-  input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-  return true;
+  const activeScope = document.activeElement?.closest(platform.selectors.composeScope);
+  if (activeScope?.querySelector(platform.selectors.composer)) return activeScope;
+  const scopes = Array.from(document.querySelectorAll<HTMLElement>(platform.selectors.composeScope))
+    .filter((scope) => scope.querySelector(platform.selectors.composer) &&
+      scope.getBoundingClientRect().width > 0 && scope.getBoundingClientRect().height > 0);
+  return scopes.length === 1 ? scopes[0] : null;
 }
 
-/**
- * Fallback — synthetic paste event into the active contentEditable composer.
- */
-function attachViaPasteEvent(
-  file: File,
-  composerTarget?: Element | null
-): boolean {
-  const platform = getPlatformAdapter();
-  if (!platform) return false;
-  const scope = findComposerScope(platform, composerTarget);
-  const composer =
-    scope.querySelector<HTMLElement>(platform.selectors.composer) ||
-    findVisibleComposer(platform) ||
-    document.querySelector<HTMLElement>(platform.selectors.composer);
-  if (!composer) return false;
-
-  composer.focus();
-
-  const dt = new DataTransfer();
-  dt.items.add(file);
-
-  const evt = new ClipboardEvent("paste", {
-    bubbles: true,
-    cancelable: true,
-    clipboardData: dt,
-  });
-  composer.dispatchEvent(evt);
-  return true;
-}
-
-function findComposerScope(
-  platform: PlatformAdapter,
-  preferredTarget?: Element | null
-): Element | Document {
-  const preferredScope = preferredTarget?.closest(platform.selectors.composeScope);
-  if (preferredScope && preferredScope.querySelector(platform.selectors.composer)) {
-    return preferredScope;
-  }
-
-  const visibleScope = findVisibleComposeScope(platform);
-  if (visibleScope) return visibleScope;
-
-  const activeComposer = document.activeElement?.closest(platform.selectors.composer);
-  const activeScope = activeComposer?.closest(platform.selectors.composeScope);
-  if (activeScope) return activeScope;
-
-  return document;
-}
-
-function findVisibleComposeScope(platform: PlatformAdapter): HTMLElement | null {
-  const scopes = Array.from(
-    document.querySelectorAll<HTMLElement>(platform.selectors.composeScope)
-  ).filter((scope) => {
-    if (!scope.querySelector(platform.selectors.composer)) return false;
-    const rect = scope.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  });
-
-  return scopes.at(-1) || null;
-}
-
-function findVisibleComposer(platform: PlatformAdapter): HTMLElement | null {
-  return findVisibleComposeScope(platform)?.querySelector<HTMLElement>(
-    platform.selectors.composer
-  ) || null;
-}
-
-function preferComposeScopeElements<T extends Element>(
-  platform: PlatformAdapter,
-  elements: T[]
-): T[] {
-  const scope = findVisibleComposeScope(platform);
-  if (!scope) return elements;
-  const scoped = elements.filter((element) => scope.contains(element));
-  return scoped.length > 0 ? scoped : elements;
-}
-
-export async function insertMemeByUrl(payload: InsertMemeInput) {
-  let file: File | null = null;
-
-  try {
-    const tailoredImageDataUrl =
-      payload.tailoredImageDataUrl ||
-      (payload.tailoredOverlay?.enabled
-        ? await renderMemeWithOverlay(
-            payload.imageUrl,
-            payload.imageDataUrl,
-            payload.tailoredOverlay
-          ).catch((err) => {
-            console.warn("[MemeDrop] Tailored insert render failed:", err);
-            return null;
-          })
-        : null);
-    const raw = await resolveMemeBlob(
-      payload.imageUrl,
-      tailoredImageDataUrl ?? payload.imageDataUrl
-    );
-    file = await toPngFile(raw);
-  } catch (err) {
-    console.error("[MemeDrop] Could not load meme image:", err);
-    showToast("Could not load meme image", "error");
-    return;
-  }
-
-  const logUsage = () => {
-    if (payload.memeId) {
-      const suggestion = currentSuggestions.find((s) => s.meme_id === payload.memeId);
-      usedSuggestionIds.add(payload.memeId);
-      chrome.runtime.sendMessage({
-        type: "LOG_USAGE",
-        payload: {
-          meme_id: payload.memeId,
-          action: "used",
-          source: suggestion?.source || payload.source,
-          feedback_context: suggestion?.feedback_context || {},
-        },
-      });
-    }
+export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"inserted" | "copied" | "failed" | "cancelled"> {
+  if (insertionInFlight) return "cancelled";
+  insertionInFlight = true;
+  const generation = payload.generation ?? panelGeneration;
+  const suggestion = payload.suggestion || currentSuggestions.find((s) => s.meme_id === payload.memeId);
+  const isCurrent = () => generation === panelGeneration;
+  const selectedAt = payload.selectionStartedAt ?? performance.now();
+  let preparedAt: number | undefined;
+  let outcome: "inserted" | "copied" | "failed" | "cancelled" = "failed";
+  const logOutcome = (action: "inserted" | "copied" | "attachment_failed") => {
+    if (!payload.memeId) return;
+    if (suggestion) logSuggestionUsage(suggestion, action);
+    else chrome.runtime.sendMessage({ type: "LOG_USAGE", payload: {
+      meme_id: payload.memeId, action, source: payload.source, feedback_context: {},
+    }});
   };
-
-  // Strategy 1: file input — the reliable path.
   try {
-    if (await attachViaFileInput(file, payload.composerTarget ?? preferredComposerTarget)) {
-      logUsage();
-      setTimeout(() => hidePanel(), 400);
-      return;
+    if (suggestion) {
+      if (!selectedSuggestionIds.has(suggestion.meme_id)) logSuggestionUsage(suggestion, "clicked");
+      selectedSuggestionIds.add(suggestion.meme_id);
     }
-  } catch (err) {
-    console.warn("[MemeDrop] File input attach failed:", err);
-  }
-
-  // Strategy 2: synthetic paste event on the contentEditable composer.
-  try {
-    if (attachViaPasteEvent(file, payload.composerTarget ?? preferredComposerTarget)) {
-      logUsage();
-      setTimeout(() => hidePanel(), 400);
-      return;
+    // Caption rendering failures must not silently attach an uncaptioned template.
+    const tailored = payload.tailoredImageDataUrl || (payload.tailoredOverlay?.enabled
+      ? await renderMemeWithOverlay(payload.imageUrl, payload.imageDataUrl, payload.tailoredOverlay)
+      : null);
+    if (tailored && suggestion) suggestion.tailored_image_data_url = tailored;
+    const raw = await resolveMemeBlob(payload.imageUrl, tailored ?? payload.imageDataUrl);
+    const file = await toPngFile(raw);
+    preparedAt = performance.now();
+    if (!isCurrent()) return outcome = "cancelled";
+    const platform = getPlatformAdapter();
+    const scope = platform && findComposerScope(platform, payload.composerTarget ?? preferredComposerTarget);
+    if (platform && scope) {
+      const before = attachmentImageSnapshot(scope, platform.selectors.attachmentImage);
+      let input = scope.querySelector<HTMLInputElement>(platform.selectors.fileInput);
+      if (!input && platform.selectors.fileInputActivator) {
+        scope.querySelector<HTMLButtonElement>(platform.selectors.fileInputActivator)?.click();
+        const deadline = performance.now() + 500;
+        while (!input && isCurrent() && performance.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          input = scope.querySelector<HTMLInputElement>(platform.selectors.fileInput);
+        }
+      }
+      if (!isCurrent() || !scope.isConnected) return outcome = "cancelled";
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      let dispatched = false;
+      if (input?.isConnected && !input.disabled) {
+        input.files = transfer.files;
+        input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+        dispatched = true;
+      } else {
+        const composer = scope.querySelector<HTMLElement>(platform.selectors.composer);
+        if (composer) {
+          composer.focus();
+          composer.dispatchEvent(new ClipboardEvent("paste", {
+            bubbles: true, cancelable: true, clipboardData: transfer,
+          }));
+          dispatched = true;
+        }
+      }
+      if (dispatched && await waitForNativeAttachment(scope, platform.selectors.attachmentImage,
+        platform.selectors.attachmentBusy, before, isCurrent)) {
+        if (!isCurrent() || !scope.isConnected) return outcome = "cancelled";
+        logOutcome("inserted");
+        outcome = "inserted";
+        hidePanel();
+        return outcome;
+      }
+      if (!scope.isConnected) return outcome = "cancelled";
+      // An unconfirmed upload is not retried through another native mechanism:
+      // a late upload could otherwise attach the same meme twice.
     }
-  } catch (err) {
-    console.warn("[MemeDrop] Synthetic paste failed:", err);
-  }
-
-  // Strategy 3: put the PNG on the clipboard so Cmd+V into the composer
-  // works. We deliberately do NOT writeText here — a text URL would paste as
-  // a link or base64 blob into the platform's text field.
-  try {
-    await navigator.clipboard.write([
-      new ClipboardItem({ "image/png": file }),
-    ]);
-    showToast("Meme copied — click composer then Cmd+V", "success");
-    logUsage();
-  } catch (err) {
-    console.error("[MemeDrop] Clipboard fallback failed:", err);
+    if (!isCurrent()) return outcome = "cancelled";
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": file })]);
+    if (!isCurrent()) return outcome = "cancelled";
+    logOutcome("copied");
+    showToast("Meme copied — click composer then paste", "success");
+    return outcome = "copied";
+  } catch {
+    if (!isCurrent()) return outcome = "cancelled";
+    logOutcome("attachment_failed");
     showToast("Couldn't attach meme — open the image control and try again", "error");
+    return outcome;
+  } finally {
+    insertionInFlight = false;
+    const diagnostics = {
+      outcome,
+      ...(preparedAt === undefined ? {} : { selected_preparation_ms: roundDuration(preparedAt - selectedAt) }),
+      ...(outcome === "inserted" && preparedAt !== undefined
+        ? { native_attachment_confirmation_ms: roundDuration(performance.now() - preparedAt) } : {}),
+      selected_total_ms: roundDuration(performance.now() - selectedAt),
+    };
+    console.debug("[MemeDrop] selected meme performance", diagnostics);
+    window.dispatchEvent(new CustomEvent("memedrop:suggestion-attach-performance", { detail: diagnostics }));
   }
 }
 
@@ -1275,9 +1213,9 @@ async function resolveMemeBlob(
     : `${API_BASE_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
 
   try {
-    const directResponse = await fetch(directUrl);
+    const { response: directResponse, blob } = await fetchMediaBlobWithTimeout(directUrl);
     if (directResponse.ok) {
-      return directResponse.blob();
+      return blob;
     }
   } catch {
     // Fall through to background fetch bridge.
@@ -1314,6 +1252,8 @@ export function setSuggestionSteeringInstruction(instruction?: string) {
 }
 
 export function showSuggestionError(message: string) {
+  browserPerformance?.markPreviewState("failed");
+  reportBrowserPerformance();
   if (!panelHost || !shadowRoot) {
     const { host, shadow } = createPanel();
     panelHost = host;
@@ -1372,41 +1312,44 @@ export function updateSuggestionPreview(memeId: string, imageDataUrl: string) {
   const img = card?.querySelector<HTMLImageElement>("img");
   if (!img) return;
 
-  if (suggestion.tailored_overlay?.enabled) {
-    void showTailoredPreview(suggestion, img);
-  } else {
-    img.src = imageDataUrl;
-  }
+  void showUsablePreview(suggestion, img);
+}
+
+export function markSuggestionPreviewFailed(memeId: string) {
+  if (!currentSuggestions.some((suggestion) => suggestion.meme_id === memeId) || failedPreviewIds.has(memeId)) return;
+  failedPreviewIds.add(memeId);
+  browserPerformance?.markPreviewRenderFailure();
+  if (failedPreviewIds.size === currentSuggestions.length) browserPerformance?.markPreviewState("failed");
+  const card = Array.from(shadowRoot?.querySelectorAll<HTMLElement>(".meme-card") || [])
+    .find((item) => item.dataset.memeId === memeId);
+  const reason = card?.querySelector<HTMLElement>(".meme-reason");
+  if (reason) reason.textContent = "Preview unavailable";
+  if (card) card.title = "Refresh suggestions to try loading this preview again";
+  reportBrowserPerformance();
 }
 
 export function hidePanel() {
-  if (panelHost) {
-    panelHost.style.display = "none";
+  if (browserPerformance?.snapshot().preview_state === "pending") {
+    browserPerformance.markPreviewState("cancelled");
+    reportBrowserPerformance();
   }
-
-  // Log dismissal if suggestions were showing
-  if (currentSuggestions.length > 0) {
-    for (const s of currentSuggestions) {
-      if (usedSuggestionIds.has(s.meme_id)) continue;
-      chrome.runtime.sendMessage({
-        type: "LOG_USAGE",
-        payload: {
-          meme_id: s.meme_id,
-          action: "dismissed",
-          source: s.source,
-          feedback_context: s.feedback_context || {},
-        },
-      });
+  disconnectPreviewObservers();
+  panelGeneration++;
+  insertingSuggestionId = null;
+  if (panelHost) panelHost.style.display = "none";
+  if (selectedSuggestionIds.size === 0) {
+    for (const suggestion of currentSuggestions) {
+      if (shownSuggestionIds.has(suggestion.meme_id)) logSuggestionUsage(suggestion, "abandoned");
     }
-    currentSuggestions = [];
-    usedSuggestionIds.clear();
-    shownSuggestionIds.clear();
   }
+  currentSuggestions = [];
+  selectedSuggestionIds.clear();
+  shownSuggestionIds.clear();
 }
 
 function logSuggestionUsage(
   suggestion: Suggestion,
-  action: "shown" | "clicked" | "used" | "dismissed"
+  action: "shown" | "clicked" | "inserted" | "copied" | "abandoned" | "attachment_failed"
 ) {
   if (action === "shown") {
     if (shownSuggestionIds.has(suggestion.meme_id)) return;
@@ -1419,6 +1362,8 @@ function logSuggestionUsage(
       meme_id: suggestion.meme_id,
       action,
       source: suggestion.source,
+      impression_id: suggestion.impression_id,
+      position: suggestion.position,
       feedback_context: suggestion.feedback_context || {},
     },
   });

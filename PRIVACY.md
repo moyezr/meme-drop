@@ -1,6 +1,6 @@
 # MemeDrop privacy policy
 
-Last updated: 2026-10-07
+Last updated: 2026-10-21
 
 This document describes the current MemeDrop private beta. Provider retention and billing details
 that are still under review will be finalized before public self-service access opens.
@@ -21,7 +21,9 @@ MemeDrop processes:
 - an identity-provider account identifier and email for authenticated dashboard users;
 - API-key names, one-way key hashes, key-use metadata, credit transactions, and generation records;
 - suggested meme IDs, captions, scores, and structured context such as intent, topic, or tone;
-- outcome events such as shown, clicked, inserted/used, saved, and dismissed;
+- outcome events: shown (visible suggestions), clicked (selection), inserted (confirmed
+  attachment), copied, saved, rejected, abandoned, and attachment_failed;
+- random event/impression IDs, suggestion position, and event-format version for those outcomes;
 - images and tags the user chooses to save to a personal library;
 - limited security, error, latency, and request-ID logs needed to operate the service.
 
@@ -48,7 +50,12 @@ for the active composer and request; cache identity contains only a one-way hash
 does not write raw source-post text or user guidance to its database, usage events, or production logs.
 
 PostgreSQL stores the anonymous install ID, saved-library records, and usage events with structured
-post context. The input schema rejects raw post-text fields inside usage context. Saved image files
+post context limited to reviewed categories. Random event/impression IDs are not derived from
+submitted content. Corrected events distinguish copying from insertion and ordinary closure from
+rejection; ambiguous older events do not train the corrected ranking. Browser rendering/attachment
+timings remain local diagnostics. Older used and dismissed events remain exportable for
+compatibility. The input schema rejects raw post-text fields inside usage
+context. Saved image files
 are stored in Supabase Storage through its S3-compatible service. The landing page and API are hosted
 as separate Vercel projects.
 

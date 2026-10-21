@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const { createSingleFlight } = await import("../src/shared/single-flight.ts");
-const { fetchMediaWithTimeout } = await import("../src/shared/media-fetch.ts");
+const { fetchMediaBlobWithTimeout } = await import("../src/shared/media-fetch.ts");
 
 test("aborts a media fetch that never settles", async () => {
   let aborted = false;
@@ -15,7 +15,7 @@ test("aborts a media fetch that never settles", async () => {
     });
 
   await assert.rejects(
-    fetchMediaWithTimeout("https://cdn.example/stalled.webp", 5, neverSettles),
+    fetchMediaBlobWithTimeout("https://cdn.example/stalled.webp", 5, neverSettles),
     /Media fetch timed out/
   );
   assert.equal(aborted, true);
@@ -28,7 +28,7 @@ test("a timed-out media flight clears so an on-demand retry can run", async () =
   await assert.rejects(
     flight.run("https://cdn.example/stalled.webp", () => {
       attempts += 1;
-      return fetchMediaWithTimeout(
+      return fetchMediaBlobWithTimeout(
         "https://cdn.example/stalled.webp",
         5,
         (_input, init) =>
@@ -47,4 +47,14 @@ test("a timed-out media flight clears so an on-demand retry can run", async () =
 
   assert.equal(await response.text(), "ok");
   assert.equal(attempts, 2);
+});
+
+
+test("media timeout also bounds a body that stalls after its headers arrive", async () => {
+  await assert.rejects(fetchMediaBlobWithTimeout("https://cdn.example/stalled-body.webp", 5,
+    async (_url, init) => new Response(new ReadableStream({
+      start(controller) {
+        init.signal.addEventListener("abort", () => controller.error(init.signal.reason));
+      },
+    }))), /Media fetch timed out/);
 });

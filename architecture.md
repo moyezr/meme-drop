@@ -136,8 +136,13 @@ positive and anti-use cases, and contrastive examples. Caption or retrieval beha
 improve through these reviewed labels so catalog additions remain server-side data changes rather
 than extension releases.
 
-The API returns at most five user-visible suggestions. The model call has a dedicated 4.5-second
-deadline. A failed call opens a short, process-local provider cooldown and immediately uses the local
+The API returns at most five user-visible suggestions. Suggestion service work has a five-second
+budget, reserving 250ms for local fallback and response assembly. Optional trend lookup is capped
+at 1.25 seconds and feedback reads at one second. The joint model receives only the remaining
+budget, capped at 4.5 seconds; the extension allows 6.5 seconds including response-body reads for
+transport headroom. The service budget begins after middleware/identity resolution and does not
+measure serverless startup or network transit. A failed call opens a short, process-local provider
+cooldown and immediately uses the local
 selection and a reviewed template-specific caption when one exists, rather than retrying on the
 user-visible path. The API may return fewer than five results instead of filling model omissions or
 fabricating generic fallback text. Catalog candidates
@@ -174,19 +179,33 @@ cards fetch that preview and the original attachment asset concurrently; preview
 the full file is ready, while attachment always uses the original. Rerun `npm run db:seed-memes` as a
 controlled production release step to backfill thumbnails for existing catalog rows.
 
-The suggestion response emits non-sensitive `Server-Timing` stages for candidate load, local rank,
-joint model/fallback, response assembly, and total duration. The extension additionally measures API
-response, first/all preview readiness, all-originals ready-to-attach, and aggregate media failures
-and settlement locally. Media fetches have a 2.5-second deadline and can be retried on attachment.
+The suggestion response emits non-sensitive `Server-Timing` stages for trend lookup, candidate
+load, local rank, joint model/fallback, response assembly, and total duration. Background-worker
+measurements distinguish `first_preview_bytes_ms`, `all_preview_bytes_ms`, and
+`all_original_bytes_ms` from browser rendering. `first_usable_preview_ms` starts at the explicit
+Meme action (or refresh/guidance submission) and waits for caption rendering, image decoding, a
+frame, and at least half the card visible in the foreground. Empty, failed, and cancelled requests
+have explicit local outcome states. Selecting a card measures preparation separately from native
+attachment confirmation; an upload event alone is not success. Media fetches have a 2.5-second
+deadline including body reads and can be retried on attachment.
 These diagnostics contain durations and counts only, never post text, captions, URLs, or template
 IDs. Text-only extension cache keys are SHA-256 hashes, and request generations prevent an older
 same-post response from overwriting a refresh.
 
 ## Learning loop
 
-Suggestion responses contain a bounded, categorical `feedback_context`. The extension returns it
-with outcome events: shown, clicked, used, saved, and dismissed. Source-derived targets and keywords
-remain server-internal for captioning and are never persisted as feedback. PostgreSQL therefore
+Suggestion responses contain only reviewed categorical feedback fields: suggestion mode,
+sentiment, tone, topic, intent, and intensity. Version 2 outcome events distinguish rendered/visible
+`shown`, selected `clicked`, native-confirmed `inserted`, clipboard `copied`, explicit `rejected`,
+neutral `abandoned`, `attachment_failed`, and `saved`. Ordinary close is not rejection, and copied
+media is not insertion or publication. The extension does not expose a new rejection control.
+Random event and impression UUIDs plus position (1–5) support retry deduplication and exposure
+analysis without deriving identifiers from user content. A tenant-scoped event UUID maps to the
+existing PostgreSQL primary key, whose conflict handling deduplicates concurrent retries before
+library use counts change. Only version 2 events feed ranking/reports; ambiguous legacy events
+remain accepted/exportable but are not learned from. Source-derived targets and keywords, along
+with arbitrary text context fields, remain server-internal and are never persisted as new feedback.
+PostgreSQL therefore
 retains enough aggregate context to evaluate template performance without raw post storage or
 request logging.
 
@@ -195,7 +214,7 @@ Improvement should remain incremental and measurable:
 1. Maintain a human-reviewed golden benchmark with acceptable and rejected meme families.
 2. Measure top-k relevance, rejection avoidance, caption specificity/layout, diversity, and stage
    latency for every ranking change.
-3. Aggregate outcome rates by template and structured context only after enough impressions.
+3. Aggregate version 2 outcome rates by template and structured context only after enough impressions.
 4. Add versioned retrieval/reranking features behind the current candidate generator.
 5. Compare versions offline, then roll out observably with an immediate local fallback.
 

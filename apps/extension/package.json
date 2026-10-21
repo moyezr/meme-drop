@@ -1,6 +1,6 @@
 {
   "name": "@memedrop/extension",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "build:release": "npm run validate:release-metadata && node scripts/validate-release-build.mjs --pre && tsc && vite build --mode release && node scripts/validate-release-build.mjs --post && npm run validate:release-metadata",
     "package:release": "node scripts/package-release.mjs",
     "test": "node --import tsx --test tests/*.test.mjs",
+    "test:browser": "node scripts/smoke-suggestions-browser.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -29,10 +30,11 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
+    "playwright": "1.62.1",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.5",
     "typescript": "^7.0.2",
-    "vite": "^8.2.0"
+    "vite": "8.3.5"
   }
 }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -125,15 +125,52 @@ async def test_usage_writes_invalidate_only_the_users_feedback_cache(
     single = await api_harness.client.post(
         "/api/v1/usage",
         headers=HEADERS,
-        json={"meme_id": str(MEME_ID), "action": "shown", "tweet_context": {}},
+        json={
+            "meme_id": str(MEME_ID),
+            "action": "shown",
+            "tweet_context": {},
+            "event_id": str(uuid4()),
+            "telemetry_version": 2,
+        },
     )
     batch = await api_harness.client.post(
         "/api/v1/usage/batch",
         headers=HEADERS,
-        json={"events": [{"meme_id": str(MEME_ID), "action": "clicked", "tweet_context": {}}]},
+        json={
+            "events": [
+                {
+                    "meme_id": str(MEME_ID),
+                    "action": "clicked",
+                    "tweet_context": {},
+                    "event_id": str(uuid4()),
+                    "telemetry_version": 2,
+                }
+            ]
+        },
     )
 
     assert single.status_code == batch.status_code == 200
+    assert invalidated == [INSTALL_ID, INSTALL_ID]
+    neutral = await api_harness.client.post(
+        "/api/v1/usage/batch",
+        headers=HEADERS,
+        json={
+            "events": [
+                {
+                    "meme_id": str(MEME_ID),
+                    "action": "copied",
+                    "event_id": str(uuid4()),
+                    "telemetry_version": 2,
+                }
+            ]
+        },
+    )
+    legacy = await api_harness.client.post(
+        "/api/v1/usage",
+        headers=HEADERS,
+        json={"meme_id": str(MEME_ID), "action": "used"},
+    )
+    assert neutral.status_code == legacy.status_code == 200
     assert invalidated == [INSTALL_ID, INSTALL_ID]
 
 
@@ -146,8 +183,7 @@ async def test_usage_batch_requires_between_one_and_fifty_events(api_harness: Ap
         headers=HEADERS,
         json={
             "events": [
-                {"meme_id": str(MEME_ID), "action": "shown", "tweet_context": {}}
-                for _ in range(51)
+                {"meme_id": str(MEME_ID), "action": "shown", "tweet_context": {}} for _ in range(51)
             ]
         },
     )
@@ -157,7 +193,19 @@ async def test_usage_batch_requires_between_one_and_fifty_events(api_harness: Ap
 
 
 async def test_usage_accepts_every_supported_action(api_harness: ApiHarness) -> None:
-    actions = ["suggested", "shown", "clicked", "used", "inserted", "saved", "dismissed"]
+    actions = [
+        "suggested",
+        "shown",
+        "clicked",
+        "used",
+        "inserted",
+        "saved",
+        "dismissed",
+        "copied",
+        "rejected",
+        "abandoned",
+        "attachment_failed",
+    ]
     for action in actions:
         response = await api_harness.client.post(
             "/api/v1/usage",
@@ -207,3 +255,62 @@ async def test_usage_rejects_oversized_context(api_harness: ApiHarness) -> None:
 
     assert response.status_code == 400
     assert response.json()["error"] == "Invalid request"
+
+
+async def test_versioned_feedback_is_retry_safe_and_has_only_reviewed_context(
+    api_harness: ApiHarness,
+) -> None:
+    impression_id = str(uuid4())
+    event = {
+        "meme_id": str(MEME_ID),
+        "action": "inserted",
+        "event_id": str(uuid4()),
+        "telemetry_version": 2,
+        "impression_id": impression_id,
+        "position": 2,
+        "tweet_context": {
+            "topic": "tech",
+            "reply_style": "source text",
+            "humor_angle": "raw model text",
+        },
+    }
+    for _ in range(2):
+        response = await api_harness.client.post(
+            "/api/v1/usage/batch", headers=HEADERS, json={"events": [event, event]}
+        )
+        assert response.status_code == 200
+    assert len(api_harness.store.usage_events) == 1
+    assert api_harness.store.usage_events[0]["tweetContext"] == {
+        "topic": "tech",
+        "telemetry_version": 2,
+        "impression_id": impression_id,
+        "position": 2,
+    }
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"telemetry_version": 2},
+        {"event_id": "not-random"},
+        {"impression_id": "source-derived"},
+        {"position": 0},
+        {"position": 6},
+        {"position": 1.5},
+        {"telemetry_version": 3},
+    ],
+)
+async def test_usage_rejects_invalid_impression_metadata(
+    api_harness: ApiHarness, metadata: dict
+) -> None:
+    response = await api_harness.client.post(
+        "/api/v1/usage",
+        headers=HEADERS,
+        json={
+            "meme_id": str(MEME_ID),
+            "action": "shown",
+            **metadata,
+        },
+    )
+    assert response.status_code == 400
+    assert api_harness.store.usage_events == []

@@ -23,6 +23,7 @@ class FakeCaptionGateway:
         context=None,
         steering_instruction=None,
         trend_cards=(),
+        timeout_ms=None,
     ):
         assert len(templates) <= 12
         assert context is not None

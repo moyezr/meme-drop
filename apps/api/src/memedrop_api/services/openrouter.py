@@ -51,6 +51,7 @@ class SuggestionModelGateway(Protocol):
         context: TweetContext | None = None,
         steering_instruction: str | None = None,
         trend_cards: Sequence[TrendCard] = (),
+        timeout_ms: int | None = None,
     ) -> JointSuggestionResult: ...
 
     async def generate_captions(
@@ -93,52 +94,60 @@ class OpenRouterSuggestionGateway:
         context: TweetContext | None = None,
         steering_instruction: str | None = None,
         trend_cards: Sequence[TrendCard] = (),
+        timeout_ms: int | None = None,
     ) -> JointSuggestionResult:
         if not self.settings.openrouter_api_key or not templates:
             return JointSuggestionResult([], {})
-        if await self._joint_circuit_open():
-            return JointSuggestionResult([], {})
-        prompt = build_joint_suggestion_prompt(
-            tweet_text,
-            templates,
-            limit,
-            context=context,
-            steering_instruction=steering_instruction,
-            trend_cards=trend_cards,
+        provider_budget_ms = min(
+            self.settings.joint_suggestion_timeout_ms,
+            timeout_ms if timeout_ms is not None else self.settings.joint_suggestion_timeout_ms,
         )
         try:
-            payload = await self._chat_json(
-                [
-                    {
-                        "role": "system",
-                        "content": joint_suggestion_system_prompt(),
+            # Include client acquisition and prompt preparation in the supplied remaining
+            # request budget. A true deadline miss still opens the provider cooldown.
+            async with asyncio.timeout(provider_budget_ms / 1000):
+                if await self._joint_circuit_open():
+                    return JointSuggestionResult([], {})
+                prompt = build_joint_suggestion_prompt(
+                    tweet_text,
+                    templates,
+                    limit,
+                    context=context,
+                    steering_instruction=steering_instruction,
+                    trend_cards=trend_cards,
+                )
+                payload = await self._chat_json(
+                    [
+                        {
+                            "role": "system",
+                            "content": joint_suggestion_system_prompt(),
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    # JSON mode preserves structure while this allows more comic reframing than the
+                    # previous conservative setting, which favored literal paraphrases.
+                    temperature=0.7,
+                    # Five short region maps fit comfortably inside this bound. Keeping it small
+                    # prevents a creative reply request from drifting into a long completion.
+                    max_tokens=600,
+                    # This task needs taste and constraint-following, not hidden multi-step work.
+                    # Disabling reasoning materially improves time-to-last-token on the hot path.
+                    reasoning_effort="none",
+                    model=self.settings.openrouter_suggestion_model,
+                    # The joint request is on the user-visible critical path. Its total provider
+                    # budget must stay independent of the legacy standalone caption endpoint.
+                    timeout_ms=provider_budget_ms,
+                    provider={
+                        # OpenRouter treats these as preferences, so a slow preferred endpoint does
+                        # not turn into an availability failure. Normal provider fallbacks
+                        # remain available when no endpoint meets the p90 target.
+                        "sort": self.settings.joint_provider_sort,
+                        "preferred_max_latency": {
+                            "p90": self.settings.joint_provider_preferred_p90_latency_seconds,
+                        },
+                        "allow_fallbacks": True,
                     },
-                    {"role": "user", "content": prompt},
-                ],
-                # JSON mode preserves structure while this allows more comic reframing than the
-                # previous conservative setting, which favored literal paraphrases.
-                temperature=0.7,
-                # Five short region maps fit comfortably inside this bound. Keeping it small
-                # prevents a creative reply request from drifting into a long completion.
-                max_tokens=600,
-                # This task needs taste and constraint-following, not hidden multi-step work.
-                # Disabling reasoning materially improves time-to-last-token on the hot path.
-                reasoning_effort="none",
-                model=self.settings.openrouter_suggestion_model,
-                # The joint request is on the user-visible critical path. Its total provider
-                # budget must stay independent of the legacy standalone caption endpoint.
-                timeout_ms=self.settings.joint_suggestion_timeout_ms,
-                provider={
-                    # OpenRouter treats these as preferences, so a slow preferred endpoint does
-                    # not turn into an availability failure. Its normal provider fallbacks remain
-                    # available when no endpoint meets the p90 target.
-                    "sort": self.settings.joint_provider_sort,
-                    "preferred_max_latency": {
-                        "p90": self.settings.joint_provider_preferred_p90_latency_seconds,
-                    },
-                    "allow_fallbacks": True,
-                },
-            )
+                )
         except Exception:
             await self._open_joint_circuit()
             raise

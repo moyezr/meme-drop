@@ -222,10 +222,39 @@ pipeline ordered around that fact:
 2. cache catalog candidates and short-lived feedback scores, and share concurrent identical work;
 3. perform independent candidate and feedback reads in parallel on a cold request;
 4. send a diversified shortlist of no more than 12 templates to one joint select-and-caption call;
-5. return no more than five results, with a 4.5-second provider deadline and local fallback/cooldown;
+5. return no more than five results within a five-second service budget, reserving 250ms for local
+   fallback; provider inference uses the remaining time up to 4.5 seconds, with local cooldown;
 6. render thumbnail previews while prefetching original assets for attachment in parallel;
-7. inspect API `Server-Timing` and local extension ready-to-attach timings before changing
+7. inspect API `Server-Timing` and actual rendered-preview/native-attachment timings before changing
    infrastructure.
+
+The extension allows 6.5 seconds including response-body parsing. Optional trend/feedback reads
+are bounded to 1.25/1 second respectively. A required catalog failure produces a bounded API error;
+optional/provider failure preserves reviewed fallback. Byte arrival is not a usable preview:
+browser diagnostics start at explicit intent and wait for caption rendering, decode, a frame,
+foreground visibility, and at least 50% card intersection. Attachment success requires a new
+decoded native preview, and clipboard completion is counted separately.
+
+Run the provider-free packaged browser flow after timing, rendering, or attachment changes:
+
+```sh
+npx playwright install chromium             # once; CI also installs system browser dependencies
+npm run quality:suggestion-browser
+```
+
+This loads the built extension in Chromium against a real loopback FastAPI fixture with a stubbed
+provider and synthetic X/LinkedIn DOM. It exercises visible captions, confirmed uploads, clipboard
+fallback, neutral closure, slow-provider fallback, native Reply without inference, errors, broken
+media, and navigation during generation. It does not establish compatibility with today's hosted
+platform DOM or hosted provider performance. Port 3001 must be unused; the runner refuses to reuse
+another project's process and removes its own temporary profile/media. An existing compatible full
+Chromium executable can be selected with `MEMEDROP_CHROMIUM_EXECUTABLE`.
+
+Feedback tests must verify version 2 semantics, random identities, bounded categorical context,
+and concurrent database retry deduplication. Copying, ordinary closure, and attachment failures
+are neutral for ranking. Legacy events remain exportable but are excluded from corrected learning
+and reports. Apply migration `20261021_0011` before deploying the API, then release the extension;
+the older API does not accept the new event fields/actions. No historical feedback is rewritten.
 
 The joint call reuses the deterministic context analysis as a bounded comedy brief: reply voice,
 joke target, social dynamic, comic tension, humor angle, and at most three caption anchors. Each

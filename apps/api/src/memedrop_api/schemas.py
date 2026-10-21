@@ -3,7 +3,15 @@ from __future__ import annotations
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    UUID4,
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 MAX_SOURCE_POST_LENGTH = 20_000
@@ -96,10 +104,10 @@ class FeedbackContextInput(StrictModel):
         | None
     ) = None
     intensity: float | None = Field(default=None, ge=0, le=1)
-    reply_style: str | None = Field(default=None, max_length=80)
-    ideal_meme_vibe: str | None = Field(default=None, max_length=180)
-    social_dynamic: str | None = Field(default=None, max_length=160)
-    humor_angle: str | None = Field(default=None, max_length=180)
+    reply_style: str | None = Field(default=None, max_length=80, exclude=True)
+    ideal_meme_vibe: str | None = Field(default=None, max_length=180, exclude=True)
+    social_dynamic: str | None = Field(default=None, max_length=160, exclude=True)
+    humor_angle: str | None = Field(default=None, max_length=180, exclude=True)
     # Older extensions can still send these source-derived fields. Accept them
     # during a rolling deployment, but Pydantic excludes them from every
     # ``model_dump`` used by the persistence boundary.
@@ -123,17 +131,41 @@ USAGE_FEEDBACK_ACTIONS = (
     "inserted",
     "saved",
     "dismissed",
+    "copied",
+    "rejected",
+    "abandoned",
+    "attachment_failed",
 )
 UsageFeedbackAction = Literal[
-    "suggested", "shown", "clicked", "used", "inserted", "saved", "dismissed"
+    "suggested",
+    "shown",
+    "clicked",
+    "used",
+    "inserted",
+    "saved",
+    "dismissed",
+    "copied",
+    "rejected",
+    "abandoned",
+    "attachment_failed",
 ]
 
 
 class UsageRequest(StrictModel):
     meme_id: UUID
     action: UsageFeedbackAction
+    event_id: UUID4 | None = None
+    impression_id: UUID4 | None = None
+    position: int | None = Field(default=None, ge=1, le=5, strict=True)
+    telemetry_version: Literal[2] | None = None
     tweet_context: FeedbackContextInput = Field(default_factory=FeedbackContextInput)
     source: Literal["user", "global"] | None = None
+
+    @model_validator(mode="after")
+    def require_retry_identity(self) -> UsageRequest:
+        if self.telemetry_version == 2 and self.event_id is None:
+            raise ValueError("Version 2 feedback requires event_id")
+        return self
 
 
 class UsageBatchRequest(StrictModel):

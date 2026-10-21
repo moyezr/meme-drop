@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
-from memedrop_api.repositories import UsageEventData
+from memedrop_api.repositories import UsageEventData, usage_context
 
 
 class FakeStore:
@@ -126,21 +126,22 @@ class FakeStore:
             ],
         )
 
-    async def record_usage_batch(
-        self, *, user_id: UUID, events: Sequence[UsageEventData]
-    ) -> None:
-        self.usage_events.extend(
-            {
-                "id": str(uuid4()),
-                "userId": str(user_id),
-                "memeId": str(event.meme_id),
-                "action": event.action,
-                "tweetContext": dict(event.tweet_context),
-                "source": event.source,
-                "createdAt": datetime.now(UTC).isoformat(),
-            }
-            for event in events
-        )
+    async def record_usage_batch(self, *, user_id: UUID, events: Sequence[UsageEventData]) -> None:
+        for event in events:
+            row_id = str(uuid5(user_id, str(event.event_id)) if event.event_id else uuid4())
+            if any(row["id"] == row_id for row in self.usage_events):
+                continue
+            self.usage_events.append(
+                {
+                    "id": row_id,
+                    "userId": str(user_id),
+                    "memeId": str(event.meme_id),
+                    "action": event.action,
+                    "tweetContext": usage_context(event),
+                    "source": event.source,
+                    "createdAt": datetime.now(UTC).isoformat(),
+                }
+            )
 
     async def export_account(
         self, user_id: UUID

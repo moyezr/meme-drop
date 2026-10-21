@@ -113,6 +113,7 @@ Recommendation and catalog quality:
 npm run quality:benchmark
 npm run quality:suggestions
 npm run quality:tuning
+npm run quality:suggestion-browser # Chromium fixture flow; see QUALITY.md for browser setup
 npm run quality:dataset-plan
 npm run dataset:taste-review
 ```
@@ -138,15 +139,18 @@ reranking is enabled.
 Each X post yields **at most five** user-visible, ready-to-attach replies. The API scores every
 verified catalog candidate locally, sends no more than 12 strong and varied candidates to one joint
 model call, then asks that call to select up to five and write their captions together. This avoids
-paying to caption templates the user will never see. A 4.5-second model budget, short provider
-cooldown after a failure, and deterministic selection/caption fallback keep a provider outage from
+paying to caption templates the user will never see. A five-second service budget reserves local
+fallback time and gives the model the remaining allowance up to 4.5 seconds. A short provider
+cooldown after a failure and deterministic selection/caption fallback keep a provider outage from
 blocking the strip.
 
 Catalog and per-install feedback scores are cached; concurrent identical suggestion requests share
 one in-flight calculation, and the first candidate and feedback reads run in parallel. Cards use a
 small preview thumbnail while the extension prefetches the original image in parallel for attachment.
 The response exposes stage durations through `Server-Timing`, while the extension records local
-API, preview, and ready-to-attach durations without retaining post text or captions.
+API/media byte durations separately from actually visible captioned previews and native-confirmed
+attachment, without retaining post text or captions. Clipboard completion and ordinary closure
+are neutral feedback outcomes. See QUALITY.md for the version 2 event and migration contract.
 
 ## Object storage
 

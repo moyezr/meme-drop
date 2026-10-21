@@ -4,9 +4,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4, uuid5
 
 from sqlalchemy import String, and_, asc, cast, delete, desc, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert
 
 from memedrop_api.db import Database, InstallUser, Meme, UsageEvent, UserMeme
 
@@ -19,6 +20,21 @@ class UsageEventData:
     action: str
     tweet_context: Mapping[str, Any]
     source: str | None
+    event_id: UUID | None = None
+    telemetry_version: int | None = None
+    impression_id: UUID | None = None
+    position: int | None = None
+
+
+def usage_context(event: UsageEventData) -> JsonRecord:
+    context = dict(event.tweet_context)
+    if event.telemetry_version == 2:
+        context["telemetry_version"] = 2
+    if event.impression_id is not None:
+        context["impression_id"] = str(event.impression_id)
+    if event.position is not None:
+        context["position"] = event.position
+    return context
 
 
 class BackendStore(Protocol):
@@ -129,7 +145,13 @@ class SqlAlchemyStore:
     async def global_meme_feedback_scores(self, user_id: UUID) -> dict[str, float]:
         statement = (
             select(UsageEvent.global_meme_id, UsageEvent.action, func.count(UsageEvent.id))
-            .where(and_(UsageEvent.user_id == user_id, UsageEvent.global_meme_id.is_not(None)))
+            .where(
+                and_(
+                    UsageEvent.user_id == user_id,
+                    UsageEvent.global_meme_id.is_not(None),
+                    UsageEvent.tweet_context["telemetry_version"].as_integer() == 2,
+                )
+            )
             .group_by(UsageEvent.global_meme_id, UsageEvent.action)
         )
         async with self.database.session() as session:
@@ -140,7 +162,7 @@ class SqlAlchemyStore:
         return {
             meme_id: feedback_ranking_boost(actions)
             for meme_id, actions in grouped.items()
-            if actions.get("shown", 0) + actions.get("suggested", 0) >= 5
+            if actions.get("shown", 0) >= 5
         }
 
     async def create_user_meme(
@@ -255,9 +277,7 @@ class SqlAlchemyStore:
             ],
         )
 
-    async def record_usage_batch(
-        self, *, user_id: UUID, events: Sequence[UsageEventData]
-    ) -> None:
+    async def record_usage_batch(self, *, user_id: UUID, events: Sequence[UsageEventData]) -> None:
         if not events:
             return
         async with self.database.session() as session, session.begin():
@@ -283,24 +303,34 @@ class SqlAlchemyStore:
                 )
                 for event in events
             ]
-            session.add_all(
-                [
-                    UsageEvent(
-                        user_id=user_id,
-                        user_meme_id=event.meme_id if source == "user" else None,
-                        global_meme_id=event.meme_id if source == "global" else None,
-                        action=event.action,
-                        tweet_context=dict(event.tweet_context),
-                    )
-                    for event, source in resolved_events
-                ]
-            )
-            used_user_meme_counts: dict[UUID, int] = {}
+            # Namespace random client identities by installation. PostgreSQL's
+            # primary key arbitrates concurrent retries across API workers.
+            values_by_id: dict[UUID, JsonRecord] = {}
             for event, source in resolved_events:
-                if source == "user" and event.action in {"used", "inserted"}:
-                    used_user_meme_counts[event.meme_id] = (
-                        used_user_meme_counts.get(event.meme_id, 0) + 1
-                    )
+                row_id = uuid5(user_id, str(event.event_id)) if event.event_id else uuid4()
+                values_by_id.setdefault(
+                    row_id,
+                    {
+                        "id": row_id,
+                        "user_id": user_id,
+                        "user_meme_id": event.meme_id if source == "user" else None,
+                        "global_meme_id": event.meme_id if source == "global" else None,
+                        "action": event.action,
+                        "tweet_context": usage_context(event),
+                    },
+                )
+            inserted_rows = (
+                await session.execute(
+                    insert(UsageEvent)
+                    .values(list(values_by_id.values()))
+                    .on_conflict_do_nothing(index_elements=[UsageEvent.id])
+                    .returning(UsageEvent.user_meme_id, UsageEvent.action, UsageEvent.tweet_context)
+                )
+            ).all()
+            used_user_meme_counts: dict[UUID, int] = {}
+            for meme_id, action, context in inserted_rows:
+                if meme_id and action == "inserted" and context.get("telemetry_version") == 2:
+                    used_user_meme_counts[meme_id] = used_user_meme_counts.get(meme_id, 0) + 1
             for meme_id, use_increment in used_user_meme_counts.items():
                 await session.execute(
                     update(UserMeme)
@@ -401,8 +431,8 @@ def usage_event_record(row: UsageEvent) -> JsonRecord:
 
 
 def feedback_ranking_boost(actions: Mapping[str, int]) -> float:
-    shown = max(1, actions.get("shown", 0) + actions.get("suggested", 0))
-    used = actions.get("used", 0) + actions.get("inserted", 0)
+    shown = max(1, actions.get("shown", 0))
+    used = actions.get("inserted", 0)
     positive = used + actions.get("saved", 0) * 0.8 + actions.get("clicked", 0) * 0.25
-    negative = actions.get("dismissed", 0) * 0.2
+    negative = actions.get("rejected", 0) * 0.2
     return max(-0.12, min(0.12, (positive - negative) / shown * 0.3))

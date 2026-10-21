@@ -29,3 +29,15 @@ test("fans progressive suggestion media updates out to every subscriber", () => 
   assert.deepEqual(first, ["api:22", "initial:2", "preview:one", "original:one", "preview:two"]);
   assert.deepEqual(second, ["api:22", "initial:2", "preview:one", "original:one", "preview:two"]);
 });
+
+test("replays preview failures so a joining tab does not wait forever", () => {
+  const observers = new SuggestionRequestObservers();
+  const failed = { meme_id: "fixture" };
+  const first = [];
+  observers.subscribe({ onPreviewFailure: (suggestion) => first.push(suggestion) });
+  observers.notifyPreviewFailure(failed);
+  const late = [];
+  observers.subscribe({ onPreviewFailure: (suggestion) => late.push(suggestion) });
+  assert.deepEqual(first, [failed]);
+  assert.deepEqual(late, [failed]);
+});

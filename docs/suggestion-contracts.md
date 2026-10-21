@@ -12,12 +12,20 @@ explains the flow and [QUALITY.md](../QUALITY.md) owns evaluation and promotion 
   retain only reviewed categorical context such as `suggestion_mode`.
 - Include every request-shaping input in both client and server cache identity. Hash sensitive
   values, and use request generations so stale results or media cannot replace newer suggestions.
+- New feedback persists only mode, sentiment, tone, topic, intent, and intensity plus random
+  event/impression identity, bounded position, and telemetry version. Version 2 `shown` requires a
+  visible rendered preview; `inserted` requires native confirmation. Copy, close/abandonment, and
+  attachment failure are neutral. Deduplicate retries atomically before counting insertion or
+  learning; ambiguous legacy events must not enter version 2 learning/reports.
 
 ## Selection and availability
 
 - Preserve the deterministic ranker fallback and return only verified templates by default.
 - Keep external calls bounded, along with the model shortlist and visible result count. The
   current request budgets and flow are documented in [architecture.md](../architecture.md#suggestion-pipeline).
+- Reserve local fallback time within the overall service deadline and keep client transport margin.
+  A caller cancellation must not cancel a shared computation needed by another caller. Browser
+  timing/attachment outcomes and late media must respect the active request generation.
 - Do not add retrieval infrastructure for anticipated scale. Change retrieval only when benchmark
   recall or measured latency regresses; retain evidence for the change.
 

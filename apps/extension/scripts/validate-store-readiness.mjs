@@ -235,7 +235,7 @@ function validateScreenshotFile(output, screenshotPath, label) {
 
 function validateUsageEventDisclosure(output, text, label) {
   const normalized = text.toLowerCase();
-  for (const term of ["shown", "clicked", "saved", "dismissed"]) {
+  for (const term of ["shown", "clicked", "saved", "dismissed", "copied", "rejected", "abandoned", "attachment_failed"]) {
     if (!normalized.includes(term)) {
       output.push({
         severity: "error",

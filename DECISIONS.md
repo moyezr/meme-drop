@@ -177,3 +177,25 @@ Status: accepted · Date: 2026-10-19
   to the deployed setting without migrating stored vectors.
 - Reconsider on observed caption rejection, poor user feedback, provider errors, or latency/cost
   regression. Evidence: [evaluation](docs/model-evaluation-2026-10-19.md) and rollout in PROGRESS.md.
+
+## D011 — Bound the whole suggestion path and version corrected feedback
+
+Status: accepted · Date: 2026-10-21
+
+- Context: the browser's five-second deadline was shorter than serial optional enrichment plus
+  inference allowances. Byte readiness did not measure a visible captioned preview, and legacy
+  `used`/`dismissed` events could mean copying/ordinary close rather than insertion/rejection.
+- Decision: use one five-second suggestion-service budget with a 250ms fallback reserve and
+  6.5-second client allowance. Keep the 4.5-second maximum provider budget, existing prompts/models,
+  verified-only ranking, and fallback. Measure actual rendering/visibility and native-confirmed
+  attachment locally. Version 2 events separate insertion, copying, explicit rejection, neutral
+  abandonment, and failure; learn only from corrected events and keep legacy records exportable.
+- Consequence: random client event IDs deduplicate atomically through installation-scoped existing
+  PostgreSQL primary keys. Retain only reviewed categorical context, random impression identity,
+  bounded position, and version; do not introduce content-derived analytics or another service.
+  Migration `20261021_0011` widens the existing event action constraint before API/extension release.
+  No historical data is rewritten. New-action data blocks an unsafe constraint downgrade.
+- Reconsider on measured fallback availability, transport/attachment latency, platform DOM changes,
+  or insufficient signal; use boundary tests, browser fixtures, and hosted QA as appropriate.
+- Evidence: [suggestion contracts](docs/suggestion-contracts.md), [quality workflow](QUALITY.md),
+  and implementation/checks in [PROGRESS.md](PROGRESS.md).

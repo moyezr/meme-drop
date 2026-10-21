@@ -1,6 +1,6 @@
 from typing import cast
 
-from sqlalchemy import Table
+from sqlalchemy import CheckConstraint, Table
 
 from memedrop_api.db import (
     Base,
@@ -10,6 +10,7 @@ from memedrop_api.db import (
     TrendObservationRecord,
     TrendScanQueryRecord,
     TrendSnapshotRecord,
+    UsageEvent,
     database_connect_args,
     normalize_database_url,
 )
@@ -106,3 +107,14 @@ def test_transaction_pooler_disables_psycopg_prepared_statements() -> None:
         "postgresql://postgres.project:secret@aws-0-region.pooler.supabase.com:6543/postgres"
     ) == {"prepare_threshold": None}
     assert database_connect_args("postgresql://localhost:5432/memedrop") == {}
+
+
+def test_usage_schema_enforces_supported_feedback_actions() -> None:
+    constraint = next(
+        constraint
+        for constraint in cast(Table, UsageEvent.__table__).constraints
+        if constraint.name == "usage_events_action_check"
+    )
+    assert isinstance(constraint, CheckConstraint)
+    for action in ["copied", "rejected", "abandoned", "attachment_failed"]:
+        assert f"'{action}'" in str(constraint.sqltext)

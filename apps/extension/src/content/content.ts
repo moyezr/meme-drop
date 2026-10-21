@@ -14,10 +14,12 @@ import { initSaveButton } from "./save-button";
 import { initMemeReplyButtons } from "./meme-reply-button";
 import {
   showSuggestionPanel,
+  beginSuggestionRequest,
   showSuggestionError,
   updateSuggestions,
   updateSuggestionMedia,
   updateSuggestionPreview,
+  markSuggestionPreviewFailed,
   insertMemeByUrl,
   hidePanel,
   isPanelVisible,
@@ -73,6 +75,7 @@ interface ReplyTweetSnapshot {
 
 const memeReplyIntent = new MemeReplyIntent();
 const memeReplyButtons = initMemeReplyButtons(platform, (source, post) => {
+  activeSuggestionTriggeredAt = performance.now();
   logDebug(
     "Meme reply armed",
     `- has tweet id: ${Boolean(source.tweetId)}
@@ -94,7 +97,7 @@ document.addEventListener(
     if (!target?.closest(platform.selectors.nativeReply)) return;
     if (!memeReplyButtons.isForwardingNativeReply()) {
       memeReplyIntent.clear();
-      if (platform.id === "linkedin") resetComposeSession();
+      resetComposeSession();
     }
   },
   true
@@ -163,6 +166,12 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (
+    message.type === "SUGGESTION_PREVIEW_FAILED" &&
+    isCurrentSuggestionMessage(message, activeSuggestionRequestId) &&
+    message.cache_key === lastSuggestionCacheKey && message.meme_id
+  ) markSuggestionPreviewFailed(message.meme_id);
+
+  if (
     message.type === "SUGGESTION_ORIGINAL_READY" &&
     isCurrentSuggestionMessage(message, activeSuggestionRequestId) &&
     message.cache_key === lastSuggestionCacheKey &&
@@ -180,7 +189,7 @@ chrome.runtime.onMessage.addListener((message) => {
   ) {
     // Diagnostics contain only counts and duration values. They stay local to
     // the extension console and are intentionally not usage telemetry.
-    console.debug("[MemeDrop] suggestion performance", message.diagnostics);
+    console.debug("[MemeDrop] suggestion transport performance", message.diagnostics);
   }
 
   if (message.type === "INSERT_MEME_FROM_POPUP" && message.payload?.image_url) {
@@ -383,6 +392,9 @@ let currentComposeDismissed = false;
 // same tweet. This keeps late media/results from a prior request out of the
 // currently visible panel.
 let activeSuggestionRequestId: string | null = null;
+let activeSuggestionTriggeredAt = performance.now();
+let lastRequestedSource: MemeReplySource | null = null;
+let lastRequestedSteeringInstruction: string | undefined;
 // Set only when the composer was opened through MemeDrop's explicit tweet-card button.
 // The source is in-memory for the lifetime of this composer and powers refreshes.
 let activeMemeReplySource: MemeReplySource | null = null;
@@ -488,8 +500,16 @@ async function requestSuggestionsForCurrentCompose(
     return;
   }
 
+  // Repeated route/focus notifications must keep the current generation and
+  // impression, including while the request is still loading.
+  if (!refresh && activeSuggestionRequestId && isPanelVisible() && source === lastRequestedSource &&
+      normalizeSteeringInstruction(steeringInstruction) === lastRequestedSteeringInstruction) return;
+  lastRequestedSource = source;
+  lastRequestedSteeringInstruction = normalizeSteeringInstruction(steeringInstruction);
   const token = ++waitToken;
   const requestId = createSuggestionRequestId(token);
+  activeSuggestionRequestId = requestId;
+  beginSuggestionRequest(activeSuggestionTriggeredAt);
   showSuggestionPanel();
   logDebug(
     "Suggestion request started",
@@ -549,17 +569,6 @@ async function requestSuggestionsForCurrentCompose(
     dismissedSuggestionCacheKey = null;
   }
 
-  if (!refresh && cacheKey === lastSuggestionCacheKey && isPanelVisible()) {
-    logDebug(
-      "Suggestion request skipped",
-      `- reason: panel already visible for this compose
-- cache key: ${cacheKey}`
-    );
-    return;
-  }
-  // Only replace the active generation when this invocation will actually
-  // send. A duplicate route event must keep receiving the in-flight request's
-  // progressive media updates.
   activeSuggestionRequestId = requestId;
   lastSuggestionCacheKey = cacheKey;
 
@@ -589,6 +598,7 @@ window.addEventListener("memedrop:steer-suggestions", (event) => {
   if (!isComposeRoute()) return;
   const detail = (event as CustomEvent<{ instruction?: unknown }>).detail;
   if (!hasSteeringInstructionChanged(activeSteeringInstruction, detail?.instruction)) return;
+  activeSuggestionTriggeredAt = performance.now();
   const nextSteeringInstruction = normalizeSteeringInstruction(detail?.instruction);
   activeSteeringInstruction = nextSteeringInstruction;
   setSuggestionSteeringInstruction(activeSteeringInstruction);
@@ -602,6 +612,7 @@ window.addEventListener("memedrop:steer-suggestions", (event) => {
 });
 
 window.addEventListener("memedrop:refresh-suggestions", () => {
+  activeSuggestionTriggeredAt = performance.now();
   if (!isComposeRoute()) {
     logDebug(
       "Refresh ignored",
@@ -615,15 +626,10 @@ window.addEventListener("memedrop:refresh-suggestions", () => {
   });
 });
 
-window.addEventListener("memedrop:suggestion-attach-performance", (event) => {
-  const diagnostics = (event as CustomEvent<unknown>).detail;
-  if (!diagnostics || typeof diagnostics !== "object") return;
-  // The panel emits durations only, never post text, captions, or template ids.
-  console.debug("[MemeDrop] selected meme performance", diagnostics);
-});
-
 window.addEventListener("memedrop:suggestions-dismissed", () => {
   currentComposeDismissed = true;
+  activeSuggestionRequestId = null;
+  waitToken++;
   dismissedSuggestionCacheKey = lastSuggestionCacheKey;
   logDebug(
     "Suggestions panel dismissed",
@@ -646,6 +652,7 @@ function onUrlChanged(url = window.location.href) {
 
   if (isCompose) {
     const source = memeReplyIntent.consume();
+    if (!source && activeMemeReplySource) return;
     if (!source) {
       // X's own Reply button and direct compose routes remain completely native.
       activeMemeReplySource = null;

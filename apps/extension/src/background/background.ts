@@ -14,7 +14,7 @@ import {
   buildSuggestionCacheKey,
   normalizeSteeringInstruction,
 } from "../shared/suggestion-request";
-import { fetchMediaWithTimeout } from "../shared/media-fetch";
+import { fetchMediaBlobWithTimeout } from "../shared/media-fetch";
 import type { MemeTextOverlay } from "@memedrop/shared";
 import {
   UsageTelemetryQueue,
@@ -46,7 +46,8 @@ interface CacheEntry {
 const SUGGESTION_TTL_MS = 5 * 60 * 1000;
 const SUGGESTION_CACHE_MAX = 100;
 const MEDIA_CACHE_MAX = 40;
-const SUGGESTION_REQUEST_TIMEOUT_MS = 5_000;
+// Server work is bounded to 5s; leave transport/serialization headroom.
+const SUGGESTION_REQUEST_TIMEOUT_MS = 6_500;
 const suggestionCache = new Map<string, CacheEntry>();
 interface InflightSuggestionRequest {
   suggestions: Promise<Suggestion[]>;
@@ -140,6 +141,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           });
         }
         reportPerformance();
+      },
+      onPreviewFailure: (suggestion) => {
+        if (sender.tab?.id) chrome.tabs.sendMessage(sender.tab.id, {
+          type: "SUGGESTION_PREVIEW_FAILED",
+          cache_key: message.payload.cache_key,
+          request_id: requestId,
+          meme_id: suggestion.meme_id,
+        });
       },
       onOriginal: (suggestion) => {
         performance.markOriginalReady(suggestion.meme_id);
@@ -253,7 +262,9 @@ async function fetchSuggestions(
     const cached = readCachedSuggestions(cacheKey);
     if (cached) {
       options.onInitial?.(cached, true);
-      options.onMediaSettled?.();
+      if (cached.some((suggestion) => !suggestion.preview_image_data_url || !suggestion.image_data_url)) {
+        void hydrateAllSuggestionMedia(cached, options);
+      } else options.onMediaSettled?.();
       return cached;
     }
   }
@@ -274,6 +285,7 @@ async function fetchSuggestions(
       onApiResponse: (durationMs, serverTiming) =>
         observers.notifyApiResponse(durationMs, serverTiming),
       onPreview: (suggestion) => observers.notifyPreview(suggestion),
+      onPreviewFailure: (suggestion) => observers.notifyPreviewFailure(suggestion),
       onOriginal: (suggestion) => observers.notifyOriginal(suggestion),
       onMediaFailure: () => observers.notifyMediaFailure(),
       onMediaSettled: () => {
@@ -307,6 +319,7 @@ async function fetchFreshSuggestions(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SUGGESTION_REQUEST_TIMEOUT_MS);
   const apiStartedAt = performance.now();
+  let data: { suggestions?: Suggestion[] };
   let res: Response;
   try {
     res = await fetch(apiUrl("/api/v1/suggest"), {
@@ -326,11 +339,11 @@ async function fetchFreshSuggestions(
     if (!res.ok) {
       throw await apiErrorFromResponse(res);
     }
+    data = await res.json();
     options.onApiResponse?.(performance.now() - apiStartedAt, res.headers.get("server-timing"));
   } finally {
     clearTimeout(timer);
   }
-  const data = await res.json();
   const raw = (data.suggestions ?? []) as Suggestion[];
 
   const suggestions: Suggestion[] = limitSuggestions(raw).map((suggestion) => ({
@@ -353,7 +366,13 @@ async function fetchFreshSuggestions(
   // Preview assets are delivered independently so captioned cards can appear
   // before their full-quality originals. Originals are still prefetched for
   // attachment, but never used to render the capped card canvas.
-  void Promise.allSettled(suggestions.map((suggestion) => hydrateSuggestionMedia(suggestion, options))).then(
+  void hydrateAllSuggestionMedia(suggestions, options);
+
+  return suggestions;
+}
+
+async function hydrateAllSuggestionMedia(suggestions: Suggestion[], options: SuggestionOptions) {
+  await Promise.allSettled(suggestions.map((suggestion) => hydrateSuggestionMedia(suggestion, options))).then(
     (results) => {
       for (const result of results) {
         if (result.status === "rejected") options.onMediaFailure?.();
@@ -361,13 +380,11 @@ async function fetchFreshSuggestions(
       options.onMediaSettled?.();
     }
   );
-
-  return suggestions;
 }
 
 async function hydrateSuggestionMedia(
   suggestion: Suggestion,
-  options: Pick<SuggestionOptions, "onPreview" | "onOriginal">
+  options: Pick<SuggestionOptions, "onPreview" | "onOriginal" | "onPreviewFailure">
 ): Promise<void> {
   const { previewUrl, originalUrl, sharesAsset } = getSuggestionMediaUrls(
     suggestion.image_url,
@@ -378,7 +395,10 @@ async function hydrateSuggestionMedia(
   // Fetch it once, while preserving separate ready notifications for the
   // preview renderer and attachment path.
   if (sharesAsset) {
-    const dataUrl = await fetchMediaDataUrl(originalUrl);
+    const dataUrl = await fetchMediaDataUrl(originalUrl).catch((error) => {
+      options.onPreviewFailure?.(suggestion);
+      throw error;
+    });
     suggestion.preview_image_data_url = dataUrl;
     options.onPreview?.(suggestion);
     suggestion.image_data_url = dataUrl;
@@ -386,16 +406,22 @@ async function hydrateSuggestionMedia(
     return;
   }
 
-  await Promise.all([
+  const outcomes = await Promise.allSettled([
     fetchMediaDataUrl(previewUrl).then((dataUrl) => {
       suggestion.preview_image_data_url = dataUrl;
       options.onPreview?.(suggestion);
+    }).catch((error) => {
+      options.onPreviewFailure?.(suggestion);
+      throw error;
     }),
     fetchMediaDataUrl(originalUrl).then((dataUrl) => {
       suggestion.image_data_url = dataUrl;
       options.onOriginal?.(suggestion);
     }),
   ]);
+  if (outcomes.some((outcome) => outcome.status === "rejected")) {
+    throw new Error("Suggestion media hydration failed");
+  }
 }
 
 async function saveMeme(imageUrl: string, sourceTweetId?: string) {
@@ -412,16 +438,21 @@ async function saveMeme(imageUrl: string, sourceTweetId?: string) {
 }
 
 async function fetchCaption(tweetText: string, memeId: string): Promise<MemeTextOverlay | null> {
-  const res = await fetch(apiUrl("/api/v1/suggest/caption"), {
-    method: "POST",
-    headers: await withApiRequestHeaders(),
-    body: JSON.stringify({ tweet_text: tweetText, meme_id: memeId }),
-  });
-  if (!res.ok) {
-    throw await apiErrorFromResponse(res);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SUGGESTION_REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(apiUrl("/api/v1/suggest/caption"), {
+      method: "POST",
+      headers: await withApiRequestHeaders(),
+      signal: controller.signal,
+      body: JSON.stringify({ tweet_text: tweetText, meme_id: memeId }),
+    });
+    if (!res.ok) throw await apiErrorFromResponse(res);
+    const data = await res.json();
+    return data.tailored_overlay ?? null;
+  } finally {
+    clearTimeout(timer);
   }
-  const data = await res.json();
-  return data.tailored_overlay ?? null;
 }
 
 async function postUsageBatch(events: UsageEvent[]): Promise<void> {
@@ -456,12 +487,11 @@ async function fetchMediaDataUrl(imageUrl: string): Promise<string> {
     const populated = mediaDataUrlCache.get(imageUrl);
     if (populated) return populated;
 
-    const response = await fetchMediaWithTimeout(imageUrl);
+    const { response, blob } = await fetchMediaBlobWithTimeout(imageUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch media (${response.status})`);
     }
 
-    const blob = await response.blob();
     const buffer = await blob.arrayBuffer();
     const base64 = arrayBufferToBase64(buffer);
     const mimeType = blob.type || guessMimeType(imageUrl);

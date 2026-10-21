@@ -13,6 +13,8 @@ export interface PlatformAdapter {
     composer: string;
     composeScope: string;
     fileInput: string;
+    attachmentImage: string;
+    attachmentBusy: string;
     fileInputActivator?: string;
   };
   isRouteCompose(url: string): boolean;
@@ -48,6 +50,8 @@ export const X_ADAPTER: PlatformAdapter = {
     composer: X_COMPOSER,
     composeScope: X_COMPOSE_DIALOG,
     fileInput: X_FILE_INPUT,
+    attachmentImage: '[data-testid="attachments"] img',
+    attachmentBusy: '[data-testid="attachments"] [role="progressbar"], [data-testid="attachments"] [aria-busy="true"]',
   },
   isRouteCompose: (url) => /(x|twitter)\.com\/compose\/post/.test(url),
   findPosts(root = document) {
@@ -78,6 +82,8 @@ export const LINKEDIN_ADAPTER: PlatformAdapter = {
     composer: LINKEDIN_COMPOSER,
     composeScope: LINKEDIN_POST,
     fileInput: LINKEDIN_FILE_INPUT,
+    attachmentImage: '.comments-comment-box__photo img, .comments-comment-box__image img, [data-testid="comment-image"] img',
+    attachmentBusy: '[role="progressbar"], [aria-busy="true"]',
     fileInputActivator: LINKEDIN_SHARE_PHOTO,
   },
   isRouteCompose: () => false,

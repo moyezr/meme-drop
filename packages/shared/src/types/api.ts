@@ -23,7 +23,13 @@ export interface SuggestResponse {
 export interface UsageRequest {
   Body: {
     meme_id: string;
-    action: "suggested" | "shown" | "clicked" | "used" | "inserted" | "saved" | "dismissed";
+    action:
+      | "suggested" | "shown" | "clicked" | "used" | "inserted" | "saved"
+      | "dismissed" | "copied" | "rejected" | "abandoned" | "attachment_failed";
+    event_id?: string;
+    impression_id?: string;
+    position?: 1 | 2 | 3 | 4 | 5;
+    telemetry_version?: 2;
     tweet_context: Partial<FeedbackContext>;
     source?: "user" | "global";
   };

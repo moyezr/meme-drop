@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, Mock
 
@@ -253,6 +254,70 @@ async def test_joint_suggestion_passes_its_dedicated_deadline_to_the_provider() 
         "preferred_max_latency": {"p90": 2.5},
         "allow_fallbacks": True,
     }
+
+
+@pytest.mark.parametrize(("request_budget_ms", "expected_ms"), [(321, 321), (9_000, 4_500)])
+async def test_joint_suggestion_remaining_budget_can_shorten_but_never_extend_provider_deadline(
+    request_budget_ms: int,
+    expected_ms: int,
+) -> None:
+    gateway = OpenRouterSuggestionGateway(
+        Settings(database_url="postgresql://localhost/test", openrouter_api_key="fixture")
+    )
+    chat_json = AsyncMock(return_value={"suggestions": []})
+    gateway._chat_json = chat_json  # type: ignore[method-assign]
+
+    await gateway.select_and_caption(
+        "tweet", [MemeCatalog.load().verified_templates[0]], 1, timeout_ms=request_budget_ms
+    )
+
+    assert chat_json.await_args is not None
+    assert chat_json.await_args.kwargs["timeout_ms"] == expected_ms
+
+
+async def test_joint_deadline_includes_client_acquisition_and_opens_cooldown() -> None:
+    gateway = OpenRouterSuggestionGateway(settings())
+    client_cancelled = asyncio.Event()
+
+    async def blocked_client() -> httpx.AsyncClient:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            client_cancelled.set()
+        raise AssertionError("unreachable")
+
+    get_client = AsyncMock(side_effect=blocked_client)
+    gateway._get_client = get_client  # type: ignore[method-assign]
+    template = MemeCatalog.load().verified_templates[0]
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(
+            gateway.select_and_caption("tweet", [template], 1, timeout_ms=20), timeout=0.5
+        )
+
+    assert client_cancelled.is_set()
+    assert (await gateway.select_and_caption("tweet", [template], 1)).selections == []
+    assert get_client.await_count == 1
+
+
+async def test_caller_cancellation_does_not_open_provider_cooldown() -> None:
+    gateway = OpenRouterSuggestionGateway(settings())
+    provider_started = asyncio.Event()
+
+    async def blocked_provider(*args: object, **kwargs: object) -> dict[str, object]:
+        provider_started.set()
+        await asyncio.Event().wait()
+        return {}
+
+    gateway._chat_json = AsyncMock(side_effect=blocked_provider)  # type: ignore[method-assign]
+    task = asyncio.create_task(
+        gateway.select_and_caption("tweet", [MemeCatalog.load().verified_templates[0]], 1)
+    )
+    await provider_started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert await gateway._joint_circuit_open() is False
 
 
 def test_openrouter_helpers_handle_fences_and_bad_scores() -> None:

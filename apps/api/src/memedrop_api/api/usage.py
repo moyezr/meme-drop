@@ -16,6 +16,10 @@ def usage_event_data(body: UsageRequest) -> UsageEventData:
         action=body.action,
         tweet_context=body.tweet_context.model_dump(exclude_none=True),
         source=body.source,
+        event_id=body.event_id,
+        telemetry_version=body.telemetry_version,
+        impression_id=body.impression_id,
+        position=body.position,
     )
 
 
@@ -29,7 +33,14 @@ async def record_usage(
     store: BackendStore = request.app.state.store
     await store.record_usage_batch(user_id=user_id, events=[usage_event_data(body)])
     suggestion_service: SuggestionService = request.app.state.suggestion_service
-    suggestion_service.invalidate_feedback(user_id)
+    if body.telemetry_version == 2 and body.action in {
+        "shown",
+        "clicked",
+        "inserted",
+        "saved",
+        "rejected",
+    }:
+        suggestion_service.invalidate_feedback(user_id)
     return {"logged": True}
 
 
@@ -46,5 +57,10 @@ async def record_usage_batch(
         events=[usage_event_data(event) for event in body.events],
     )
     suggestion_service: SuggestionService = request.app.state.suggestion_service
-    suggestion_service.invalidate_feedback(user_id)
+    if any(
+        event.telemetry_version == 2
+        and event.action in {"shown", "clicked", "inserted", "saved", "rejected"}
+        for event in body.events
+    ):
+        suggestion_service.invalidate_feedback(user_id)
     return {"logged": len(body.events)}

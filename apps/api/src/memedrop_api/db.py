@@ -127,6 +127,11 @@ class UserMeme(Base):
 class UsageEvent(Base):
     __tablename__ = "usage_events"
     __table_args__ = (
+        CheckConstraint(
+            "action IN ('suggested', 'shown', 'clicked', 'used', 'inserted', 'saved', "
+            "'dismissed', 'copied', 'rejected', 'abandoned', 'attachment_failed')",
+            name="usage_events_action_check",
+        ),
         Index("idx_usage_events_user_id", "user_id"),
         Index("idx_usage_events_user_action_created_at", "user_id", "action", "created_at"),
     )

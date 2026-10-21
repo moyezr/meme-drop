@@ -44,6 +44,37 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
 
+  suggestion-browser:
+    name: Packaged suggestion browser flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync --project apps/api --frozen
+          npx playwright install --with-deps chromium
+
+      - name: Verify provider-free suggestion and attachment flow
+        run: npm run quality:suggestion-browser
+
   backend-image:
     name: Backend image smoke
     runs-on: ubuntu-latest

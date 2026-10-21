@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
           A plain-language disclosure of how the MemeDrop private beta handles information, and
           which hosted-provider and billing details remain to be finalized before public launch.
         </p>
-        <p className="policyMeta">Effective date: October 7, 2026</p>
+        <p className="policyMeta">Effective date: October 21, 2026</p>
       </header>
 
       <aside className="notice" aria-label="Pre-launch policy status">
@@ -82,6 +82,16 @@ export default function PrivacyPolicyPage() {
           persistence and telemetry. Request identity uses a one-way SHA-256 fingerprint rather
           than stored plaintext. A full hosted-infrastructure log and retention audit has not been
           completed yet.
+        </p>
+        <h3>Suggestion feedback</h3>
+        <p>
+          Extension feedback distinguishes visible rendered suggestions, selection, confirmed image
+          attachment, copying, saving, explicit rejection, abandonment, and attachment failure.
+          It includes the meme identifier, reviewed context categories, random event and impression
+          identifiers, suggestion position, and event-format version. These random identifiers are
+          not derived from submitted content. Copying is not counted as confirmed attachment, and
+          ordinary closure is not treated as rejection. Ambiguous older events do not train the
+          corrected ranking. Browser rendering and attachment timings remain local diagnostics.
         </p>
         <h3>Account, API, and billing data</h3>
         <p>

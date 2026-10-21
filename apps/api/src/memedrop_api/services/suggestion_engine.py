@@ -40,6 +40,13 @@ SUGGESTION_CACHE_MAX = 200
 FEEDBACK_SCORE_CACHE_TTL_SECONDS = 60
 FEEDBACK_SCORE_CACHE_MAX = 500
 MODEL_SHORTLIST_SIZE = 12
+# One service budget includes reads, optional context and inference. Keep time for
+# local ranking/captions so a provider timeout still produces a useful response.
+SUGGESTION_TIMEOUT_MS = 5_000
+SUGGESTION_FALLBACK_RESERVE_MS = 250
+SUGGESTION_MODEL_CLEANUP_MS = 10
+SUGGESTION_TREND_TIMEOUT_MS = 1_250
+FEEDBACK_READ_TIMEOUT_MS = 1_000
 RETRIEVAL_STOP_WORDS = {
     "a",
     "an",
@@ -449,10 +456,6 @@ USAGE_FEEDBACK_CONTEXT_FIELDS = (
     "topic",
     "intent",
     "intensity",
-    "reply_style",
-    "ideal_meme_vibe",
-    "social_dynamic",
-    "humor_angle",
 )
 
 
@@ -702,10 +705,19 @@ class SuggestionService:
         cache_key: str | None = None,
         steering_instruction: str | None = None,
     ) -> SuggestionRun:
+        deadline = asyncio.get_running_loop().time() + SUGGESTION_TIMEOUT_MS / 1000
         normalized_limit = max(1, min(5, int(limit or 5)))
         context = heuristic_tweet_context(tweet_text)
         trend_lookup_started = time.perf_counter()
-        trend_retrieval = await self._retrieve_trends(context)
+        try:
+            async with asyncio.timeout_at(
+                min(
+                    deadline, asyncio.get_running_loop().time() + SUGGESTION_TREND_TIMEOUT_MS / 1000
+                )
+            ):
+                trend_retrieval = await self._retrieve_trends(context)
+        except TimeoutError:
+            trend_retrieval = TrendRetrieval.empty()
         trend_lookup_ms = elapsed_ms(trend_lookup_started)
         has_trend_context = bool(trend_retrieval.cards)
         key = suggestion_request_key(
@@ -739,6 +751,7 @@ class SuggestionService:
                     context=context,
                     trend_cards=trend_retrieval.cards,
                     trend_lookup_ms=trend_lookup_ms,
+                    deadline=deadline,
                 )
             )
             self._inflight_suggestions[flight_key] = task
@@ -747,11 +760,16 @@ class SuggestionService:
             )
         # Shielding lets a cancelled HTTP request stop waiting without cancelling the
         # shared computation that other callers are relying on.
-        return await asyncio.shield(task)
+        async with asyncio.timeout_at(deadline):
+            return await asyncio.shield(task)
 
     def _clear_inflight_suggestion(self, key: str, completed: asyncio.Task[SuggestionRun]) -> None:
         if self._inflight_suggestions.get(key) is completed:
             self._inflight_suggestions.pop(key, None)
+        # A disconnected caller may have stopped awaiting a shielded request.
+        # Retrieve failures so a bounded storage timeout never leaks task warnings.
+        if not completed.cancelled():
+            completed.exception()
 
     async def _generate_suggestions(
         self,
@@ -765,15 +783,19 @@ class SuggestionService:
         context: TweetContext,
         trend_cards: tuple[TrendCard, ...],
         trend_lookup_ms: float,
+        deadline: float,
     ) -> SuggestionRun:
         started = time.perf_counter()
+        work_deadline = deadline - SUGGESTION_FALLBACK_RESERVE_MS / 1000
         candidate_load_started = time.perf_counter()
-        candidates = await self._load_candidates(user_id, refresh_feedback=refresh_feedback)
+        async with asyncio.timeout_at(work_deadline):
+            candidates = await self._load_candidates(user_id, refresh_feedback=refresh_feedback)
         candidate_load_ms = elapsed_ms(candidate_load_started)
         if not candidates:
             return SuggestionRun(
                 [],
                 SuggestionTiming(
+                    trend_lookup_ms=trend_lookup_ms,
                     candidate_load_ms=candidate_load_ms,
                     joint_outcome="fallback",
                 ),
@@ -802,8 +824,16 @@ class SuggestionService:
         joint_outcome = "model"
         model_selections: list[TemplateSelection] = []
         generated: dict[str, dict[str, str]] = {}
+        model_budget_ms = min(
+            self.settings.joint_suggestion_timeout_ms,
+            max(0, int((work_deadline - asyncio.get_running_loop().time()) * 1000)),
+        )
         try:
-            if trend_cards:
+            if model_budget_ms <= 0:
+                raise TimeoutError
+            # Let the gateway unwind its own timeout and cooldown before the outer
+            # safety guard fires; cleanup consumes a small part of the fallback reserve.
+            async with asyncio.timeout_at(work_deadline + SUGGESTION_MODEL_CLEANUP_MS / 1000):
                 model = await self.gateway.select_and_caption(
                     tweet_text,
                     shortlist_templates,
@@ -811,21 +841,14 @@ class SuggestionService:
                     context=context,
                     steering_instruction=steering_instruction,
                     trend_cards=trend_cards,
-                )
-            else:
-                model = await self.gateway.select_and_caption(
-                    tweet_text,
-                    shortlist_templates,
-                    limit,
-                    context=context,
-                    steering_instruction=steering_instruction,
+                    timeout_ms=model_budget_ms,
                 )
         except TimeoutError:
             # A bounded provider miss is an expected availability condition, not an
             # application crash. Keep logs actionable without emitting a cancellation stack.
             LOGGER.warning(
                 "Joint suggestion generation timed out after %dms; using reviewed local fallback",
-                self.settings.joint_suggestion_timeout_ms,
+                model_budget_ms,
             )
             joint_outcome = "timeout"
         except Exception:
@@ -986,7 +1009,13 @@ class SuggestionService:
 
     async def _fetch_feedback_scores(self, user_id: UUID, generation: int) -> dict[str, float]:
         try:
-            scores = await self.store.global_meme_feedback_scores(user_id)
+            try:
+                async with asyncio.timeout(FEEDBACK_READ_TIMEOUT_MS / 1000):
+                    scores = await self.store.global_meme_feedback_scores(user_id)
+            except TimeoutError:
+                # Personalization is optional. Do not cache a timeout as real feedback,
+                # or leave its shielded singleflight read running after the request.
+                return {}
             # Copy at the storage boundary. In particular, fake or adapter stores must
             # not be able to mutate an already-cached user's score map after returning.
             cached_scores = dict(scores)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from uuid import UUID, uuid4
@@ -10,7 +11,8 @@ from sqlalchemy import delete, text
 
 from memedrop_api.catalog_workbench import CatalogDraftConflict, SqlAlchemyCatalogDraftStore
 from memedrop_api.db import Base, CatalogDraft, Database, Meme
-from memedrop_api.repositories import SqlAlchemyStore
+from memedrop_api.repositories import SqlAlchemyStore, UsageEventData
+from memedrop_api.services.usage_feedback import load_usage_feedback
 
 pytestmark = pytest.mark.integration
 TEST_DATABASE_URL = os.environ.get("MEMEDROP_TEST_DATABASE_URL")
@@ -97,12 +99,18 @@ async def test_sqlalchemy_store_exercises_every_data_feature(database: Database)
         assert updated["userName"] == "Renamed Reaction"
         assert updated["userTags"] == ["work", "favorite"]
 
-        await store.record_usage(
+        await store.record_usage_batch(
             user_id=user_id,
-            meme_id=UUID(first["id"]),
-            action="used",
-            tweet_context={"tone": "sarcastic"},
-            source=None,
+            events=[
+                UsageEventData(
+                    meme_id=UUID(first["id"]),
+                    action="inserted",
+                    tweet_context={"tone": "sarcastic"},
+                    source=None,
+                    event_id=uuid4(),
+                    telemetry_version=2,
+                )
+            ],
         )
         await store.record_usage(
             user_id=user_id,
@@ -116,7 +124,7 @@ async def test_sqlalchemy_store_exercises_every_data_feature(database: Database)
         used = next(row for row in library if row["id"] == first["id"])
         assert used["useCount"] == 1
         assert used["lastUsedAt"] is not None
-        assert {row["action"] for row in usage} == {"used", "shown"}
+        assert {row["action"] for row in usage} == {"inserted", "shown"}
 
         deleted = await store.delete_user_meme(user_id, UUID(second["id"]))
         assert deleted is not None
@@ -188,3 +196,135 @@ async def test_catalog_drafts_use_postgres_revision_guards(database: Database) -
     finally:
         async with database.session() as session, session.begin():
             await session.execute(delete(CatalogDraft).where(CatalogDraft.id == draft_id))
+
+
+async def test_feedback_retry_is_atomic_across_store_instances(database: Database) -> None:
+    first_store = SqlAlchemyStore(database)
+    second_store = SqlAlchemyStore(database)
+    user_id, other_user_id = uuid4(), uuid4()
+    await first_store.ensure_install_user(user_id)
+    await second_store.ensure_install_user(other_user_id)
+    try:
+        meme = await first_store.create_user_meme(
+            user_id=user_id, file_path="/memes/retry.png", user_name="Retry", system_tags={}
+        )
+        other = await first_store.create_user_meme(
+            user_id=other_user_id, file_path="/memes/other.png", user_name="Other", system_tags={}
+        )
+        event_id, impression_id = uuid4(), uuid4()
+        event = UsageEventData(
+            meme_id=UUID(meme["id"]),
+            action="inserted",
+            tweet_context={},
+            source="user",
+            event_id=event_id,
+            telemetry_version=2,
+            impression_id=impression_id,
+            position=1,
+        )
+        await asyncio.gather(
+            first_store.record_usage_batch(user_id=user_id, events=[event, event]),
+            second_store.record_usage_batch(user_id=user_id, events=[event]),
+        )
+        library, usage = await first_store.export_account(user_id)
+        assert len(usage) == 1
+        assert library[0]["useCount"] == 1
+        assert usage[0]["tweetContext"] == {
+            "telemetry_version": 2,
+            "impression_id": str(impression_id),
+            "position": 1,
+        }
+        # The same random identity is scoped to the installation.
+        await second_store.record_usage_batch(
+            user_id=other_user_id,
+            events=[
+                UsageEventData(
+                    meme_id=UUID(other["id"]),
+                    action="inserted",
+                    tweet_context={},
+                    source="user",
+                    event_id=event_id,
+                    telemetry_version=2,
+                )
+            ],
+        )
+        other_library, other_usage = await second_store.export_account(other_user_id)
+        assert len(other_usage) == 1
+        assert other_usage[0]["id"] != usage[0]["id"]
+        assert other_library[0]["useCount"] == 1
+        await first_store.record_usage_batch(
+            user_id=user_id,
+            events=[
+                UsageEventData(
+                    meme_id=UUID(meme["id"]),
+                    action=action,
+                    tweet_context={},
+                    source="user",
+                    event_id=uuid4(),
+                    telemetry_version=version,
+                )
+                for action, version in [
+                    ("used", None),
+                    ("inserted", None),
+                    ("copied", 2),
+                    ("abandoned", 2),
+                    ("attachment_failed", 2),
+                ]
+            ],
+        )
+        library, _ = await first_store.export_account(user_id)
+        assert library[0]["useCount"] == 1
+    finally:
+        await first_store.delete_account(user_id)
+        await second_store.delete_account(other_user_id)
+
+
+async def test_only_corrected_feedback_changes_global_ranking(database: Database) -> None:
+    store = SqlAlchemyStore(database)
+    user_id, meme_id = uuid4(), uuid4()
+    await store.ensure_install_user(user_id)
+    async with database.session() as session, session.begin():
+        session.add(
+            Meme(
+                id=meme_id,
+                name="Versioned",
+                file_path="/memes/versioned.png",
+                format_type="reaction_image",
+                system_tags={},
+            )
+        )
+    try:
+        await store.record_usage_batch(
+            user_id=user_id,
+            events=[
+                UsageEventData(meme_id=meme_id, action=action, tweet_context={}, source="global")
+                for action in ["shown"] * 5 + ["used"] * 5 + ["dismissed"] * 5
+            ],
+        )
+        assert await store.global_meme_feedback_scores(user_id) == {}
+        await store.record_usage_batch(
+            user_id=user_id,
+            events=[
+                UsageEventData(
+                    meme_id=meme_id,
+                    action=action,
+                    tweet_context={},
+                    source="global",
+                    event_id=uuid4(),
+                    telemetry_version=2,
+                )
+                for action in ["shown"] * 5 + ["inserted"] + ["copied"] * 5 + ["abandoned"] * 5
+            ],
+        )
+        assert await store.global_meme_feedback_scores(user_id) == {str(meme_id): 0.06}
+        report = await load_usage_feedback(database, lookback_days=30, minimum_shown=5, limit=0)
+        item = next(item for item in report["items"] if item["meme_id"] == str(meme_id))
+        assert report["telemetry_version"] == 2
+        assert item["shown"] == 5
+        assert item["inserted"] == 1
+        assert item["rejected"] == 0
+        assert item["copied"] == item["abandoned"] == 5
+    finally:
+        await store.delete_account(user_id)
+        async with database.session() as session, session.begin():
+            await session.execute(delete(Meme).where(Meme.id == meme_id))
