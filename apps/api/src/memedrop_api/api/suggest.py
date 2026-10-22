@@ -33,6 +33,7 @@ async def suggest(
             refresh=body.refresh,
             cache_key=body.cache_key,
             steering_instruction=body.steering_instruction,
+            deadline=request.state.suggestion_deadline,
         )
         return JSONResponse(
             content={"suggestions": run.suggestions},

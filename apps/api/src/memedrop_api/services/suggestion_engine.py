@@ -704,8 +704,10 @@ class SuggestionService:
         refresh: bool = False,
         cache_key: str | None = None,
         steering_instruction: str | None = None,
+        deadline: float | None = None,
     ) -> SuggestionRun:
-        deadline = asyncio.get_running_loop().time() + SUGGESTION_TIMEOUT_MS / 1000
+        service_deadline = asyncio.get_running_loop().time() + SUGGESTION_TIMEOUT_MS / 1000
+        deadline = min(service_deadline, deadline) if deadline is not None else service_deadline
         normalized_limit = max(1, min(5, int(limit or 5)))
         context = heuristic_tweet_context(tweet_text)
         trend_lookup_started = time.perf_counter()

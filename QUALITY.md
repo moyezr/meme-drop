@@ -228,6 +228,10 @@ pipeline ordered around that fact:
 7. inspect API `Server-Timing` and actual rendered-preview/native-attachment timings before changing
    infrastructure.
 
+The five-second application deadline starts before rate limiting and body parsing; the service
+uses the remaining allowance. Rate-limit checks fail closed within 500ms. `Server-Timing`
+separates route `total`, `rate-limit`, and headers-ready `http-app` durations; cold startup and
+network transit remain outside those server measurements.
 The extension allows 6.5 seconds including response-body parsing. Optional trend/feedback reads
 are bounded to 1.25/1 second respectively. A required catalog failure produces a bounded API error;
 optional/provider failure preserves reviewed fallback. Byte arrival is not a usable preview:
@@ -315,7 +319,7 @@ After automated gates pass, test the packaged extension against the production A
 - captions are readable at preview and inserted size;
 - click and drag/drop insert the expected image;
 - saving, listing, editing, and deleting library images work;
-- shown/clicked/used/saved/dismissed events reach the correct install identity;
+- version 2 shown/clicked/inserted/copied/abandoned events reach the correct install identity;
 - account export and deletion affect only the current install;
 - cross-origin media loads from `/memes/...` without exposing object-store URLs or keys.
 

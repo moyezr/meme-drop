@@ -12,10 +12,11 @@ export interface PlatformAdapter {
     nativeReply: string;
     composer: string;
     composeScope: string;
+    portalComposeScope?: string;
     fileInput: string;
+    fileInputActivator?: string;
     attachmentImage: string;
     attachmentBusy: string;
-    fileInputActivator?: string;
   };
   isRouteCompose(url: string): boolean;
   findPosts(root?: ParentNode): HTMLElement[];
@@ -33,12 +34,11 @@ const X_FILE_INPUT = 'input[data-testid="fileInput"]';
 
 const LINKEDIN_POST =
   '[data-urn^="urn:li:activity:"], [data-urn^="urn:li:ugcPost:"], [role="listitem"]';
-const LINKEDIN_NATIVE_REPLY = 'button[aria-label="Comment"]';
+const LINKEDIN_NATIVE_REPLY = 'button[aria-label="Comment"], a[aria-label="Comment"]';
 const LINKEDIN_POST_TEXT = '[data-testid="expandable-text-box"]';
 const LINKEDIN_COMPOSER =
   '[contenteditable="true"][role="textbox"][aria-label="Text editor for creating comment"]';
 const LINKEDIN_FILE_INPUT = 'input[type="file"][accept*="image"]';
-const LINKEDIN_SHARE_PHOTO = 'button[aria-label="Share photo"]';
 
 export const X_ADAPTER: PlatformAdapter = {
   id: "x",
@@ -80,11 +80,12 @@ export const LINKEDIN_ADAPTER: PlatformAdapter = {
     post: LINKEDIN_POST,
     nativeReply: LINKEDIN_NATIVE_REPLY,
     composer: LINKEDIN_COMPOSER,
-    composeScope: LINKEDIN_POST,
+    composeScope: `${LINKEDIN_POST}, dialog[data-testid="dialog"]`,
+    portalComposeScope: 'dialog[data-testid="dialog"]',
     fileInput: LINKEDIN_FILE_INPUT,
-    attachmentImage: '.comments-comment-box__photo img, .comments-comment-box__image img, [data-testid="comment-image"] img',
+    fileInputActivator: 'button[aria-label="Share photo"]',
+    attachmentImage: '.comments-comment-box__photo img, .comments-comment-box__image img, [data-testid="comment-image"] img, div:has(> button[aria-label="Dismiss"]) > a > figure > img[src^="blob:"][data-loaded="true"]',
     attachmentBusy: '[role="progressbar"], [aria-busy="true"]',
-    fileInputActivator: LINKEDIN_SHARE_PHOTO,
   },
   isRouteCompose: () => false,
   findPosts(root = document) {

@@ -36,6 +36,9 @@ jobs:
       - name: Run release dry run
         run: npm run release:dry-run
 
+      - name: Run provider-free recommendation gates
+        run: npm run quality:tuning
+
       - name: Upload extension package
         uses: actions/upload-artifact@v7
         with:

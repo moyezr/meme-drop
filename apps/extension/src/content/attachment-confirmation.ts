@@ -35,3 +35,35 @@ export async function waitForNativeAttachment(
   }
   return false;
 }
+
+/** Capture only the image input activated synchronously by this composer's control. */
+export function captureComposerFileInput(
+  scope: Element,
+  buttonSelector: string,
+  inputSelector: string,
+  isCurrent: () => boolean
+): HTMLInputElement | null {
+  const button = scope.querySelector<HTMLButtonElement>(buttonSelector);
+  if (!button || button.disabled || !button.isConnected || !scope.isConnected || !isCurrent()) return null;
+  const bounds = button.getBoundingClientRect();
+  if (bounds.width <= 0 || bounds.height <= 0) return null;
+  const activated = new Set<HTMLInputElement>();
+  const document = scope.ownerDocument;
+  const intercept = (event: Event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.matches(inputSelector)) return;
+    // Cancel the file input's native chooser; retain its exact reference even
+    // when the platform portals it outside the bound dialog.
+    event.preventDefault();
+    activated.add(input);
+  };
+  document.addEventListener("click", intercept, true);
+  try {
+    button.click();
+  } finally {
+    document.removeEventListener("click", intercept, true);
+  }
+  if (activated.size !== 1 || !scope.isConnected || !isCurrent()) return null;
+  const input = activated.values().next().value;
+  return input?.isConnected && !input.disabled ? input : null;
+}
