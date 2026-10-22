@@ -17,11 +17,12 @@ This is the current session handoff. Replace stale state; git retains history. T
   Never search arbitrary global file inputs. Require a new decoded native removable image preview,
   including the verified blob/figure/link/Dismiss structure; unconfirmed attempts remain copied.
 - Production extension version 0.0.3 was built, reloaded and exercised in signed-in Chrome.
-  LinkedIn produced a captioned card and a native image draft without a file chooser. Corrected
-  production aggregates confirmed one `inserted` separately from three earlier `copied` attempts.
-  All LinkedIn test images were removed and empty dialogs dismissed. No social reply was published.
-  X passed caption/native attachment/removal on 0.0.2; final 0.0.3 displays a captioned card, with
-  the final attachment recheck pending. Concurrent window changes still interrupt native automation.
+  LinkedIn produced a captioned card and a native image draft without a file chooser. Both platforms showed
+  captioned cards and native draft attachments on final 0.0.3. X exposed Edit media/Remove media
+  and enabled Reply; each image was removed before closing its empty draft. X card selection used
+  the page DevTools UI because its modal hides the body panel from accessibility and monitor mapping
+  prevented reliable coordinate selection. No social reply was published. Safe production version-2
+  aggregates: shown 5, clicked 5, inserted 2, copied 3; copied attempts did not become insertions.
 - Live worker tracing observed client cancellation at 6.4s with no response headers before a warm
   request succeeded. Local reproduction proved the earlier route timer excluded rate limiting.
   The five-second application deadline now starts at middleware entry and covers rate checks/body
@@ -38,6 +39,9 @@ This is the current session handoff. Replace stale state; git retains history. T
   exceeded the unchanged 50ms scale latency ceiling under host load (p95 55.6–87.8ms); container
   liveness also missed its unchanged eight-second startup check. Require independent CI evidence
   before main/production promotion. CI now always runs the provider-free tuning gate.
+  PR CI `39841467994` passed all required jobs, including scale p95 21.108ms against the unchanged
+  50ms ceiling, packaged browser flow, PostgreSQL/Redis integration, and container liveness.
+  Optional live-model evaluation remains skipped; the deterministic gate always runs.
 - Fresh security auditing found critical Next.js advisories; updated only Next 16.4.0 to the first
   patched 16.4.1 and matching lock entries. Web tests/typecheck/build and complete npm/Python audits
   pass. No security exception or permission expansion. Existing TikTok Sans build warning remains.
@@ -45,9 +49,29 @@ This is the current session handoff. Replace stale state; git retains history. T
   `20261021_0011`; restored/verified in an isolated database, archived with the existing AES-256
   Keychain workflow, and plaintext removed. Migration already precedes API deployment; no further
   schema change is needed. Disposable test services were stopped; unrelated services remain.
-- Next action: finish final X draft cleanup/feedback verification, rebuild the final production-only
-  package after dry-run restoration, obtain passing CI before main promotion, verify deployed API
-  timings/privacy/health, and restore `moyez-dev` after each GitHub mutation session.
+- Committed `b02bc89`, pushed through verified `moyezr`, and merged PR #2 only after required CI
+  passed; main release is `1d273d7`. GitHub CLI returned to verified `moyez-dev` after push and merge.
+  API preview refused to build without production credentials; no secrets were copied into preview.
+  Production configuration validates with zero warnings. API deployment
+  `dpl_6qxrZJmUTRtkniyEX9sF7uEmTNmu` and web `dpl_22LRcRq773tXmhMS1YM3n8f9x2em` are READY
+  at runtime release `1d273d7`; independent canonical alias lookups resolve to those IDs. Main CI
+  `39842023588` also passed all required jobs. No production secrets or schema changed.
+- Final package `.memedrop/memedrop-extension-v0.0.3.zip` is 330543 bytes, SHA-256
+  `b9452eeaed07dd6ca5014aaf5041baa3273abdcb9903312500ee052edbe099de`. ZIP files match
+  production dist, version/hosts validate, and no localhost permission is packaged. Reloaded this
+  final production build into Chrome after dry-run restoration. Disposable QA containers removed.
+- Hosted verification: `/live`, `/health`, and privacy return 200; trend snapshot 156 is fresh.
+  Privacy disclosures/effective date match source (the first check incorrectly searched internal
+  event names rather than public prose; corrected check passes). First observed suggestion request
+  returned 200 in 5533.4ms, cached repeat in 1322.7ms; both were empty for that fixed fixture. A
+  second reviewed fallback fixture returned one captioned suggestion in 5224.2ms after provider
+  timeout, within the 6.5s client allowance. New `rate-limit` and `http-app` timings and allowed-origin
+  CORS headers were verified; application duration was approximately 4752ms on fallback. These
+  samples do not establish cold-start or population p95 performance. No free source/caption retained.
+- Status: live suggestions/native draft attachments, neutral/confirmed feedback, current source
+  gates, migration-first production rollout, final package, and GitHub-account restoration are
+  verified. Nothing was published on either social platform. Next action: observe beta latency
+  and corrected feedback aggregates; broader human taste evaluation remains the assessment backlog.
 
 ## Suggestion production rollout — 2026-10-21
 
