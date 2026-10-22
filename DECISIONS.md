@@ -185,7 +185,8 @@ Status: accepted · Date: 2026-10-21
 - Context: the browser's five-second deadline was shorter than serial optional enrichment plus
   inference allowances. Byte readiness did not measure a visible captioned preview, and legacy
   `used`/`dismissed` events could mean copying/ordinary close rather than insertion/rejection.
-- Decision: use one five-second suggestion-service budget with a 250ms fallback reserve and
+- Decision: use one five-second suggestion application budget, starting before rate limiting and
+  body parsing, with a 500ms fail-closed rate-check cap, a 250ms fallback reserve and
   6.5-second client allowance. Keep the 4.5-second maximum provider budget, existing prompts/models,
   verified-only ranking, and fallback. Measure actual rendering/visibility and native-confirmed
   attachment locally. Version 2 events separate insertion, copying, explicit rejection, neutral

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -70,7 +72,7 @@ from memedrop_api.services.storage import (
     MemeStorage,
     create_meme_storage,
 )
-from memedrop_api.services.suggestion_engine import SuggestionService
+from memedrop_api.services.suggestion_engine import SUGGESTION_TIMEOUT_MS, SuggestionService
 from memedrop_api.services.trend_cron import CronLock, RedisCronLock, RedisTrendRefreshLock
 from memedrop_api.services.trend_embeddings import OpenRouterTrendEmbedder
 from memedrop_api.services.trend_index import RedisTrendIndex
@@ -86,6 +88,7 @@ from memedrop_api.user_repository import SqlAlchemyUserRepository
 LOGGER = logging.getLogger("memedrop.api")
 REQUEST_ID_HEADER = "x-request-id"
 SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
+SUGGESTION_RATE_LIMIT_TIMEOUT_MS = 500
 
 
 def create_app(
@@ -293,88 +296,106 @@ def create_app(
     app.state.billing_webhook_service = webhook_service
     app.state.meme_catalog = catalog
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=app_settings.cors_origins,
-        allow_origin_regex=app_settings.cors_origin_regex,
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=[
-            "Authorization",
-            "Content-Type",
-            "Idempotency-Key",
-            "x-memedrop-install-id",
-            REQUEST_ID_HEADER,
-        ],
-        expose_headers=["Server-Timing", REQUEST_ID_HEADER],
-    )
-
     @app.middleware("http")
     async def request_context(request: Request, call_next):  # type: ignore[no-untyped-def]
+        started = time.perf_counter()
+        suggestion_request = request.method == "POST" and request.url.path == "/api/v1/suggest"
+        deadline = (
+            asyncio.get_running_loop().time() + SUGGESTION_TIMEOUT_MS / 1000
+            if suggestion_request
+            else None
+        )
+        request.state.suggestion_deadline = deadline
+        rate_limit_ms = 0.0
         incoming = request.headers.get(REQUEST_ID_HEADER)
         request_id = incoming if incoming and SAFE_REQUEST_ID.fullmatch(incoming) else str(uuid4())
         request.state.request_id = request_id
         try:
-            path = request.url.path
-            if request.method != "OPTIONS" and path not in {
-                "/live",
-                "/health",
-                "/internal/cron/trends/refresh",
-                "/internal/cron/assets/cleanup",
-                TREND_WORKFLOW_PATH,
-            }:
-                route_key = f"{request.method} {path}"
-                expensive = route_key in EXPENSIVE_ROUTES
-                client_ip = request.client.host if request.client else None
-                client_key = rate_limit_client_key(request.headers, client_ip)
-                if not app.state.rate_limiter_ready:
-                    if path == "/api/v1/memes/generate":
-                        response = JSONResponse(
-                            status_code=503,
-                            content={"error": {"code": "temporarily_unavailable"}},
-                        )
-                    else:
-                        response = JSONResponse(
-                            status_code=503,
-                            content={"error": "Service unavailable"},
-                        )
-                else:
-                    allowed = await limiter.consume(
-                        f"{client_key}:{route_key}",
-                        app_settings.expensive_rate_limit_window_ms
-                        if expensive
-                        else app_settings.api_rate_limit_window_ms,
-                        app_settings.expensive_rate_limit_max
-                        if expensive
-                        else app_settings.api_rate_limit_max,
-                    )
-                    if not allowed:
+            async with asyncio.timeout_at(deadline):
+                path = request.url.path
+                if request.method != "OPTIONS" and path not in {
+                    "/live",
+                    "/health",
+                    "/internal/cron/trends/refresh",
+                    "/internal/cron/assets/cleanup",
+                    TREND_WORKFLOW_PATH,
+                }:
+                    route_key = f"{request.method} {path}"
+                    expensive = route_key in EXPENSIVE_ROUTES
+                    client_ip = request.client.host if request.client else None
+                    client_key = rate_limit_client_key(request.headers, client_ip)
+                    if not app.state.rate_limiter_ready:
                         if path == "/api/v1/memes/generate":
                             response = JSONResponse(
-                                status_code=429,
-                                content={"error": {"code": "rate_limited"}},
+                                status_code=503,
+                                content={"error": {"code": "temporarily_unavailable"}},
                             )
                         else:
                             response = JSONResponse(
-                                status_code=429,
-                                content={"error": "Too many requests"},
+                                status_code=503,
+                                content={"error": "Service unavailable"},
                             )
                     else:
-                        response = await call_next(request)
-            else:
-                response = await call_next(request)
-        except Exception:
-            LOGGER.exception("Request failed", extra={"request_id": request_id})
-            if request.url.path == "/api/v1/memes/generate":
+                        rate_limit_started = time.perf_counter()
+                        try:
+                            async with asyncio.timeout(
+                                SUGGESTION_RATE_LIMIT_TIMEOUT_MS / 1000
+                                if suggestion_request
+                                else None
+                            ):
+                                allowed = await limiter.consume(
+                                    f"{client_key}:{route_key}",
+                                    app_settings.expensive_rate_limit_window_ms
+                                    if expensive
+                                    else app_settings.api_rate_limit_window_ms,
+                                    app_settings.expensive_rate_limit_max
+                                    if expensive
+                                    else app_settings.api_rate_limit_max,
+                                )
+                        finally:
+                            rate_limit_ms = (time.perf_counter() - rate_limit_started) * 1000
+                        if not allowed:
+                            if path == "/api/v1/memes/generate":
+                                response = JSONResponse(
+                                    status_code=429,
+                                    content={"error": {"code": "rate_limited"}},
+                                )
+                            else:
+                                response = JSONResponse(
+                                    status_code=429,
+                                    content={"error": "Too many requests"},
+                                )
+                        else:
+                            response = await call_next(request)
+                else:
+                    response = await call_next(request)
+        except Exception as error:
+            if suggestion_request and isinstance(error, TimeoutError):
+                LOGGER.warning(
+                    "Suggestion request deadline exceeded", extra={"request_id": request_id}
+                )
+                response = JSONResponse(status_code=503, content={"error": "Service unavailable"})
+            elif request.url.path == "/api/v1/memes/generate":
+                LOGGER.exception("Request failed", extra={"request_id": request_id})
                 response = JSONResponse(
                     status_code=500,
                     content={"error": {"code": "internal_failure"}, "request_id": request_id},
                 )
             else:
+                LOGGER.exception("Request failed", extra={"request_id": request_id})
                 response = JSONResponse(
                     status_code=500,
                     content={"error": "Internal Server Error", "request_id": request_id},
                 )
+        if suggestion_request:
+            metrics = (
+                f"rate-limit;dur={rate_limit_ms:.1f}, "
+                f"http-app;dur={(time.perf_counter() - started) * 1000:.1f}"
+            )
+            existing_timing = response.headers.get("Server-Timing")
+            response.headers["Server-Timing"] = (
+                f"{existing_timing}, {metrics}" if existing_timing else metrics
+            )
         if request.url.path.startswith("/api/v1/dashboard/"):
             response.headers["Cache-Control"] = "private, no-store"
             response.headers["Pragma"] = "no-cache"
@@ -434,5 +455,23 @@ def create_app(
         if object_key.startswith("generated/users/"):
             raise HTTPException(status_code=404, detail="Not Found")
         return await meme_storage.serve(f"/memes/{object_key}")
+
+    # Wrap request-context failures too, so the extension can read bounded
+    # rate-limit/deadline errors under the same origin policy as route responses.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=app_settings.cors_origins,
+        allow_origin_regex=app_settings.cors_origin_regex,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Idempotency-Key",
+            "x-memedrop-install-id",
+            REQUEST_ID_HEADER,
+        ],
+        expose_headers=["Server-Timing", REQUEST_ID_HEADER],
+    )
 
     return app

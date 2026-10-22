@@ -167,7 +167,7 @@ together before a new submission.
 - On `x.com`, verify suggestions, refresh, caption generation, click insertion, and drag/drop.
 - Exercise model timeout/failure and confirm local suggestions/captions still work.
 - Save, edit, load, and delete a meme; confirm the object is in `meme-drop-prod`, not the dev bucket.
-- Confirm shown/clicked/used/saved/dismissed outcomes are recorded for the correct install.
+- Confirm version 2 shown/clicked/inserted/copied/abandoned outcomes are recorded for the correct install.
 - Confirm account export and deletion do not reveal or delete another install's records.
 - Inspect logs: no raw tweet text, secrets, signed object URLs, or full request bodies.
 - Measure warm and cold suggestion latency plus storage round-trip latency from production.

@@ -16,7 +16,7 @@ import { drawMemeTextOverlay } from "@memedrop/shared/overlay-renderer";
 import { ensureMemeOverlayFonts } from "./overlay-fonts";
 import { SuggestionPerformanceTracker, roundDuration } from "../shared/suggestion-performance";
 import { fetchMediaBlobWithTimeout } from "../shared/media-fetch";
-import { attachmentImageSnapshot, waitForNativeAttachment } from "./attachment-confirmation";
+import { attachmentImageSnapshot, waitForNativeAttachment, captureComposerFileInput } from "./attachment-confirmation";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const IMAGE_PLACEHOLDER =
@@ -94,11 +94,23 @@ function reportBrowserPerformance() {
 }
 
 function isCurrentSuggestion(suggestion: Suggestion, generation: number) {
-  return generation === panelGeneration && currentSuggestions.includes(suggestion) && isPanelVisible();
+  return generation === panelGeneration && currentSuggestions.includes(suggestion) &&
+    Boolean(panelHost?.isConnected && panelHost.style.display !== "none");
+}
+
+function panelContainer(): HTMLElement {
+  return preferredComposerTarget instanceof HTMLDialogElement &&
+    preferredComposerTarget.isConnected && preferredComposerTarget.open
+    ? preferredComposerTarget : document.body;
 }
 
 export function setSuggestionComposerTarget(target: Element | null) {
   preferredComposerTarget = target;
+  if (panelHost) panelContainer().appendChild(panelHost);
+  for (const [card, observer] of previewObservers) {
+    observer.unobserve(card);
+    observer.observe(card);
+  }
 }
 
 export const PANEL_STYLES = `
@@ -497,7 +509,7 @@ function createPanel(): { host: HTMLDivElement; shadow: ShadowRoot } {
       observer.observe(card);
     }
   });
-  document.body.appendChild(host);
+  panelContainer().appendChild(host);
   return { host, shadow };
 }
 
@@ -981,7 +993,7 @@ async function showUsablePreview(suggestion: Suggestion, img: HTMLImageElement, 
     card.setAttribute("aria-disabled", "false");
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
-        if (!entry.isIntersecting || entry.intersectionRatio < 0.5 || document.visibilityState !== "visible") continue;
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.5 || document.visibilityState !== "visible" || !isPanelVisible()) continue;
         if (!isCurrentSuggestion(suggestion, generation)) return;
         browserPerformance?.markUsablePreview(suggestion.meme_id);
         logSuggestionUsage(suggestion, "shown");
@@ -1079,17 +1091,15 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
     const platform = getPlatformAdapter();
     const scope = platform && findComposerScope(platform, payload.composerTarget ?? preferredComposerTarget);
     if (platform && scope) {
+      const isCurrentScope = () => isCurrent() && scope.isConnected &&
+        (!(scope instanceof HTMLDialogElement) || scope.open);
       const before = attachmentImageSnapshot(scope, platform.selectors.attachmentImage);
       let input = scope.querySelector<HTMLInputElement>(platform.selectors.fileInput);
-      if (!input && platform.selectors.fileInputActivator) {
-        scope.querySelector<HTMLButtonElement>(platform.selectors.fileInputActivator)?.click();
-        const deadline = performance.now() + 500;
-        while (!input && isCurrent() && performance.now() < deadline) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          input = scope.querySelector<HTMLInputElement>(platform.selectors.fileInput);
-        }
+      const activator = platform.selectors.fileInputActivator;
+      if (!input && activator) {
+        input = captureComposerFileInput(scope, activator, platform.selectors.fileInput, isCurrentScope);
       }
-      if (!isCurrent() || !scope.isConnected) return outcome = "cancelled";
+      if (!isCurrentScope()) return outcome = "cancelled";
       const transfer = new DataTransfer();
       transfer.items.add(file);
       let dispatched = false;
@@ -1097,7 +1107,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
         input.files = transfer.files;
         input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
         dispatched = true;
-      } else {
+      } else if (!activator) {
         const composer = scope.querySelector<HTMLElement>(platform.selectors.composer);
         if (composer) {
           composer.focus();
@@ -1108,14 +1118,14 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
         }
       }
       if (dispatched && await waitForNativeAttachment(scope, platform.selectors.attachmentImage,
-        platform.selectors.attachmentBusy, before, isCurrent)) {
-        if (!isCurrent() || !scope.isConnected) return outcome = "cancelled";
+        platform.selectors.attachmentBusy, before, isCurrentScope)) {
+        if (!isCurrentScope()) return outcome = "cancelled";
         logOutcome("inserted");
         outcome = "inserted";
         hidePanel();
         return outcome;
       }
-      if (!scope.isConnected) return outcome = "cancelled";
+      if (!isCurrentScope()) return outcome = "cancelled";
       // An unconfirmed upload is not retried through another native mechanism:
       // a late upload could otherwise attach the same meme twice.
     }
@@ -1370,5 +1380,8 @@ function logSuggestionUsage(
 }
 
 export function isPanelVisible(): boolean {
-  return panelHost?.style.display !== "none" && panelHost !== null;
+  if (!panelHost?.isConnected || panelHost.style.display === "none") return false;
+  // A body-level panel is inert while a native modal owns the top layer.
+  const modal = Array.from(document.querySelectorAll<HTMLDialogElement>("dialog:modal")).at(-1);
+  return !modal || modal.contains(panelHost);
 }

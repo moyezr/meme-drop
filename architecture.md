@@ -79,6 +79,14 @@ opens a normal composer without contacting MemeDrop. A separate MemeDrop action 
 each timeline post; it transiently captures that post's text/id, forwards to X's native Reply action,
 and arms exactly one suggestion request when the composer route opens. Abandoned intent expires and
 post text is never persisted by the extension.
+LinkedIn's native Comment may be a button or link and may open an inline editor or a native
+comments dialog. The explicit Meme action binds only its newly revealed composer within 3.5 seconds;
+pre-existing or ambiguous dialogs are excluded. A native-dialog panel mounts inside that top layer.
+Attachment uses a scoped file input, or captures the exact input synchronously activated by that
+composer's Share photo control while cancelling its chooser. The temporary listener is removed
+immediately; absent or ambiguous inputs fall back to copying. Insertion requires a new decoded
+native image preview in the bound composer, including LinkedIn's removable blob preview;
+unconfirmed attempts stay neutral.
 
 The suggestion panel also offers an optional, bounded instruction for users who already have a joke
 angle, tone, or template in mind. Automatic suggestions remain the default. The instruction lives
@@ -136,12 +144,15 @@ positive and anti-use cases, and contrastive examples. Caption or retrieval beha
 improve through these reviewed labels so catalog additions remain server-side data changes rather
 than extension releases.
 
-The API returns at most five user-visible suggestions. Suggestion service work has a five-second
-budget, reserving 250ms for local fallback and response assembly. Optional trend lookup is capped
+The API returns at most five user-visible suggestions. Its five-second application deadline starts
+at request middleware entry, before rate limiting and body parsing. Rate checks have a 500ms cap
+and fail closed with HTTP 503; the service receives the remaining budget, reserving 250ms for local
+fallback and response assembly. Optional trend lookup is capped
 at 1.25 seconds and feedback reads at one second. The joint model receives only the remaining
 budget, capped at 4.5 seconds; the extension allows 6.5 seconds including response-body reads for
-transport headroom. The service budget begins after middleware/identity resolution and does not
-measure serverless startup or network transit. A failed call opens a short, process-local provider
+transport headroom. `Server-Timing` retains route `total` and adds `rate-limit` and `http-app`
+(middleware entry to response headers ready). These timings exclude serverless startup and network
+transit. The same CORS allowlist covers middleware errors. A failed call opens a short, process-local provider
 cooldown and immediately uses the local
 selection and a reviewed template-specific caption when one exists, rather than retrying on the
 user-visible path. The API may return fewer than five results instead of filling model omissions or

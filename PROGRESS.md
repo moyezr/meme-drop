@@ -4,6 +4,51 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## Live suggestion QA and release follow-up — 2026-10-23
+
+- Requested outcome: reload the production extension, verify actual X/LinkedIn captioned suggestions
+  and native draft attachments, remove all QA attachments, publish nothing, and safely commit/roll
+  out necessary repairs through `moyezr` before restoring `moyez-dev`. Baseline `56edd32`;
+  preserve unrelated progress edits and the local October 19 assessment.
+- Live LinkedIn exposed Comment links and a native HTML dialog outside its source post. Added
+  bounded explicit-action composer binding, panel placement inside the native top layer, and
+  cancellation on closure. Capture only the exact image input synchronously activated by that
+  composer's Share photo control; cancel its chooser and remove the temporary listener immediately.
+  Never search arbitrary global file inputs. Require a new decoded native removable image preview,
+  including the verified blob/figure/link/Dismiss structure; unconfirmed attempts remain copied.
+- Production extension version 0.0.3 was built, reloaded and exercised in signed-in Chrome.
+  LinkedIn produced a captioned card and a native image draft without a file chooser. Corrected
+  production aggregates confirmed one `inserted` separately from three earlier `copied` attempts.
+  All LinkedIn test images were removed and empty dialogs dismissed. No social reply was published.
+  X passed caption/native attachment/removal on 0.0.2; final 0.0.3 displays a captioned card, with
+  the final attachment recheck pending. Concurrent window changes still interrupt native automation.
+- Live worker tracing observed client cancellation at 6.4s with no response headers before a warm
+  request succeeded. Local reproduction proved the earlier route timer excluded rate limiting.
+  The five-second application deadline now starts at middleware entry and covers rate checks/body
+  parsing; rate checks cap at 500ms and fail closed. Pass remaining allowance into the service;
+  retain route `total` and add `rate-limit`/headers-ready `http-app` timings. The same CORS policy now
+  covers middleware errors. Serverless startup/network transit remain outside these measurements;
+  the live cold-timeout cause is not yet established. Independent backend review found no issues.
+- Verification on current runtime: 504 API tests, 28 PostgreSQL/Redis integration tests, 69 extension
+  tests, 30 web tests, and 16 packaged Chromium/FastAPI browser scenarios passed, including actual
+  native-dialog markup, exact external-input ownership, chooser suppression, unrelated blob/avatar
+  rejection, cancellation and fallback. API process smoke and full release dry run passed, including
+  workspace typechecks/tests/lint/build, metadata/catalog gates and packaging. No ranking/model or
+  promotion threshold changed. Final local tuning preserves relevance/case-level baselines but
+  exceeded the unchanged 50ms scale latency ceiling under host load (p95 55.6–87.8ms); container
+  liveness also missed its unchanged eight-second startup check. Require independent CI evidence
+  before main/production promotion. CI now always runs the provider-free tuning gate.
+- Fresh security auditing found critical Next.js advisories; updated only Next 16.4.0 to the first
+  patched 16.4.1 and matching lock entries. Web tests/typecheck/build and complete npm/Python audits
+  pass. No security exception or permission expansion. Existing TikTok Sans build warning remains.
+- Fresh production backup `20261022T191930Z` contains 100 objects and 18 tables at schema
+  `20261021_0011`; restored/verified in an isolated database, archived with the existing AES-256
+  Keychain workflow, and plaintext removed. Migration already precedes API deployment; no further
+  schema change is needed. Disposable test services were stopped; unrelated services remain.
+- Next action: finish final X draft cleanup/feedback verification, rebuild the final production-only
+  package after dry-run restoration, obtain passing CI before main promotion, verify deployed API
+  timings/privacy/health, and restore `moyez-dev` after each GitHub mutation session.
+
 ## Suggestion production rollout — 2026-10-21
 
 - Requested outcome: commit/push the deadline, measurement, feedback and privacy changes through
@@ -23,8 +68,38 @@ This is the current session handoff. Replace stale state; git retains history. T
   package advance together to 0.0.2; the package-test fixture now follows that version dynamically.
 - Fresh full readiness passed with 499 API tests, 28 integration tests, all static/build/process/
   image/tuning gates, and clean npm/Python audits after those dependency updates. Release dry-run
-  packaging also passed. Commit and migration are next; deployment follows migration readback.
-- No production schema, deployment configuration, or application changes have been made yet.
+  packaging also passed. GitHub Actions run `39580005586` passed, including the packaged browser
+  flow, static, database/Redis integration, and backend image jobs; the conditional live model
+  quality job was skipped. Benchmarks and promotion gates were not weakened.
+- Release `56edd32` committed and pushed to `main` using the SSH identity verified as `moyezr`.
+  The first HTTPS push was refused because the existing token lacks workflow scope; no scopes were
+  expanded. GitHub CLI was restored to `moyez-dev` after both attempts and verified again afterward.
+  Unrelated historical progress edits and the local assessment artifact remain unstaged.
+- Applied production migration `20261021_0011` before pushing/deploying, with five-second lock and
+  thirty-second statement limits; independent readback confirmed the schema and widened event
+  constraint. This additive change does not rewrite historical events. No production env changed.
+- API deployment `dpl_HBcpWoYU7bFZCWojAq3DYMN66dTq` and web deployment
+  `dpl_5NNGUinPXkHHU8BcKZjfGaSzfMBw` are READY at `56edd32`; canonical aliases independently
+  resolve to those deployments. `/live` and `/health` return 200; trend snapshot 156 remains fresh.
+  Hosted privacy policy returns 200 and includes the October 21 corrected feedback disclosures.
+- Built and validated the production-only extension 0.0.2 after the API became ready:
+  `.memedrop/memedrop-extension-v0.0.2.zip` (329845 bytes), SHA-256
+  `9e0706828a988db81ce47fd64a8d20fd5738e0102f73299564a58e9e4307f33b`.
+  Manifest hosts include production API, X/Twitter, and LinkedIn; no localhost permission.
+- Hosted black-box agent smoke passed with a fixed benchmark fixture: valid generation, identical
+  idempotent replay, authenticated 56132-byte WebP, request IDs, and exactly one-credit settlement.
+  Generation 3793.89ms, replay 215.45ms. Temporary operator key was revoked in `finally`; balance
+  returned to zero and no active operator keys remain. No source text/captions/credentials retained.
+- Live Chrome verification remains pending: signed-in X/LinkedIn and the existing unpacked
+  extension were located, but concurrent window/tab changes interrupt native automation. Requested
+  a brief idle personal Chrome window. Version 0.0.2 has not yet been reloaded into Chrome, no live
+  draft attachments or corrected feedback events have been verified, and no replies were published.
+  Production QA aggregates contain no version-2 events yet. Fixture success does not establish
+  compatibility with today's platform DOM. Next action: reload the existing extension from its
+  production `dist`, reload both social tabs, verify visible captions/native draft attachment,
+  discard drafts, and inspect only safe feedback aggregates.
+- Cleanup: release-only PostgreSQL/Redis containers were removed; unrelated services remain.
+  Production backup is encrypted, temporary API keys are revoked, and `moyez-dev` remains active.
 
 ## Suggestion deadline, measurements, and feedback — 2026-10-21
 

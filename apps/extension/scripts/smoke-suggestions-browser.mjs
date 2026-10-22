@@ -9,12 +9,15 @@ import { chromium } from "playwright";
 import { repositoryOnlyEnvironment } from "../../../scripts/deployment-readiness.mjs";
 
 const repository = fileURLToPath(new URL("../../../", import.meta.url));
-const extension = path.join(repository, "apps/extension/dist");
+const extension = process.env.MEMEDROP_BROWSER_EXTENSION_DIR
+  ? path.resolve(process.env.MEMEDROP_BROWSER_EXTENSION_DIR)
+  : path.join(repository, "apps/extension/dist");
 const api = "http://127.0.0.1:3001";
 const temporary = await mkdtemp(path.join(tmpdir(), "memedrop-browser-"));
 let backend;
 let context;
 let scenarioId = 100;
+const fileChooserCounts = new WeakMap();
 
 async function until(check, label, timeout = 10_000) {
   const end = Date.now() + timeout;
@@ -35,43 +38,103 @@ async function eventsFor(action) {
   return state.events.filter((event) => event.action === action);
 }
 
-function fixtureHtml(platform, confirmation) {
+function fixtureHtml(platform, confirmation, commentLink = false, portal = false, photoInputMode = "single") {
   const linkedin = platform === "linkedin";
   const native = linkedin ? 'aria-label="Comment"' : 'data-testid="reply"';
   const source = linkedin
     ? `<div role="listitem" data-urn="urn:li:activity:${scenarioId}">`
     : '<article data-testid="tweet">';
   const close = linkedin ? "</div>" : "</article>";
+  // The current LinkedIn feed exposes Comment as an A inside a plain DIV
+  // containing seven actions, four ancestor levels below its post list item.
+  const actions = linkedin && commentLink
+    ? '<div><div><div><a id="native-reply" aria-label="Comment">Comment</a><button>Like</button><button>Repost</button><button>Send</button><span>Reactions</span><span>Comments</span><span>Reposts</span></div></div></div>'
+    : `<div role="group"><div><button id="native-reply" ${native}>Reply</button></div><div><button>Like</button></div></div>`;
   return `<!doctype html><html><head><style>
     body { margin:40px; font:16px system-ui; background:#fafafa; }
     article,[role=listitem] { width:650px; padding:20px; }
-    [role=dialog] { width:650px; height:400px; border:1px solid #aaa; }
+    [role=dialog], dialog { width:650px; height:400px; border:1px solid #aaa; }
     [contenteditable] { height:100px; }
     #upload img { width:100px; height:100px; }
   </style></head><body>${source}
   <div data-testid="${linkedin ? "expandable-text-box" : "tweetText"}">We skipped tests and deployed Friday. Who could have predicted this?</div>
   <a href="${linkedin ? `/feed/update/urn:li:activity:${scenarioId}/` : `/fixture/status/${scenarioId}`}">Fixture post</a>
-  <div role="group"><div><button id="native-reply" ${native}>Reply</button></div><div><button>Like</button></div></div>
+  ${actions}
   ${linkedin ? '<div id="editor"></div>' : ""}${close}
+  ${portal ? '<dialog open id="unrelated-dialog" data-testid="dialog"><div contenteditable="true" role="textbox" aria-label="Text editor for creating comment"></div><input id="unrelated-input" type="file" accept="image/*"></dialog>' : ""}
   <script>
   const linkedin = ${linkedin};
+  const portal = ${portal};
+  const photoInputMode = ${JSON.stringify(photoInputMode)};
+  window.__photoClicks = 0;
+  window.__pasteCount = 0;
+  window.__inputClickStates = [];
   const confirmation = ${JSON.stringify(confirmation)};
-  document.querySelector('#native-reply').onclick = () => {
-    const editor = linkedin ? document.querySelector('#editor') : document.createElement('div');
+  document.querySelector('#native-reply').onclick = (event) => {
+    event.preventDefault();
+    const editor = portal ? document.createElement('dialog') : linkedin ? document.querySelector('#editor') : document.createElement('div');
+    if (portal) { editor.id = 'comment-dialog'; editor.dataset.testid = 'dialog'; document.body.append(editor); }
     if (!linkedin) { editor.setAttribute('role','dialog'); document.body.append(editor); }
     editor.innerHTML = linkedin
       ? '<div contenteditable="true" role="textbox" aria-label="Text editor for creating comment"></div><input type="file" accept="image/*"><div id="upload" class="comments-comment-box__photo"></div>'
       : '<div contenteditable="true" data-testid="tweetTextarea_0"></div><input type="file" data-testid="fileInput" accept="image/*"><div id="upload" data-testid="attachments"></div>';
-    editor.querySelector('input').addEventListener('change', event => {
-      if (confirmation !== 'confirm' || !event.target.files.length) return;
+    if (portal) {
+      editor.querySelector('input').remove();
+      editor.querySelector('#upload').className = '';
+      const photo = document.createElement('button');
+      photo.setAttribute('aria-label','Share photo');
+      photo.onclick = () => {
+        window.__photoClicks++;
+        const count = photoInputMode === 'absent' ? 0 : photoInputMode === 'ambiguous' ? 2 : 1;
+        for (let index = 0; index < count; index++) {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.id = 'owned-input-' + index;
+          input.style.display = 'none';
+          input.addEventListener('click', event => window.__inputClickStates.push(event.defaultPrevented));
+          input.addEventListener('change', event => acceptFile(event.target.files[0]));
+          document.body.append(input);
+          input.click();
+        }
+        if (photoInputMode === 'closed') editor.close();
+      };
+      editor.append(photo);
+      editor.showModal();
+    }
+    const acceptFile = file => {
+      if (portal && file) {
+        // A newly decoded blob/avatar in this same dialog must not count as
+        // an attachment without the native figure/link/Dismiss structure.
+        const avatar = document.createElement('img');
+        avatar.id = 'unrelated-blob-avatar';
+        avatar.src = URL.createObjectURL(file);
+        avatar.dataset.loaded = 'true';
+        editor.append(avatar);
+      }
+      if (confirmation !== 'confirm' || !file) return;
       setTimeout(() => {
         const img = document.createElement('img');
-        img.src = URL.createObjectURL(event.target.files[0]);
+        img.src = URL.createObjectURL(file);
         const remove = document.createElement('button');
         remove.dataset.testid = 'removeMedia';
         remove.textContent = 'Remove image';
-        document.querySelector('#upload').replaceChildren(img,remove);
+        if (portal) {
+          img.dataset.loaded = 'true';
+          const figure = document.createElement('figure');
+          figure.append(img);
+          const link = document.createElement('a');
+          link.href = 'https://www.linkedin.com/fixture-preview/';
+          link.append(figure);
+          remove.setAttribute('aria-label','Dismiss');
+          editor.querySelector('#upload').replaceChildren(link,remove);
+        } else editor.querySelector('#upload').replaceChildren(img,remove);
       }, 150);
+    };
+    editor.querySelector('input')?.addEventListener('change', event => acceptFile(event.target.files[0]));
+    editor.querySelector('[contenteditable]').addEventListener('paste', event => {
+      window.__pasteCount++;
+      acceptFile(event.clipboardData.files[0]);
     });
     if (!linkedin) history.pushState({},'', '/compose/post');
   };
@@ -82,15 +145,17 @@ function fixtureHtml(platform, confirmation) {
   </script></body></html>`;
 }
 
-async function openScenario({ platform = "x", mode = "success", confirmation = "confirm", waitReady = true, request = true } = {}) {
+async function openScenario({ platform = "x", mode = "success", confirmation = "confirm", waitReady = true, request = true, commentLink = false, portal = false, photoInputMode = "single" } = {}) {
   scenarioId++;
   await fetch(`${api}/_fixture/reset?mode=${mode}`, { method: "POST" });
   const page = await context.newPage();
+  fileChooserCounts.set(page, 0);
+  page.on("filechooser", () => fileChooserCounts.set(page, fileChooserCounts.get(page) + 1));
   const origin = platform === "linkedin" ? "https://www.linkedin.com" : "https://x.com";
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
   await page.route(`${origin}/**`, (route) => {
     if (route.request().isNavigationRequest()) {
-      return route.fulfill({ contentType: "text/html", body: fixtureHtml(platform, confirmation) });
+      return route.fulfill({ contentType: "text/html", body: fixtureHtml(platform, confirmation, commentLink, portal, photoInputMode) });
     }
     return route.abort();
   });
@@ -135,14 +200,50 @@ try {
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
   });
   await until(async () => context.serviceWorkers().length > 0, "extension service worker");
-  for (const platform of ["x", "linkedin"]) {
-    const { page, usable } = await openScenario({ platform });
+  for (const scenario of [
+    { platform: "x", label: "x" },
+    { platform: "linkedin", label: "linkedin-comment-button" },
+    { platform: "linkedin", commentLink: true, label: "linkedin-comment-link" },
+    { platform: "linkedin", commentLink: true, portal: true, label: "linkedin-native-dialog" },
+  ]) {
+    const { platform, label } = scenario;
+    const { page, usable } = await openScenario(scenario);
+    assert.equal((await fixtureState()).suggestion_calls, 1, `${label} extracts source and requests once`);
+    if (scenario.commentLink) {
+      assert.equal(await page.locator('a[aria-label="Comment"]').count(), 1);
+      assert.equal(await page.locator('button[aria-label="Comment"]').count(), 0);
+      assert.equal(await page.locator('[contenteditable="true"][role="textbox"]').count(), scenario.portal ? 2 : 1);
+      assert.equal(await page.locator('[data-memedrop-reply="true"]').count(), 1);
+    }
     if (process.env.MEMEDROP_BROWSER_SCREENSHOT_DIR) {
       await mkdir(process.env.MEMEDROP_BROWSER_SCREENSHOT_DIR, { recursive: true });
-      await page.screenshot({ path: path.join(process.env.MEMEDROP_BROWSER_SCREENSHOT_DIR, `${platform}.png`) });
+      await page.screenshot({ path: path.join(process.env.MEMEDROP_BROWSER_SCREENSHOT_DIR, `${label}.png`) });
+    }
+    if (scenario.portal) {
+      assert.equal(await page.locator('#comment-dialog:modal #memedrop-suggestion-panel').count(), 1);
+      assert.equal(await page.locator('#comment-dialog input[type="file"]').count(), 0);
     }
     await usable.first().click();
-    await until(async () => (await eventsFor("inserted")).length === 1, `${platform} confirmed native attachment`);
+    await until(async () => (await eventsFor("inserted")).length === 1, `${label} confirmed native attachment`);
+    if (scenario.portal) {
+      assert.equal(await page.evaluate(() => window.__photoClicks), 1, "activates only the bound composer photo control");
+      assert.deepEqual(await page.evaluate(() => window.__inputClickStates), [true], "cancels the exact input chooser activation");
+      assert.equal(await page.evaluate(() => window.__pasteCount), 0);
+      assert.equal(fileChooserCounts.get(page), 0, "never opens a native OS picker");
+      assert.equal(await page.locator('#owned-input-0').evaluate((input) => input.closest('dialog')), null);
+      assert.equal(await page.locator('#owned-input-0').evaluate((input) => input.files.length), 1);
+      const leakedCapture = await page.locator('#owned-input-0').evaluate((input) => {
+        let cancelledBeforeTarget = false;
+        input.addEventListener('click', event => {
+          cancelledBeforeTarget = event.defaultPrevented;
+          event.preventDefault();
+        }, { once: true });
+        input.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        return cancelledBeforeTarget;
+      });
+      assert.equal(leakedCapture, false, "removes the temporary capture listener");
+      assert.equal(await page.locator('#unrelated-input').evaluate((input) => input.files.length), 0);
+    }
     assert.equal(await page.locator("#upload img").count(), 1);
     assert.equal((await eventsFor("copied")).length, 0);
     assert.equal((await eventsFor("dismissed")).length, 0);
@@ -153,7 +254,58 @@ try {
       assert.doesNotMatch(JSON.stringify(timing), /tweet|caption|https?:|Skipped tests/i);
     }
     await page.close();
-    console.log(`[MemeDrop] ${platform}: rendered preview, safe timings, confirmed attachment PASS`);
+    console.log(`[MemeDrop] ${label}: rendered preview, safe timings, confirmed attachment PASS`);
+  }
+  {
+    const { page } = await openScenario({ platform: "linkedin", commentLink: true, portal: true, mode: "slow", waitReady: false });
+    await until(async () => (await fixtureState()).suggestion_calls === 1, "portal suggestion request");
+    await page.evaluate(() => document.querySelector('#comment-dialog').close());
+    await until(async () => (await fixtureState()).suggestion_pending === 0, "closed portal request completion");
+    assert.equal((await eventsFor("shown")).length, 0);
+    assert.equal((await eventsFor("inserted")).length, 0);
+    assert.equal(await page.locator('body > #memedrop-suggestion-panel').count(), 1, "recovers panel host from closed portal");
+    assert.equal(await page.locator('.meme-card[aria-disabled="false"]').count(), 0);
+    await page.close();
+    console.log("[MemeDrop] closed native dialog: stale result ignored despite unrelated editor PASS");
+  }
+  {
+    const { page, usable } = await openScenario({ platform: "linkedin", commentLink: true, portal: true, confirmation: "ignore" });
+    await usable.first().click();
+    await until(async () => (await eventsFor("copied")).length === 1, "unconfirmed captured upload clipboard outcome", 10_000);
+    assert.equal((await eventsFor("inserted")).length, 0);
+    assert.equal(await page.evaluate(() => window.__photoClicks), 1);
+    assert.equal(await page.evaluate(() => window.__pasteCount), 0);
+    assert.deepEqual(await page.evaluate(() => window.__inputClickStates), [true]);
+    assert.equal(fileChooserCounts.get(page), 0);
+    assert.equal(await page.locator('#unrelated-input').evaluate((input) => input.files.length), 0);
+    assert.equal(await page.locator('#unrelated-blob-avatar').evaluate((image) => image.complete && image.naturalWidth > 0), true,
+      "an unrelated decoded blob image cannot confirm attachment");
+    await page.close();
+    console.log("[MemeDrop] unconfirmed captured native upload: copied, no picker or false insertion PASS");
+  }
+  for (const photoInputMode of ["absent", "ambiguous"]) {
+    const { page, usable } = await openScenario({ platform: "linkedin", commentLink: true, portal: true, photoInputMode });
+    await usable.first().click();
+    await until(async () => (await eventsFor("copied")).length === 1, `${photoInputMode} activated input fallback`);
+    assert.equal((await eventsFor("inserted")).length, 0);
+    assert.equal(fileChooserCounts.get(page), 0);
+    assert.equal(await page.locator('#unrelated-input').evaluate((input) => input.files.length), 0);
+    const assignedCounts = await page.locator('[id^="owned-input-"]').evaluateAll((inputs) => inputs.map((input) => input.files.length));
+    assert.ok(assignedCounts.every((count) => count === 0), "never assigns ambiguous inputs");
+    assert.deepEqual(await page.evaluate(() => window.__inputClickStates), photoInputMode === "ambiguous" ? [true, true] : []);
+    await page.close();
+    console.log(`[MemeDrop] ${photoInputMode} activated file input: copied, no arbitrary assignment or picker PASS`);
+  }
+  {
+    const { page, usable } = await openScenario({ platform: "linkedin", commentLink: true, portal: true, photoInputMode: "closed" });
+    await usable.first().click();
+    await page.waitForTimeout(400);
+    assert.equal((await eventsFor("inserted")).length, 0);
+    assert.equal((await eventsFor("copied")).length, 0);
+    assert.equal(fileChooserCounts.get(page), 0);
+    assert.equal(await page.locator('#owned-input-0').evaluate((input) => input.files.length), 0);
+    await page.close();
+    console.log("[MemeDrop] dialog closes during capture: no file assignment or stale outcome PASS");
   }
   {
     const { page, usable } = await openScenario({ confirmation: "ignore" });

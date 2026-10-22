@@ -218,7 +218,11 @@ function isComposeRoute(url = window.location.href): boolean {
   return isInlineComposeSessionActive({
     hasSource: Boolean(activeMemeReplySource),
     elapsedMs: Date.now() - activeInlineComposeStartedAt,
-    composerPresent: Boolean(document.querySelector(platform.selectors.composer)),
+    composerPresent: Boolean(
+      activeLinkedInComposerScope?.isConnected &&
+      (!(activeLinkedInComposerScope instanceof HTMLDialogElement) || activeLinkedInComposerScope.open) &&
+      activeLinkedInComposerScope.querySelector(platform.selectors.composer)
+    ),
   });
 }
 
@@ -404,15 +408,91 @@ let activeSteeringInstruction: string | undefined;
 // Token used to abandon stale waitForTweetText() loops when the URL changes
 // again before tweet text appears.
 let waitToken = 0;
-// LinkedIn opens comment composers inline without changing routes. Keep a
-// short grace period while its editor is mounting, then require the editor to
-// remain present so abandoned comment boxes do not retain stale suggestions.
+// LinkedIn can open a comment editor inline or in a native top-layer dialog.
+// Bind only the editor revealed by the explicit Meme action during mounting.
 let activeInlineComposeStartedAt = 0;
+let activeLinkedInComposerScope: Element | null = null;
+let composerBindingGeneration = 0;
+let pendingComposerBindingCleanup: (() => void) | null = null;
+let boundComposerCleanup: (() => void) | null = null;
+
+function clearComposerBinding() {
+  composerBindingGeneration++;
+  pendingComposerBindingCleanup?.();
+  pendingComposerBindingCleanup = null;
+  boundComposerCleanup?.();
+  boundComposerCleanup = null;
+  activeLinkedInComposerScope = null;
+}
+
+function isVisibleEditor(editor: HTMLElement): boolean {
+  const bounds = editor.getBoundingClientRect();
+  return editor.isConnected && bounds.width > 0 && bounds.height > 0;
+}
+
+function bindLinkedInComposerFromAction(post: HTMLElement) {
+  const generation = composerBindingGeneration;
+  const portalSelector = platform.selectors.portalComposeScope;
+  const previousEditors = new Set(
+    Array.from(document.querySelectorAll<HTMLElement>(platform.selectors.composer)).filter(isVisibleEditor)
+  );
+  const previousOpenDialogs = new Set(portalSelector
+    ? Array.from(document.querySelectorAll<HTMLDialogElement>(portalSelector)).filter((dialog) => dialog.open)
+    : []);
+  const observer = new MutationObserver(tryBind);
+  const timeout = setTimeout(() => {
+    pendingComposerBindingCleanup?.();
+    pendingComposerBindingCleanup = null;
+  }, 3_500);
+  pendingComposerBindingCleanup = () => {
+    observer.disconnect();
+    clearTimeout(timeout);
+  };
+
+  function tryBind() {
+    if (generation !== composerBindingGeneration || !activeMemeReplySource || activeLinkedInComposerScope) return;
+    const portals = portalSelector
+      ? Array.from(document.querySelectorAll<HTMLDialogElement>(portalSelector)).filter((dialog) => {
+          if (!dialog.open || previousOpenDialogs.has(dialog)) return false;
+          const editors = Array.from(dialog.querySelectorAll<HTMLElement>(platform.selectors.composer))
+            .filter(isVisibleEditor);
+          return editors.length === 1 && !previousEditors.has(editors[0]);
+        })
+      : [];
+    // Ambiguity must never choose somebody else's composer.
+    if (portals.length > 1) return;
+    const inlineEditor = Array.from(post.querySelectorAll<HTMLElement>(platform.selectors.composer))
+      .find((editor) => isVisibleEditor(editor) &&
+        (!previousEditors.has(editor) || editor.contains(document.activeElement)));
+    const scope = portals[0] || (inlineEditor ? post : null);
+    if (!scope) return;
+    activeLinkedInComposerScope = scope;
+    setSuggestionComposerTarget(scope);
+    pendingComposerBindingCleanup?.();
+    pendingComposerBindingCleanup = null;
+    if (scope instanceof HTMLDialogElement) {
+      const onClose = () => {
+        if (generation === composerBindingGeneration) resetComposeSession();
+      };
+      scope.addEventListener("close", onClose);
+      boundComposerCleanup = () => scope.removeEventListener("close", onClose);
+    }
+  }
+
+  observer.observe(document.body, {
+    childList: true, subtree: true, attributes: true,
+    attributeFilter: ["open", "style", "hidden", "aria-hidden"],
+  });
+  // The callback runs before MemeDrop forwards the native Comment click.
+  queueMicrotask(tryBind);
+}
 
 function activateInlineMemeReply(source: MemeReplySource, post: HTMLElement) {
+  clearComposerBinding();
   activeMemeReplySource = source;
   activeInlineComposeStartedAt = Date.now();
   setSuggestionComposerTarget(post);
+  bindLinkedInComposerFromAction(post);
   activeSteeringInstruction = undefined;
   setSuggestionSteeringInstruction(undefined);
   lastSuggestionCacheKey = null;
@@ -426,6 +506,7 @@ function activateInlineMemeReply(source: MemeReplySource, post: HTMLElement) {
 }
 
 function resetComposeSession() {
+  clearComposerBinding();
   memeReplyIntent.clear();
   activeMemeReplySource = null;
   activeInlineComposeStartedAt = 0;
