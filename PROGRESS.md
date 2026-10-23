@@ -44,10 +44,15 @@ This is the current session handoff. Replace stale state; git retains history. T
   eight empty results and zero errors; joint stages were four model, one timeout and seven fallback.
   All nine catalog images were available. The ignored review packet is ready for human scoring;
   this service-only run excludes production database feedback/trends and is not quality approval.
+  Final packet QA rendered all nine previews without layout warnings, missing media, HTTP requests
+  or page errors; exported scores validate with all human ratings still null.
 - Production read-only aggregate confirms collection is not deployed yet: six corrected visible-card
   impressions, three matched insertions, and insufficient data; prior records include operator QA.
-  No production migration/deployment has been performed for this change. Next: push the reviewed
-  commit, then migration `20261023_0012` before API/privacy and extension rollout, verify ingestion,
+  No production migration/deployment has been performed for this change. Commit `af37036` is pushed
+  on `codex/evaluation-and-production-baseline`; PR #3 is open with CI running. Push/PR creation used
+  verified `moyezr`, then restored verified `moyez-dev`. Unrelated history/assessment remain unstaged;
+  disposable QA services were removed. Next: require CI, then migration `20261023_0012` before
+  API/privacy and extension rollout, verify ingestion,
   and record a post-QA observation cutoff. Actual human scoring and beta traffic remain necessary.
 
 ## Live suggestion QA and release follow-up — 2026-10-23
