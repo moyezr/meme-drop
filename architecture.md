@@ -203,6 +203,16 @@ These diagnostics contain durations and counts only, never post text, captions, 
 IDs. Text-only extension cache keys are SHA-256 hashes, and request generations prevent an older
 same-post response from overwriting a refresh.
 
+A strict subset of browser measurements is sent best-effort to FastAPI's
+`POST /api/v1/performance/batch`: at most 20 typed samples per request, with bounded durations,
+counts, outcomes, platform/version and cache/generation categories. A random sample UUID deduplicates
+retries in a separate PostgreSQL table; installation headers are validated but never retained or
+joined to measurements. The extension keeps at most 100 pending samples in memory and does not read
+page-dispatched diagnostics. Ingestion prunes expired rows in bounded batches; weekly authenticated
+maintenance handles idle periods and fails visibly if an expiry backlog remains. Aggregate SQL
+reports cover at most 30 days, expose coverage, and suppress percentiles/rates below 20 observations.
+These samples neither train ranking nor establish a cold-start or representative population claim.
+
 ## Learning loop
 
 Suggestion responses contain only reviewed categorical feedback fields: suggestion mode,

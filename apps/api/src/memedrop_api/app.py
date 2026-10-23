@@ -34,6 +34,7 @@ from memedrop_api.api.internal_trends import TrendRefreshRunner
 from memedrop_api.api.internal_trends import router as internal_trends_router
 from memedrop_api.api.library import router as library_router
 from memedrop_api.api.memes import router as memes_router
+from memedrop_api.api.performance import router as performance_router
 from memedrop_api.api.suggest import router as suggest_router
 from memedrop_api.api.usage import router as usage_router
 from memedrop_api.api.webhooks import router as webhooks_router
@@ -47,6 +48,7 @@ from memedrop_api.catalog_workbench import CatalogDraftStore, SqlAlchemyCatalogD
 from memedrop_api.config import Settings
 from memedrop_api.db import Database
 from memedrop_api.generated_asset_repository import SqlAlchemyGeneratedAssetRetentionRepository
+from memedrop_api.performance_metrics import PerformanceStore, SqlAlchemyPerformanceStore
 from memedrop_api.rate_limit import (
     EXPENSIVE_ROUTES,
     MemoryRateLimitStore,
@@ -115,11 +117,13 @@ def create_app(
     agent_meme_service: AgentMemeService | None = None,
     billing_checkout_service: BillingCheckoutCreator | None = None,
     billing_webhook_service: BillingWebhookProcessor | None = None,
+    performance_store: PerformanceStore | None = None,
 ) -> FastAPI:
     app_settings = settings or Settings()  # type: ignore[call-arg]
     meme_storage = storage or create_meme_storage(app_settings)
     app_database = database or Database(app_settings.database_url)
     backend_store = store or SqlAlchemyStore(app_database)
+    browser_performance_store = performance_store or SqlAlchemyPerformanceStore(app_database)
     catalog_store = catalog_draft_store or SqlAlchemyCatalogDraftStore(app_database)
     catalog = MemeCatalog.load()
     default_gateway: OpenRouterSuggestionGateway | None = None
@@ -219,6 +223,7 @@ def create_app(
     generated_asset_maintenance_service = GeneratedAssetMaintenanceService(
         generated_asset_cleanup_service,
         generation_credits,
+        performance_store=browser_performance_store,
     )
     if rate_limiter is not None:
         limiter = rate_limiter
@@ -264,6 +269,7 @@ def create_app(
     app.state.settings = app_settings
     app.state.database = app_database
     app.state.store = backend_store
+    app.state.performance_store = browser_performance_store
     app.state.catalog_draft_store = catalog_store
     app.state.rate_limiter = limiter
     app.state.rate_limiter_ready = True
@@ -445,6 +451,7 @@ def create_app(
     app.include_router(memes_router)
     app.include_router(suggest_router)
     app.include_router(usage_router)
+    app.include_router(performance_router)
     app.include_router(webhooks_router)
     if not app_settings.is_production:
         app.include_router(internal_catalog_router)

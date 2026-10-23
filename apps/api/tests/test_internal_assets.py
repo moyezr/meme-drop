@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -134,6 +135,8 @@ async def test_cleanup_cron_returns_bounded_content_free_metrics(tmp_path: Path)
             "blocked_expired_assets": 0,
             "oldest_blocked_lag_seconds": None,
             "stale_generations_reconciled": 0,
+            "performance_samples_deleted": 0,
+            "performance_expired_remaining": 0,
         },
     }
     assert lock.released == ["asset-lease-token"]
@@ -158,6 +161,8 @@ async def test_cleanup_cron_makes_asset_deletion_failures_alertable(tmp_path: Pa
             "blocked_expired_assets": 0,
             "oldest_blocked_lag_seconds": None,
             "stale_generations_reconciled": 0,
+            "performance_samples_deleted": 0,
+            "performance_expired_remaining": 0,
         },
     }
 
@@ -183,6 +188,8 @@ async def test_cleanup_cron_continuously_alerts_on_blocked_expired_assets(
             "blocked_expired_assets": 3,
             "oldest_blocked_lag_seconds": 180,
             "stale_generations_reconciled": 0,
+            "performance_samples_deleted": 0,
+            "performance_expired_remaining": 0,
         },
     }
 
@@ -196,6 +203,21 @@ async def test_cleanup_cron_failure_is_non_success_and_releases_lease(tmp_path: 
 
     assert response.status_code == 503
     assert response.json() == {"status": "failed", "reason": "internal"}
+    assert lock.released == ["asset-lease-token"]
+
+
+async def test_cleanup_cron_alerts_on_expired_anonymous_measurement_backlog(tmp_path: Path) -> None:
+    async def runner() -> GeneratedAssetCleanupReport:
+        return replace(
+            completed_report(), performance_samples_deleted=10_000, performance_expired_remaining=3
+        )
+
+    lock = FakeLock()
+    response = await request_cleanup(tmp_path, lock, runner)
+    assert response.status_code == 503
+    assert response.json()["reason"] == "retention_blocked"
+    assert response.json()["report"]["performance_samples_deleted"] == 10_000
+    assert response.json()["report"]["performance_expired_remaining"] == 3
     assert lock.released == ["asset-lease-token"]
 
 
@@ -254,6 +276,7 @@ def test_default_cleanup_runner_uses_app_database_and_configured_storage(tmp_pat
     assert isinstance(service.retention.repository, SqlAlchemyGeneratedAssetRetentionRepository)
     assert service.retention.repository.database is app.state.database
     assert service.generations is app.state.agent_generation_credits
+    assert service.performance_store is app.state.performance_store
 
 
 async def test_cleanup_cron_reports_stale_credit_reconciliation(tmp_path: Path) -> None:

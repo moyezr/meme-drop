@@ -83,6 +83,8 @@ async def scheduled_generated_asset_cleanup(request: Request) -> JSONResponse:
         "blocked_expired_assets": report.blocked_expired_assets,
         "oldest_blocked_lag_seconds": report.oldest_blocked_lag_seconds,
         "stale_generations_reconciled": report.stale_generations_reconciled,
+        "performance_samples_deleted": report.performance_samples_deleted,
+        "performance_expired_remaining": report.performance_expired_remaining,
     }
     if report.failed:
         return JSONResponse(
@@ -93,7 +95,7 @@ async def scheduled_generated_asset_cleanup(request: Request) -> JSONResponse:
                 "report": report_json,
             },
         )
-    if report.blocked_expired_assets:
+    if report.blocked_expired_assets or report.performance_expired_remaining:
         return JSONResponse(
             status_code=503,
             content={

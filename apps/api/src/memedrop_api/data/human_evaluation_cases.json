@@ -1,0 +1,701 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "x-launch-a",
+      "group_id": "x-launch",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "short",
+        "work",
+        "self_deprecating"
+      ],
+      "text": "Merged the fix. Broke the fix.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-launch-b",
+      "group_id": "x-launch",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "I celebrated the green build so loudly that I missed the next notification: the deployment had rolled back. Excellent five-second victory lap.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-waiting-a",
+      "group_id": "x-waiting",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "everyday"
+      ],
+      "text": "The delivery map says the driver is one minute away. It has been a very consistent minute for the last half hour.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-waiting-b",
+      "group_id": "x-waiting",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "everyday",
+        "self_deprecating"
+      ],
+      "text": "Refreshing the ticket queue does not make my turn arrive sooner. I have personally verified this 43 times.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-plans-a",
+      "group_id": "x-plans",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "short",
+        "everyday",
+        "self_deprecating"
+      ],
+      "text": "Packed gym clothes. Ordered fries.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-plans-b",
+      "group_id": "x-plans",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "everyday",
+        "self_deprecating"
+      ],
+      "text": "My plan was to spend Sunday preparing meals for the week. My actual preparation was finding a second takeaway place because the first one was closed.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-small-wins-a",
+      "group_id": "x-small-wins",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "short",
+        "everyday",
+        "celebratory"
+      ],
+      "text": "The seedling has a new leaf!",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-small-wins-b",
+      "group_id": "x-small-wins",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "everyday",
+        "celebratory",
+        "self_deprecating"
+      ],
+      "text": "The crooked shelf I built is finally level. I am accepting congratulations as if I personally invented horizontal surfaces.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-missing-context-a",
+      "group_id": "x-missing-context",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "short",
+        "ambiguous",
+        "missing_context"
+      ],
+      "text": "Well. That happened.",
+      "expectation": "context_needed"
+    },
+    {
+      "id": "x-missing-context-b",
+      "group_id": "x-missing-context",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "ambiguous",
+        "missing_context"
+      ],
+      "text": "I cannot believe the second one did that after everything the first one said. If you saw it, you know.",
+      "expectation": "context_needed"
+    },
+    {
+      "id": "x-sensitive-a",
+      "group_id": "x-sensitive",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "sensitive",
+        "no_fit"
+      ],
+      "text": "Our neighborhood volunteer passed away this morning. Please give their family privacy; details of the memorial will come from the organizers.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "x-sensitive-b",
+      "group_id": "x-sensitive",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "sensitive",
+        "no_fit"
+      ],
+      "text": "We have closed the search for our missing neighbor following a family announcement. Please do not speculate or repost old location details.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "x-quoted-stance-a",
+      "group_id": "x-quoted-stance",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "everyday",
+        "quoted_context",
+        "disagreement"
+      ],
+      "text": "Someone told me, \"Taking a proper lunch break is lazy.\" I disagree. A sandwich is not a moral failure, and I will defend this hill with a napkin.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-quoted-stance-b",
+      "group_id": "x-quoted-stance",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "everyday",
+        "quoted_context",
+        "disagreement"
+      ],
+      "text": "A reply said, \"If the hobby does not earn money, it is wasted time.\" Meanwhile my spectacularly unprofitable model train is having a lovely afternoon.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-long-automation-a",
+      "group_id": "x-long-automation",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "long",
+        "everyday",
+        "work",
+        "self_deprecating"
+      ],
+      "text": "I tried turning my home into a perfectly automated home this weekend, and I now have a much deeper relationship with the light switch.\n\nThe original plan was modest: one lamp should turn on when I enter the study. I bought a motion sensor, paired it, gave it a sensible name, and tested it twice. Success. Naturally, instead of stopping, I decided that this was the beginning of a comprehensive household orchestration system.\n\nBy lunchtime I had separate scenes for reading, working, watching a film, and searching for the remote. The remote-search scene was mostly just the reading scene with a much more ambitious name. I also created a dashboard to tell me which scenes were active, because apparently looking at the room was no longer sufficient.\n\nThen the lamp stopped responding. The sensor was awake, the hub was awake, and the dashboard had a reassuring green dot. The lamp itself had been unplugged so someone could charge a vacuum cleaner. My carefully designed monitoring system had correctly established that several computers were willing to discuss a lamp that had no electricity.\n\nI plugged it back in and added a rule to notify me if it went offline. This worked beautifully until the router restarted and every device sent an alert at once. I was standing in a completely ordinary, reasonably well-lit kitchen while my phone explained that the household had suffered a major operational incident.\n\nThe next version had a quiet mode. The quiet mode needed a schedule. The schedule needed an exception for weekends. The weekend exception behaved differently when the calendar thought a public holiday counted as a workday. At this point the switch on the wall still performed its original function with no calendar permissions at all.\n\nThe strangest part is that I enjoyed solving each small problem. The mistake was treating every solved problem as an invitation to create two more. I wanted a lamp to save me a step; I had accidentally assigned myself a part-time job as the manager of the lamp.\n\nI am leaving one useful automation running and writing down how to turn it off. That is the entire release plan. No dashboard redesign, no room-by-room rollout, and absolutely no smart kettle until I have demonstrated that I can make tea without opening a settings screen.\n\nThe lamp now works. I am calling this a restrained engineering success, and the wall switch remains the senior member of the team.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-long-automation-b",
+      "group_id": "x-long-automation",
+      "split": "development",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "long",
+        "everyday",
+        "work",
+        "self_deprecating"
+      ],
+      "text": "I tried turning my home into a perfectly automated home this weekend, and I now have a much deeper relationship with the light switch.\n\nThe original plan was modest: one lamp should turn on when I enter the study. I bought a motion sensor, paired it, gave it a sensible name, and tested it twice. Success. Naturally, instead of stopping, I decided that this was the beginning of a comprehensive household orchestration system.\n\nBy lunchtime I had separate scenes for reading, working, watching a film, and searching for the remote. The remote-search scene was mostly just the reading scene with a much more ambitious name. I also created a dashboard to tell me which scenes were active, because apparently looking at the room was no longer sufficient.\n\nThen the lamp stopped responding. The sensor was awake, the hub was awake, and the dashboard had a reassuring green dot. The lamp itself had been unplugged so someone could charge a vacuum cleaner. My carefully designed monitoring system had correctly established that several computers were willing to discuss a lamp that had no electricity.\n\nI plugged it back in and added a rule to notify me if it went offline. This worked beautifully until the router restarted and every device sent an alert at once. I was standing in a completely ordinary, reasonably well-lit kitchen while my phone explained that the household had suffered a major operational incident.\n\nThe next version had a quiet mode. The quiet mode needed a schedule. The schedule needed an exception for weekends. The weekend exception behaved differently when the calendar thought a public holiday counted as a workday. At this point the switch on the wall still performed its original function with no calendar permissions at all.\n\nThe strangest part is that I enjoyed solving each small problem. The mistake was treating every solved problem as an invitation to create two more. I wanted a lamp to save me a step; I had accidentally assigned myself a part-time job as the manager of the lamp.\n\nI am leaving one useful automation running and writing down how to turn it off. That is the entire release plan. No dashboard redesign, no room-by-room rollout, and absolutely no smart kettle until I have demonstrated that I can make tea without opening a settings screen.\n\nUpdate: a guest used the wall switch, which disabled the whole automation. The guest achieved the intended lighting level immediately and has been promoted to head of user experience.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-project-a",
+      "group_id": "linkedin-project",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "Our team removed one unnecessary approval step and a routine task dropped from two days to ten minutes. The hardest part was admitting we had invented the delay ourselves.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-project-b",
+      "group_id": "linkedin-project",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "I spent the afternoon designing a dashboard for a process that ran once a month. A colleague replaced the whole plan with a calendar reminder. I am choosing to call this a successful design review.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-meetings-a",
+      "group_id": "linkedin-meetings",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "We scheduled a workshop to reduce meeting overload. The preparation call, kickoff, and follow-up are already on my calendar.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-meetings-b",
+      "group_id": "linkedin-meetings",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "A productive morning: we agreed that the status report needs less detail, then assigned a working group to define exactly which details should describe that decision.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-celebration-a",
+      "group_id": "linkedin-celebration",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "celebratory"
+      ],
+      "text": "Today our small team shipped the accessibility fixes that customers had been requesting. The best feedback was one person saying they could finally complete the task without help. Proud of the care behind this release.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-celebration-b",
+      "group_id": "linkedin-celebration",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "celebratory",
+        "self_deprecating"
+      ],
+      "text": "After months of practice, I led my first project review without reading from a script. I still had the notes open in another tab, but today they were backup rather than a life raft. Small steps count.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-quoted-stance-a",
+      "group_id": "linkedin-quoted-stance",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "quoted_context",
+        "disagreement"
+      ],
+      "text": "I keep hearing, \"If the team is not online late, they are not committed.\" I would rather see a clear handoff and a sustainable schedule. Availability is useful; permanent exhaustion is not a delivery strategy.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-quoted-stance-b",
+      "group_id": "linkedin-quoted-stance",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "quoted_context",
+        "disagreement"
+      ],
+      "text": "A comment on my last post said, \"Documentation means the product is too complicated.\" Sometimes it means the next person deserves a better introduction than guessing. The quiet work still counts.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-missing-context-a",
+      "group_id": "linkedin-missing-context",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "ambiguous",
+        "missing_context"
+      ],
+      "text": "An important lesson from that conversation.",
+      "expectation": "context_needed"
+    },
+    {
+      "id": "linkedin-missing-context-b",
+      "group_id": "linkedin-missing-context",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "ambiguous",
+        "missing_context"
+      ],
+      "text": "Sharing the results below. The difference between the two columns surprised everyone on the team. What would you do next?",
+      "expectation": "context_needed"
+    },
+    {
+      "id": "linkedin-sensitive-a",
+      "group_id": "linkedin-sensitive",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "sensitive",
+        "no_fit"
+      ],
+      "text": "Today we informed several colleagues that their roles are ending. This post is only to share the support arrangements. Please respect individual choices about whether and when to discuss their circumstances.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "linkedin-sensitive-b",
+      "group_id": "linkedin-sensitive",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "sensitive",
+        "no_fit"
+      ],
+      "text": "Our office is closed following a serious incident nearby. Team members are safe and updates will be shared through the designated contact. Please avoid speculation while the response team does its work.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "linkedin-neutral-notice-a",
+      "group_id": "linkedin-neutral-notice",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "no_fit"
+      ],
+      "text": "The registration desk for the fictional North Window Workshop opens at 08:30 on Monday. Bring the confirmation code provided at registration; the accessible entrance is beside reception. This is a logistics notice, not a discussion prompt.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "linkedin-neutral-notice-b",
+      "group_id": "linkedin-neutral-notice",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "no_fit"
+      ],
+      "text": "The library meeting room booking form will move to the new address on Tuesday. Existing bookings remain valid. Staff will send the replacement link directly to registered organizers.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "linkedin-long-process-a",
+      "group_id": "linkedin-long-process",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "long",
+        "work",
+        "self_deprecating"
+      ],
+      "text": "Last month our small product team tried a deliberately unglamorous experiment: improve the handoff between a customer question arriving and someone taking responsibility for the answer.\n\nThere was no shortage of effort. Several people checked the shared inbox, another person maintained a spreadsheet, and a weekly meeting was supposed to catch anything that fell between them. We were all doing useful-looking things, yet a question could still wait two days because everyone assumed that someone else had picked it up.\n\nThe first proposal was an integrated workflow with automatic classification, a priority score, routing rules, and a new dashboard. I liked it. It had a tidy diagram, several interesting implementation problems, and enough settings to make me feel that we had understood the complexity of the organization.\n\nBefore starting, we followed a handful of ordinary questions from arrival to reply. We did not copy their contents into the planning document. We wrote down timestamps and which handoff had happened. That small exercise showed a simpler problem: the team did not share a definition of ownership. A colored row in a spreadsheet meant different things to different people.\n\nWe agreed that every new question would have one named owner by the next working session. The owner did not need to know the answer immediately. Their job was to make the next step clear, ask for help if needed, and say when the requester should expect an update. We also agreed on a visible way to return a question to the queue rather than quietly leaving it halfway through a private conversation.\n\nThe operational change fit on one page. We tried it for a week with the tools we already had. The first review was uncomfortable because it revealed how often our old process relied on someone remembering a promise in their head. It was also encouraging because the missing information was usually straightforward to supply once we noticed it.\n\nWe still found legitimate exceptions. Some questions needed specialist review, some arrived outside working hours, and some could not be answered on the first attempt. The point was not to make every row green. It was to make waiting visible and give the person waiting an honest expectation. We stopped treating a quick acknowledgment as proof that the underlying question had been resolved.\n\nAt the end of the experiment we kept the ownership rule and dropped the proposed dashboard. We might eventually need better tooling, but now we can describe what it should help people do. That feels more useful than asking everyone to learn a new interface before agreeing on the basic promise we are making to each other.\n\nMy main contribution was finally deleting the very attractive architecture diagram I had prepared for a problem that turned out to need one sentence and a clear owner.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-long-process-b",
+      "group_id": "linkedin-long-process",
+      "split": "development",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "long",
+        "work",
+        "celebratory"
+      ],
+      "text": "Last month our small product team tried a deliberately unglamorous experiment: improve the handoff between a customer question arriving and someone taking responsibility for the answer.\n\nThere was no shortage of effort. Several people checked the shared inbox, another person maintained a spreadsheet, and a weekly meeting was supposed to catch anything that fell between them. We were all doing useful-looking things, yet a question could still wait two days because everyone assumed that someone else had picked it up.\n\nThe first proposal was an integrated workflow with automatic classification, a priority score, routing rules, and a new dashboard. I liked it. It had a tidy diagram, several interesting implementation problems, and enough settings to make me feel that we had understood the complexity of the organization.\n\nBefore starting, we followed a handful of ordinary questions from arrival to reply. We did not copy their contents into the planning document. We wrote down timestamps and which handoff had happened. That small exercise showed a simpler problem: the team did not share a definition of ownership. A colored row in a spreadsheet meant different things to different people.\n\nWe agreed that every new question would have one named owner by the next working session. The owner did not need to know the answer immediately. Their job was to make the next step clear, ask for help if needed, and say when the requester should expect an update. We also agreed on a visible way to return a question to the queue rather than quietly leaving it halfway through a private conversation.\n\nThe operational change fit on one page. We tried it for a week with the tools we already had. The first review was uncomfortable because it revealed how often our old process relied on someone remembering a promise in their head. It was also encouraging because the missing information was usually straightforward to supply once we noticed it.\n\nWe still found legitimate exceptions. Some questions needed specialist review, some arrived outside working hours, and some could not be answered on the first attempt. The point was not to make every row green. It was to make waiting visible and give the person waiting an honest expectation. We stopped treating a quick acknowledgment as proof that the underlying question had been resolved.\n\nAt the end of the experiment we kept the ownership rule and dropped the proposed dashboard. We might eventually need better tooling, but now we can describe what it should help people do. That feels more useful than asking everyone to learn a new interface before agreeing on the basic promise we are making to each other.\n\nThe most encouraging result was a teammate saying the queue felt calmer even on a busy day. A smaller process gave us more room to help, which is the kind of improvement I would like to keep making.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-notifications-a",
+      "group_id": "x-notifications",
+      "split": "holdout",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "Muted the project channel to focus. Spent the next ten minutes checking whether I had missed anything important in the project channel.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-notifications-b",
+      "group_id": "x-notifications",
+      "split": "holdout",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "My inbox has a notification explaining how to reduce notifications. It was marked urgent.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-hobby-disagreement-a",
+      "group_id": "x-hobby-disagreement",
+      "split": "holdout",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "everyday",
+        "disagreement"
+      ],
+      "text": "My friend says a holiday itinerary should be optimized minute by minute. My itinerary currently says \"find bread\" and leaves the afternoon open.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-hobby-disagreement-b",
+      "group_id": "x-hobby-disagreement",
+      "split": "holdout",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "everyday",
+        "disagreement",
+        "self_deprecating"
+      ],
+      "text": "Apparently buying a notebook without a complete productivity system is reckless. I was just hoping to write down which bus to take.",
+      "expectation": "reply"
+    },
+    {
+      "id": "x-unseen-media-a",
+      "group_id": "x-unseen-media",
+      "split": "holdout",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "short",
+        "ambiguous",
+        "missing_context"
+      ],
+      "text": "This chart explains everything.",
+      "expectation": "context_needed"
+    },
+    {
+      "id": "x-unseen-media-b",
+      "group_id": "x-unseen-media",
+      "split": "holdout",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "ambiguous",
+        "missing_context"
+      ],
+      "text": "The expression in the last frame says more than I ever could. No additional context needed if you watched the clip.",
+      "expectation": "context_needed"
+    },
+    {
+      "id": "x-care-request-a",
+      "group_id": "x-care-request",
+      "split": "holdout",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "sensitive",
+        "no_fit"
+      ],
+      "text": "A friend is dealing with a difficult family emergency. I am only posting to ask people to stop sending jokes and repeated requests for updates.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "x-care-request-b",
+      "group_id": "x-care-request",
+      "split": "holdout",
+      "platform": "x",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "sensitive",
+        "no_fit"
+      ],
+      "text": "Please pause the speculation about the person who left our local group. They have asked for privacy and there is no public explanation to discuss.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "linkedin-metrics-a",
+      "group_id": "linkedin-metrics",
+      "split": "holdout",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "Our report celebrated a rising number of completed tasks. Then we noticed people had started splitting one task into six. The work had not become faster; our definition of a task had become more ambitious.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-metrics-b",
+      "group_id": "linkedin-metrics",
+      "split": "holdout",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "self_deprecating"
+      ],
+      "text": "We optimized the average response time until every difficult question was being transferred immediately. This week we are measuring whether the person actually receives an answer. The old chart was much more cheerful.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-mentoring-a",
+      "group_id": "linkedin-mentoring",
+      "split": "holdout",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "celebratory"
+      ],
+      "text": "A colleague I have been mentoring ran the onboarding session today and improved two explanations I had been repeating for years. There is a particular joy in watching someone make your old instructions unnecessary.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-mentoring-b",
+      "group_id": "linkedin-mentoring",
+      "split": "holdout",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "work",
+        "celebratory"
+      ],
+      "text": "Our new teammate asked the question everyone else had quietly worked around for months. We fixed the confusing step that afternoon. Grateful for fresh eyes and for a team willing to answer honestly.",
+      "expectation": "reply"
+    },
+    {
+      "id": "linkedin-unseen-results-a",
+      "group_id": "linkedin-unseen-results",
+      "split": "holdout",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "short",
+        "ambiguous",
+        "missing_context"
+      ],
+      "text": "A powerful takeaway from yesterday.",
+      "expectation": "context_needed"
+    },
+    {
+      "id": "linkedin-unseen-results-b",
+      "group_id": "linkedin-unseen-results",
+      "split": "holdout",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "ambiguous",
+        "missing_context"
+      ],
+      "text": "The attached before-and-after screenshots show why we changed our approach. Interested in your reaction to the highlighted section.",
+      "expectation": "context_needed"
+    },
+    {
+      "id": "linkedin-long-notice-a",
+      "group_id": "linkedin-long-notice",
+      "split": "holdout",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "long",
+        "work",
+        "sensitive",
+        "no_fit"
+      ],
+      "text": "This is an operational notice for participants in the fictional Alder Lane Training Programme. It explains a temporary change to the schedule and the support available during that change. It is not a request for speculation about the people involved.\n\nThe programme will pause in-person sessions for the remainder of this week following a serious incident affecting one of our partner venues. The venue team is handling the response through its own designated contacts. We will not publish personal details, informal accounts, or images from people who were present. Please do not send those materials to the shared programme inbox.\n\nAnyone booked into a paused session will receive a direct message containing the replacement arrangements. There is no need to register again. Existing access requirements and requests for assistance remain attached to the booking. If the proposed alternative does not work for you, the support team will discuss the available options privately rather than asking you to explain your circumstances in a public comment.\n\nRemote sessions that can take place without the venue will continue at their scheduled times. Tutors will use the normal contact route to confirm whether a particular session is affected. Please rely on that confirmation rather than screenshots of earlier timetable drafts. Those drafts were prepared before the current change and may contain information that is no longer correct.\n\nWe recognize that uncertainty can be difficult for participants and staff. The programme team will provide a further scheduling update at the end of the next working day, even if some arrangements are still being confirmed. A lack of immediate detail should not be read as permission to fill the gaps with guesses about individuals, the venue, or the cause of the incident.\n\nPractical support remains available through the established programme contact. The team can help with rescheduling, accessibility arrangements, and questions about the paused activities. They cannot provide information about another participant or member of staff. We ask that people respect those limits and avoid repeatedly contacting individuals who have not offered to discuss the situation.\n\nThank you to everyone making room for a careful response. The immediate priorities are support, accurate scheduling information, and privacy. We will share any wider organizational lessons only after the responsible teams have completed their work and determined what can appropriately be discussed in public.\n\nPlease leave this post clear for verified programme updates. Scheduling questions should go to the established private support channel.",
+      "expectation": "abstain"
+    },
+    {
+      "id": "linkedin-long-notice-b",
+      "group_id": "linkedin-long-notice",
+      "split": "holdout",
+      "platform": "linkedin",
+      "language": "en",
+      "provenance": "authored_synthetic",
+      "slices": [
+        "long",
+        "work",
+        "sensitive",
+        "no_fit"
+      ],
+      "text": "This is an operational notice for participants in the fictional Alder Lane Training Programme. It explains a temporary change to the schedule and the support available during that change. It is not a request for speculation about the people involved.\n\nThe programme will pause in-person sessions for the remainder of this week following a serious incident affecting one of our partner venues. The venue team is handling the response through its own designated contacts. We will not publish personal details, informal accounts, or images from people who were present. Please do not send those materials to the shared programme inbox.\n\nAnyone booked into a paused session will receive a direct message containing the replacement arrangements. There is no need to register again. Existing access requirements and requests for assistance remain attached to the booking. If the proposed alternative does not work for you, the support team will discuss the available options privately rather than asking you to explain your circumstances in a public comment.\n\nRemote sessions that can take place without the venue will continue at their scheduled times. Tutors will use the normal contact route to confirm whether a particular session is affected. Please rely on that confirmation rather than screenshots of earlier timetable drafts. Those drafts were prepared before the current change and may contain information that is no longer correct.\n\nWe recognize that uncertainty can be difficult for participants and staff. The programme team will provide a further scheduling update at the end of the next working day, even if some arrangements are still being confirmed. A lack of immediate detail should not be read as permission to fill the gaps with guesses about individuals, the venue, or the cause of the incident.\n\nPractical support remains available through the established programme contact. The team can help with rescheduling, accessibility arrangements, and questions about the paused activities. They cannot provide information about another participant or member of staff. We ask that people respect those limits and avoid repeatedly contacting individuals who have not offered to discuss the situation.\n\nThank you to everyone making room for a careful response. The immediate priorities are support, accurate scheduling information, and privacy. We will share any wider organizational lessons only after the responsible teams have completed their work and determined what can appropriately be discussed in public.\n\nIf you are helping another participant, please pass along only the confirmed schedule information. Do not collect personal accounts or post jokes in this update thread.",
+      "expectation": "abstain"
+    }
+  ]
+}

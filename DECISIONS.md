@@ -200,3 +200,23 @@ Status: accepted · Date: 2026-10-21
   or insufficient signal; use boundary tests, browser fixtures, and hosted QA as appropriate.
 - Evidence: [suggestion contracts](docs/suggestion-contracts.md), [quality workflow](QUALITY.md),
   and implementation/checks in [PROGRESS.md](PROGRESS.md).
+
+## D012 — Separate human taste review from anonymous operational measurements
+
+Status: accepted · Date: 2026-10-23
+
+- Context: deterministic family retrieval cannot establish humor quality, and categorical feedback
+  alone cannot measure time to visible preview or confirmed draft attachment.
+- Decision: add a separate authored-synthetic 48-case seed with grouped development/holdout splits
+  and local production-renderer review. Export only canonical IDs, ratings and enums; preserve
+  unrated/empty/error cases and provisional judgments. Keep existing benchmarks and promotion gates.
+  Collect a strictly typed subset of browser timing/count/outcome measurements in the existing
+  FastAPI/PostgreSQL service. Random retry UUIDs deduplicate samples without retained installation,
+  account, impression, template or content identity. Detailed diagnostics remain local.
+- Consequence: allowlisted payloads, bounded in-memory queues/batches/writes, 30-day aggregate
+  windows, expiry cleanup on ingest and weekly maintenance, visible cleanup backlog, and suppression
+  below 20 observations. Physical deletion can lag by the maintenance cadence or failed retries.
+  These measurements do not train ranking, establish publication, or label cold starts. Local
+  synthetic service captures omit production database feedback and trends; label that difference.
+- Reconsider after reviewed human scores, representative beta traffic, measured collection loss,
+  or retention/abuse findings. See [workflow](docs/evaluation.md) and [progress](PROGRESS.md).

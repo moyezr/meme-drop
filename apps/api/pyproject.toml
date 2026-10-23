@@ -31,6 +31,8 @@ memedrop-storage-check = "memedrop_api.cli:storage_check"
 memedrop-trend-refresh = "memedrop_api.cli:trend_refresh"
 memedrop-suggestion-eval = "memedrop_api.suggestion_evaluation:main"
 memedrop-caption-eval = "memedrop_api.caption_evaluation:main"
+memedrop-human-eval = "memedrop_api.human_evaluation:main"
+memedrop-performance-baseline = "memedrop_api.performance_baseline:main"
 memedrop-catalog-import = "memedrop_api.catalog_import:main"
 
 [dependency-groups]

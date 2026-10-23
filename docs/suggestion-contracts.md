@@ -17,6 +17,13 @@ explains the flow and [QUALITY.md](../QUALITY.md) owns evaluation and promotion 
   visible rendered preview; `inserted` requires native confirmation. Copy, close/abandonment, and
   attachment failure are neutral. Deduplicate retries atomically before counting insertion or
   learning; ambiguous legacy events must not enter version 2 learning/reports.
+- Separate performance samples allow only random retry UUID, X/LinkedIn, extension version,
+  bounded durations/counts and reviewed outcome/cache/generation enums. Never attach installation,
+  account, request, impression, template or content identity, free text, or URLs. Derive measurements
+  directly from the extension's active request; do not collect page-dispatched diagnostic events.
+  Use best-effort bounded memory queues. Reports use at most 30 days and suppress rates/percentiles
+  below 20 observations per denominator/metric; unknown metadata stays unknown. Expired samples
+  are pruned on ingest and weekly maintenance, with a visible failure for remaining expiry backlog.
 
 ## Selection and availability
 

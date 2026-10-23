@@ -4,6 +4,57 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## Evaluation and content-free production baseline — 2026-10-23
+
+- Requested outcome: build a practical evaluation corpus and human scoring workflow, and start
+  collecting a production baseline without retaining user source posts, steering, or captions.
+  Baseline `4984c9e`; preserve existing historical progress edits and the local assessment.
+- Bounded scope: a separate authored-synthetic seed corpus with grouped development/holdout splits,
+  rendered local human review and structured scores, anonymous bounded browser timing/outcome
+  samples with aggregate reporting and expiry, and a controlled migration/API/privacy/extension
+  rollout. Keep existing benchmarks, model, prompts, ranking, and catalog promotion unchanged.
+- Acceptance: no real/public/customer post text enters the corpus or reports; score exports contain
+  IDs, ratings and enums only; unrated/missing/empty cases stay explicit. Request measurements
+  reflect visible decoded captions and confirmed native attachments, with truthful cache/fallback
+  coverage and no fake cold-start label. Production storage has a strict bounded schema, random
+  retry identity, aggregate-only reporting, retention cleanup, and no installation/content identity.
+- Parallel ownership: agents build the synthetic corpus/validator, local human scoring workflow,
+  and FastAPI sample collection/reporting. Root integrates extension sampling, contracts/privacy,
+  tests and production baseline activation. No automatic quality promotion or new analytics service.
+- Initial read-only production aggregate captured under ignored `.memedrop/`; prior v2 feedback
+  includes operator QA and cannot establish request denominators or browser latency percentiles.
+- Implemented 48 authored-synthetic cases (24 X/24 LinkedIn, grouped 32 development/16 holdout),
+  strict validation and offline production-renderer human review with structured export/resume and
+  paired summaries. Judgments remain provisional; no human quality ratings have been invented.
+- Extension 0.0.4 collects one terminal request/attachment measurement through a strict projection,
+  trusted runtime messaging and bounded in-memory retry queue. FastAPI accepts bounded typed batches,
+  stores random UUID retry identity without installation/account/content identity, and prunes expiry
+  during ingest and existing weekly maintenance. Aggregate SQL reports expose coverage and suppress
+  rates/quantiles below 20 observations. Detailed diagnostics remain local; ranking is unchanged.
+- Verified full deployment-readiness: 577 API tests, 31 PostgreSQL/Redis integration tests, 80 extension
+  tests, workspace typecheck/lint/build, process/container smoke and clean npm/Python security audits.
+  Existing tuning gates passed unchanged (5,000-template warm p95 15.942ms against 50ms ceiling).
+  Release dry-run and 16 packaged Chromium/FastAPI scenarios passed, including content-free sample
+  ingestion and confirmed native attachment. Local review rendered with bundled fonts, exported,
+  summarized and resumed with no HTTP requests; automated fixture scores are UI tests only.
+- Fixed local-review configuration isolation after an initial capture rejected inherited production
+  S3 settings before making provider calls. Final API verification passes 579 tests plus lint/mypy;
+  regression checks prove production database/storage/Redis/QStash settings cannot enter review.
+  Explicit live capture of 12 development cases produced nine suggestions across four cases,
+  eight empty results and zero errors; joint stages were four model, one timeout and seven fallback.
+  All nine catalog images were available. The ignored review packet is ready for human scoring;
+  this service-only run excludes production database feedback/trends and is not quality approval.
+  Final packet QA rendered all nine previews without layout warnings, missing media, HTTP requests
+  or page errors; exported scores validate with all human ratings still null.
+- Production read-only aggregate confirms collection is not deployed yet: six corrected visible-card
+  impressions, three matched insertions, and insufficient data; prior records include operator QA.
+  No production migration/deployment has been performed for this change. Commit `af37036` is pushed
+  on `codex/evaluation-and-production-baseline`; PR #3 is open with CI running. Push/PR creation used
+  verified `moyezr`, then restored verified `moyez-dev`. Unrelated history/assessment remain unstaged;
+  disposable QA services were removed. Next: require CI, then migration `20261023_0012` before
+  API/privacy and extension rollout, verify ingestion,
+  and record a post-QA observation cutoff. Actual human scoring and beta traffic remain necessary.
+
 ## Live suggestion QA and release follow-up — 2026-10-23
 
 - Requested outcome: reload the production extension, verify actual X/LinkedIn captioned suggestions
