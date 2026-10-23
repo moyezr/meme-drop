@@ -128,6 +128,30 @@ and record the amount rather than deleting history.
 
 ## Daily beta review
 
+For suggestion measurements after migration `20261023_0012` and extension 0.0.4, run the read-only
+aggregate report with production configuration loaded:
+
+```sh
+uv run --env-file .env.prod --project apps/api memedrop-performance-baseline \
+  --days 30 --since <timezone-aware-cutover-after-operator-QA> \
+  --out .memedrop/production-baseline.json
+```
+
+Record the cutover timestamp/version and keep operator QA outside that window. Inspect observed
+request/attachment counts, empty/error/timeout/cancellation outcomes, cache/generation coverage and
+unknown values alongside p50/p95. Rates and quantiles remain null below 20 relevant observations;
+even above that floor, a small synthetic/private-beta sample is not population or cold-start proof.
+Clients are anonymous, untrusted and best-effort: closed/offline browsers, old versions and dropped
+batches are unobserved. Corrected v2 card-impression feedback is reported separately and cannot be
+joined to timing samples. Reports contain aggregate SQL results, never individual samples or text.
+
+Reports cover at most 30 days. Ingest prunes up to 1,000 expired samples per batch, and the existing
+authenticated weekly cleanup prunes up to 10,000. Check its `performance_samples_deleted` and
+`performance_expired_remaining`; any remaining expiry backlog returns 503 so the existing cleanup
+alert fires. Retry protected cleanup to drain a backlog. Physical deletion may lag expiry by up to
+one maintenance interval, or longer on failures. Do not delete a bucket or weaken the retention gate.
+Use [evaluation workflow](evaluation.md) for human quality review; these timings do not grade humor.
+
 Check the health monitor and cleanup history, QStash workflow status, Vercel error logs, OpenRouter
 usage, Tavily credits, database/storage utilization, generation success versus `no_fit`, and credit
 balances. Production logs and operator reports may contain request IDs and categorical outcomes

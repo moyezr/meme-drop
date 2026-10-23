@@ -17,6 +17,8 @@ import { ensureMemeOverlayFonts } from "./overlay-fonts";
 import { SuggestionPerformanceTracker, roundDuration } from "../shared/suggestion-performance";
 import { fetchMediaBlobWithTimeout } from "../shared/media-fetch";
 import { attachmentImageSnapshot, waitForNativeAttachment, captureComposerFileInput } from "./attachment-confirmation";
+import { SuggestionBaselineTracker, projectPerformanceSample, type PerformanceSample } from "../shared/performance-sample";
+import type { SuggestionPerformanceSnapshot } from "../shared/suggestion-performance";
 
 const MEME_DROP_MIME_TYPE = "application/x-memedrop-meme";
 const IMAGE_PLACEHOLDER =
@@ -77,10 +79,26 @@ function disconnectPreviewObservers() {
   previewObservers.clear();
 }
 let browserPerformance: SuggestionPerformanceTracker | null = null;
+let baselinePerformance: SuggestionBaselineTracker | null = null;
 let insertionInFlight = false;
+
+function sendPerformanceSample(sample: PerformanceSample) {
+  // Direct extension messaging only: page-dispatched CustomEvents are not collected.
+  try { void chrome.runtime.sendMessage({ type: "LOG_PERFORMANCE", payload: sample }).catch(() => {}); }
+  catch { /* Best effort when Chrome invalidates this content-script context. */ }
+}
+
+export function updateSuggestionTransport(snapshot: SuggestionPerformanceSnapshot) {
+  baselinePerformance?.updateTransport(snapshot);
+}
 
 export function beginSuggestionRequest(startedAt = performance.now()) {
   hidePanel();
+  baselinePerformance?.flush();
+  const platform = getPlatformAdapter();
+  baselinePerformance = platform ? new SuggestionBaselineTracker({
+    platform: platform.id, extension_version: chrome.runtime.getManifest().version,
+  }, startedAt, sendPerformanceSample) : null;
   browserPerformance = new SuggestionPerformanceTracker(() => performance.now(), startedAt);
   browserPerformance.startBrowserRequest();
   reportBrowserPerformance();
@@ -89,6 +107,7 @@ export function beginSuggestionRequest(startedAt = performance.now()) {
 function reportBrowserPerformance() {
   if (!browserPerformance) return;
   const diagnostics = browserPerformance.snapshot();
+  baselinePerformance?.observe(diagnostics);
   console.debug("[MemeDrop] browser suggestion performance", diagnostics);
   window.dispatchEvent(new CustomEvent("memedrop:suggestion-browser-performance", { detail: diagnostics }));
 }
@@ -1151,6 +1170,16 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
     };
     console.debug("[MemeDrop] selected meme performance", diagnostics);
     window.dispatchEvent(new CustomEvent("memedrop:suggestion-attach-performance", { detail: diagnostics }));
+    const platform = getPlatformAdapter();
+    const sample = platform && projectPerformanceSample({
+      event_id: crypto.randomUUID(), kind: "attachment", platform: platform.id,
+      extension_version: chrome.runtime.getManifest().version,
+      outcome: outcome === "failed" ? "attachment_failed" : outcome,
+      elapsed_ms: diagnostics.selected_total_ms,
+      ...(diagnostics.selected_preparation_ms === undefined ? {} : { selected_preparation_ms: diagnostics.selected_preparation_ms }),
+      ...(diagnostics.native_attachment_confirmation_ms === undefined ? {} : { native_attachment_confirmation_ms: diagnostics.native_attachment_confirmation_ms }),
+    });
+    if (sample) sendPerformanceSample(sample);
   }
 }
 
@@ -1261,7 +1290,8 @@ export function setSuggestionSteeringInstruction(instruction?: string) {
   if (!currentSteeringInstruction) steeringEditorOpen = false;
 }
 
-export function showSuggestionError(message: string) {
+export function showSuggestionError(message: string, failure: "failed" | "timeout" = "failed") {
+  baselinePerformance?.setFailure(failure);
   browserPerformance?.markPreviewState("failed");
   reportBrowserPerformance();
   if (!panelHost || !shadowRoot) {
@@ -1355,6 +1385,14 @@ export function hidePanel() {
   currentSuggestions = [];
   selectedSuggestionIds.clear();
   shownSuggestionIds.clear();
+}
+
+export function flushSuggestionMeasurement() {
+  if (browserPerformance?.snapshot().preview_state === "pending") {
+    browserPerformance.markPreviewState("cancelled");
+    reportBrowserPerformance();
+  }
+  baselinePerformance?.flush();
 }
 
 function logSuggestionUsage(

@@ -21,6 +21,8 @@ import {
   type UsageEvent,
   type UsageEventInput,
 } from "./usage-telemetry";
+import { PerformanceTelemetryQueue } from "./performance-telemetry";
+import type { PerformanceSample } from "../shared/performance-sample";
 
 interface Suggestion {
   meme_id: string;
@@ -60,6 +62,7 @@ const mediaDataUrlInflight = createSingleFlight<string>();
 const usageTelemetry = new UsageTelemetryQueue({
   sendBatch: postUsageBatch,
 });
+const performanceTelemetry = new PerformanceTelemetryQueue(postPerformanceBatch);
 
 function readCachedSuggestions(key: string): Suggestion[] | null {
   const entry = suggestionCache.get(key);
@@ -192,6 +195,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             request_id: requestId,
             suggestions: [],
             error: "Suggestion request failed",
+            error_kind: err?.name === "AbortError" ? "timeout" : "failed",
           });
         }
         sendResponse({ suggestions: [], error: err?.message });
@@ -224,6 +228,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  if (message.type === "LOG_PERFORMANCE") {
+    // Metadata is checked against the sender, never a URL supplied in the payload.
+    const host = sender.tab?.url ? new URL(sender.tab.url).hostname : "";
+    const platform = ["x.com", "www.x.com", "twitter.com", "www.twitter.com"].includes(host) ? "x"
+      : host === "www.linkedin.com" || host === "linkedin.com" ? "linkedin" : null;
+    if (platform && message.payload?.platform === platform) {
+      performanceTelemetry.enqueue(message.payload, chrome.runtime.getManifest().version);
+    }
+    return false;
+  }
+
   if (message.type === "FETCH_MEDIA_DATA_URL") {
     const imageUrl = toAbsoluteMediaUrl(message.payload.image_url);
     fetchMediaDataUrl(imageUrl)
@@ -238,7 +253,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.runtime.onSuspend.addListener(() => {
   void usageTelemetry.flush();
+  void performanceTelemetry.flush();
 });
+
+async function postPerformanceBatch(samples: PerformanceSample[]): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3_000);
+  try {
+    const response = await fetch(apiUrl("/api/v1/performance/batch"), {
+      method: "POST", headers: await withApiRequestHeaders(), signal: controller.signal,
+      body: JSON.stringify({ samples }),
+    });
+    if (!response.ok) throw new Error("Performance sample delivery failed");
+  } finally { clearTimeout(timer); }
+}
 
 async function fetchSuggestions(
   tweetText: string,

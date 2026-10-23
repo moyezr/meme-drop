@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
           A plain-language disclosure of how the MemeDrop private beta handles information, and
           which hosted-provider and billing details remain to be finalized before public launch.
         </p>
-        <p className="policyMeta">Effective date: October 21, 2026</p>
+        <p className="policyMeta">Effective date: October 23, 2026</p>
       </header>
 
       <aside className="notice" aria-label="Pre-launch policy status">
@@ -91,7 +91,19 @@ export default function PrivacyPolicyPage() {
           identifiers, suggestion position, and event-format version. These random identifiers are
           not derived from submitted content. Copying is not counted as confirmed attachment, and
           ordinary closure is not treated as rejection. Ambiguous older events do not train the
-          corrected ranking. Browser rendering and attachment timings remain local diagnostics.
+          corrected ranking.
+        </p>
+        <h3>Suggestion performance measurements</h3>
+        <p>
+          The extension sends bounded durations, suggestion counts, outcome categories, platform,
+          extension version, and cache or model/fallback categories to measure visible suggestions
+          and confirmed draft attachments. Each sample has a random retry identifier. These
+          measurements contain no post text, creative direction, captions, page or media URLs,
+          content fingerprints, meme identifiers, or installation/account identifiers. The existing
+          installation header is validated for access but is not stored with measurements.
+          Reports cover at most 30 days. Expired samples are deleted during ingestion and weekly
+          maintenance; physical deletion may take up to another week, or longer if cleanup fails.
+          Detailed browser diagnostics stay local. Draft attachment does not mean publication.
         </p>
         <h3>Account, API, and billing data</h3>
         <p>

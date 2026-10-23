@@ -7,6 +7,7 @@ from typing import Protocol
 
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore[import-untyped]
 
+from memedrop_api.performance_metrics import PerformanceStore
 from memedrop_api.services.storage import public_path_for_key
 
 DEFAULT_CLEANUP_BATCH_SIZE = 100
@@ -48,6 +49,8 @@ class GeneratedAssetCleanupReport:
     blocked_expired_assets: int = 0
     oldest_blocked_lag_seconds: int | None = None
     stale_generations_reconciled: int = 0
+    performance_samples_deleted: int = 0
+    performance_expired_remaining: int = 0
 
 
 class GeneratedAssetRetentionRepository(Protocol):
@@ -202,9 +205,12 @@ class GeneratedAssetMaintenanceService:
         self,
         retention: GeneratedAssetRetentionService,
         generations: StaleGenerationReconciler,
+        *,
+        performance_store: PerformanceStore | None = None,
     ) -> None:
         self.retention = retention
         self.generations = generations
+        self.performance_store = performance_store
 
     async def cleanup_expired_assets(self) -> GeneratedAssetCleanupReport:
         report = await self.retention.cleanup_expired_assets()
@@ -212,7 +218,15 @@ class GeneratedAssetMaintenanceService:
             reconciled = await self.generations.reconcile_stale_generations()
         except Exception as error:
             raise StaleGenerationReconciliationFailure from error
-        return replace(report, stale_generations_reconciled=reconciled)
+        if self.performance_store is None:
+            return replace(report, stale_generations_reconciled=reconciled)
+        performance_cleanup = await self.performance_store.cleanup_expired()
+        return replace(
+            report,
+            stale_generations_reconciled=reconciled,
+            performance_samples_deleted=performance_cleanup.deleted,
+            performance_expired_remaining=performance_cleanup.remaining,
+        )
 
 
 def _client_error_code(error: ClientError) -> str:

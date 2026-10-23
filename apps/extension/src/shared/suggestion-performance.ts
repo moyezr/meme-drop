@@ -1,5 +1,5 @@
 /**
- * Small, local-only timings for the suggestion path. They are deliberately
+ * Small diagnostic timings for the suggestion path. They are deliberately
  * counts and durations only: post text, captions, URLs, and template ids are
  * never part of a diagnostic snapshot.
  */
@@ -17,6 +17,8 @@ export interface SuggestionPerformanceSnapshot {
   preview_render_failure_count: number;
   preview_state?: "pending" | "usable" | "empty" | "failed" | "cancelled";
   server_timing?: Record<string, number>;
+  server_cache_hit?: boolean;
+  generation_mode?: "model" | "fallback";
 }
 
 export type Clock = () => number;
@@ -49,6 +51,7 @@ export class SuggestionPerformanceTracker {
   private mediaSettledMs: number | undefined;
   private mediaFailureCount = 0;
   private serverTiming: Record<string, number> | undefined;
+  private responseMetadata: Pick<SuggestionPerformanceSnapshot, "server_cache_hit" | "generation_mode"> = {};
   private previewState: SuggestionPerformanceSnapshot["preview_state"];
   private firstUsablePreviewMs: number | undefined;
   private allUsablePreviewsMs: number | undefined;
@@ -69,6 +72,15 @@ export class SuggestionPerformanceTracker {
   markApiResponse(durationMs: number, serverTimingHeader: string | null): void {
     this.apiResponseMs = roundDuration(durationMs);
     this.serverTiming = parseServerTimingHeader(serverTimingHeader);
+    const joint = serverTimingHeader?.split(",").find((entry) => entry.trim().startsWith("joint-model;"));
+    const description = joint?.match(/;\s*desc="?(model|fallback|timeout|cache)"?(?:;|$)/)?.[1];
+    if (description) {
+      this.responseMetadata = {
+        server_cache_hit: description === "cache" || /(?:^|,)\s*cache;\s*desc="?hit"?(?:;|$)/.test(serverTimingHeader ?? ""),
+        ...(description === "model" ? { generation_mode: "model" as const } : {}),
+        ...(["fallback", "timeout"].includes(description) ? { generation_mode: "fallback" as const } : {}),
+      };
+    }
   }
 
   markPreviewReady(memeId: string): void {
@@ -134,6 +146,7 @@ export class SuggestionPerformanceTracker {
         : { all_original_bytes_ms: this.readyToAttachMs }),
       ...(this.mediaSettledMs === undefined ? {} : { media_settled_ms: this.mediaSettledMs }),
       ...(this.serverTiming ? { server_timing: this.serverTiming } : {}),
+      ...this.responseMetadata,
     };
   }
 

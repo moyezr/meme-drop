@@ -93,6 +93,13 @@ average improvement that introduces a severe failure or materially worsens p95. 
 under ignored `.memedrop/` because they are experiment artifacts, while the fixed sample definition
 is reviewed in the repository.
 
+For rendered, structured human review, use [the evaluation workflow](docs/evaluation.md).
+Its separate 48-case authored-synthetic seed has grouped development/holdout splits, explicit
+abstention/context-needed cases, offline rendered review, and content-free score exports. Expected
+judgments are provisional until humans review them. Missing scores stay null; output coverage,
+empty/error cases, rendering failures and fallback stages remain visible. This seed supplements
+the unchanged automated benchmark and cannot automatically promote a model, prompt or template.
+
 When changing ranking, record stage timings and compare results on the same corpus. Relevance,
 diversity, caption quality, fallback availability, and p95 latency are joint constraints; an average
 score improvement does not justify a slow or brittle request path.

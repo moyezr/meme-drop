@@ -45,6 +45,7 @@ def test_database_models_preserve_existing_table_names() -> None:
         "credit_transactions",
         "billing_checkouts",
         "generated_assets",
+        "suggestion_performance_samples",
     }
 
 

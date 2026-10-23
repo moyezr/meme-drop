@@ -486,9 +486,7 @@ class ApiKey(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     name: Mapped[str] = mapped_column(String(120))
     secret_hash: Mapped[bytes] = mapped_column(LargeBinary(32))
-    issuance_idempotency_hash: Mapped[bytes | None] = mapped_column(
-        LargeBinary(32), nullable=True
-    )
+    issuance_idempotency_hash: Mapped[bytes | None] = mapped_column(LargeBinary(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
@@ -698,6 +696,37 @@ class GeneratedAsset(Base):
         DateTime(timezone=True), server_default=text("now()")
     )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class SuggestionPerformanceSample(Base):
+    """Anonymous measurements; random retry identity is never tied to an install."""
+
+    __tablename__ = "suggestion_performance_samples"
+    __table_args__ = (
+        CheckConstraint("kind IN ('request', 'attachment')", name="performance_kind_check"),
+        CheckConstraint("platform IN ('x', 'linkedin')", name="performance_platform_check"),
+        CheckConstraint(
+            "elapsed_ms >= 0 AND elapsed_ms <= 120000", name="performance_elapsed_check"
+        ),
+        Index("idx_performance_created_at", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(12))
+    platform: Mapped[str] = mapped_column(String(8))
+    extension_version: Mapped[str] = mapped_column(String(19))
+    outcome: Mapped[str] = mapped_column(String(20))
+    elapsed_ms: Mapped[float] = mapped_column(Float)
+    suggestion_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    first_usable_preview_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    api_response_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cache_status: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    generation_mode: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    selected_preparation_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    native_attachment_confirmation_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
 
