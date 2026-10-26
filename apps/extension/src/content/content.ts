@@ -15,6 +15,8 @@ import { initMemeReplyButtons } from "./meme-reply-button";
 import {
   showSuggestionPanel,
   beginSuggestionRequest,
+  updateSuggestionTransport,
+  flushSuggestionMeasurement,
   showSuggestionError,
   updateSuggestions,
   updateSuggestionMedia,
@@ -148,7 +150,8 @@ chrome.runtime.onMessage.addListener((message) => {
     );
     if (message.error) {
       showSuggestionError(
-        "Could not reach the MemeDrop API. Check that the API is running, then try again."
+        "Could not reach the MemeDrop API. Check that the API is running, then try again.",
+        message.error_kind === "timeout" ? "timeout" : "failed"
       );
       return;
     }
@@ -187,8 +190,9 @@ chrome.runtime.onMessage.addListener((message) => {
     message.cache_key === lastSuggestionCacheKey &&
     message.diagnostics
   ) {
-    // Diagnostics contain only counts and duration values. They stay local to
-    // the extension console and are intentionally not usage telemetry.
+    updateSuggestionTransport(message.diagnostics);
+    // Detailed diagnostics stay local; collection separately projects a strict
+    // allowlist of terminal timings/counts/enums, without headers or content.
     console.debug("[MemeDrop] suggestion transport performance", message.diagnostics);
   }
 
@@ -717,6 +721,8 @@ window.addEventListener("memedrop:suggestions-dismissed", () => {
     `- dismissed cache key: ${dismissedSuggestionCacheKey || "(none)"}`
   );
 });
+
+window.addEventListener("pagehide", flushSuggestionMeasurement);
 
 function onUrlChanged(url = window.location.href) {
   const isCompose = isComposeRoute(url);

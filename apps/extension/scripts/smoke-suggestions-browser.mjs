@@ -38,6 +38,20 @@ async function eventsFor(action) {
   return state.events.filter((event) => event.action === action);
 }
 
+async function performanceFor(kind, outcome) {
+  return (await fixtureState()).performance_samples.filter((sample) =>
+    sample.kind === kind && (!outcome || sample.outcome === outcome));
+}
+
+function assertContentFree(sample) {
+  const allowed = new Set(["event_id", "kind", "platform", "extension_version", "outcome", "elapsed_ms",
+    "suggestion_count", "first_usable_preview_ms", "api_response_ms", "cache_status", "generation_mode",
+    "selected_preparation_ms", "native_attachment_confirmation_ms"]);
+  assert.ok(Object.keys(sample).every((key) => allowed.has(key)));
+  const encoded = JSON.stringify(sample);
+  assert.ok(!/Skipped|Deploying|Who could|https?:|tweet|caption|steering|meme_id|cache_key|impression_id/.test(encoded));
+}
+
 function fixtureHtml(platform, confirmation, commentLink = false, portal = false, photoInputMode = "single") {
   const linkedin = platform === "linkedin";
   const native = linkedin ? 'aria-label="Comment"' : 'data-testid="reply"';
@@ -225,6 +239,20 @@ try {
     }
     await usable.first().click();
     await until(async () => (await eventsFor("inserted")).length === 1, `${label} confirmed native attachment`);
+    const requestSamples = await until(async () => {
+      const samples = await performanceFor("request", "usable");
+      return samples.length ? samples : null;
+    }, `${label} visible preview measurement`);
+    const attachments = await until(async () => {
+      const samples = await performanceFor("attachment", "inserted");
+      return samples.length ? samples : null;
+    }, `${label} native insertion measurement`);
+    assert.equal(requestSamples.length, 1, "one terminal measurement per explicit request");
+    assert.equal(requestSamples[0].platform, platform);
+    assert.ok(requestSamples[0].first_usable_preview_ms > 0);
+    assert.equal(requestSamples[0].generation_mode, "model");
+    assert.ok(attachments[0].native_attachment_confirmation_ms >= 100, "waits for native upload preview");
+    [...requestSamples, ...attachments].forEach(assertContentFree);
     if (scenario.portal) {
       assert.equal(await page.evaluate(() => window.__photoClicks), 1, "activates only the bound composer photo control");
       assert.deepEqual(await page.evaluate(() => window.__inputClickStates), [true], "cancels the exact input chooser activation");

@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-10-21 (suggestion observability task; other product status retains its recorded evidence)
+Last updated: 2026-10-23 (evaluation and suggestion measurement; other status retains recorded evidence)
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and acceptance evidence here as implementation
@@ -239,6 +239,11 @@ access.
   includes packaged Chromium fixture flows and PostgreSQL integration; hosted rollout and real
   X/LinkedIn DOM QA remain separate. Apply `20261021_0011` before API then extension deployment.
   Verification is recorded in [PROGRESS.md](../PROGRESS.md).
+- [~] Build a human evaluation and production baseline workflow. The 48-case authored-synthetic
+  grouped corpus, offline rendered scoring/export, and content-free browser collection/aggregate
+  report are implemented; see [evaluation](evaluation.md). Human labels remain provisional and
+  real reviewer scores/population measurements are still required. Apply `20261023_0012` before
+  API/privacy then extension 0.0.4. Keep QA outside the observation window and report low coverage.
 - [ ] Track estimated and reconciled cost per successful generation and per customer.
 - [~] Add dashboards and alerts for elevated errors, provider timeouts, stale trends, Redis or
   PostgreSQL failures, credit-transaction anomalies, storage cleanup lag, and unusual user usage.

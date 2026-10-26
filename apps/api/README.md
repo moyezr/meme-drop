@@ -19,9 +19,14 @@ columns, install identity semantics, and extension-facing error contract.
 - deterministic contextual overlays for model outages
 - five-result response cap, cached candidates/feedback, and singleflight request sharing
 - preview-thumbnail/original-attachment media path and `Server-Timing` diagnostics
+- content-free browser performance samples with bounded retention and aggregate-only reporting
+- authored-synthetic human evaluation with offline rendered review and structured score exports
 
 FastAPI has route parity and is the runtime used by root development, build, database, container,
 and deployment commands.
+
+See [evaluation and baseline workflow](../../docs/evaluation.md) for `npm run eval:human`,
+`npm run baseline:suggestions`, score handling, privacy boundaries and interpretation limits.
 
 Runtime OpenRouter models are independently configurable: `OPENROUTER_SUGGESTION_MODEL` for the
 interactive joint call, `OPENROUTER_CAPTION_MODEL` for the explicit caption endpoint, and

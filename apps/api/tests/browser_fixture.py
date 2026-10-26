@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw
 
 from memedrop_api.app import create_app
 from memedrop_api.config import Settings
+from memedrop_api.performance_metrics import BrowserPerformanceSample, PerformanceCleanupResult
 from memedrop_api.schemas import TweetContext
 from memedrop_api.services.catalog import MemeCatalog, MemeTemplate
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
@@ -45,6 +46,22 @@ fixture_mode = "success"
 suggestion_calls = 0
 suggestion_pending = 0
 fixture_revision = 0
+performance_samples: list[dict[str, object]] = []
+
+
+class FixturePerformanceStore:
+    async def record(self, samples: Sequence[BrowserPerformanceSample]) -> int:
+        recorded = 0
+        for sample in samples:
+            safe = sample.model_dump(mode="json", exclude_none=True)
+            if any(row["event_id"] == safe["event_id"] for row in performance_samples):
+                continue
+            performance_samples.append(safe)
+            recorded += 1
+        return recorded
+
+    async def cleanup_expired(self) -> PerformanceCleanupResult:
+        return PerformanceCleanupResult(0, 0)
 
 
 class FixtureStore(FakeStore):
@@ -135,6 +152,7 @@ app = create_app(
     suggestion_service=service,
     readiness_check=ready,
     storage=LocalMemeStorage(root),
+    performance_store=FixturePerformanceStore(),
 )
 
 
@@ -163,6 +181,7 @@ async def reset(
     suggestion_calls = 0
     fixture_revision += 1
     store.usage_events.clear()
+    performance_samples.clear()
     service.cache.clear()
     service._global_candidates = None
     for index, row in enumerate(store.memes, start=1):
@@ -176,4 +195,5 @@ async def state() -> dict[str, object]:
         "suggestion_calls": suggestion_calls,
         "suggestion_pending": suggestion_pending,
         "events": store.usage_events,
+        "performance_samples": performance_samples,
     }
