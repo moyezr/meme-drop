@@ -21,6 +21,44 @@ This is the current session handoff. Replace stale state; git retains history. T
   database, encrypted through the existing Keychain/AES workflow, plaintext removed. Production
   config validates with zero warnings. Previous healthy API `dpl_DMWmLBW4aRe7P48o99TifAWXQEoR`
   and web `dpl_Dn4VgudB6iJ8836nBxrVCJU22ZEh` recorded for rollback. Production remains unchanged.
+- Patch release `162c09b` passed fresh CI `40304954538` (all four required jobs) and a clean-checkout
+  release dry-run. No benchmark, security or promotion exception. Initial configuration/launch
+  checks omitted the operator environment; corrected invocations explicitly load ignored `.env.prod`
+  and pass. The preview still has no production secrets.
+- Applied `20261023_0012` before merge/deployment through the session pooler. Startup options did
+  not enforce limits, so the Alembic transaction explicitly set and verified 5s lock/30s statement
+  limits. Independent readback matches the exact 14 ORM columns, version 0012 and zero initial rows;
+  no installation/account/content fields exist. No prior schema or data was rewritten.
+- Merged PR #3 as `b2daac0` using verified `moyezr`, immediately restored verified `moyez-dev`.
+  Main CI `40305324161` passed all required jobs; optional live-model job skipped as designed.
+  API `dpl_GqvcjG9Q1D5qGRhfgD2JcokKdAuS` and web `dpl_GmERpidJGVvJQ7YeHZ2MdEnZjtux` are READY;
+  build logs identify main/b2daac0, and independent canonical lookups resolve to those IDs.
+- Hosted `/live`, `/health` and privacy return 200. Privacy matches October 23 measurement
+  disclosures. A synthetic collector probe records once, deduplicates retry and rejects an unknown
+  text field with generic 400/no input echo; allowed-origin CORS verified. This probe is QA only.
+- Exact production extension 0.0.4 ZIP: 332428 bytes, SHA-256
+  `8ad0a0be2dbf33406cc3aa64cde6b5cf841e2db3a071af65238a34b4062ca793`.
+  ZIP matches dist; only production API/X/Twitter/LinkedIn hosts. Built from the clean merged tree,
+  copied to the existing unpacked path and reloaded. Worker inspector confirms version 0.0.4 and
+  production-only manifest hosts; the extension details page retains an older grant display.
+- Live X: one usable request (cache miss/reviewed fallback), one native-confirmed attachment.
+  DevTools UI selected the rendered card because X hides its body strip from accessibility and
+  coordinate selection did not activate it. Native Edit media/Remove media appeared; image removed,
+  empty Reply disabled and draft closed. Measurements are independent of per-card feedback.
+- Live LinkedIn: the first pre-opened inline-editor attempt cancelled; explicitly focusing that
+  editor after Meme made binding succeed. One usable model-stage request and one native-confirmed
+  attachment reached production. Removed the image with its native Dismiss control and verified an
+  empty placeholder editor. This editor-focus friction is a concrete UX follow-up, not a collection
+  failure. Both platforms' typed aggregate counts verified without reading raw measurement rows.
+- No social post/comment was published. Temporary DevTools/QA window closed, disposable restore
+  service and temporary generated dist backup removed; unrelated browser windows/services intact.
+  Production baseline starts `2026-10-26T10:22:38.413230+00:00` after all QA, extension 0.0.4.
+  Initial normal-use sample/impression counts are zero; rates/percentiles remain unavailable below
+  20 observations. Collection is active, but no population baseline or human quality result exists.
+  Private-beta launch status passes with production environment loaded and zero warnings.
+- Next: human-score the existing synthetic packet, observe ordinary browsing using this cutoff,
+  and fix the LinkedIn pre-opened editor focus friction as a separate bounded UX task. Preserve
+  current model, ranking and promotion gates until that evidence exists.
 
 ## Evaluation and content-free production baseline — 2026-10-23
 
