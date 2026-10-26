@@ -4,6 +4,24 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## Evaluation production rollout — 2026-10-26
+
+- Requested outcome: migration-first rollout, merge PR #3, deploy API/privacy, reload extension
+  0.0.4 and verify collection on X/LinkedIn without publication. Use `moyezr` for GitHub mutations
+  and restore `moyez-dev`. Preserve unrelated progress history and the local product assessment.
+- Baseline `8a73168`; CI `39988722933` passed all four required repository jobs. API preview failed
+  because production configuration is intentionally absent there; no production secrets copied.
+  Acceptance: fresh verified encrypted backup, schema 0012 readback before merge/deployment,
+  healthy canonical API/privacy at the merged release, exact production package reloaded,
+  content-free request/attachment samples from both platforms, post-QA baseline cutoff, no posts.
+- Fresh audit found new transitive fast-uri/undici advisories. Patch only fast-uri 3.1.8→3.1.9
+  and undici 7.30.0→7.30.1 lock entries (template-pipeline dependencies). Nine pipeline tests,
+  its typecheck/build, and complete npm/Python audit pass without exceptions or runtime changes.
+- Backup `20261026T100515Z`: 100 objects, 18 tables, schema `20261021_0011`; restored in an isolated
+  database, encrypted through the existing Keychain/AES workflow, plaintext removed. Production
+  config validates with zero warnings. Previous healthy API `dpl_DMWmLBW4aRe7P48o99TifAWXQEoR`
+  and web `dpl_Dn4VgudB6iJ8836nBxrVCJU22ZEh` recorded for rollback. Production remains unchanged.
+
 ## Evaluation and content-free production baseline — 2026-10-23
 
 - Requested outcome: build a practical evaluation corpus and human scoring workflow, and start
