@@ -413,7 +413,7 @@ let activeSteeringInstruction: string | undefined;
 // again before tweet text appears.
 let waitToken = 0;
 // LinkedIn can open a comment editor inline or in a native top-layer dialog.
-// Bind only the editor revealed by the explicit Meme action during mounting.
+// Bind only the unique editor owned by the explicit Meme action's post or new dialog.
 let activeInlineComposeStartedAt = 0;
 let activeLinkedInComposerScope: Element | null = null;
 let composerBindingGeneration = 0;
@@ -454,7 +454,8 @@ function bindLinkedInComposerFromAction(post: HTMLElement) {
   };
 
   function tryBind() {
-    if (generation !== composerBindingGeneration || !activeMemeReplySource || activeLinkedInComposerScope) return;
+    if (generation !== composerBindingGeneration || !activeMemeReplySource ||
+        activeLinkedInComposerScope instanceof HTMLDialogElement) return;
     const portals = portalSelector
       ? Array.from(document.querySelectorAll<HTMLDialogElement>(portalSelector)).filter((dialog) => {
           if (!dialog.open || previousOpenDialogs.has(dialog)) return false;
@@ -464,23 +465,33 @@ function bindLinkedInComposerFromAction(post: HTMLElement) {
         })
       : [];
     // Ambiguity must never choose somebody else's composer.
-    if (portals.length > 1) return;
-    const inlineEditor = Array.from(post.querySelectorAll<HTMLElement>(platform.selectors.composer))
-      .find((editor) => isVisibleEditor(editor) &&
-        (!previousEditors.has(editor) || editor.contains(document.activeElement)));
+    if (portals.length > 1) {
+      if (activeLinkedInComposerScope) resetComposeSession();
+      return;
+    }
+    const inlineEditors = Array.from(post.querySelectorAll<HTMLElement>(platform.selectors.composer))
+      .filter((editor) => isVisibleEditor(editor) &&
+        editor.closest(platform.selectors.post) === post);
+    const inlineEditor = inlineEditors.length === 1 ? inlineEditors[0] : null;
     const scope = portals[0] || (inlineEditor ? post : null);
-    if (!scope) return;
+    if (!scope || scope === activeLinkedInComposerScope) return;
     activeLinkedInComposerScope = scope;
     setSuggestionComposerTarget(scope);
-    pendingComposerBindingCleanup?.();
-    pendingComposerBindingCleanup = null;
+    // LinkedIn can leave a pre-mounted editor unfocused after the forwarded
+    // Comment click. Focus its unique owned editor without changing the draft
+    // or jumping the viewport; focus is not evidence of composer ownership.
+    if (scope === post) inlineEditor?.focus({ preventScroll: true });
     if (scope instanceof HTMLDialogElement) {
+      pendingComposerBindingCleanup?.();
+      pendingComposerBindingCleanup = null;
       const onClose = () => {
         if (generation === composerBindingGeneration) resetComposeSession();
       };
       scope.addEventListener("close", onClose);
       boundComposerCleanup = () => scope.removeEventListener("close", onClose);
     }
+    // Keep the bounded observer for an inline binding: LinkedIn may mount its
+    // native dialog asynchronously after forwarding Comment. That dialog wins.
   }
 
   observer.observe(document.body, {
