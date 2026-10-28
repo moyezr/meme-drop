@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw
 from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 from memedrop_api.performance_metrics import BrowserPerformanceSample, PerformanceCleanupResult
+from memedrop_api.rate_limit import MemoryRateLimitStore
 from memedrop_api.schemas import TweetContext
 from memedrop_api.services.catalog import MemeCatalog, MemeTemplate
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
@@ -146,6 +147,7 @@ service = SuggestionService(
     settings,
     trend_retriever=FixtureTrends(),
 )
+rate_limiter = MemoryRateLimitStore()
 app = create_app(
     settings,
     store=store,
@@ -153,6 +155,7 @@ app = create_app(
     readiness_check=ready,
     storage=LocalMemeStorage(root),
     performance_store=FixturePerformanceStore(),
+    rate_limiter=rate_limiter,
 )
 
 
@@ -180,6 +183,10 @@ async def reset(
     fixture_mode = mode
     suggestion_calls = 0
     fixture_revision += 1
+    # Polling earlier scenarios must not exhaust the next scenario's diagnostics.
+    # Keep normal limits within each scenario; only the loopback fixture resets them.
+    async with rate_limiter.lock:
+        rate_limiter.buckets.clear()
     store.usage_events.clear()
     performance_samples.clear()
     service.cache.clear()

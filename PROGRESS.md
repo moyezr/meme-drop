@@ -4,6 +4,31 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## PR #4 navigation-cancellation CI — 2026-10-28
+
+- Requested outcome: fix the failing cancellation check without weakening tests, push through
+  `moyezr`, restore `moyez-dev`, and keep live QA deferred. Baseline `e93c1f1`, clean task branch
+  `codex/linkedin-editor-focus`; [PR #4](https://github.com/moyezr/meme-drop/pull/4).
+- CI run `40660420654` passed static, backend-image and API integration jobs; browser scenarios
+  passed 20/21 before `abandoned request completion` timed out. The same failure was reproduced
+  locally against the immutable extension artifact. Diagnostic polling changed from HTTP 200 to
+  429 near the final scenario: earlier scenarios consumed the shared loopback status-route quota.
+  The runner interpreted the 429 body as state and hid the actual cause behind a timeout.
+- Bounded fix: reset the fixture-owned memory rate limiter alongside other per-scenario state,
+  retain normal per-scenario limits, and assert successful control responses immediately. No
+  production application or rate-limit changes. Preserve the original 10-second cancellation
+  bound and all existing assertions; also require exactly one content-free cancellation sample
+  and no insertion after the abandoned request completes.
+- Focused regression fails without the reset (429 after scenario reset) and passes with it;
+  it also proves a normal API route still returns 429 when its quota is exhausted. Acceptance:
+  full browser suite and applicable code gates pass locally, then fresh CI passes for the pushed
+  revision. Live signed-in Chrome remains deferred; no reload, publication or production QA.
+- Verification: all 21 real-FastAPI/packaged-extension/Chromium scenarios pass with the strengthened
+  cancellation case. `quality:static` passes (580 API tests, 80 extension tests; 31 environment-bound
+  API tests skipped), along with `quality:api-process`, clean npm/Python `quality:security`, and
+  `git diff --check`. These results cover the fixture/runner changes atop `e93c1f1`; hosted CI must
+  still confirm the pushed revision. The API preview's missing configuration remains separate.
+
 ## LinkedIn pre-opened editor focus — 2026-10-26
 
 - Requested outcome: one Meme click must show suggestions for an already visible LinkedIn editor

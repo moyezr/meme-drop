@@ -30,7 +30,9 @@ async function until(check, label, timeout = 10_000) {
 }
 
 async function fixtureState() {
-  return fetch(`${api}/_fixture/state`).then((response) => response.json());
+  const response = await fetch(`${api}/_fixture/state`);
+  assert.equal(response.status, 200, "fixture state diagnostics must remain available");
+  return response.json();
 }
 
 async function eventsFor(action) {
@@ -186,7 +188,8 @@ function fixtureHtml(platform, confirmation, commentLink = false, portal = false
 
 async function openScenario({ platform = "x", mode = "success", confirmation = "confirm", waitReady = true, request = true, commentLink = false, portal = false, photoInputMode = "single", editorMode = "new" } = {}) {
   scenarioId++;
-  await fetch(`${api}/_fixture/reset?mode=${mode}`, { method: "POST" });
+  const reset = await fetch(`${api}/_fixture/reset?mode=${mode}`, { method: "POST" });
+  assert.equal(reset.status, 200, "fixture scenario reset must succeed");
   const page = await context.newPage();
   fileChooserCounts.set(page, 0);
   page.on("filechooser", () => fileChooserCounts.set(page, fileChooserCounts.get(page) + 1));
@@ -495,7 +498,14 @@ try {
     await until(async () => (await fixtureState()).suggestion_calls === 1, "in-flight suggestion request");
     await page.evaluate(() => history.pushState({}, "", "/home"));
     await until(async () => (await fixtureState()).suggestion_pending === 0, "abandoned request completion");
+    const cancelled = await until(async () => {
+      const samples = await performanceFor("request", "cancelled");
+      return samples.length ? samples : null;
+    }, "navigation cancellation measurement");
+    assert.equal(cancelled.length, 1, "one terminal cancellation measurement per abandoned request");
+    cancelled.forEach(assertContentFree);
     assert.equal((await eventsFor("shown")).length, 0);
+    assert.equal((await eventsFor("inserted")).length, 0);
     assert.equal(await page.locator('.meme-card[aria-disabled="false"]').count(), 0);
     await page.close();
     console.log("[MemeDrop] navigation during generation: late result ignored PASS");
