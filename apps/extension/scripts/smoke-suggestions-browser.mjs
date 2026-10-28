@@ -30,7 +30,9 @@ async function until(check, label, timeout = 10_000) {
 }
 
 async function fixtureState() {
-  return fetch(`${api}/_fixture/state`).then((response) => response.json());
+  const response = await fetch(`${api}/_fixture/state`);
+  assert.equal(response.status, 200, "fixture state diagnostics must remain available");
+  return response.json();
 }
 
 async function eventsFor(action) {
@@ -52,7 +54,7 @@ function assertContentFree(sample) {
   assert.ok(!/Skipped|Deploying|Who could|https?:|tweet|caption|steering|meme_id|cache_key|impression_id/.test(encoded));
 }
 
-function fixtureHtml(platform, confirmation, commentLink = false, portal = false, photoInputMode = "single") {
+function fixtureHtml(platform, confirmation, commentLink = false, portal = false, photoInputMode = "single", editorMode = "new") {
   const linkedin = platform === "linkedin";
   const native = linkedin ? 'aria-label="Comment"' : 'data-testid="reply"';
   const source = linkedin
@@ -64,34 +66,56 @@ function fixtureHtml(platform, confirmation, commentLink = false, portal = false
   const actions = linkedin && commentLink
     ? '<div><div><div><a id="native-reply" aria-label="Comment">Comment</a><button>Like</button><button>Repost</button><button>Send</button><span>Reactions</span><span>Comments</span><span>Reposts</span></div></div></div>'
     : `<div role="group"><div><button id="native-reply" ${native}>Reply</button></div><div><button>Like</button></div></div>`;
+  const editorMarkup = linkedin
+    ? '<div id="owned-editor" contenteditable="true" role="textbox" aria-label="Text editor for creating comment"></div><input type="file" accept="image/*"><div id="upload" class="comments-comment-box__photo"></div>'
+    : '<div contenteditable="true" data-testid="tweetTextarea_0"></div><input type="file" data-testid="fileInput" accept="image/*"><div id="upload" data-testid="attachments"></div>';
+  const preopenedMarkup = editorMode === "preexisting-portal"
+    ? editorMarkup.replace('id="owned-editor"', 'id="inline-editor"')
+      .replace('<input ', '<input id="inline-input" ').replace('id="upload"', 'id="inline-upload"')
+    : editorMarkup;
   return `<!doctype html><html><head><style>
     body { margin:40px; font:16px system-ui; background:#fafafa; }
     article,[role=listitem] { width:650px; padding:20px; }
     [role=dialog], dialog { width:650px; height:400px; border:1px solid #aaa; }
     [contenteditable] { height:100px; }
+    ${editorMode === "preexisting-offscreen" ? '#editor { margin-top:900px; }' : ""}
     #upload img { width:100px; height:100px; }
   </style></head><body>${source}
   <div data-testid="${linkedin ? "expandable-text-box" : "tweetText"}">We skipped tests and deployed Friday. Who could have predicted this?</div>
   <a href="${linkedin ? `/feed/update/urn:li:activity:${scenarioId}/` : `/fixture/status/${scenarioId}`}">Fixture post</a>
   ${actions}
-  ${linkedin ? '<div id="editor"></div>' : ""}${close}
+  ${editorMode === "preexisting" ? '<div role="listitem"><div id="nested-editor" contenteditable="true" role="textbox" aria-label="Text editor for creating comment"></div><input id="nested-input" type="file" accept="image/*"></div>' : ""}
+  ${linkedin ? `<div id="editor">${editorMode === "new" ? "" : preopenedMarkup}</div>` : ""}
+  ${editorMode === "ambiguous" ? '<div id="ambiguous-editor" contenteditable="true" role="textbox" aria-label="Text editor for creating comment"></div>' : ""}${close}
+  ${editorMode !== "new" ? '<aside role="listitem"><div id="other-editor" contenteditable="true" role="textbox" aria-label="Text editor for creating comment"></div><input id="other-input" type="file" accept="image/*"></aside>' : ""}
   ${portal ? '<dialog open id="unrelated-dialog" data-testid="dialog"><div contenteditable="true" role="textbox" aria-label="Text editor for creating comment"></div><input id="unrelated-input" type="file" accept="image/*"></dialog>' : ""}
   <script>
   const linkedin = ${linkedin};
   const portal = ${portal};
   const photoInputMode = ${JSON.stringify(photoInputMode)};
+  const editorMode = ${JSON.stringify(editorMode)};
+  const editorMarkup = ${JSON.stringify(editorMarkup)};
+  window.__nativeReplyClicks = 0;
+  window.__unrelatedEditorFocus = 0;
+  window.__initialEditor = document.querySelector('#inline-editor, #owned-editor');
+  if (window.__initialEditor) window.__initialEditor.textContent = 'Existing synthetic draft';
+  for (const editor of document.querySelectorAll('#nested-editor, #other-editor, #ambiguous-editor')) {
+    editor.addEventListener('focus', () => window.__unrelatedEditorFocus++);
+  }
   window.__photoClicks = 0;
   window.__pasteCount = 0;
   window.__inputClickStates = [];
   const confirmation = ${JSON.stringify(confirmation)};
   document.querySelector('#native-reply').onclick = (event) => {
     event.preventDefault();
+    window.__nativeReplyClicks++;
+    const openEditor = () => {
     const editor = portal ? document.createElement('dialog') : linkedin ? document.querySelector('#editor') : document.createElement('div');
     if (portal) { editor.id = 'comment-dialog'; editor.dataset.testid = 'dialog'; document.body.append(editor); }
     if (!linkedin) { editor.setAttribute('role','dialog'); document.body.append(editor); }
-    editor.innerHTML = linkedin
-      ? '<div contenteditable="true" role="textbox" aria-label="Text editor for creating comment"></div><input type="file" accept="image/*"><div id="upload" class="comments-comment-box__photo"></div>'
-      : '<div contenteditable="true" data-testid="tweetTextarea_0"></div><input type="file" data-testid="fileInput" accept="image/*"><div id="upload" data-testid="attachments"></div>';
+    // A pre-opened LinkedIn editor survives the native Comment click without
+    // being focused or remounted. The extension must bind it from one Meme click.
+    if (editorMode === 'new' || portal) editor.innerHTML = editorMarkup;
     if (portal) {
       editor.querySelector('input').remove();
       editor.querySelector('#upload').className = '';
@@ -151,6 +175,9 @@ function fixtureHtml(platform, confirmation, commentLink = false, portal = false
       acceptFile(event.clipboardData.files[0]);
     });
     if (!linkedin) history.pushState({},'', '/compose/post');
+    };
+    if (editorMode === 'preexisting-portal') setTimeout(openEditor, 100);
+    else openEditor();
   };
   window.__browserTimings = [];
   for (const name of ['memedrop:suggestion-browser-performance','memedrop:suggestion-attach-performance']) {
@@ -159,9 +186,10 @@ function fixtureHtml(platform, confirmation, commentLink = false, portal = false
   </script></body></html>`;
 }
 
-async function openScenario({ platform = "x", mode = "success", confirmation = "confirm", waitReady = true, request = true, commentLink = false, portal = false, photoInputMode = "single" } = {}) {
+async function openScenario({ platform = "x", mode = "success", confirmation = "confirm", waitReady = true, request = true, commentLink = false, portal = false, photoInputMode = "single", editorMode = "new" } = {}) {
   scenarioId++;
-  await fetch(`${api}/_fixture/reset?mode=${mode}`, { method: "POST" });
+  const reset = await fetch(`${api}/_fixture/reset?mode=${mode}`, { method: "POST" });
+  assert.equal(reset.status, 200, "fixture scenario reset must succeed");
   const page = await context.newPage();
   fileChooserCounts.set(page, 0);
   page.on("filechooser", () => fileChooserCounts.set(page, fileChooserCounts.get(page) + 1));
@@ -169,13 +197,16 @@ async function openScenario({ platform = "x", mode = "success", confirmation = "
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
   await page.route(`${origin}/**`, (route) => {
     if (route.request().isNavigationRequest()) {
-      return route.fulfill({ contentType: "text/html", body: fixtureHtml(platform, confirmation, commentLink, portal, photoInputMode) });
+      return route.fulfill({ contentType: "text/html", body: fixtureHtml(platform, confirmation, commentLink, portal, photoInputMode, editorMode) });
     }
     return route.abort();
   });
   await page.goto(`${origin}/${platform === "linkedin" ? "feed/" : "home"}`);
   const action = page.locator('[data-memedrop-reply="true"]');
   await action.waitFor();
+  if (editorMode === "preexisting-offscreen") {
+    await page.evaluate(() => { window.__scrollBeforeMeme = window.scrollY; });
+  }
   await (request ? action : page.locator("#native-reply")).click();
   const usable = page.locator('.meme-card[aria-disabled="false"]');
   if (waitReady && request) {
@@ -215,18 +246,36 @@ try {
   });
   await until(async () => context.serviceWorkers().length > 0, "extension service worker");
   for (const scenario of [
+    { platform: "linkedin", editorMode: "preexisting", label: "linkedin-preopened-editor" },
     { platform: "x", label: "x" },
     { platform: "linkedin", label: "linkedin-comment-button" },
     { platform: "linkedin", commentLink: true, label: "linkedin-comment-link" },
     { platform: "linkedin", commentLink: true, portal: true, label: "linkedin-native-dialog" },
+    { platform: "linkedin", commentLink: true, portal: true, editorMode: "preexisting-portal", label: "linkedin-preopened-editor-then-dialog" },
   ]) {
     const { platform, label } = scenario;
     const { page, usable } = await openScenario(scenario);
     assert.equal((await fixtureState()).suggestion_calls, 1, `${label} extracts source and requests once`);
+    if (scenario.editorMode === "preexisting") {
+      assert.equal(await page.locator('#owned-editor').evaluate((editor) => editor === window.__initialEditor), true,
+        "native Comment preserves the already mounted editor");
+      assert.equal(await page.locator('#owned-editor').evaluate((editor) => editor === document.activeElement), true,
+        "one Meme click focuses only its owned pre-opened editor");
+      assert.equal(await page.locator('#owned-editor').textContent(), 'Existing synthetic draft', "preserves typed draft");
+      assert.equal(await page.evaluate(() => window.__nativeReplyClicks), 1, "forwards native Comment once");
+      assert.equal(await page.evaluate(() => window.__unrelatedEditorFocus), 0);
+      // Cross the bounded composer-mount grace period before selecting a card;
+      // the previous bug rendered briefly then cancelled this valid session.
+      await page.waitForTimeout(3_800);
+      assert.ok(await usable.count() > 0, "pre-opened compose remains bound after mount grace");
+      assert.equal((await fixtureState()).suggestion_calls, 1, "focus does not trigger another inference");
+      assert.equal((await performanceFor("request", "cancelled")).length, 0);
+    }
     if (scenario.commentLink) {
       assert.equal(await page.locator('a[aria-label="Comment"]').count(), 1);
       assert.equal(await page.locator('button[aria-label="Comment"]').count(), 0);
-      assert.equal(await page.locator('[contenteditable="true"][role="textbox"]').count(), scenario.portal ? 2 : 1);
+      assert.equal(await page.locator('[contenteditable="true"][role="textbox"]').count(),
+        scenario.editorMode === "preexisting-portal" ? 4 : scenario.portal ? 2 : 1);
       assert.equal(await page.locator('[data-memedrop-reply="true"]').count(), 1);
     }
     if (process.env.MEMEDROP_BROWSER_SCREENSHOT_DIR) {
@@ -236,6 +285,11 @@ try {
     if (scenario.portal) {
       assert.equal(await page.locator('#comment-dialog:modal #memedrop-suggestion-panel').count(), 1);
       assert.equal(await page.locator('#comment-dialog input[type="file"]').count(), 0);
+    }
+    if (scenario.editorMode === "preexisting-portal") {
+      assert.equal(await page.locator('#inline-editor').evaluate((editor) => editor === window.__initialEditor), true);
+      assert.equal(await page.locator('#inline-editor').textContent(), 'Existing synthetic draft');
+      assert.equal(await page.evaluate(() => window.__nativeReplyClicks), 1);
     }
     await usable.first().click();
     await until(async () => (await eventsFor("inserted")).length === 1, `${label} confirmed native attachment`);
@@ -271,8 +325,21 @@ try {
       });
       assert.equal(leakedCapture, false, "removes the temporary capture listener");
       assert.equal(await page.locator('#unrelated-input').evaluate((input) => input.files.length), 0);
+      if (scenario.editorMode === "preexisting-portal") {
+        assert.equal(await page.locator('#inline-input').evaluate((input) => input.files.length), 0);
+        assert.equal(await page.locator('#inline-upload img').count(), 0);
+        assert.equal(await page.locator('#inline-editor').textContent(), 'Existing synthetic draft');
+      }
     }
     assert.equal(await page.locator("#upload img").count(), 1);
+    if (scenario.editorMode === "preexisting") {
+      assert.equal(await page.locator('#owned-editor').textContent(), 'Existing synthetic draft');
+      assert.equal(await page.locator('#editor > input').evaluate((input) => input.files.length), 1);
+      assert.equal(await page.locator('#nested-input').evaluate((input) => input.files.length), 0);
+      assert.equal(await page.locator('#other-input').evaluate((input) => input.files.length), 0);
+      assert.equal(await page.evaluate(() => window.__unrelatedEditorFocus), 0);
+      assert.equal(fileChooserCounts.get(page), 0);
+    }
     assert.equal((await eventsFor("copied")).length, 0);
     assert.equal((await eventsFor("dismissed")).length, 0);
     assert.equal((await eventsFor("rejected")).length, 0);
@@ -285,14 +352,55 @@ try {
     console.log(`[MemeDrop] ${label}: rendered preview, safe timings, confirmed attachment PASS`);
   }
   {
-    const { page } = await openScenario({ platform: "linkedin", commentLink: true, portal: true, mode: "slow", waitReady: false });
+    const { page } = await openScenario({ platform: "linkedin", editorMode: "preexisting-offscreen" });
+    assert.equal(await page.locator('#owned-editor').evaluate((editor) => editor === document.activeElement), true);
+    assert.equal(await page.evaluate(() => window.scrollY === window.__scrollBeforeMeme), true,
+      "focusing the exact editor does not scroll away from the selected post");
+    await page.close();
+    console.log("[MemeDrop] pre-opened offscreen editor: focused without scrolling PASS");
+  }
+  {
+    const { page, usable } = await openScenario({ platform: "linkedin", editorMode: "ambiguous" });
+    assert.equal(await page.evaluate(() => window.__unrelatedEditorFocus), 0, "never focuses an ambiguous editor");
+    assert.notEqual(await page.locator('#owned-editor').evaluate((editor) => editor === document.activeElement), true);
+    // Select before the mount grace expires: rejecting the binding must also
+    // prevent an early card click from assigning the first arbitrary file input.
+    await usable.first().click();
+    const samples = await until(async () => {
+      const rows = await performanceFor("attachment");
+      return rows.length ? rows : null;
+    }, "ambiguous composer neutral attachment outcome");
+    assert.ok(samples.every((sample) => ["copied", "cancelled"].includes(sample.outcome)));
+    assert.equal(await page.locator('#editor > input').evaluate((input) => input.files.length), 0);
+    assert.equal(await page.locator('#other-input').evaluate((input) => input.files.length), 0);
+    assert.equal((await eventsFor("inserted")).length, 0);
+    await until(async () => (await page.locator('.meme-card[aria-disabled="false"]:visible').count()) === 0,
+      "unbound ambiguous session closes", 6_000);
+    await page.close();
+    console.log("[MemeDrop] ambiguous pre-opened editors: no arbitrary focus or attachment PASS");
+  }
+  {
+    const { page } = await openScenario({ platform: "linkedin", editorMode: "preexisting", request: false });
+    await page.waitForTimeout(400);
+    assert.equal((await fixtureState()).suggestion_calls, 0, "native Comment never starts inference");
+    assert.equal(await page.locator('.meme-card').count(), 0);
+    assert.equal(await page.locator('#owned-editor').evaluate((editor) => editor === document.activeElement), false,
+      "native Comment leaves focus behavior to LinkedIn");
+    await page.close();
+    console.log("[MemeDrop] pre-opened native Comment: no implicit inference or extension focus PASS");
+  }
+  {
+    const { page } = await openScenario({ platform: "linkedin", commentLink: true, portal: true,
+      editorMode: "preexisting-portal", mode: "slow", waitReady: false });
     await until(async () => (await fixtureState()).suggestion_calls === 1, "portal suggestion request");
+    await page.locator('#comment-dialog:modal #memedrop-suggestion-panel').waitFor();
     await page.evaluate(() => document.querySelector('#comment-dialog').close());
     await until(async () => (await fixtureState()).suggestion_pending === 0, "closed portal request completion");
     assert.equal((await eventsFor("shown")).length, 0);
     assert.equal((await eventsFor("inserted")).length, 0);
     assert.equal(await page.locator('body > #memedrop-suggestion-panel').count(), 1, "recovers panel host from closed portal");
     assert.equal(await page.locator('.meme-card[aria-disabled="false"]').count(), 0);
+    assert.equal(await page.locator('#inline-editor').textContent(), 'Existing synthetic draft');
     await page.close();
     console.log("[MemeDrop] closed native dialog: stale result ignored despite unrelated editor PASS");
   }
@@ -390,7 +498,14 @@ try {
     await until(async () => (await fixtureState()).suggestion_calls === 1, "in-flight suggestion request");
     await page.evaluate(() => history.pushState({}, "", "/home"));
     await until(async () => (await fixtureState()).suggestion_pending === 0, "abandoned request completion");
+    const cancelled = await until(async () => {
+      const samples = await performanceFor("request", "cancelled");
+      return samples.length ? samples : null;
+    }, "navigation cancellation measurement");
+    assert.equal(cancelled.length, 1, "one terminal cancellation measurement per abandoned request");
+    cancelled.forEach(assertContentFree);
     assert.equal((await eventsFor("shown")).length, 0);
+    assert.equal((await eventsFor("inserted")).length, 0);
     assert.equal(await page.locator('.meme-card[aria-disabled="false"]').count(), 0);
     await page.close();
     console.log("[MemeDrop] navigation during generation: late result ignored PASS");

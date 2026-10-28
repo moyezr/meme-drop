@@ -1064,15 +1064,23 @@ async function renderMemeWithOverlay(
 
 /** Use only the intended composer; an unrelated input cannot confirm success. */
 function findComposerScope(platform: PlatformAdapter, preferredTarget?: Element | null): Element | null {
+  const hasOwnedComposer = (scope: Element | null): scope is Element => {
+    if (!scope?.isConnected) return false;
+    if (platform.id !== "linkedin") return Boolean(scope.querySelector(platform.selectors.composer));
+    const editors = Array.from(scope.querySelectorAll<HTMLElement>(platform.selectors.composer))
+      .filter((editor) => editor.closest(platform.selectors.composeScope) === scope &&
+        editor.getBoundingClientRect().width > 0 && editor.getBoundingClientRect().height > 0);
+    return editors.length === 1;
+  };
   if (preferredTarget) {
     if (!preferredTarget.isConnected) return null;
     const preferredScope = preferredTarget.closest(platform.selectors.composeScope);
-    return preferredScope?.querySelector(platform.selectors.composer) ? preferredScope : null;
+    return hasOwnedComposer(preferredScope) ? preferredScope : null;
   }
-  const activeScope = document.activeElement?.closest(platform.selectors.composeScope);
-  if (activeScope?.querySelector(platform.selectors.composer)) return activeScope;
+  const activeScope = document.activeElement?.closest(platform.selectors.composeScope) ?? null;
+  if (hasOwnedComposer(activeScope)) return activeScope;
   const scopes = Array.from(document.querySelectorAll<HTMLElement>(platform.selectors.composeScope))
-    .filter((scope) => scope.querySelector(platform.selectors.composer) &&
+    .filter((scope) => hasOwnedComposer(scope) &&
       scope.getBoundingClientRect().width > 0 && scope.getBoundingClientRect().height > 0);
   return scopes.length === 1 ? scopes[0] : null;
 }
@@ -1113,10 +1121,17 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
       const isCurrentScope = () => isCurrent() && scope.isConnected &&
         (!(scope instanceof HTMLDialogElement) || scope.open);
       const before = attachmentImageSnapshot(scope, platform.selectors.attachmentImage);
-      let input = scope.querySelector<HTMLInputElement>(platform.selectors.fileInput);
+      const inputs = Array.from(scope.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput))
+        .filter((candidate) => platform.id !== "linkedin" ||
+          candidate.closest(platform.selectors.composeScope) === scope);
+      let input = (platform.id === "linkedin" ? inputs.length === 1 : inputs.length > 0)
+        ? inputs[0] : null;
       const activator = platform.selectors.fileInputActivator;
-      if (!input && activator) {
-        input = captureComposerFileInput(scope, activator, platform.selectors.fileInput, isCurrentScope);
+      if (!input && inputs.length === 0 && activator) {
+        const control = scope.querySelector(activator);
+        if (control?.closest(platform.selectors.composeScope) === scope) {
+          input = captureComposerFileInput(scope, activator, platform.selectors.fileInput, isCurrentScope);
+        }
       }
       if (!isCurrentScope()) return outcome = "cancelled";
       const transfer = new DataTransfer();

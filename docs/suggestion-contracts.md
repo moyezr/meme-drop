@@ -33,6 +33,9 @@ explains the flow and [QUALITY.md](../QUALITY.md) owns evaluation and promotion 
 - Reserve local fallback time within the overall service deadline and keep client transport margin.
   A caller cancellation must not cancel a shared computation needed by another caller. Browser
   timing/attachment outcomes and late media must respect the active request generation.
+- An explicit LinkedIn Meme action may focus the unique visible editor owned by that post,
+  including an already mounted editor, without replacing draft text or scrolling. Native Comment
+  alone stays native. Ambiguous composers and nested/foreign file inputs cannot authorize insertion.
 - Do not add retrieval infrastructure for anticipated scale. Change retrieval only when benchmark
   recall or measured latency regresses; retain evidence for the change.
 

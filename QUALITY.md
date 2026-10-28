@@ -261,6 +261,10 @@ platform DOM or hosted provider performance. Port 3001 must be unused; the runne
 another project's process and removes its own temporary profile/media. An existing compatible full
 Chromium executable can be selected with `MEMEDROP_CHROMIUM_EXECUTABLE`.
 
+LinkedIn coverage includes pre-opened unfocused editors with existing synthetic draft text, no-scroll
+focus, ambiguity before mount grace expires, and nested/other-post file inputs. A single Meme action
+must keep the correct editor bound; native Comment alone must not request inference or alter focus.
+
 Feedback tests must verify version 2 semantics, random identities, bounded categorical context,
 and concurrent database retry deduplication. Copying, ordinary closure, and attachment failures
 are neutral for ranking. Legacy events remain exportable but are excluded from corrected learning

@@ -4,6 +4,65 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## PR #4 navigation-cancellation CI — 2026-10-28
+
+- Requested outcome: fix the failing cancellation check without weakening tests, push through
+  `moyezr`, restore `moyez-dev`, and keep live QA deferred. Baseline `e93c1f1`, clean task branch
+  `codex/linkedin-editor-focus`; [PR #4](https://github.com/moyezr/meme-drop/pull/4).
+- CI run `40660420654` passed static, backend-image and API integration jobs; browser scenarios
+  passed 20/21 before `abandoned request completion` timed out. The same failure was reproduced
+  locally against the immutable extension artifact. Diagnostic polling changed from HTTP 200 to
+  429 near the final scenario: earlier scenarios consumed the shared loopback status-route quota.
+  The runner interpreted the 429 body as state and hid the actual cause behind a timeout.
+- Bounded fix: reset the fixture-owned memory rate limiter alongside other per-scenario state,
+  retain normal per-scenario limits, and assert successful control responses immediately. No
+  production application or rate-limit changes. Preserve the original 10-second cancellation
+  bound and all existing assertions; also require exactly one content-free cancellation sample
+  and no insertion after the abandoned request completes.
+- Focused regression fails without the reset (429 after scenario reset) and passes with it;
+  it also proves a normal API route still returns 429 when its quota is exhausted. Acceptance:
+  full browser suite and applicable code gates pass locally, then fresh CI passes for the pushed
+  revision. Live signed-in Chrome remains deferred; no reload, publication or production QA.
+- Verification: all 21 real-FastAPI/packaged-extension/Chromium scenarios pass with the strengthened
+  cancellation case. `quality:static` passes (580 API tests, 80 extension tests; 31 environment-bound
+  API tests skipped), along with `quality:api-process`, clean npm/Python `quality:security`, and
+  `git diff --check`. These results cover the fixture/runner changes atop `e93c1f1`; hosted CI must
+  still confirm the pushed revision. The API preview's missing configuration remains separate.
+
+## LinkedIn pre-opened editor focus — 2026-10-26
+
+- Requested outcome: one Meme click must show suggestions for an already visible LinkedIn editor
+  without an extra editor click. Preserve existing draft content, native Comment behavior, exact
+  composer ownership, dialog support and content-free measurements. Publish nothing.
+- Baseline `5dacec8`; this clean managed checkout is on `codex/linkedin-editor-focus`.
+  Bounded change: bind and focus only the unique visible editor owned by the explicitly selected
+  post, including a pre-mounted unfocused editor. Keep dialog priority and reject ambiguous or
+  unrelated editors. No backend, prompt, ranking, schema or telemetry contract change.
+- Acceptance: packaged regression fails before the fix and passes afterward with one Meme click,
+  preserved synthetic draft text, no unrelated focus/input assignment, stable request lifecycle and
+  confirmed native attachment. Existing X/dialog/cancellation cases stay green; verify the same
+  pre-opened editor flow with the production package in signed-in Chrome, remove QA media and do
+  not publish. Existing normal-use baseline must not include these operator checks.
+- Implemented for extension 0.0.5: bind/focus the unique owned pre-mounted editor with
+  `preventScroll`, preserve delayed native-dialog priority and close cancellation, and reject
+  ambiguous composers or nested/foreign file inputs before insertion. Draft text is untouched.
+- Verification on October 27: reproduced the original focus failure against the old build;
+  all 21 packaged-extension/real-FastAPI/Chromium scenarios pass against an immutable development
+  artifact, including preserved synthetic drafts, no-scroll focus, delayed dialogs, exact input
+  ownership and X/navigation cancellation. `quality:static` passes (579 API and 80 extension tests;
+  31 environment-dependent API tests skipped). No tests or gates were weakened.
+- Fresh `release:dry-run` passes, including promotion gates, package validation and clean npm/Python
+  security audits. Production-origin 0.0.5 packaging also passes; the ZIP is ready for the pending
+  reload. The currently installed extension has not been changed by these checks.
+- Production package: 332584 bytes; SHA-256
+  `5f4f2d5f2e526e9d86031badb4fc36c52311b6c4cdff9c70c9bb9e10ffa1fe88`.
+  Independently checked ZIP version 0.0.5, canonical API permission and absence of localhost grants.
+- Live QA is explicitly deferred at the user's request on October 27. No extension reload or live
+  suggestion action was attempted; no production QA samples were added and nothing was published.
+  Code checks are complete. The user authorized committing/pushing the task branch using `moyezr`
+  and restoring `moyez-dev`, while keeping live QA deferred. Next action after that handoff: resume
+  signed-in LinkedIn QA only when requested; do not treat automated checks as live verification.
+
 ## Evaluation production rollout — 2026-10-26
 
 - Requested outcome: migration-first rollout, merge PR #3, deploy API/privacy, reload extension
