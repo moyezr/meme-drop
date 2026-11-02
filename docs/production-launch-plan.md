@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-10-26 (evaluation measurement rollout; other status retains recorded evidence)
+Last updated: 2026-11-02 (LinkedIn editor binding follow-up; other status retains recorded evidence)
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and acceptance evidence here as implementation
@@ -245,7 +245,9 @@ access.
   real reviewer scores/population measurements are still required. Migration `20261023_0012`,
   API/privacy and extension 0.0.4 are rolled out; X/LinkedIn request and native-attachment collection
   verified. A post-QA cutoff starts normal-use observation; initial coverage is zero. LinkedIn's
-  pre-opened inline editor required focus and remains a bounded UX follow-up. See PROGRESS.md.
+  pre-opened inline editor fix is merged for extension 0.0.5 with packaged-browser regression
+  coverage and passing main CI; production reload and live LinkedIn QA remain explicitly deferred.
+  See PROGRESS.md.
 - [ ] Track estimated and reconciled cost per successful generation and per customer.
 - [~] Add dashboards and alerts for elevated errors, provider timeouts, stale trends, Redis or
   PostgreSQL failures, credit-transaction anomalies, storage cleanup lag, and unusual user usage.

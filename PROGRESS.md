@@ -4,6 +4,23 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## LinkedIn fix checkout reconciliation — 2026-11-02
+
+- Requested outcome: commit/push the LinkedIn fix through `moyezr`, then restore `moyez-dev`.
+  Pre-push fetch found that this checkout was behind: PR #4 already merged the fix and browser
+  fixture follow-up into main at `430d259`. The earlier local variant was superseded by that
+  implementation, including exact editor/input ownership and delayed-dialog priority.
+- Synchronized this checkout to the merged extension 0.0.5 implementation, preserving unrelated
+  historical PROGRESS edits and the untracked assessment. No duplicate runtime patch is needed.
+  This follow-up commits only the current handoff and launch-plan status.
+- GitHub reports main CI `40673727242` successful for `430d259`. The prior local 19-scenario
+  result applied to the superseded variant; the merged implementation's 21-scenario evidence is
+  recorded below. All four required CI jobs passed; the optional live-model job was skipped.
+  Reviewed the documentation against the merged source, existing links and 73-line AGENTS.md;
+  working-tree/staged whitespace checks pass. Runtime suites need no rerun for this docs-only delta.
+- Live reload/LinkedIn QA remains explicitly deferred. Next: resume it only when requested;
+  no publication, production configuration, schema, credentials or storage changes are included.
+
 ## PR #4 navigation-cancellation CI — 2026-10-28
 
 - Requested outcome: fix the failing cancellation check without weakening tests, push through
