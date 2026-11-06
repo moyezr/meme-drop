@@ -100,6 +100,10 @@ judgments are provisional until humans review them. Missing scores stay null; ou
 empty/error cases, rendering failures and fallback stages remain visible. This seed supplements
 the unchanged automated benchmark and cannot automatically promote a model, prompt or template.
 
+Dense caption layout must use available lines before shrinking and shrink past an ellipsized
+layout when a smaller complete fit is allowed. Preserve catalog minimum sizes and overflow,
+character and line-limit diagnostics. Inspect synthetic multi-panel samples at attachment size.
+
 When changing ranking, record stage timings and compare results on the same corpus. Relevance,
 diversity, caption quality, fallback availability, and p95 latency are joint constraints; an average
 score improvement does not justify a slow or brittle request path.
@@ -260,6 +264,11 @@ media, and navigation during generation. It does not establish compatibility wit
 platform DOM or hosted provider performance. Port 3001 must be unused; the runner refuses to reuse
 another project's process and removes its own temporary profile/media. An existing compatible full
 Chromium executable can be selected with `MEMEDROP_CHROMIUM_EXECUTABLE`.
+
+Readability coverage on X and LinkedIn includes portrait/landscape dense templates, uncropped
+cards and unobstructed captions, a larger image with selectable caption text, and complete review
+controls at 820×560 and 390×400. Reviewing makes no inference/selection/upload; Escape restores
+keyboard focus, Guide and strip position. Explicit attachment preserves the native draft.
 
 LinkedIn coverage includes pre-opened unfocused editors with existing synthetic draft text, no-scroll
 focus, ambiguity before mount grace expires, and nested/other-post file inputs. A single Meme action

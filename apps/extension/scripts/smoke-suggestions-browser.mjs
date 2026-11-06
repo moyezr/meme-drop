@@ -18,6 +18,22 @@ let backend;
 let context;
 let scenarioId = 100;
 const fileChooserCounts = new WeakMap();
+let sharedCardAppearance;
+
+async function verifySharedCardAppearance(card) {
+  const appearance = await card.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const image = element.querySelector('img');
+    return { radius: style.borderRadius, width: style.width, background: style.backgroundColor,
+      imageFit: getComputedStyle(image).objectFit,
+      badgesBelowImage: [...element.querySelectorAll('.source-badge, .tailored-badge')]
+        .every(badge => badge.getBoundingClientRect().top >= image.getBoundingClientRect().bottom) };
+  });
+  if (!sharedCardAppearance) sharedCardAppearance = appearance;
+  assert.deepEqual(appearance, sharedCardAppearance, "supported platforms share the same card presentation");
+  assert.equal(appearance.imageFit, "contain", "preserves the entire captioned image");
+  assert.equal(appearance.badgesBelowImage, true, "badges cannot cover caption text");
+}
 
 async function until(check, label, timeout = 10_000) {
   const end = Date.now() + timeout;
@@ -210,7 +226,17 @@ async function openScenario({ platform = "x", mode = "success", confirmation = "
   await (request ? action : page.locator("#native-reply")).click();
   const usable = page.locator('.meme-card[aria-disabled="false"]');
   if (waitReady && request) {
-    await usable.first().waitFor({ timeout: 9_000 });
+    try {
+      await usable.first().waitFor({ timeout: 9_000 });
+    } catch (error) {
+      const state = await fixtureState();
+      throw new Error(`${error.message}\n${JSON.stringify({ platform, mode,
+        suggestion_calls: state.suggestion_calls,
+        samples: state.performance_samples.map(sample => ({ kind: sample.kind, outcome: sample.outcome,
+          generation_mode: sample.generation_mode })),
+        unavailable_previews: await page.getByText('Preview unavailable', { exact: true }).count(),
+        empty_panels: await page.locator('.empty').count() })}`);
+    }
     await until(async () => (await eventsFor("shown")).length > 0, "visible rendered impression");
   }
   return { page, usable };
@@ -234,10 +260,14 @@ try {
   });
   let backendError = "";
   backend.stderr.on("data", (chunk) => { backendError = (backendError + chunk).slice(-4000); });
-  await until(async () => {
-    if (backend.exitCode !== null) throw new Error(`Fixture backend exited: ${backendError}`);
-    return fetch(`${api}/_fixture/state`).then((response) => response.ok).catch(() => false);
-  }, "loopback fixture backend");
+  try {
+    await until(async () => {
+      if (backend.exitCode !== null) throw new Error(`Fixture backend exited: ${backendError}`);
+      return fetch(`${api}/_fixture/state`).then((response) => response.ok).catch(() => false);
+    }, "loopback fixture backend");
+  } catch (error) {
+    throw new Error(`${error.message}\n${backendError}`);
+  }
   context = await chromium.launchPersistentContext(path.join(temporary, "profile"), {
     headless: true,
     channel: "chromium",
@@ -256,6 +286,7 @@ try {
     const { platform, label } = scenario;
     const { page, usable } = await openScenario(scenario);
     assert.equal((await fixtureState()).suggestion_calls, 1, `${label} extracts source and requests once`);
+    await verifySharedCardAppearance(usable.first());
     if (scenario.editorMode === "preexisting") {
       assert.equal(await page.locator('#owned-editor').evaluate((editor) => editor === window.__initialEditor), true,
         "native Comment preserves the already mounted editor");
@@ -509,6 +540,54 @@ try {
     assert.equal(await page.locator('.meme-card[aria-disabled="false"]').count(), 0);
     await page.close();
     console.log("[MemeDrop] navigation during generation: late result ignored PASS");
+  }
+  for (const platform of ["x", "linkedin"]) {
+    for (const [name, captions] of [
+      ["Two Buttons", ['Ship without tests', 'Wait for review', 'Friday deployment']],
+      ["Gru's Plan", ['Skip the tests', 'Deploy on Friday', 'Service goes down', 'My weekend is gone']],
+    ]) {
+      const { page, usable } = await openScenario({ platform, mode: "dense" });
+      await verifySharedCardAppearance(usable.first());
+      const editor = page.locator(platform === "x" ? '[data-testid="tweetTextarea_0"]'
+        : '[aria-label="Text editor for creating comment"]');
+      await editor.fill('Existing synthetic draft');
+      await page.getByRole('button', { name: 'Guide', exact: true }).click();
+      const preview = page.getByRole('button', { name: `Preview ${name}`, exact: true });
+      await preview.click();
+      const detail = page.getByRole('region', { name: 'Meme preview', exact: true });
+      await detail.waitFor();
+      assert.deepEqual(await detail.locator('.preview-captions li').allTextContents(), captions);
+      assert.equal(await detail.locator('.preview-captions').evaluate(el => getComputedStyle(el).userSelect), 'text');
+      assert.ok(await detail.locator('img').evaluate(img => img.getBoundingClientRect().width > 300));
+      for (const viewport of [{ width: 820, height: 560 }, { width: 390, height: 400 }]) {
+        await page.setViewportSize(viewport);
+        const bounds = await page.locator('#memedrop-suggestion-panel .panel').evaluate(panel => {
+          const r = panel.getBoundingClientRect();
+          const attach = panel.querySelector('.preview-attach').getBoundingClientRect();
+          return { top: r.top, bottom: r.bottom, left: r.left, right: r.right,
+            attachTop: attach.top, attachBottom: attach.bottom, height: innerHeight, width: innerWidth };
+        });
+        assert.ok(bounds.top >= 0 && bounds.bottom <= bounds.height && bounds.left >= 0 && bounds.right <= bounds.width,
+          'review stays inside short and narrow viewports with Guide previously open');
+        assert.ok(bounds.attachTop >= 0 && bounds.attachBottom <= bounds.height, 'Attach stays in view');
+      }
+      assert.equal((await fixtureState()).suggestion_calls, 1, 'review makes no inference call');
+      assert.equal((await eventsFor('clicked')).length, 0, 'review does not select');
+      assert.equal((await eventsFor('inserted')).length, 0, 'review does not attach');
+      await page.keyboard.press('Escape');
+      await detail.waitFor({ state: 'detached' });
+      assert.equal(await preview.evaluate(el => el === el.getRootNode().activeElement), true, 'Escape restores focus');
+      assert.equal(await page.locator('#memedrop-suggestion-panel').evaluate(host => host.style.bottom), '80px');
+      assert.equal(await page.locator('.steering-control').evaluate(el => el.hidden), false, 'Guide is restored');
+      await preview.click();
+      await detail.getByRole('button', { name: 'Attach meme', exact: true }).click();
+      await until(async () => (await eventsFor('inserted')).length === 1, 'reviewed dense native attachment');
+      assert.equal((await fixtureState()).suggestion_calls, 1);
+      assert.equal(await editor.textContent(), 'Existing synthetic draft');
+      assert.equal(fileChooserCounts.get(page), 0);
+      await page.close();
+      console.log(`[MemeDrop] ${platform} ${name}: complete review, narrow layout, keyboard return and explicit native attachment PASS`);
+    }
   }
   console.log("[MemeDrop] packaged extension / real FastAPI / Chromium fixture smoke passed");
 } finally {

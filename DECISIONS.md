@@ -220,3 +220,20 @@ Status: accepted · Date: 2026-10-23
   synthetic service captures omit production database feedback and trends; label that difference.
 - Reconsider after reviewed human scores, representative beta traffic, measured collection loss,
   or retention/abuse findings. See [workflow](docs/evaluation.md) and [progress](PROGRESS.md).
+
+## D014 — Fit complete captions and share their readable review surface
+
+Status: accepted · Date: 2026-11-05
+
+- Context: dense multi-panel captions were shrunk toward a single-line width, then cropped in
+  square extension cards. Small social-platform previews amplify the problem.
+- Decision: the shared renderer tries the largest complete wrapped fit within catalog font,
+  region and line limits. Truncation is a reason to keep fitting; minimum-size failures remain
+  diagnosed. Do not shorten generated copy or alter catalog typography/eligibility to hide failures.
+- Decision: all extension platforms use uncropped cards with metadata below the image and an
+  optional larger review image with selectable caption text. Reviewing makes no inference/upload;
+  attachment remains explicit and uses the same native ownership/draft guards.
+- Consequence: renderer, browser and ranking gates remain required; no automatic catalog promotion
+  or human-quality approval follows. Adapter-owned native output limits remain separate. The shared
+  review surface must fit short viewports, retain keyboard return and survive stale-session
+  cancellation. This renderer/UI change does not enable additional social platforms.

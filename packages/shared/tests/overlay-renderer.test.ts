@@ -80,6 +80,30 @@ test("renderer flags an unrenderable glyph that cannot fit at its minimum font s
   assert.equal(diagnostics.overflowed, true);
 });
 
+test("dense captions use their available lines before shrinking toward one line", () => {
+  const ctx = new TestCanvasContext() as unknown as CanvasRenderingContext2D;
+  const layout = measureMemeTextRegion(ctx, 400, 400, region({
+    text: "BUY RAM NOW", width: 0.4, height: 0.24, padding_ratio: 0,
+    font: { min_size: 12, max_size: 36 },
+  }));
+  assert.deepEqual(layout.lines, ["BUY RAM", "NOW"]);
+  assert.equal(layout.fontSize, 36);
+  assert.equal(layout.truncated, false);
+  assert.equal(layout.overflowed, false);
+});
+
+test("line-limit truncation causes a smaller complete fit when the catalog permits it", () => {
+  const ctx = new TestCanvasContext() as unknown as CanvasRenderingContext2D;
+  const layout = measureMemeTextRegion(ctx, 400, 400, region({
+    text: "ONE TWO THREE FOUR", width: 0.4, height: 0.4, padding_ratio: 0,
+    font: { min_size: 12, max_size: 40 },
+  }));
+  assert.ok(layout.fontSize >= 26 && layout.fontSize < 40);
+  assert.equal(layout.lines.join(" "), "ONE TWO THREE FOUR");
+  assert.equal(layout.truncated, false);
+  assert.equal(layout.overflowed, false);
+});
+
 test("overlay drawing returns aggregate diagnostics and paints transformed copy", () => {
   const canvas = new TestCanvasContext();
   const diagnostics = drawMemeTextOverlay(
