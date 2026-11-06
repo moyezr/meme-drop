@@ -4,6 +4,38 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## Readability production release — 2026-11-06
+
+- Requested outcome: ship wrapped caption fitting, uncropped cards and larger readable review;
+  use `moyezr` for GitHub writes and restore `moyez-dev`; publish nothing on social platforms.
+  Baseline `07094cd`; release checkout `codex/readability-release` excludes unfinished Reddit work.
+- Acceptance: preserve catalog fonts/regions/limits and existing eligibility; review keeps all
+  captions visible at short/narrow viewports, restores keyboard focus and makes no inference or
+  upload; explicit native attachment and preserved drafts stay intact. Fresh local/CI/release
+  gates and exact production 0.0.6 reload/live draft verification are required before completion.
+- Ported only the renderer/panel changes and dense synthetic fixtures from the existing local
+  implementation. Extension package/manifest/lock advance together to 0.0.6. Baseline renderer
+  suite: 16 passed; updated suite: 18 passed. No new platform/API contract or migration is included.
+- All 25 packaged Chromium/FastAPI scenarios pass, including four portrait/landscape review cases
+  on X/LinkedIn with unobstructed images, selectable complete captions, Guide previously open,
+  820×560 and 390×400 viewports, keyboard return and explicit native attachment preserving drafts.
+  Initial browser startup and slow-fixture readiness attempts failed; added bounded categorical
+  diagnostics, then focused and complete runs passed with unchanged deadlines/assertions.
+- Fresh `quality:deployment-readiness` passes: workspace typecheck/tests/lint/build/catalog audit,
+  580 API tests, 31 separate PostgreSQL/Redis integration tests, 80 extension and 18 shared tests,
+  143 API process checks, backend image build/smoke and clean npm/Python audits. Default API test
+  pass includes 31 environment-bound skips; the integration run exercises them separately.
+  Recommendation gates retain zero case regressions/new rejects; 5k warm p95 is 14.582ms.
+  Production-origin `release:dry-run` passes. Catalog limits/gates remain unchanged.
+- Backup `20261106T142942Z`: 102 objects, 19 tables, schema `20261023_0012`; restored/verified in
+  the task-owned database on 55438, archived with the existing Keychain/AES workflow and plaintext
+  removed. The initially cached pg15 image contained unrelated initialization scripts and failed;
+  replaced only this task's disposable container with the official pg17 image. No shared service
+  or production configuration/data changed. Redis tests use isolated loopback port 56389.
+- Next: require fresh PR CI, merge using `moyezr` and restore `moyez-dev`, package committed source
+  for the canonical API, reload the exact artifact, then verify live readable review/attachment
+  and cleanup without publication. Existing 0.0.5 remains installed until that final step.
+
 ## LinkedIn fix checkout reconciliation — 2026-11-02
 
 - Requested outcome: commit/push the LinkedIn fix through `moyezr`, then restore `moyez-dev`.

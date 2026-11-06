@@ -309,9 +309,11 @@ export const PANEL_STYLES = `
   .meme-strip::-webkit-scrollbar { height: 4px; }
   .meme-strip::-webkit-scrollbar-track { background: transparent; }
   .meme-strip::-webkit-scrollbar-thumb { background: #3d444d; border-radius: 999px; }
+  .meme-strip[hidden] { display: none; }
+  .meme-option { flex: 0 0 160px; }
   .meme-card {
     flex-shrink: 0;
-    width: 116px;
+    width: 160px;
     padding: 0;
     overflow: hidden;
     position: relative;
@@ -335,16 +337,15 @@ export const PANEL_STYLES = `
     border-color: #8b949e;
   }
   .meme-card img {
-    width: 116px;
-    height: 116px;
-    object-fit: cover;
+    width: 158px;
+    height: 160px;
+    object-fit: contain;
     display: block;
     background: #21262d;
   }
   .source-badge {
-    position: absolute;
-    top: 6px;
-    left: 6px;
+    display: inline-block;
+    margin: 6px 0 0 8px;
     padding: 3px 5px;
     border: 1px solid rgba(240, 246, 252, 0.12);
     border-radius: 999px;
@@ -357,9 +358,8 @@ export const PANEL_STYLES = `
     backdrop-filter: blur(6px);
   }
   .tailored-badge {
-    position: absolute;
-    top: 6px;
-    right: 6px;
+    display: inline-block;
+    margin: 6px 0 0 4px;
     padding: 3px 5px;
     border-radius: 999px;
     background: rgba(240, 246, 252, 0.9);
@@ -385,6 +385,35 @@ export const PANEL_STYLES = `
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .preview-btn, .preview-back, .preview-attach {
+    border: 1px solid #3d444d;
+    border-radius: 8px;
+    background: #21262d;
+    color: #f1f3f4;
+    padding: 7px 10px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .preview-btn { width: 100%; margin-top: 6px; }
+  .preview-btn:disabled { opacity: 0.5; cursor: default; }
+  .panel.is-previewing { display: flex; flex-direction: column; max-height: calc(100vh - 48px); cursor: default; }
+  .is-previewing .header { flex-shrink: 0; }
+  .is-previewing .steering-control, .is-previewing .steering-btn { display: none; }
+  .expanded-preview {
+    display: flex; flex-direction: column; flex: 1; min-height: 0;
+    width: min(480px, calc(100vw - 76px));
+  }
+  .preview-back { align-self: flex-start; flex-shrink: 0; }
+  .preview-heading { margin: 10px 0; font-size: 14px; font-weight: 500; }
+  .preview-content { flex: 1; min-height: 0; overflow-y: auto; }
+  .preview-image { display: block; width: 100%; height: auto; max-height: 45vh; object-fit: contain; }
+  .preview-captions { margin: 12px 0; padding-left: 24px; font-size: 14px; line-height: 1.5; user-select: text; }
+  .preview-captions li { padding: 3px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .preview-attach { width: 100%; margin-top: 10px; flex-shrink: 0; }
+  .preview-attach:focus-visible, .preview-back:focus-visible, .preview-btn:focus-visible {
+    outline: 2px solid #f1f3f4; outline-offset: 2px;
   }
   .card-overlay {
     position: absolute;
@@ -719,6 +748,18 @@ function renderSuggestions(suggestions: Suggestion[]) {
       card.setAttribute("role", "button");
       card.setAttribute("aria-disabled", "true");
       card.setAttribute("aria-label", `Use ${s.name || "meme"}`);
+      const option = document.createElement("div");
+      option.className = "meme-option";
+      const previewButton = document.createElement("button");
+      previewButton.type = "button";
+      previewButton.className = "preview-btn";
+      previewButton.disabled = true;
+      previewButton.textContent = "Read captions";
+      previewButton.setAttribute("aria-label", `Preview ${s.name || "meme"}`);
+      previewButton.addEventListener("click", () => {
+        if (img.dataset.usable !== "true" || !isCurrentSuggestion(s, generation)) return;
+        showExpandedPreview(panel, strip, s, img, previewButton, generation, () => card.click());
+      });
 
       const img = document.createElement("img");
       img.src = s.tailored_overlay?.enabled && !s.tailored_image_data_url ? IMAGE_PLACEHOLDER : getBestImageSrc(s);
@@ -815,7 +856,8 @@ function renderSuggestions(suggestions: Suggestion[]) {
         }
       });
 
-      strip.appendChild(card);
+      option.append(card, previewButton);
+      strip.appendChild(option);
     }
 
     panel.appendChild(header);
@@ -831,11 +873,80 @@ function renderSuggestions(suggestions: Suggestion[]) {
   shadowRoot.appendChild(panel);
 }
 
+/** One readable review surface for every platform; reviewing never attaches. */
+function showExpandedPreview(
+  panel: HTMLElement, strip: HTMLElement, suggestion: Suggestion, image: HTMLImageElement,
+  trigger: HTMLButtonElement, generation: number, attach: () => void
+) {
+  panel.querySelector(".expanded-preview")?.remove();
+  const host = panelHost!;
+  const previousPosition = {
+    top: host.style.top, right: host.style.right, bottom: host.style.bottom, left: host.style.left,
+  };
+  // Review can be much taller than the strip. Anchor it inside the viewport,
+  // then restore the user's strip position when they return.
+  Object.assign(host.style, { top: "auto", left: "auto", right: "24px", bottom: "24px" });
+  const preview = document.createElement("section");
+  preview.className = "expanded-preview";
+  preview.setAttribute("aria-label", "Meme preview");
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "preview-back";
+  back.textContent = "Back to suggestions";
+  const heading = document.createElement("h2");
+  heading.className = "preview-heading";
+  heading.textContent = suggestion.name;
+  const content = document.createElement("div");
+  content.className = "preview-content";
+  const fullImage = document.createElement("img");
+  fullImage.className = "preview-image";
+  fullImage.src = image.currentSrc || image.src;
+  fullImage.alt = suggestion.name;
+  content.appendChild(fullImage);
+  const captions = document.createElement("ol");
+  captions.className = "preview-captions";
+  for (const region of suggestion.tailored_overlay?.regions || []) {
+    const item = document.createElement("li");
+    item.textContent = region.text;
+    captions.appendChild(item);
+  }
+  if (captions.children.length) content.appendChild(captions);
+  const use = document.createElement("button");
+  use.type = "button";
+  use.className = "preview-attach";
+  use.textContent = "Attach meme";
+  use.addEventListener("click", () => {
+    if (isCurrentSuggestion(suggestion, generation)) attach();
+  });
+  const close = () => {
+    preview.remove();
+    panel.classList.remove("is-previewing");
+    strip.hidden = false;
+    if (isCurrentSuggestion(suggestion, generation)) {
+      Object.assign(host.style, previousPosition);
+      trigger.focus({ preventScroll: true });
+    }
+  };
+  back.addEventListener("click", close);
+  preview.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  });
+  strip.hidden = true;
+  panel.classList.add("is-previewing");
+  preview.append(back, heading, content, use);
+  panel.appendChild(preview);
+  back.focus({ preventScroll: true });
+}
+
 function setupDrag(panel: HTMLElement) {
   panel.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
     // Interactive controls must keep their native click, selection, and focus behavior.
-    if (target.closest(".meme-card, button, input, form")) return;
+    if (panel.classList.contains("is-previewing") ||
+        target.closest(".meme-card, .expanded-preview, button, input, form")) return;
 
     isDragging = true;
     panel.classList.add("dragging");
@@ -1010,6 +1121,8 @@ async function showUsablePreview(suggestion: Suggestion, img: HTMLImageElement, 
     const card = img.closest<HTMLElement>(".meme-card");
     if (!card) return;
     card.setAttribute("aria-disabled", "false");
+    const previewButton = card.parentElement?.querySelector<HTMLButtonElement>(".preview-btn");
+    if (previewButton) previewButton.disabled = false;
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting || entry.intersectionRatio < 0.5 || document.visibilityState !== "visible" || !isPanelVisible()) continue;
