@@ -244,10 +244,10 @@ Status: accepted design requirement; experimental local implementation · Date: 
 
 ## D014 — Fit complete captions and share their readable review surface
 
-Status: accepted local implementation; release review pending · Date: 2026-11-05
+Status: accepted · Date: 2026-11-05
 
 - Context: dense multi-panel captions were shrunk toward a single-line width, then cropped in
-  square extension cards. Reddit's documented 240px output bound amplifies the problem.
+  square extension cards. Small social-platform previews amplify the problem.
 - Decision: the shared renderer tries the largest complete wrapped fit within catalog font,
   region and line limits. Truncation is a reason to keep fitting; minimum-size failures remain
   diagnosed. Do not shorten generated copy or alter catalog typography/eligibility to hide failures.

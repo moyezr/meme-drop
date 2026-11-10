@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-11-06 (LinkedIn live verification; Reddit track retains recorded evidence)
+Last updated: 2026-11-11 (combined PR integration; historical evidence remains dated)
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and acceptance evidence here as implementation
@@ -306,6 +306,16 @@ documented flow.
 
 Done when: the hosted policy matches deployed behavior and providers, operational requests have an
 owner and procedure, and the release gate contains no placeholder privacy values.
+
+## Extension readability release
+
+- [x] Fit complete wrapped captions within unchanged catalog typography/region limits.
+- [x] Implement uncropped cards and a larger review with selectable captions through the common UI.
+- [x] Verify review/keyboard/draft behavior for portrait and landscape templates on X/LinkedIn,
+  including short and narrow viewports; keep existing recommendation and promotion gates.
+- [~] The isolated readability candidate was 0.0.6; the combined source candidate is 0.0.7.
+  Verify an explicitly selected production package in live native drafts before distribution.
+  The installed extension remains 0.0.5. See [PROGRESS.md](../PROGRESS.md) for dated evidence.
 
 ## Parallel quality track — Expand the verified template catalog
 

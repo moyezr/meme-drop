@@ -266,9 +266,10 @@ platform DOM or hosted provider performance. Port 3001 must be unused; the runne
 another project's process and removes its own temporary profile/media. An existing compatible full
 Chromium executable can be selected with `MEMEDROP_CHROMIUM_EXECUTABLE`.
 
-Shared readability cases on X, LinkedIn and Reddit verify uncropped image containment, complete
-selectable caption text, a larger preview, keyboard return, short-window layout with Guide open,
-no generation/selection from review alone, and explicit attachment with native draft preservation.
+Readability coverage on X, LinkedIn and Reddit includes portrait/landscape dense templates, uncropped
+cards and unobstructed captions, a larger image with selectable caption text, and complete review
+controls at 820×560 and 390×400. Reviewing makes no inference/selection/upload; Escape restores
+keyboard focus, Guide and strip position. Explicit attachment preserves the native draft.
 
 LinkedIn coverage includes pre-opened unfocused editors with existing synthetic draft text, no-scroll
 focus, ambiguity before mount grace expires, and nested/other-post file inputs. A single Meme action

@@ -71,8 +71,11 @@ explains the flow and [QUALITY.md](../QUALITY.md) owns evaluation and promotion 
 - Keep typography and placement catalog-owned and render them through `packages/shared`.
   Bundled fonts must not add a request-time CDN dependency.
 - Fit complete wrapped captions at the largest allowed catalog size before shrinking. Preserve
-  minimum fonts, region/line/character bounds and failure diagnostics; never hide overflow by
-  reducing the reviewed minimum or dropping words. Respect native output-size bounds separately.
+  minimum fonts, region/line/character bounds and failure diagnostics. Never hide overflow by
+  reducing reviewed minimum sizes or dropping words. Respect native output-size bounds separately.
+- Captioned cards stay uncropped and badges do not cover their text. The shared readable preview
+  exposes complete selectable captions and a larger image; review makes no inference or upload.
+  Attachment remains explicit and keeps the existing composer/session ownership guards.
 - Any render-input change must invalidate visual QA; machine annotations cannot supply human
   sign-off. Workbench approval alone does not promote a template into the serving catalog.
 - Ranking, caption, annotation, and feedback changes require focused tests and the benchmark,

@@ -4,6 +4,50 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## Merge all open PRs — 2026-11-11
+
+- Requested outcome: integrate all open PRs into main, using `moyezr` for GitHub changes and
+  restoring `moyez-dev`; publish nothing on social. Baseline main `07094cd`, PR #5 `eb64d0d`,
+  PR #6 `e1f4fa2`. PR #1's head `5aca04f` is already an ancestor of main, with no unique commits.
+- Bounded scope: reconcile #5 into #6, preserving the stronger portrait/landscape/narrow review
+  assertions plus Reddit context/attachment coverage and coordinated extension version 0.0.7.
+  Preserve historical notes and the installed production 0.0.5 directory via an isolated checkout.
+- Acceptance: full fresh combined local gates and packaged browser cases; fresh restored/encrypted
+  production backup, migration-first compatible schema, normal GitHub merges without fabricated
+  statuses/protection changes, all open PRs resolved, main/source identity and account restored.
+- GitHub jobs remain unable to start because of the owner's billing lock. The user explicitly
+  requested all merges after this was reported. Use normal merge controls with transparent local
+  evidence; if GitHub enforces a block, report it without administrative bypass.
+- Conflict resolution keeps #5's unobstructed badge/contain assertions and complete selectable
+  portrait/landscape review at 820×560 and 390×400, extending both cases to Reddit with the same
+  native-draft/no-submit/240px bounds. No benchmark, assertion or deadline is relaxed.
+- Fresh focused baseline: 12 reply-context API tests pass. Combined `quality:deployment-readiness`
+  passes: 593 API tests, 85 extension tests, 18 renderer tests, workspace static/build/catalog,
+  143 API process checks, 32 separate PostgreSQL/Redis integration cases, backend image smoke and
+  clean locked npm/Python audits. Default 32 environment-bound skips are exercised separately.
+  Ranking: zero regressions/new rejects, 5k warm p95 14.506ms; existing 25 catalog warnings remain.
+- All 53 packaged real-FastAPI/Chromium scenarios pass, including six dense review cases at both
+  short/narrow sizes, native draft preservation and no submit. Checked 129 local documentation
+  paths, 73-line AGENTS.md and whitespace. No provider calls or social publication were needed.
+- Fresh production backup `20261110T190727Z` (UTC): 103 objects, 19 tables, schema 0012; restored
+  on task-owned loopback PostgreSQL 55440, verified, encrypted with the existing Keychain/AES
+  workflow, plaintext removed. Production configuration validates with zero warnings.
+- Applied exact Alembic 0012→0013 generated SQL in one session-pooler transaction, with explicit
+  local 5s lock/30s statement bounds and expected-version guard. Independent readback confirms
+  schema `20261104_0013`, x/linkedin/reddit constraint and unchanged measurement row count.
+  No storage, credentials, catalog eligibility, production data rows or provider settings changed.
+- PR #1 was closed as redundant using `moyezr`: GitHub rejects retargeting it to main because
+  there are no new commits between its head and main. Its head is already fully included in main;
+  no old API implementation was reapplied. Restored and verified `moyez-dev` afterward.
+- Production-origin `release:dry-run` passes. Validation-only 0.0.7 ZIP: 336955 bytes,
+  SHA-256 `b0c51995ae954f47c83c03e3b53350f2580724bd6d8bfb0ffa1c247b1819926e`, 29 files;
+  X/Twitter/LinkedIn/Reddit/canonical API hosts only. It is not installed or distributed.
+  Canonical API `/live` and `/health` return 200 after migration, before the Git merges.
+- Next: push this reconciled merge to PR #6, merge #5 and #6 through normal GitHub controls,
+  verify main includes their heads and hosted rollout status, restore account and remove only
+  task-owned local test services. GitHub CI billing remains a separately reported limitation.
+
+
 ## Push all pending product work — 2026-11-11
 
 - Requested outcome: push all remaining product source and documentation to GitHub, using
@@ -351,6 +395,37 @@ This is the current session handoff. Replace stale state; git retains history. T
   adapters own native integration. Updated the plan/backlog and recorded design requirement D013.
   Added acceptance for context/cache/fallback separation, huge-thread fixtures and shared UI
   verification. Documentation links/anchors and whitespace checks pass; runtime remains unchanged.
+## Readability production release — 2026-11-06
+
+- Requested outcome: ship wrapped caption fitting, uncropped cards and larger readable review;
+  use `moyezr` for GitHub writes and restore `moyez-dev`; publish nothing on social platforms.
+  Baseline `07094cd`; release checkout `codex/readability-release` excludes unfinished Reddit work.
+- Acceptance: preserve catalog fonts/regions/limits and existing eligibility; review keeps all
+  captions visible at short/narrow viewports, restores keyboard focus and makes no inference or
+  upload; explicit native attachment and preserved drafts stay intact. Fresh local/CI/release
+  gates and exact production 0.0.6 reload/live draft verification are required before completion.
+- Ported only the renderer/panel changes and dense synthetic fixtures from the existing local
+  implementation. Extension package/manifest/lock advance together to 0.0.6. Baseline renderer
+  suite: 16 passed; updated suite: 18 passed. No new platform/API contract or migration is included.
+- All 25 packaged Chromium/FastAPI scenarios pass, including four portrait/landscape review cases
+  on X/LinkedIn with unobstructed images, selectable complete captions, Guide previously open,
+  820×560 and 390×400 viewports, keyboard return and explicit native attachment preserving drafts.
+  Initial browser startup and slow-fixture readiness attempts failed; added bounded categorical
+  diagnostics, then focused and complete runs passed with unchanged deadlines/assertions.
+- Fresh `quality:deployment-readiness` passes: workspace typecheck/tests/lint/build/catalog audit,
+  580 API tests, 31 separate PostgreSQL/Redis integration tests, 80 extension and 18 shared tests,
+  143 API process checks, backend image build/smoke and clean npm/Python audits. Default API test
+  pass includes 31 environment-bound skips; the integration run exercises them separately.
+  Recommendation gates retain zero case regressions/new rejects; 5k warm p95 is 14.582ms.
+  Production-origin `release:dry-run` passes. Catalog limits/gates remain unchanged.
+- Backup `20261106T142942Z`: 102 objects, 19 tables, schema `20261023_0012`; restored/verified in
+  the task-owned database on 55438, archived with the existing Keychain/AES workflow and plaintext
+  removed. The initially cached pg15 image contained unrelated initialization scripts and failed;
+  replaced only this task's disposable container with the official pg17 image. No shared service
+  or production configuration/data changed. Redis tests use isolated loopback port 56389.
+- Next: require fresh PR CI, merge using `moyezr` and restore `moyez-dev`, package committed source
+  for the canonical API, reload the exact artifact, then verify live readable review/attachment
+  and cleanup without publication. Existing 0.0.5 remains installed until that final step.
 
 ## LinkedIn fix checkout reconciliation — 2026-11-02
 
