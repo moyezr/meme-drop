@@ -69,13 +69,17 @@ class FixtureStore(FakeStore):
     async def list_global_memes(self) -> list[dict[str, Any]]:
         if fixture_mode == "error":
             raise TimeoutError("Fixture catalog unavailable")
-        return await super().list_global_memes()
+        rows = await super().list_global_memes()
+        return rows if fixture_mode == "dense" else rows[:2]
 
 
 store = FixtureStore()
-for index, template_id in enumerate(("surprised-pikachu", "this-is-fine"), start=1):
+for index, template_id in enumerate(
+    ("surprised-pikachu", "this-is-fine", "two-buttons", "gru-s-plan"), start=1
+):
     template = next(item for item in catalog.verified_templates if item.template_id == template_id)
-    image = Image.new("RGB", (480, 480), (246, 210, 96))
+    dimensions = (600, 908) if index == 3 else (700, 449) if index == 4 else (480, 480)
+    image = Image.new("RGB", dimensions, (246, 210, 96))
     ImageDraw.Draw(image).rectangle((40, 120, 440, 320), fill=(98, 130, 180))
     image.save(root / f"fixture-{index}.png")
     store.memes.append(
@@ -104,6 +108,26 @@ class FixtureGateway:
     ) -> JointSuggestionResult:
         if fixture_mode == "slow":
             await asyncio.sleep(20)
+        if fixture_mode == "dense":
+            return JointSuggestionResult(
+                selections=[
+                    TemplateSelection("two-buttons", "review or rush", 0.96),
+                    TemplateSelection("gru-s-plan", "the plan backfires", 0.9),
+                ][:limit],
+                captions={
+                    "two-buttons": {
+                        "left_button": "Ship without tests",
+                        "right_button": "Wait for review",
+                        "person": "Friday deployment",
+                    },
+                    "gru-s-plan": {
+                        "step_1": "Skip the tests",
+                        "step_2": "Deploy on Friday",
+                        "step_3": "Service goes down",
+                        "realization": "My weekend is gone",
+                    },
+                },
+            )
         return JointSuggestionResult(
             selections=[
                 TemplateSelection("surprised-pikachu", "predictable result", 0.96),
@@ -177,7 +201,7 @@ async def count_requests(request: Request, call_next):  # type: ignore[no-untype
 
 @app.post("/_fixture/reset")
 async def reset(
-    mode: Literal["success", "slow", "error", "broken_media"] = "success",
+    mode: Literal["success", "slow", "error", "broken_media", "dense"] = "success",
 ) -> dict[str, bool]:
     global fixture_mode, suggestion_calls, fixture_revision
     fixture_mode = mode
