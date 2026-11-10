@@ -21,6 +21,28 @@ This is the current session handoff. Replace stale state; git retains history. T
   initially pending source/documentation files for inclusion and credential patterns; no private
   or generated artifacts are selected. Full checks will use an isolated checkout so the installed
   unpacked production extension directory is not overwritten by development builds.
+- Complete source snapshot `699588a` includes all 55 pending product files (the original 53 plus
+  coordinated package/lock version updates). New source/tests, migration, privacy updates,
+  assessment/Reddit plan and historical handoff notes are included. Readability PR #5 remains
+  independent; this combined candidate is not a production rollout.
+- Fresh verification of `699588a` in the isolated `all-pending-verification` checkout passes:
+  `quality:deployment-readiness` (593 API tests, 85 extension tests, 18 renderer tests, all
+  workspace static/build/catalog checks, 143 process checks, 32 separate PostgreSQL/Redis
+  integration tests, backend image smoke and clean npm/Python audits), all 50 packaged browser
+  scenarios, and `release:dry-run`. Default tests skip 32 environment-bound cases; the separate
+  integration run exercises them. Recommendation gates retain zero regressions/new rejects,
+  with 5k warm p95 16.018ms. Catalog warnings remain the existing 25; no gates were weakened.
+- The initial readiness run missed the unchanged eight-second process-startup bound; a complete
+  rerun passed with identical source/deadlines. Tests used disposable loopback PostgreSQL/Redis
+  on 55439/56390; task-owned containers/volumes and browser fixture profiles/media were removed.
+  Verified 91 local documentation paths, the 73-line AGENTS.md and `git diff --check`.
+- GitHub handoff branch: `codex/all-pending-product-work`. Use verified `moyezr` for remote writes
+  with guaranteed restoration of `moyez-dev`; confirm remote HEAD matches before finishing.
+  The installed unpacked directory remains production 0.0.5. No production migration/configuration,
+  browser reload, social publication or third-party access/distribution change was performed.
+- Next release gates remain CI availability, migration-first compatible backend/privacy rollout,
+  permitted Reddit access/distribution, real human review and a bounded pilot. Pushing source does
+  not establish those external approvals or hosted readiness.
 
 ## Readability release preparation — 2026-11-06
 
