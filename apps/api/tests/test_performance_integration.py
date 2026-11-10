@@ -259,3 +259,56 @@ async def test_additive_migration_preserves_existing_data_and_rejects_data_loss(
     finally:
         async with database.engine.begin() as connection:
             await connection.exec_driver_sql(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")
+
+
+def _exercise_reddit_migration(connection: Connection, schema: str) -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    quoted_schema = connection.dialect.identifier_preparer.quote(schema)
+    connection.exec_driver_sql(f"CREATE SCHEMA {quoted_schema}")
+    connection.exec_driver_sql(f"SET LOCAL search_path TO {quoted_schema}")
+    original = importlib.import_module("migrations.versions.20261023_0012_suggestion_performance")
+    migration = importlib.import_module("migrations.versions.20261104_0013_reddit_performance")
+    insert = text(
+        "INSERT INTO suggestion_performance_samples "
+        "(id, kind, platform, extension_version, outcome, elapsed_ms) "
+        "VALUES (:id, 'request', :platform, '1.0.0', 'empty', 10)"
+    )
+    with Operations.context(MigrationContext.configure(connection)):
+        original.upgrade()
+        for platform in ("x", "linkedin"):
+            connection.execute(insert, {"id": uuid4(), "platform": platform})
+        with pytest.raises(IntegrityError), connection.begin_nested():
+            connection.execute(insert, {"id": uuid4(), "platform": "reddit"})
+        migration.upgrade()
+        reddit_id = uuid4()
+        connection.execute(insert, {"id": reddit_id, "platform": "reddit"})
+        with pytest.raises(RuntimeError, match="Reddit performance samples exist"):
+            migration.downgrade()
+        assert connection.exec_driver_sql(
+            "SELECT platform FROM suggestion_performance_samples ORDER BY platform"
+        ).scalars().all() == ["linkedin", "reddit", "x"]
+        connection.execute(
+            text("DELETE FROM suggestion_performance_samples WHERE id = :id"), {"id": reddit_id}
+        )
+        migration.downgrade()
+        with pytest.raises(IntegrityError), connection.begin_nested():
+            connection.execute(insert, {"id": uuid4(), "platform": "reddit"})
+        assert connection.exec_driver_sql(
+            "SELECT platform FROM suggestion_performance_samples ORDER BY platform"
+        ).scalars().all() == ["linkedin", "x"]
+        migration.upgrade()
+        connection.execute(insert, {"id": uuid4(), "platform": "reddit"})
+
+
+async def test_reddit_migration_preserves_platforms_and_blocks_lossy_downgrade(
+    database: Database,
+) -> None:
+    schema = f"test_reddit_migration_{uuid4().hex}"
+    quoted_schema = database.engine.dialect.identifier_preparer.quote(schema)
+    try:
+        async with database.engine.begin() as connection:
+            await connection.run_sync(_exercise_reddit_migration, schema)
+    finally:
+        async with database.engine.begin() as connection:
+            await connection.exec_driver_sql(f"DROP SCHEMA IF EXISTS {quoted_schema} CASCADE")

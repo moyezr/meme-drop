@@ -9,6 +9,7 @@
     "https://x.com/*": "Runs the content script on X so users can insert selected meme replies.",
     "https://twitter.com/*": "Runs the content script on Twitter/X so users can insert selected meme replies.",
     "https://www.linkedin.com/*": "Runs the content script on LinkedIn so users can insert selected meme comments.",
+    "https://www.reddit.com/*": "Runs the shared content workflow for experimental, user-triggered Reddit meme replies on supported desktop detail pages.",
     "api_host": "Sends selected source-post context and meme actions to the MemeDrop backend for suggestions, captions, saved library, feedback quality signals, and deletion/export requests."
   },
   "data_disclosures": {

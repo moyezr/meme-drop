@@ -1,6 +1,6 @@
 import type { SuggestionPerformanceSnapshot } from "./suggestion-performance";
 
-type Platform = "x" | "linkedin";
+type Platform = "x" | "linkedin" | "reddit";
 type RequestOutcome = "usable" | "empty" | "failed" | "timeout" | "cancelled";
 interface SampleBase {
   event_id: string;
@@ -38,7 +38,7 @@ export function projectPerformanceSample(value: unknown, version?: string): Perf
   const input = value as Record<string, unknown>;
   const extensionVersion = version ?? input.extension_version;
   if (typeof input.event_id !== "string" || !UUID4.test(input.event_id) ||
-      !oneOf(input.platform, ["x", "linkedin"]) ||
+      !oneOf(input.platform, ["x", "linkedin", "reddit"]) ||
       typeof extensionVersion !== "string" || !VERSION.test(extensionVersion) ||
       !duration(input.elapsed_ms)) return null;
   const base: SampleBase = {

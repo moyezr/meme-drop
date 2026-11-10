@@ -1,3 +1,5 @@
+import type { ReplyContext } from "@memedrop/shared";
+
 export type SuggestionMessageIdentity = {
   cache_key?: string;
   request_id?: string;
@@ -42,8 +44,17 @@ async function sha256(value: string): Promise<string> {
 export async function buildSuggestionCacheKey(
   tweetText: string,
   canonicalTweetId?: string | null,
-  steeringInstruction?: string
+  steeringInstruction?: string,
+  replyContext?: ReplyContext
 ): Promise<string> {
+  if (replyContext) {
+    // Target identity alone cannot distinguish edited comments or a changed root post.
+    return `reply:sha256:${await sha256(JSON.stringify([
+      canonicalTweetId ?? null, tweetText, replyContext.platform, replyContext.target_kind,
+      replyContext.post_title, replyContext.post_body, replyContext.truncated,
+      normalizeSteeringInstruction(steeringInstruction) ?? null,
+    ]))}`;
+  }
   const baseKey = canonicalTweetId
     ? `tweet:${canonicalTweetId}`
     : `text:sha256:${await sha256(tweetText.trim().replace(/\s+/g, " ").toLowerCase())}`;

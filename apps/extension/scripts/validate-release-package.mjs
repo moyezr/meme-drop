@@ -58,12 +58,14 @@ for (const iconPath of ["icons/icon16.png", "icons/icon48.png", "icons/icon128.p
   }
 }
 
-for (const host of [
+const requiredHosts = [
   "https://x.com/*",
   "https://twitter.com/*",
   "https://www.linkedin.com/*",
+  "https://www.reddit.com/*",
   expectedApiPermission,
-]) {
+];
+for (const host of requiredHosts) {
   if (!hostPermissions.includes(host)) {
     fail(`Release package manifest is missing host permission: ${host}`);
   }
@@ -74,6 +76,10 @@ const localHosts = hostPermissions.filter((permission) =>
 );
 if (localHosts.length > 0) {
   fail(`Release package manifest contains local host permissions: ${localHosts.join(", ")}`);
+}
+const unexpectedHosts = hostPermissions.filter((host) => !requiredHosts.includes(host));
+if (unexpectedHosts.length) {
+  fail(`Release package manifest contains unexpected host permissions: ${unexpectedHosts.join(", ")}`);
 }
 
 const unexpectedPermissions = permissions.filter((permission) => permission !== "storage");

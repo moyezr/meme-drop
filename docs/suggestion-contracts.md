@@ -17,7 +17,7 @@ explains the flow and [QUALITY.md](../QUALITY.md) owns evaluation and promotion 
   visible rendered preview; `inserted` requires native confirmation. Copy, close/abandonment, and
   attachment failure are neutral. Deduplicate retries atomically before counting insertion or
   learning; ambiguous legacy events must not enter version 2 learning/reports.
-- Separate performance samples allow only random retry UUID, X/LinkedIn, extension version,
+- Separate performance samples allow only random retry UUID, X/LinkedIn/Reddit, extension version,
   bounded durations/counts and reviewed outcome/cache/generation enums. Never attach installation,
   account, request, impression, template or content identity, free text, or URLs. Derive measurements
   directly from the extension's active request; do not collect page-dispatched diagnostic events.
@@ -39,6 +39,31 @@ explains the flow and [QUALITY.md](../QUALITY.md) owns evaluation and promotion 
 - Do not add retrieval infrastructure for anticipated scale. Change retrieval only when benchmark
   recall or measured latency regresses; retain evidence for the change.
 
+## Shared UI and Reddit reply context
+
+- Keep panel/cards, steering controls, action rendering, styles and interaction states shared across
+  X, LinkedIn and Reddit. Native placement, context extraction, composer ownership and attachment
+  capabilities belong at the adapter boundary; do not fork the Reddit UI.
+- Captioned card images must stay uncropped and badges must not cover their text. The common
+  readable preview exposes complete caption text with a larger image; opening/closing it makes
+  no inference or attachment. Attach only after explicit selection, with existing session guards.
+- Reddit comment replies carry both the selected comment and root post as separate untrusted fields.
+  The comment is the immediate target, even when its stance conflicts with the original post.
+  Bound selected text to 2,000 characters, post titles to 300 and post bodies to 1,200, with a
+  truncation flag. Bound DOM visits, prune other comments, and never crawl/summarize entire threads.
+- An explicit Reddit action must identify one owned visible composer with an enabled image control
+  before inference. Missing source/ownership/capability means no suggestion request. Preserve drafts
+  and existing media; require a new decoded, removable native preview before recording insertion.
+  Native Reddit RTE images may be removed by selection and Backspace. That path additionally
+  requires an image object inside the owned editable, a nonempty Lexical key and matching native
+  media identity on its decoded image; a bare image or unrelated toolbar media is insufficient.
+- Include selected target and root context in hashed cache identity at both browser and API
+  boundaries. Changes to used context, navigation, removal or remount invalidate the active session.
+  Never log Reddit permalink slugs or send Reddit-derived context categories with usage feedback.
+- Apply `20261104_0013` and deploy the compatible API before distributing an extension that emits
+  Reddit performance samples. A downgrade is blocked while Reddit rows exist; do not delete rows
+  merely to roll back the extension. Live access/processing and distribution remain pilot prerequisites.
+
 ## Catalog and rendering
 
 - Internal tools create drafts only. Human review, rendered QA, benchmark coverage, and the
@@ -47,7 +72,7 @@ explains the flow and [QUALITY.md](../QUALITY.md) owns evaluation and promotion 
   Bundled fonts must not add a request-time CDN dependency.
 - Fit complete wrapped captions at the largest allowed catalog size before shrinking. Preserve
   minimum fonts, region/line/character bounds and failure diagnostics. Never hide overflow by
-  reducing reviewed minimum sizes or dropping words.
+  reducing reviewed minimum sizes or dropping words. Respect native output-size bounds separately.
 - Captioned cards stay uncropped and badges do not cover their text. The shared readable preview
   exposes complete selectable captions and a larger image; review makes no inference or upload.
   Attachment remains explicit and keeps the existing composer/session ownership guards.

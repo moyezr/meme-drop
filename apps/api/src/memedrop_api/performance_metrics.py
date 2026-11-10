@@ -28,7 +28,7 @@ class PerformanceSample(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     event_id: UUID4
-    platform: Literal["x", "linkedin"]
+    platform: Literal["x", "linkedin", "reddit"]
     extension_version: ExtensionVersion
     elapsed_ms: Duration
 

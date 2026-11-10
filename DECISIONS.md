@@ -221,6 +221,27 @@ Status: accepted · Date: 2026-10-23
 - Reconsider after reviewed human scores, representative beta traffic, measured collection loss,
   or retention/abuse findings. See [workflow](docs/evaluation.md) and [progress](PROGRESS.md).
 
+## D013 — Share the extension experience and bound Reddit reply context
+
+Status: accepted design requirement; experimental local implementation · Date: 2026-11-04
+
+- Context: the user requires Reddit replies to account for both the selected comment and its post
+  in potentially huge threads, and future MemeDrop UI/UX changes to reach every supported platform.
+- Decision: comment replies use separately labeled selected-comment and root-post context within
+  explicit per-field/total limits. Preserve the immediate reply target, bound extraction independently
+  of thread size and avoid whole-thread collection or summarization. Both top-level and nested
+  replies are required for the first Reddit pilot.
+- Decision: use one shared extension panel, card/control rendering, interaction state and style
+  source across X, LinkedIn and Reddit. Adapters own native DOM/context extraction, action placement,
+  composer lifecycle, mounting, capabilities and attachment confirmation. Extend the existing adapter;
+  do not fork a Reddit UI or introduce a plugin framework.
+- Consequence: shared UI edits propagate across supported extension platforms. Context/cache/fallback
+  tests prove both selected comment and root post matter; browser fixtures cover huge/deep threads
+  and the common UI across platforms. Existing API contracts remain compatible during implementation.
+- Reconsider when measured context quality or native constraints require a bounded extension;
+  platform-specific visual forks require an explicit product decision.
+- Evidence: user clarification on November 4 and [Reddit plan](docs/reddit-integration-plan.md).
+
 ## D014 — Fit complete captions and share their readable review surface
 
 Status: accepted · Date: 2026-11-05
@@ -234,6 +255,5 @@ Status: accepted · Date: 2026-11-05
   optional larger review image with selectable caption text. Reviewing makes no inference/upload;
   attachment remains explicit and uses the same native ownership/draft guards.
 - Consequence: renderer, browser and ranking gates remain required; no automatic catalog promotion
-  or human-quality approval follows. Adapter-owned native output limits remain separate. The shared
-  review surface must fit short viewports, retain keyboard return and survive stale-session
-  cancellation. This renderer/UI change does not enable additional social platforms.
+  or human-quality approval follows. Keep Reddit's adapter-owned 240px limit. The shared review
+  surface must fit short viewports, retain keyboard return and survive stale-session cancellation.

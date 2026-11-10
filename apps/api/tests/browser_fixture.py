@@ -16,7 +16,7 @@ from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 from memedrop_api.performance_metrics import BrowserPerformanceSample, PerformanceCleanupResult
 from memedrop_api.rate_limit import MemoryRateLimitStore
-from memedrop_api.schemas import TweetContext
+from memedrop_api.schemas import ReplyContext, TweetContext
 from memedrop_api.services.catalog import MemeCatalog, MemeTemplate
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.storage import LocalMemeStorage
@@ -48,6 +48,7 @@ suggestion_calls = 0
 suggestion_pending = 0
 fixture_revision = 0
 performance_samples: list[dict[str, object]] = []
+reply_context_checks: list[dict[str, object]] = []
 
 
 class FixturePerformanceStore:
@@ -105,7 +106,20 @@ class FixtureGateway:
         steering_instruction: str | None = None,
         trend_cards: Sequence[TrendCard] = (),
         timeout_ms: int | None = None,
+        reply_context: ReplyContext | None = None,
     ) -> JointSuggestionResult:
+        if reply_context is not None:
+            reply_context_checks.append(
+                {
+                    "kind": reply_context.target_kind,
+                    "has_selected_comment": tweet_text.startswith("I warned them."),
+                    "has_post_title": reply_context.post_title == "Our synthetic Friday launch",
+                    "has_post_body": reply_context.post_body.startswith("We skipped tests"),
+                    "target_length": len(tweet_text),
+                    "body_length": len(reply_context.post_body),
+                    "truncated": reply_context.truncated,
+                }
+            )
         if fixture_mode == "slow":
             await asyncio.sleep(20)
         if fixture_mode == "dense":
@@ -213,6 +227,7 @@ async def reset(
         rate_limiter.buckets.clear()
     store.usage_events.clear()
     performance_samples.clear()
+    reply_context_checks.clear()
     service.cache.clear()
     service._global_candidates = None
     for index, row in enumerate(store.memes, start=1):
@@ -227,4 +242,5 @@ async def state() -> dict[str, object]:
         "suggestion_pending": suggestion_pending,
         "events": store.usage_events,
         "performance_samples": performance_samples,
+        "reply_context_checks": reply_context_checks,
     }

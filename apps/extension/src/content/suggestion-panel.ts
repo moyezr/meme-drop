@@ -11,12 +11,12 @@ import {
   MAX_STEERING_INSTRUCTION_LENGTH,
   normalizeSteeringInstruction,
 } from "../shared/suggestion-request";
-import type { MemeTextOverlay } from "@memedrop/shared";
+import type { MemeTextOverlay, ReplyContext } from "@memedrop/shared";
 import { drawMemeTextOverlay } from "@memedrop/shared/overlay-renderer";
 import { ensureMemeOverlayFonts } from "./overlay-fonts";
 import { SuggestionPerformanceTracker, roundDuration } from "../shared/suggestion-performance";
 import { fetchMediaBlobWithTimeout } from "../shared/media-fetch";
-import { attachmentImageSnapshot, waitForNativeAttachment, captureComposerFileInput } from "./attachment-confirmation";
+import { attachmentImageSnapshot, waitForNativeAttachment, captureComposerFileInput, queryComposer } from "./attachment-confirmation";
 import { SuggestionBaselineTracker, projectPerformanceSample, type PerformanceSample } from "../shared/performance-sample";
 import type { SuggestionPerformanceSnapshot } from "../shared/suggestion-performance";
 
@@ -53,6 +53,7 @@ interface Suggestion {
   score: number;
   source: "user" | "global";
   tweet_text?: string;
+  reply_context?: ReplyContext;
   feedback_context?: Record<string, unknown>;
   impression_id?: string;
   position?: number;
@@ -70,6 +71,7 @@ let insertingSuggestionId: string | null = null;
 let currentSteeringInstruction = "";
 let steeringEditorOpen = false;
 let preferredComposerTarget: Element | null = null;
+let preferredComposerGuard: (() => boolean) | null = null;
 let panelGeneration = 0;
 const previewObservers = new Map<Element, IntersectionObserver>();
 const failedPreviewIds = new Set<string>();
@@ -81,6 +83,8 @@ function disconnectPreviewObservers() {
 let browserPerformance: SuggestionPerformanceTracker | null = null;
 let baselinePerformance: SuggestionBaselineTracker | null = null;
 let insertionInFlight = false;
+
+export function isSuggestionAttachmentInFlight(): boolean { return insertionInFlight; }
 
 function sendPerformanceSample(sample: PerformanceSample) {
   // Direct extension messaging only: page-dispatched CustomEvents are not collected.
@@ -123,8 +127,9 @@ function panelContainer(): HTMLElement {
     ? preferredComposerTarget : document.body;
 }
 
-export function setSuggestionComposerTarget(target: Element | null) {
+export function setSuggestionComposerTarget(target: Element | null, isCurrent?: () => boolean) {
   preferredComposerTarget = target;
+  preferredComposerGuard = isCurrent || null;
   if (panelHost) panelContainer().appendChild(panelHost);
   for (const [card, observer] of previewObservers) {
     observer.unobserve(card);
@@ -1046,6 +1051,7 @@ async function requestTailoredCaption(
     payload: {
       tweet_text: suggestion.tweet_text,
       meme_id: suggestion.meme_id,
+      ...(suggestion.reply_context ? { reply_context: suggestion.reply_context } : {}),
     },
   });
 
@@ -1073,19 +1079,20 @@ type InsertMemeInput = {
  * Files coming through its file input; re-encoding normalizes everything
  * (including unknown types served by `/memes/...`) into a format X accepts.
  */
-async function toPngFile(blob: Blob, filename = "meme.png"): Promise<File> {
-  if (blob.type === "image/png") {
+async function toPngFile(blob: Blob, filename = "meme.png", maxDimension?: number): Promise<File> {
+  if (blob.type === "image/png" && !maxDimension) {
     return new File([blob], filename, { type: "image/png" });
   }
 
   const bitmap = await createImageBitmap(blob);
   try {
     const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
+    const dimensions = maxDimension ? getPreviewDimensions(bitmap.width, bitmap.height, maxDimension) : bitmap;
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2d context unavailable");
-    ctx.drawImage(bitmap, 0, 0);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
     const pngBlob: Blob = await new Promise((resolve, reject) => {
       canvas.toBlob(
@@ -1177,6 +1184,7 @@ async function renderMemeWithOverlay(
 
 /** Use only the intended composer; an unrelated input cannot confirm success. */
 function findComposerScope(platform: PlatformAdapter, preferredTarget?: Element | null): Element | null {
+  if (platform.resolveComposerScope) return platform.resolveComposerScope(preferredTarget);
   const hasOwnedComposer = (scope: Element | null): scope is Element => {
     if (!scope?.isConnected) return false;
     if (platform.id !== "linkedin") return Boolean(scope.querySelector(platform.selectors.composer));
@@ -1203,7 +1211,8 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
   insertionInFlight = true;
   const generation = payload.generation ?? panelGeneration;
   const suggestion = payload.suggestion || currentSuggestions.find((s) => s.meme_id === payload.memeId);
-  const isCurrent = () => generation === panelGeneration;
+  const sessionGuard = preferredComposerGuard;
+  const isCurrent = () => generation === panelGeneration && (!sessionGuard || sessionGuard());
   const selectedAt = payload.selectionStartedAt ?? performance.now();
   let preparedAt: number | undefined;
   let outcome: "inserted" | "copied" | "failed" | "cancelled" = "failed";
@@ -1225,7 +1234,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
       : null);
     if (tailored && suggestion) suggestion.tailored_image_data_url = tailored;
     const raw = await resolveMemeBlob(payload.imageUrl, tailored ?? payload.imageDataUrl);
-    const file = await toPngFile(raw);
+    const file = await toPngFile(raw, "meme.png", getPlatformAdapter()?.attachmentMaxDimension);
     preparedAt = performance.now();
     if (!isCurrent()) return outcome = "cancelled";
     const platform = getPlatformAdapter();
@@ -1233,17 +1242,23 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
     if (platform && scope) {
       const isCurrentScope = () => isCurrent() && scope.isConnected &&
         (!(scope instanceof HTMLDialogElement) || scope.open);
-      const before = attachmentImageSnapshot(scope, platform.selectors.attachmentImage);
-      const inputs = Array.from(scope.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput))
+      const query = platform.queryComposerElements || queryComposer;
+      if (platform.canAttachImage && !platform.canAttachImage(scope)) throw new Error("Images unavailable");
+      const before = attachmentImageSnapshot(scope, platform.selectors.attachmentImage, query);
+      if (platform.canAttachImage && before.size) throw new Error("Composer already has media");
+      const inputs = (query(scope, platform.selectors.fileInput) as HTMLInputElement[])
         .filter((candidate) => platform.id !== "linkedin" ||
           candidate.closest(platform.selectors.composeScope) === scope);
-      let input = (platform.id === "linkedin" ? inputs.length === 1 : inputs.length > 0)
+      if (platform.canAttachImage && inputs.some((input) => input.files?.length)) {
+        throw new Error("Composer already has media");
+      }
+      let input = (platform.id === "linkedin" || platform.resolveComposerScope ? inputs.length === 1 : inputs.length > 0)
         ? inputs[0] : null;
       const activator = platform.selectors.fileInputActivator;
       if (!input && inputs.length === 0 && activator) {
-        const control = scope.querySelector(activator);
-        if (control?.closest(platform.selectors.composeScope) === scope) {
-          input = captureComposerFileInput(scope, activator, platform.selectors.fileInput, isCurrentScope);
+        const control = query(scope, activator)[0];
+        if (control && (platform.resolveComposerScope || control.closest(platform.selectors.composeScope) === scope)) {
+          input = captureComposerFileInput(scope, activator, platform.selectors.fileInput, isCurrentScope, query);
         }
       }
       if (!isCurrentScope()) return outcome = "cancelled";
@@ -1265,7 +1280,8 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
         }
       }
       if (dispatched && await waitForNativeAttachment(scope, platform.selectors.attachmentImage,
-        platform.selectors.attachmentBusy, before, isCurrentScope)) {
+        platform.selectors.attachmentBusy, before, isCurrentScope, 4_000, query,
+        () => platform.hasRemovableAttachment?.(scope) ?? true)) {
         if (!isCurrentScope()) return outcome = "cancelled";
         logOutcome("inserted");
         outcome = "inserted";

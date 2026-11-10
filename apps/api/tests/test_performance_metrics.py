@@ -70,6 +70,23 @@ async def post(
         ), users
 
 
+async def test_reddit_measurements_keep_the_same_content_free_boundary(settings: Settings) -> None:
+    store = RecordingPerformanceStore()
+    response, _ = await post(settings, store, {"samples": [sample(platform="reddit")]})
+    assert response.status_code == 200
+    assert store.samples[0]["platform"] == "reddit"
+    invalid, _ = await post(
+        settings,
+        store,
+        {
+            "samples": [sample(platform="reddit", post_title="Must not be collected")],
+        },
+    )
+    assert invalid.status_code == 400
+    assert "Must not be collected" not in invalid.text
+    assert len(store.samples) == 1
+
+
 async def test_collects_only_explicit_measurements_without_creating_install(
     settings: Settings,
 ) -> None:

@@ -23,6 +23,7 @@ import {
   updateSuggestionPreview,
   markSuggestionPreviewFailed,
   insertMemeByUrl,
+  isSuggestionAttachmentInFlight,
   hidePanel,
   isPanelVisible,
   setSuggestionComposerTarget,
@@ -78,12 +79,22 @@ interface ReplyTweetSnapshot {
 const memeReplyIntent = new MemeReplyIntent();
 const memeReplyButtons = initMemeReplyButtons(platform, (source, post) => {
   activeSuggestionTriggeredAt = performance.now();
+  if (platform.inlineComposer && !source.tweetText) {
+    resetComposeSession();
+    showSuggestionError("Could not find the selected comment and original post. Reopen the thread and try again.");
+    return false;
+  }
   logDebug(
     "Meme reply armed",
     `- has tweet id: ${Boolean(source.tweetId)}
 - extracted text length: ${source.tweetText?.length || 0}`
   );
-  if (platform.id === "linkedin") {
+  if (platform.inlineComposer) {
+    const needsNativeComposer = platform.inlineComposer.candidates(post).length === 0;
+    activateOwnedInlineReply(source, post);
+    // Reply can toggle an existing editor closed. Keep an already owned draft open.
+    return needsNativeComposer;
+  } else if (platform.id === "linkedin") {
     activateInlineMemeReply(source, post);
   } else {
     memeReplyIntent.arm(source);
@@ -95,7 +106,8 @@ const memeReplyButtons = initMemeReplyButtons(platform, (source, post) => {
 document.addEventListener(
   "click",
   (event) => {
-    const target = event.target instanceof Element ? event.target : null;
+    const target = event.composedPath().find((node): node is Element =>
+      node instanceof Element && node.matches(platform.selectors.nativeReply));
     if (!target?.closest(platform.selectors.nativeReply)) return;
     if (!memeReplyButtons.isForwardingNativeReply()) {
       memeReplyIntent.clear();
@@ -117,7 +129,7 @@ chrome.runtime.onMessage.addListener((message) => {
       logDebug(
         "Ignored suggestions result",
         `- reason: current URL is not compose
-- url: ${window.location.href}`
+- platform: ${platform.id}`
       );
       return;
     }
@@ -218,14 +230,21 @@ ${title}${details ? `\n${details}` : ""}`);
 
 function isComposeRoute(url = window.location.href): boolean {
   if (platform.isRouteCompose(url)) return true;
+  if (platform.inlineComposer) {
+    if (!activeMemeReplySource || !activeInlineTarget || !activeNativeComposerScope ||
+        url !== activeInlineUrl ||
+        !platform.inlineComposer.isSourceCurrent(activeInlineTarget, activeMemeReplySource)) return false;
+    const candidates = platform.inlineComposer.candidates(activeInlineTarget);
+    return candidates.length === 1 && candidates[0] === activeNativeComposerScope;
+  }
   if (platform.id !== "linkedin") return false;
   return isInlineComposeSessionActive({
     hasSource: Boolean(activeMemeReplySource),
     elapsedMs: Date.now() - activeInlineComposeStartedAt,
     composerPresent: Boolean(
-      activeLinkedInComposerScope?.isConnected &&
-      (!(activeLinkedInComposerScope instanceof HTMLDialogElement) || activeLinkedInComposerScope.open) &&
-      activeLinkedInComposerScope.querySelector(platform.selectors.composer)
+      activeNativeComposerScope?.isConnected &&
+      (!(activeNativeComposerScope instanceof HTMLDialogElement) || activeNativeComposerScope.open) &&
+      activeNativeComposerScope.querySelector(platform.selectors.composer)
     ),
   });
 }
@@ -415,7 +434,9 @@ let waitToken = 0;
 // LinkedIn can open a comment editor inline or in a native top-layer dialog.
 // Bind only the unique editor owned by the explicit Meme action's post or new dialog.
 let activeInlineComposeStartedAt = 0;
-let activeLinkedInComposerScope: Element | null = null;
+let activeNativeComposerScope: Element | null = null;
+let activeInlineTarget: HTMLElement | null = null;
+let activeInlineUrl: string | null = null;
 let composerBindingGeneration = 0;
 let pendingComposerBindingCleanup: (() => void) | null = null;
 let boundComposerCleanup: (() => void) | null = null;
@@ -426,7 +447,53 @@ function clearComposerBinding() {
   pendingComposerBindingCleanup = null;
   boundComposerCleanup?.();
   boundComposerCleanup = null;
-  activeLinkedInComposerScope = null;
+  activeNativeComposerScope = null;
+  activeInlineTarget = null;
+  activeInlineUrl = null;
+}
+
+/** Platform adapters discover native composers; the panel and request lifecycle stay shared. */
+function activateOwnedInlineReply(source: MemeReplySource, target: HTMLElement) {
+  resetComposeSession();
+  activeMemeReplySource = source;
+  activeInlineTarget = target;
+  activeInlineUrl = window.location.href;
+  const generation = composerBindingGeneration;
+  const deadline = Date.now() + 3_500;
+  const check = () => {
+    if (generation !== composerBindingGeneration) return;
+    const adapter = platform.inlineComposer!;
+    if (window.location.href !== activeInlineUrl || !adapter.isSourceCurrent(target, source)) {
+      resetComposeSession();
+      return;
+    }
+    const candidates = adapter.candidates(target);
+    if (activeNativeComposerScope) {
+      if (candidates.length !== 1 || candidates[0] !== activeNativeComposerScope ||
+          (!isSuggestionAttachmentInFlight() && !platform.canAttachImage?.(activeNativeComposerScope))) resetComposeSession();
+      return;
+    }
+    if (candidates.length === 1) {
+      const scope = candidates[0];
+      if (!adapter.canSuggest(scope)) {
+        resetComposeSession();
+        showSuggestionError("Images are unavailable in this reply box, or it already contains an image.");
+        return;
+      }
+      activeNativeComposerScope = scope;
+      setSuggestionComposerTarget(scope, () => isComposeRoute());
+      platform.queryComposerElements?.(scope, platform.selectors.composer)
+        .find((element): element is HTMLElement => element instanceof HTMLElement)?.focus({ preventScroll: true });
+      void requestSuggestionsForCurrentCompose(false, source);
+    } else if (candidates.length > 1 || Date.now() >= deadline) {
+      resetComposeSession();
+      showSuggestionError("Could not identify one image-capable reply box. Open the intended reply and try again.");
+    }
+  };
+  // Polling also observes native changes inside open shadow roots and editor decoding.
+  const timer = setInterval(check, 100);
+  boundComposerCleanup = () => clearInterval(timer);
+  queueMicrotask(check);
 }
 
 function isVisibleEditor(editor: HTMLElement): boolean {
@@ -455,7 +522,7 @@ function bindLinkedInComposerFromAction(post: HTMLElement) {
 
   function tryBind() {
     if (generation !== composerBindingGeneration || !activeMemeReplySource ||
-        activeLinkedInComposerScope instanceof HTMLDialogElement) return;
+        activeNativeComposerScope instanceof HTMLDialogElement) return;
     const portals = portalSelector
       ? Array.from(document.querySelectorAll<HTMLDialogElement>(portalSelector)).filter((dialog) => {
           if (!dialog.open || previousOpenDialogs.has(dialog)) return false;
@@ -466,7 +533,7 @@ function bindLinkedInComposerFromAction(post: HTMLElement) {
       : [];
     // Ambiguity must never choose somebody else's composer.
     if (portals.length > 1) {
-      if (activeLinkedInComposerScope) resetComposeSession();
+      if (activeNativeComposerScope) resetComposeSession();
       return;
     }
     const inlineEditors = Array.from(post.querySelectorAll<HTMLElement>(platform.selectors.composer))
@@ -474,8 +541,8 @@ function bindLinkedInComposerFromAction(post: HTMLElement) {
         editor.closest(platform.selectors.post) === post);
     const inlineEditor = inlineEditors.length === 1 ? inlineEditors[0] : null;
     const scope = portals[0] || (inlineEditor ? post : null);
-    if (!scope || scope === activeLinkedInComposerScope) return;
-    activeLinkedInComposerScope = scope;
+    if (!scope || scope === activeNativeComposerScope) return;
+    activeNativeComposerScope = scope;
     setSuggestionComposerTarget(scope);
     // LinkedIn can leave a pre-mounted editor unfocused after the forwarded
     // Comment click. Focus its unique owned editor without changing the draft
@@ -532,6 +599,8 @@ function resetComposeSession() {
   dismissedSuggestionCacheKey = null;
   currentComposeDismissed = false;
   activeSuggestionRequestId = null;
+  lastRequestedSource = null;
+  lastRequestedSteeringInstruction = undefined;
   waitToken++;
   hidePanel();
 }
@@ -580,7 +649,7 @@ async function requestSuggestionsForCurrentCompose(
     logDebug(
       "Suggestion request skipped",
       `- reason: current URL is not compose
-- url: ${window.location.href}`
+- platform: ${platform.id}`
     );
     return;
   }
@@ -591,7 +660,7 @@ async function requestSuggestionsForCurrentCompose(
     logDebug(
       "Suggestion request skipped",
       `- reason: panel was dismissed for this compose before request start
-- url: ${window.location.href}`
+- platform: ${platform.id}`
     );
     return;
   }
@@ -611,7 +680,7 @@ async function requestSuggestionsForCurrentCompose(
     "Suggestion request started",
     `- token: ${token}
 - refresh: ${refresh}
-- url: ${window.location.href}`
+- platform: ${platform.id}`
   );
 
   const text = source?.tweetText || (await waitForTweetText(token));
@@ -628,7 +697,7 @@ async function requestSuggestionsForCurrentCompose(
     logDebug(
       "Suggestion request abandoned",
       `- reason: user left compose before suggestions were requested
-- url: ${window.location.href}`
+- platform: ${platform.id}`
     );
     return;
   }
@@ -648,7 +717,8 @@ async function requestSuggestionsForCurrentCompose(
   const cacheKey = await buildSuggestionCacheKey(
     suggestionText,
     source?.tweetId || getCanonicalTweetId(),
-    normalizedSteering
+    normalizedSteering,
+    source?.replyContext
   );
   if (!isCurrentSuggestionGeneration(token, waitToken)) return;
 
@@ -683,6 +753,7 @@ async function requestSuggestionsForCurrentCompose(
       refresh,
       cache_key: cacheKey,
       request_id: requestId,
+      ...(source?.replyContext ? { reply_context: source.replyContext } : {}),
       ...(normalizedSteering
         ? { steering_instruction: normalizedSteering }
         : {}),
@@ -713,7 +784,7 @@ window.addEventListener("memedrop:refresh-suggestions", () => {
     logDebug(
       "Refresh ignored",
       `- reason: current URL is not compose
-- url: ${window.location.href}`
+- platform: ${platform.id}`
     );
     return;
   }
@@ -733,16 +804,26 @@ window.addEventListener("memedrop:suggestions-dismissed", () => {
   );
 });
 
-window.addEventListener("pagehide", flushSuggestionMeasurement);
+window.addEventListener("pagehide", () => {
+  flushSuggestionMeasurement();
+  resetComposeSession();
+});
 
 function onUrlChanged(url = window.location.href) {
   const isCompose = isComposeRoute(url);
   logDebug(
     "URL change detected",
-    `- url: ${url}
+    `- platform: ${platform.id}
 - is compose: ${isCompose}`
   );
 
+  if (platform.inlineComposer) {
+    // A new explicit target can be waiting for Reddit to mount its editor while
+    // the previous target's compose state changes. The binding timer owns that
+    // wait; only a bound editor's closure or actual navigation cancels it here.
+    if (url !== activeInlineUrl || (activeNativeComposerScope && !isCompose)) resetComposeSession();
+    return;
+  }
   if (platform.id === "linkedin") {
     if (!isCompose) resetComposeSession();
     return;
@@ -787,8 +868,7 @@ function handlePotentialUrlChange(reason = "history") {
   logDebug(
     "Route state changed",
     `- reason: ${reason}
-- previous url: ${lastSeenUrl}
-- current url: ${currentUrl}
+- platform: ${platform.id}
 - previous is compose: ${lastSeenIsCompose}
 - current is compose: ${currentIsCompose}`
   );

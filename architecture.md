@@ -24,7 +24,7 @@ apps/smoke-agent (local TypeScript CLI) -> public HTTPS agent API only
 | `apps/api` | HTTP contract, ranking/caption services, persistence, storage, Python tests |
 | `apps/catalog` | Local human annotation workflow, visual region editor, quality checklist |
 | `apps/template-pipeline` | Development-only template discovery, machine draft annotation, and real-catalog scale fixtures |
-| `apps/extension` | X integration, service worker, suggestion UI, popup/library |
+| `apps/extension` | X/LinkedIn and experimental Reddit adapters, service worker, shared suggestion UI, popup/library |
 | `apps/web` | Public marketing and docs plus the authenticated customer dashboard |
 | `apps/smoke-agent` | Black-box public agent API generation, replay, and media verification |
 | `packages/shared` | TypeScript contracts and source template manifests |
@@ -87,6 +87,42 @@ composer's Share photo control while cancelling its chooser. The temporary liste
 immediately; absent or ambiguous inputs fall back to copying. Insertion requires a new decoded
 native image preview in the bound composer, including LinkedIn's removable blob preview;
 unconfirmed attempts stay neutral.
+
+The experimental Reddit adapter uses the same panel, cards, steering, action markup and styling.
+Adapters provide native DOM discovery, exact composer scopes, capability checks and attachment
+confirmation. Open native shadow roots use bounded, ownership-aware queries; closed/inaccessible
+or ambiguous composers are unsupported. A Reddit action is bound before inference begins, and
+ordinary native Comment/Reply never starts suggestions. No Reddit submission control is clicked.
+
+For Reddit detail pages, the selected comment is the immediate reply target, with the root post's
+title/body in a separate optional `reply_context` contract. Top-level replies use the post itself.
+Client extraction caps selected comments at 2,000 characters, titles at 300 and bodies at 1,200,
+with a truncation flag and bounded node visits. It excludes sibling/descendant comments and never
+loads or summarizes an entire thread. Both target and root identity/content shape hashed browser
+cache identity. FastAPI validates the fields, keeps them separated in the joint prompt, and uses
+both for deterministic analysis/ranking/fallback and server cache identity. Legacy callers retain
+their existing contract. Reddit suggestions expose no inferred feedback categories.
+
+Reddit's visible native image control gates generation and attachment. Existing draft text/media
+are preserved; PNG uploads are capped at the documented 240px dimension and insertion requires a
+new decoded, removable native preview after upload progress ends. Source changes, remounts,
+navigation and ambiguous ownership invalidate the session. Synthetic browser proof does not
+establish live Reddit compatibility or permission to distribute/process its content.
+Native Reddit composer hosts can sit outside the source post, so explicit `post-id`/`parent-id`
+ownership binds the outer host. Nested RTE image/video toolbars are queried separately. The current
+native image object is keyboard-removable: its nonempty Lexical key and decoded image must share
+the native media identity inside the owned editable. Source reads keep their 512-node budget;
+native UI discovery has a separate 2,048-node ceiling for the richer toolbar and metadata tree.
+Nested projected body slots represent one source field; distinct sibling fields remain ambiguous.
+The collapsed post opener needs focus before its native click. While a newly selected target's
+editor mounts, its bounded binding timer owns the pending intent; a same-URL compose-state change
+from the previous target cannot cancel that wait. Bound-editor closure and navigation still cancel.
+
+The shared renderer fits the complete wrapped caption inside catalog-owned font and region bounds,
+using available lines before shrinking. Extension cards contain the whole image and keep metadata
+below it. Their shared readable review surface pairs a larger image with selectable caption text,
+fits within the viewport and requires explicit attachment; review itself makes no provider or
+upload request. Native size limits remain adapter-owned. No template review gate is bypassed.
 
 The suggestion panel also offers an optional, bounded instruction for users who already have a joke
 angle, tone, or template in mind. Automatic suggestions remain the default. The instruction lives

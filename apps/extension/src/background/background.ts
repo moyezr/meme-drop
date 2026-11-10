@@ -15,7 +15,9 @@ import {
   normalizeSteeringInstruction,
 } from "../shared/suggestion-request";
 import { fetchMediaBlobWithTimeout } from "../shared/media-fetch";
-import type { MemeTextOverlay } from "@memedrop/shared";
+import type { MemeTextOverlay, ReplyContext } from "@memedrop/shared";
+import { readReplyContext, REPLY_CONTEXT_LIMITS } from "../shared/reply-context";
+import { platformForUrl } from "../shared/platform";
 import {
   UsageTelemetryQueue,
   type UsageEvent,
@@ -35,6 +37,7 @@ interface Suggestion {
   score: number;
   source: "user" | "global";
   tweet_text?: string;
+  reply_context?: ReplyContext;
   feedback_context?: Record<string, unknown>;
   image_data_url?: string | null;
   preview_image_data_url?: string | null;
@@ -43,6 +46,7 @@ interface Suggestion {
 interface CacheEntry {
   suggestions: Suggestion[];
   expiresAt: number;
+  timeout: ReturnType<typeof setTimeout>;
 }
 
 const SUGGESTION_TTL_MS = 5 * 60 * 1000;
@@ -68,6 +72,7 @@ function readCachedSuggestions(key: string): Suggestion[] | null {
   const entry = suggestionCache.get(key);
   if (!entry) return null;
   if (entry.expiresAt < Date.now()) {
+    clearTimeout(entry.timeout);
     suggestionCache.delete(key);
     return null;
   }
@@ -78,18 +83,41 @@ function readCachedSuggestions(key: string): Suggestion[] | null {
 }
 
 function writeCachedSuggestions(key: string, suggestions: Suggestion[]) {
-  suggestionCache.set(key, {
+  const previous = suggestionCache.get(key);
+  if (previous) clearTimeout(previous.timeout);
+  const entry: CacheEntry = {
     suggestions,
     expiresAt: Date.now() + SUGGESTION_TTL_MS,
-  });
+    timeout: setTimeout(() => {
+      if (suggestionCache.get(key) === entry) suggestionCache.delete(key);
+    }, SUGGESTION_TTL_MS),
+  };
+  suggestionCache.set(key, entry);
   if (suggestionCache.size > SUGGESTION_CACHE_MAX) {
     const oldestKey = suggestionCache.keys().next().value;
-    if (oldestKey) suggestionCache.delete(oldestKey);
+    if (oldestKey) {
+      clearTimeout(suggestionCache.get(oldestKey)!.timeout);
+      suggestionCache.delete(oldestKey);
+    }
   }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_SUGGESTIONS") {
+    let replyContext: ReplyContext | undefined;
+    try {
+      replyContext = readReplyContext(message.payload?.reply_context);
+      const senderPlatform = platformForUrl(sender.tab?.url);
+      if ((replyContext && senderPlatform !== "reddit") ||
+          (senderPlatform === "reddit" && !replyContext) ||
+          (replyContext && (typeof message.payload?.tweet_text !== "string" ||
+            message.payload.tweet_text.length > REPLY_CONTEXT_LIMITS.comment))) {
+        throw new Error("Invalid reply context");
+      }
+    } catch {
+      sendResponse({ suggestions: [], error: "Invalid reply context" });
+      return false;
+    }
     const steeringInstruction = normalizeSteeringInstruction(
       message.payload.steering_instruction
     );
@@ -110,6 +138,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       limit: message.payload.limit,
       cacheKey: message.payload.cache_key,
       steeringInstruction,
+      replyContext,
       onInitial: (suggestions, cacheHit) => {
         sentInitialSuggestions = true;
         performance.setSuggestions(suggestions.length, cacheHit);
@@ -214,7 +243,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "GET_CAPTION") {
-    fetchCaption(message.payload.tweet_text, message.payload.meme_id)
+    fetchCaption(message.payload.tweet_text, message.payload.meme_id, message.payload.reply_context)
       .then((tailored_overlay) => sendResponse({ tailored_overlay }))
       .catch((err) => {
         console.error("[MemeDrop] Caption error:", err);
@@ -224,15 +253,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "LOG_USAGE") {
-    usageTelemetry.enqueue(message.payload as UsageEventInput);
+    usageTelemetry.enqueue((platformForUrl(sender.tab?.url) === "reddit"
+      ? { ...message.payload, feedback_context: {} } : message.payload) as UsageEventInput);
     return false;
   }
 
   if (message.type === "LOG_PERFORMANCE") {
     // Metadata is checked against the sender, never a URL supplied in the payload.
-    const host = sender.tab?.url ? new URL(sender.tab.url).hostname : "";
-    const platform = ["x.com", "www.x.com", "twitter.com", "www.twitter.com"].includes(host) ? "x"
-      : host === "www.linkedin.com" || host === "linkedin.com" ? "linkedin" : null;
+    const platform = platformForUrl(sender.tab?.url);
     if (platform && message.payload?.platform === platform) {
       performanceTelemetry.enqueue(message.payload, chrome.runtime.getManifest().version);
     }
@@ -274,7 +302,9 @@ async function fetchSuggestions(
 ): Promise<Suggestion[]> {
   const limit = clampSuggestionLimit(options.limit);
   const requestOptions = { ...options, limit };
-  const baseCacheKey = options.cacheKey || await buildSuggestionCacheKey(
+  const baseCacheKey = options.replyContext ? await buildSuggestionCacheKey(
+    tweetText, options.cacheKey, options.steeringInstruction, options.replyContext
+  ) : options.cacheKey || await buildSuggestionCacheKey(
     tweetText,
     undefined,
     options.steeringInstruction
@@ -336,6 +366,7 @@ type SuggestionOptions = SuggestionRequestObserver<Suggestion> & {
   limit?: number;
   cacheKey?: string;
   steeringInstruction?: string;
+  replyContext?: ReplyContext;
   onMediaSettled?: () => void;
 };
 
@@ -359,6 +390,7 @@ async function fetchFreshSuggestions(
         limit: options.limit,
         refresh: options.refresh,
         cache_key: options.cacheKey,
+        ...(options.replyContext ? { reply_context: options.replyContext } : {}),
         ...(options.steeringInstruction
           ? { steering_instruction: options.steeringInstruction }
           : {}),
@@ -382,6 +414,7 @@ async function fetchFreshSuggestions(
       ? toAbsoluteMediaUrl(suggestion.preview_image_url)
       : undefined,
     tweet_text: tweetText,
+    ...(options.replyContext ? { reply_context: options.replyContext } : {}),
     image_data_url: null,
     preview_image_data_url: null,
   }));
@@ -465,7 +498,8 @@ async function saveMeme(imageUrl: string, sourceTweetId?: string) {
   return data.meme;
 }
 
-async function fetchCaption(tweetText: string, memeId: string): Promise<MemeTextOverlay | null> {
+async function fetchCaption(tweetText: string, memeId: string, context?: unknown): Promise<MemeTextOverlay | null> {
+  const replyContext = readReplyContext(context);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SUGGESTION_REQUEST_TIMEOUT_MS);
   try {
@@ -473,7 +507,8 @@ async function fetchCaption(tweetText: string, memeId: string): Promise<MemeText
       method: "POST",
       headers: await withApiRequestHeaders(),
       signal: controller.signal,
-      body: JSON.stringify({ tweet_text: tweetText, meme_id: memeId }),
+      body: JSON.stringify({ tweet_text: tweetText, meme_id: memeId,
+        ...(replyContext ? { reply_context: replyContext } : {}) }),
     });
     if (!res.ok) throw await apiErrorFromResponse(res);
     const data = await res.json();

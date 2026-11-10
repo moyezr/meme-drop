@@ -248,8 +248,23 @@ SteeringInstruction = Annotated[
 ]
 
 
+class ReplyContext(StrictModel):
+    platform: Literal["reddit"]
+    target_kind: Literal["post", "comment"]
+    post_title: str = Field(min_length=1, max_length=300)
+    post_body: str = Field(max_length=1200)
+    truncated: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def nonblank_title(self) -> ReplyContext:
+        if not self.post_title.strip():
+            raise ValueError("Reply context requires a post title")
+        return self
+
+
 class SuggestRequest(StrictModel):
     tweet_text: TweetText
+    reply_context: ReplyContext | None = None
     # An optional preference for the joke direction or meme format. It is used only
     # while generating this response and is never included in feedback or storage.
     steering_instruction: SteeringInstruction | None = None
@@ -259,7 +274,20 @@ class SuggestRequest(StrictModel):
     refresh: bool = False
     cache_key: str | None = Field(default=None, min_length=1, max_length=240)
 
+    @model_validator(mode="after")
+    def bounded_reply_target(self) -> SuggestRequest:
+        if self.reply_context and len(self.tweet_text) > 2000:
+            raise ValueError("Reply target exceeds context budget")
+        return self
+
 
 class CaptionRequest(StrictModel):
     tweet_text: TweetText
     meme_id: UUID
+    reply_context: ReplyContext | None = None
+
+    @model_validator(mode="after")
+    def bounded_reply_target(self) -> CaptionRequest:
+        if self.reply_context and len(self.tweet_text) > 2000:
+            raise ValueError("Reply target exceeds context budget")
+        return self

@@ -24,6 +24,7 @@ class FakeCaptionGateway:
         steering_instruction=None,
         trend_cards=(),
         timeout_ms=None,
+        reply_context=None,
     ):
         assert len(templates) <= 12
         assert context is not None

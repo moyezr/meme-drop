@@ -1,6 +1,6 @@
 # MemeDrop privacy policy
 
-Last updated: 2026-10-21
+Last updated: 2026-11-04
 
 This document describes the current MemeDrop private beta. Provider retention and billing details
 that are still under review will be finalized before public self-service access opens.
@@ -10,6 +10,9 @@ that are still under review will be finalized before public self-service access 
 MemeDrop is an API, website, and Chrome extension that helps users and their AI agents create meme
 replies. The extension reads source-post or compose context only after the user explicitly invokes
 MemeDrop for that post. It is not designed to collect unrelated browsing activity.
+For experimental Reddit comment replies, the selected comment and a bounded original-post title
+and body provide context; the extension does not collect the whole thread. Reddit support remains
+subject to permitted access and live verification before pilot distribution.
 
 ## Data processed
 
@@ -50,8 +53,9 @@ for the active composer and request; cache identity contains only a one-way hash
 does not write raw source-post text or user guidance to its database, usage events, or production logs.
 
 PostgreSQL stores the anonymous install ID, saved-library records, and usage events with structured
-post context limited to reviewed categories. Random event/impression IDs are not derived from
-submitted content. Corrected events distinguish copying from insertion and ordinary closure from
+post context limited to reviewed categories. Reddit replies omit inferred context categories from
+usage feedback. Random event/impression IDs are not derived from submitted content.
+Corrected events distinguish copying from insertion and ordinary closure from
 rejection; ambiguous older events do not train the corrected ranking. Browser rendering/attachment
 timings remain local diagnostics. Older used and dismissed events remain exportable for
 compatibility. The input schema rejects raw post-text fields inside usage

@@ -34,6 +34,7 @@ export type {
   TweetContext,
   FeedbackContext,
   SuggestionRequest,
+  ReplyContext,
   SuggestionResult,
   MemeTextOverlay,
   MemeTextRegion,

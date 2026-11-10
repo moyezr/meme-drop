@@ -4,6 +4,397 @@ This is the current session handoff. Replace stale state; git retains history. T
 [launch plan](docs/production-launch-plan.md) owns the backlog and
 [DECISIONS.md](DECISIONS.md) owns durable choices. Local checks do not establish hosted readiness.
 
+## Merge all open PRs — 2026-11-11
+
+- Requested outcome: integrate all open PRs into main, using `moyezr` for GitHub changes and
+  restoring `moyez-dev`; publish nothing on social. Baseline main `07094cd`, PR #5 `eb64d0d`,
+  PR #6 `e1f4fa2`. PR #1's head `5aca04f` is already an ancestor of main, with no unique commits.
+- Bounded scope: reconcile #5 into #6, preserving the stronger portrait/landscape/narrow review
+  assertions plus Reddit context/attachment coverage and coordinated extension version 0.0.7.
+  Preserve historical notes and the installed production 0.0.5 directory via an isolated checkout.
+- Acceptance: full fresh combined local gates and packaged browser cases; fresh restored/encrypted
+  production backup, migration-first compatible schema, normal GitHub merges without fabricated
+  statuses/protection changes, all open PRs resolved, main/source identity and account restored.
+- GitHub jobs remain unable to start because of the owner's billing lock. The user explicitly
+  requested all merges after this was reported. Use normal merge controls with transparent local
+  evidence; if GitHub enforces a block, report it without administrative bypass.
+- Conflict resolution keeps #5's unobstructed badge/contain assertions and complete selectable
+  portrait/landscape review at 820×560 and 390×400, extending both cases to Reddit with the same
+  native-draft/no-submit/240px bounds. No benchmark, assertion or deadline is relaxed.
+- Fresh focused baseline: 12 reply-context API tests pass. Combined `quality:deployment-readiness`
+  passes: 593 API tests, 85 extension tests, 18 renderer tests, workspace static/build/catalog,
+  143 API process checks, 32 separate PostgreSQL/Redis integration cases, backend image smoke and
+  clean locked npm/Python audits. Default 32 environment-bound skips are exercised separately.
+  Ranking: zero regressions/new rejects, 5k warm p95 14.506ms; existing 25 catalog warnings remain.
+- All 53 packaged real-FastAPI/Chromium scenarios pass, including six dense review cases at both
+  short/narrow sizes, native draft preservation and no submit. Checked 129 local documentation
+  paths, 73-line AGENTS.md and whitespace. No provider calls or social publication were needed.
+- Fresh production backup `20261110T190727Z` (UTC): 103 objects, 19 tables, schema 0012; restored
+  on task-owned loopback PostgreSQL 55440, verified, encrypted with the existing Keychain/AES
+  workflow, plaintext removed. Production configuration validates with zero warnings.
+- Applied exact Alembic 0012→0013 generated SQL in one session-pooler transaction, with explicit
+  local 5s lock/30s statement bounds and expected-version guard. Independent readback confirms
+  schema `20261104_0013`, x/linkedin/reddit constraint and unchanged measurement row count.
+  No storage, credentials, catalog eligibility, production data rows or provider settings changed.
+- PR #1 was closed as redundant using `moyezr`: GitHub rejects retargeting it to main because
+  there are no new commits between its head and main. Its head is already fully included in main;
+  no old API implementation was reapplied. Restored and verified `moyez-dev` afterward.
+- Production-origin `release:dry-run` passes. Validation-only 0.0.7 ZIP: 336955 bytes,
+  SHA-256 `b0c51995ae954f47c83c03e3b53350f2580724bd6d8bfb0ffa1c247b1819926e`, 29 files;
+  X/Twitter/LinkedIn/Reddit/canonical API hosts only. It is not installed or distributed.
+  Canonical API `/live` and `/health` return 200 after migration, before the Git merges.
+- Next: push this reconciled merge to PR #6, merge #5 and #6 through normal GitHub controls,
+  verify main includes their heads and hosted rollout status, restore account and remove only
+  task-owned local test services. GitHub CI billing remains a separately reported limitation.
+
+
+## Push all pending product work — 2026-11-11
+
+- Requested outcome: push all remaining product source and documentation to GitHub, using
+  `moyezr` and restoring `moyez-dev`. Baseline `07094cd`; readability remains separately available
+  on PR #5. The user now explicitly authorizes including the previously untracked product files
+  and historical notes. Ignored credentials, backups, generated builds and QA data remain local.
+- Scope: shared readability implementation, experimental Reddit adapter/context/measurement
+  migration, privacy/contracts, tests, planning/assessment documents and complete handoff history.
+  Preserve the existing code and gates; coordinate this combined candidate as extension 0.0.7.
+- Acceptance: all selected source is committed and verified on a remote branch/PR, applicable
+  fresh local gates pass (including migration/browser/security checks), account restoration is
+  verified, and ignored private/generated data is excluded. This push does not apply production
+  migrations, enable Reddit distribution, reload the installed extension or publish social replies.
+- Baseline: 12 reply-context API tests and four focused extension tests pass. Reviewed all 53
+  initially pending source/documentation files for inclusion and credential patterns; no private
+  or generated artifacts are selected. Full checks will use an isolated checkout so the installed
+  unpacked production extension directory is not overwritten by development builds.
+- Complete source snapshot `699588a` includes all 55 pending product files (the original 53 plus
+  coordinated package/lock version updates). New source/tests, migration, privacy updates,
+  assessment/Reddit plan and historical handoff notes are included. Readability PR #5 remains
+  independent; this combined candidate is not a production rollout.
+- Fresh verification of `699588a` in the isolated `all-pending-verification` checkout passes:
+  `quality:deployment-readiness` (593 API tests, 85 extension tests, 18 renderer tests, all
+  workspace static/build/catalog checks, 143 process checks, 32 separate PostgreSQL/Redis
+  integration tests, backend image smoke and clean npm/Python audits), all 50 packaged browser
+  scenarios, and `release:dry-run`. Default tests skip 32 environment-bound cases; the separate
+  integration run exercises them. Recommendation gates retain zero regressions/new rejects,
+  with 5k warm p95 16.018ms. Catalog warnings remain the existing 25; no gates were weakened.
+- The initial readiness run missed the unchanged eight-second process-startup bound; a complete
+  rerun passed with identical source/deadlines. Tests used disposable loopback PostgreSQL/Redis
+  on 55439/56390; task-owned containers/volumes and browser fixture profiles/media were removed.
+  Verified 91 local documentation paths, the 73-line AGENTS.md and `git diff --check`.
+- GitHub handoff branch: `codex/all-pending-product-work`. Use verified `moyezr` for remote writes
+  with guaranteed restoration of `moyez-dev`; confirm remote HEAD matches before finishing.
+  The installed unpacked directory remains production 0.0.5. No production migration/configuration,
+  browser reload, social publication or third-party access/distribution change was performed.
+- Next release gates remain CI availability, migration-first compatible backend/privacy rollout,
+  permitted Reddit access/distribution, real human review and a bounded pilot. Pushing source does
+  not establish those external approvals or hosted readiness.
+
+## Readability release preparation — 2026-11-06
+
+- Requested outcome: ship the existing readability improvements; use `moyezr` for GitHub writes
+  and restore the original account; publish nothing on social platforms. Baseline `07094cd`.
+- Isolated release checkout: `codex/readability-release` at
+  `/Users/moyezrabbani/.codex/worktrees/readability-release/meme-drop`. Preserve this working
+  tree's unfinished Reddit implementation and existing notes. Port only wrapped caption fitting,
+  uncropped cards and readable review, then bump the production extension to 0.0.6.
+- Acceptance: catalog constraints preserved, complete captions/keyboard review work at short and
+  narrow viewports, reviewing triggers no inference/upload, exact native attachment remains
+  explicit; required local/CI/release gates pass; committed production package is reloaded and
+  live draft-only review/attachment/cleanup verified. No Reddit permissions, API contract or
+  migration are included. Record package identity, QA interval and account restoration.
+- Candidate `eb64d0d` is committed/pushed as `moyezr` on
+  [PR #5](https://github.com/moyezr/meme-drop/pull/5), then `moyez-dev` was restored and independently
+  verified. The isolated release contains only readability, synthetic fixtures/contracts and the
+  coordinated 0.0.6 version bump; this checkout's Reddit work and existing notes remain intact.
+- Fresh full `quality:deployment-readiness` and production-origin `release:dry-run` pass: 580 API
+  tests, 31 separate PostgreSQL/Redis integration tests, 80 extension tests, 18 renderer tests,
+  143 process checks, all static/build/catalog/tuning gates, backend image smoke and clean security
+  audits. All 25 packaged browser scenarios pass, including complete portrait/landscape review on
+  X/LinkedIn at 820×560 and 390×400. No deadlines, benchmarks or assertions were weakened.
+- Committed production package: 333461 bytes, SHA-256
+  `315916aff5f6f69f94b59045c74512f605dd2efb53cbb0df429f75cecf31277e`, 24 files, only the existing
+  X/Twitter/LinkedIn/canonical API hosts. An immutable copy and content-free metadata are under
+  ignored `.memedrop/readability-release-20261106/`; production configuration validates with zero
+  warnings. The installed production extension remains the verified 0.0.5 while CI is blocked.
+- Backup `20261106T142942Z`: 102 objects, 19 tables, schema 0012, restored/verified on isolated
+  port 55438, encrypted through the existing Keychain/AES workflow and plaintext removed. Removed
+  only the task-owned readiness containers/volumes; unrelated local services are intact.
+- Blocker: GitHub run `42234924801` refused all four required jobs before any test step started.
+  Its annotation states: "The job was not started because your account is locked due to a billing
+  issue." User input requested to resolve the `moyezr` billing lock. Do not substitute fabricated
+  CI statuses or merge/reload while the required checks cannot run. Nothing was published on social.
+- Next after billing is resolved: rerun PR #5 CI, require all four jobs, merge as `moyezr` and
+  restore `moyez-dev`, then reload the pinned 0.0.6 package and verify live review/attachment and
+  cleanup without publication. Detailed release evidence is in the isolated checkout's PROGRESS.
+
+## LinkedIn production extension QA — 2026-11-06
+
+- Requested outcome: reload the committed extension and verify the pre-opened LinkedIn editor
+  fix live without publication, then recommend product improvements. Baseline `07094cd` plus
+  unrelated uncommitted Reddit/readability work; preserve that implementation and existing drafts.
+- Bounded scope: existing Personal-profile MemeDrop installation, exact committed 0.0.5 artifact,
+  production API, at most four explicit suggestion requests, native draft attachment and cleanup.
+  Acceptance: version/hosts verified after reload, one Meme click binds an unfocused pre-opened
+  editor beyond mount grace, draft text preserved, native image confirmed and removed, no publish.
+- Preflight: six adapter tests pass. Root 0.0.5 ZIP was overwritten by an experimental build
+  using a placeholder API/Reddit hosts; leave it untouched. The task worktree retains the original
+  332584-byte production ZIP with SHA-256
+  `5f4f2d5f2e526e9d86031badb4fc36c52311b6c4cdff9c70c9bb9e10ffa1fe88`, matching the recorded
+  release and production-only X/Twitter/LinkedIn/API host allowlist. Installed Chrome is 0.0.4.
+- Reloaded that exact ZIP at the existing unpacked path in Moyez Personal. Chrome and its worker
+  independently report 0.0.5; runtime manifest contains only X/Twitter/LinkedIn/canonical API hosts,
+  with no localhost/Reddit grants. All 24 package files match the ZIP after QA. The prior generated
+  build is preserved under ignored `.memedrop/linkedin-live-20261106/preexisting-dist/`; unrelated
+  source changes and the overwritten experimental ZIP were not modified.
+- Opened a native inline editor first, added a synthetic draft, then moved focus to another
+  page control. One Meme action focused the intended pre-opened editor and returned one usable
+  captioned card. It remained bound for another 10.398 seconds beyond the observed ready state;
+  draft text stayed unchanged. Card selection produced a decoded, removable native image in that
+  editor. Removed it with native Dismiss, cleared only the synthetic text, and verified the empty
+  placeholder with photo control re-enabled and submission control absent. Nothing was published.
+- The first attempt timed out with a generic API error; retry succeeded. Read-only production
+  aggregates confirm exactly two 0.0.5 LinkedIn request samples (one timeout, one usable model/cache
+  miss) and one confirmed attachment sample. These counts do not establish rates or population
+  latency; normal suppression below 20 observations remains. Cold-start cause is not established.
+- Operator QA exclusion interval: `2026-11-06T14:04:49.480187+00:00` through
+  `2026-11-06T14:11:20.815716+00:00`. Keep it out of ordinary-use evidence; a fresh 0.0.5 observation
+  window may start after that end. Ignored session/aggregate records contain categorical outcomes
+  and timestamps only, with no live source, steering, draft text or captions.
+- `/live` and `/health` return 200; snapshot 166 is fresh. Closed only the task's fresh LinkedIn
+  tab, extension-manager tab and worker inspector. No task-owned service was started. Verified
+  hashes of 51 unrelated modified/untracked files unchanged. Documentation/source review,
+  existing local links, the 73-line AGENTS.md and `git diff --check` pass. Broader runtime suites
+  were not rerun for this artifact reload/documentation task; no application source was changed.
+- Product next steps: release the existing shared readability improvements after their release
+  gates, investigate first-request reliability and improve explicit retry/error states, add caption
+  editing/one-card rewriting and quick stance choices, and complete real human scoring plus a
+  bounded tester pilot before model/ranking/catalog expansion. Reddit remains its own unreleased
+  implementation/access/migration/review track; this reload includes the committed LinkedIn fix.
+
+## Dense-caption readability — 2026-11-05
+
+- Requested outcome: fix dense multi-panel caption readability in the shared platform UI and
+  retest hosted-model post/comment replies on live Reddit in Moyez Personal, preserving drafts
+  and publishing nothing. Baseline `07094cd` plus existing uncommitted implementation/docs.
+- Bounded next step: measure reviewed synthetic dense examples at their source/preview/240px
+  output sizes, fix shared fit/presentation without changing template eligibility or model,
+  then run rendering/workspace/browser gates and live draft-only QA. Preserve unrelated edits.
+- Acceptance: complete captions remain visible, wrapping uses available lines before shrinking,
+  catalog typography/region constraints hold, common behavior remains across X/LinkedIn/Reddit,
+  dense post/comment images are readable in live native previews, existing drafts unchanged,
+  no submission, task-only QA artifacts removed. Record limits or failures explicitly.
+- Baseline: 85 extension tests pass. Current cards crop to a 116px square with badges over the
+  image; shared font estimation may shrink to a single-line width before wrapping. Reddit's
+  current official help still specifies 240px maximum dimensions; retain that native bound.
+- Implemented shared largest-complete-wrapped fitting without changing catalog font/region bounds,
+  uncropped 160px cards with badges below the image, and an explicit larger readable review with
+  selectable caption text. Review makes no generation/upload call and preserves keyboard return.
+  A short-window regression caught the expanded host's old 80px anchor; review now anchors within
+  24px margins, scrolls its content, hides Guide temporarily and restores the strip's position.
+- Synthetic 240px comparison: authored Two Buttons labels grew from 4.1/4.9px to 7.0/10.3px;
+  other multi-panel cases retain/improve size without new source-resolution truncation. Current
+  240px direct rendering still cannot fit every template, so do not switch to that path or loosen
+  minimum sizes. Inspected before/after artifact; catalog inputs/eligibility and provider prompt
+  remain unchanged. Standalone viewport checks pass at 820×560 and 390×400.
+- Initial hosted live post attempt timed out under the normal deadline. One explicit dense-template
+  retry returned a validated model caption in 2,440 ms (no fallback/cache), was reviewed through
+  the new surface and attached with text unchanged. Confirmed native image at 240px and removed
+  only the new post image/sentinel. Pre-existing comment draft stayed intact in its original tab.
+  Final viewport build and all 50 browser scenarios pass, including dense review/attachment
+  across X, LinkedIn and Reddit with Guide open at 820×560.
+- Final checks on the current implementation: `quality:static` passes (593 API tests, 32
+  environment-dependent skips, 85 extension tests, 18 shared tests, workspace typecheck/lint/build
+  and catalog audit; 25 existing annotation warnings). `quality:tuning` and `quality:api-process`
+  pass, with zero ranking regressions/new rejects, 5k ranking p95 25.737 ms and 143 process checks.
+  `git diff --check` passes. These do not establish deployment or human quality approval.
+- Resumed after the user's explicit pause, verified Moyez Personal and completed the live comment
+  retest against current local FastAPI → hosted `openai/gpt-6-luna`. A fresh disposable PostgreSQL
+  database on 55437 was migrated through `0013` and seeded with 49 verified existing local image
+  references. One comment request returned four validated model captions (two multi-panel) in
+  2,219 ms, with `joint_outcome=model` and `cache_hit=false`. Metadata confirmed a 94-character
+  selected target plus nonempty post title/body; no source, steering or captions were retained.
+  Total provider attempts across this readability task: three of the six-attempt ceiling.
+- Inspected the complete four-region review with Guide previously open: header, full image,
+  selectable transcript and Attach were visible. Escape returned focus to its preview button and
+  restored Guide. Reviewing added no generation/click/insertion. Explicit Attach produced one
+  confirmed native comment insertion; visually inspected the complete 240px image and unchanged
+  draft. The resumed database recorded three shown, one clicked and one inserted event.
+- Removed only the new comment image using Reddit's selected-image trash control. Verified the
+  existing text unchanged and Image re-enabled, closed only the fresh QA tab, then verified the
+  original preserved Reddit draft remained open with no editable image. No Comment/Submit action
+  occurred. Unrelated Personal tabs and all other profiles were left intact.
+- Uninstalled only `MemeDrop Readability QA` (`ogjndhpkcloelohealgfdmmkgfgablea`): name/ID absent
+  in the extension manager; original MemeDrop 0.0.4 still enabled and not reloaded. Closed the QA
+  manager tab. Stopped the task-owned loopback API, removed the disposable database container,
+  and removed the ignored QA build/helper, synthetic measurements and temporary logs. No production
+  data, env file, storage or original MemeDrop installation changed. The requested retest and
+  cleanup are complete; release route, formal human quality review and pilot gates remain.
+
+## Hosted-model Reddit QA — 2026-11-05
+
+- Completed the requested hosted-model live Reddit post/comment tests in Moyez Personal. Baseline
+  `07094cd` plus the previously verified uncommitted implementation; no application source changes,
+  commit, rollout or production migration. Existing documentation/assessment work is preserved.
+- Deployed `/live` succeeds, but deployed OpenAPI has no Reddit reply-context contract. Exercised
+  current FastAPI locally against the configured `openai/gpt-6-luna` hosted OpenRouter model using
+  only the development model credential server-side. Used disposable PostgreSQL at port 55436,
+  migrations through `20261104_0013`, and 49 verified existing local catalog references. No production
+  database, storage, buckets or credentials were changed. Trends were disabled for the isolated test.
+- Kept normal provider deadlines, caption/region validation, fallback and verified-template gates.
+  Metadata-only observer counted provider outcomes, validated captions, durations, request kinds and
+  context lengths; retained no live source, usernames, draft text, steering or captions. Disabled
+  body-bearing exception/access logs. Six-attempt ceiling; only three provider calls were needed.
+- Synthetic provider preflight returned two validated model captions in 2,054 ms. Live post and
+  selected-comment requests each returned three validated model captions, in 2,081 and 2,416 ms.
+  All three runs had `joint_outcome=model`, `cache_hit=false`; none relied on deterministic fallback.
+  Live comment metadata confirmed a distinct selected target plus nonempty original title/body.
+  Visual spot-check showed the comment response used comment-specific context.
+- Through the shared panel, one live post suggestion and one live comment suggestion attached only
+  to their intended native editors. The isolated database recorded two `inserted` events and six
+  shown suggestions. Both draft texts stayed unchanged while both editors/images coexisted.
+  No native Comment/Submit action occurred; no Reddit post/comment was published.
+- A comment draft already existed before this run (restored by Reddit after the previous QA).
+  Preserved its text, removed only the newly attached image through Reddit's selected-image trash
+  control, and left that draft open with Image re-enabled and no editable image present. Cleared
+  only this run's synthetic post draft/image and cancelled that empty composer. The Reddit test tab
+  stays open specifically to preserve/review the existing comment draft; unrelated tabs are intact.
+- Cleanup verified in Personal: `MemeDrop Hosted QA` name/ID absent after uninstall; original
+  MemeDrop 0.0.4 still enabled and not reloaded. QA manager tab closed. Task-owned API stopped,
+  disposable database container removed, ignored QA build/helper and temporary build log removed.
+  The development env file was read selectively and never modified; no secret reached the browser.
+- Checks: 12 reply-context tests and the scoped extension build passed. Previous 47 browser
+  regressions/full workspace gate cover the unchanged application source; this run adds actual
+  hosted-provider/native-Reddit evidence. `git diff --check` passes. No human-scored quality or
+  broad frontend compatibility claim: dense multi-panel text is small after 240px preparation,
+  so caption readability/humor review remains a pilot requirement. No render/quality gate was relaxed.
+- Next: permitted release route, formal human review, broader frontend coverage and opt-in pilot
+  remain in the launch plan. The requested hosted-model live testing and cleanup are complete.
+
+## Live Reddit QA — 2026-11-05 (continued from November 4)
+
+- Requested outcome: test live Reddit post/comment replies in Moyez Personal Chrome, preserve
+  existing drafts, remove QA artifacts and publish nothing. Baseline `07094cd` with the existing
+  uncommitted implementation, documentation and assessment work preserved. No commit or rollout.
+- Acceptance: correct profile/build; common UI; exact native editor ownership; selected-comment plus
+  post title/body context; draft text retained during attachment; native confirmation and cleanup;
+  no submission; applicable regression gates pass. Hosted model quality remains a separate check.
+- Test boundary: separately named Reddit-only `MemeDrop Reddit QA` extension, actual local FastAPI,
+  disposable PostgreSQL at port 55435 with migrations through `20261104_0013`, 49 verified existing
+  local catalog images, no model key or storage credentials. Original installed MemeDrop 0.0.4 was
+  not reloaded or removed. No production migration, deployment, bucket or credential changes.
+- Live evidence in explicitly selected Moyez Personal: shared panel post/comment flows each attached
+  to the intended native editor while two synthetic drafts stayed unchanged. The isolated database
+  recorded two confirmed `inserted` events. Native image upload/removal baseline also passed.
+  QA images and synthetic text were removed afterward; empty test tabs were closed. No Comment/
+  Submit action occurred. Unrelated drafts/tabs were left intact. No live source, usernames,
+  draft text, steering or captions were copied into repository evidence or retained server logs.
+- Short image-post sources initially returned no local fallback. The shared Guide control selected
+  a reviewed fallback template for attachment QA. A later text-post comment produced an automatic
+  local suggestion. These checks establish UI/context/upload behavior, not hosted caption quality.
+- Metadata-only API observation verified post/comment target kinds, selected target distinct from
+  the root post, and nonempty original title/body fields on a text post. The image post correctly
+  had an empty body. Final live retest verified direct post opening and one-click switching from
+  an active post session to a newly mounted comment editor.
+- Fixed native DOM gaps: slotted Reply trackers; post action versus collapsed composer opener;
+  external `comment-composer-host` with `post-id`/`parent-id`; nested image/video shadow toolbars;
+  source text budget 512 versus bounded native-UI discovery 2,048; decoded keyboard-removable
+  Lexical image identity/key confirmation; nested projected text-body slots treated as one field,
+  while sibling bodies remain ambiguous. Focus the unique native opener before clicking it.
+- Fixed session switching: during asynchronous native mounting, the binding timer owns the pending
+  intent. Same-URL compose-state changes cannot cancel it merely because a previous target was
+  active. Actual navigation, bound-editor closure, changed context and ambiguity still cancel.
+  Shared panel/cards/styles remain unchanged across platforms.
+- Final verification on this working tree: `npm run quality:static` passes (593 API tests, 32
+  environment-bound skips; 85 extension tests; workspace typecheck/test/lint/build/catalog audit).
+  `npm run quality:suggestion-browser` passes all 47 real-FastAPI/packaged-extension/Chromium
+  scenarios: prior 40 plus native-host/media, body projection/ambiguity and delayed target-switch
+  regressions. Existing 25 catalog annotation warnings remain. `git diff --check` passes.
+- Cleanup complete after the user made Personal available: removed only `MemeDrop Reddit QA`
+  through Chrome and confirmed its name/ID no longer appears. Original MemeDrop 0.0.4 remains
+  enabled and was not reloaded. Closed the task's extension-manager tab; the original Personal tab
+  remains. Prior QA tabs were closed after visible cleanup; the later hosted check found a restored
+  comment draft and preserved it as described above.
+  Task-owned API/helper, disposable PostgreSQL container, scoped ignored QA build and temporary
+  task logs are removed/stopped. No production or work-profile extension was modified.
+- Next: release permission, hosted model/human quality review, broader frontend coverage and
+  opt-in pilot remain pending in the launch plan. Local live draft QA does not establish hosted
+  Reddit readiness. The requested live testing and cleanup are complete; no publish/commit/deploy.
+
+## Reddit integration implementation — 2026-11-04
+
+- Requested outcome: start the Reddit extension flow with shared UI and selected-comment plus
+  root-post context. Baseline `07094cd`; preserve existing documentation edits and assessment.
+- Bounded implementation: desktop detail-page adapters, bounded structured context/cache handling,
+  exact composer ownership and capability checks, shared panel/actions, additive anonymous Reddit
+  measurements, synthetic browser regression coverage. No deployment or live Reddit processing.
+- Acceptance: top-level and nested fixture replies render through the common panel; both comment
+  and post reach generation/fallback and affect cache identity; unrelated editors/media stay intact;
+  missing capability/context never starts inference; navigation invalidates late work. Existing
+  X/LinkedIn browser cases and applicable development gates must pass. Live DOM, permitted access
+  and human quality review remain separate pilot prerequisites.
+- Baseline: 18 focused extension adapter/intent/request tests and 27 API performance tests pass.
+- Implemented experimental desktop detail-page post/comment adapters using the existing shared
+  panel, cards, controls, action markup and styles. Native open-shadow action groups and composers
+  are supported; closed/inaccessible, ambiguous, wrong-root or image-ineligible targets fail closed.
+  A pre-opened reply is reused without toggling native Reply again. Draft text and existing media
+  are preserved; a new decoded, removable native preview is required for insertion. No submission.
+- Selected comments (2,000 characters) and root-post title/body (300/1,200) remain separate through
+  strict request validation and joint prompts; both shape deterministic retrieval/fallback and
+  hashed cache identity. Selected-comment stance stays primary. Node reads prune other reply
+  branches, used-context changes invalidate sessions, and root/target IDs isolate browser caches.
+  Session references clear on closure; worker cache entries are physically evicted after five
+  minutes. Source/steering/permalink slugs stay out of diagnostics and operational measurements.
+- Added optional compatible `/suggest` and `/suggest/caption` context contracts and additive
+  `20261104_0013` for anonymous Reddit performance samples. Reddit-derived feedback categories are
+  omitted. Updated architecture, privacy source/disclosures, exact-host validators and launch notes.
+- Verification: `quality:static` passed, followed by final affected-path reruns after the pre-opened
+  editor change: 593 API tests pass (32 environment-bound skips), 85 extension tests pass, API and
+  extension typechecks, API lint and extension build pass. Workspace lint/build and catalog audit
+  pass; the existing 25 catalog annotation warnings are unchanged. `quality:api-process` passes.
+- Final immutable-artifact browser run passes all 40 real-FastAPI/packaged-extension/Chromium
+  scenarios: the existing 21 X/LinkedIn cases plus 19 Reddit cases, including 2,000 direct child
+  comments/deep nesting, bounded long inputs, shared card appearance, open/closed shadow roots,
+  pre-opened drafts, native upload disable/re-enable, zero-inference capability failures and stale
+  source/navigation cancellation. Inspected synthetic screenshots of the common panel. Fixture
+  waits finish prior impression/measurement delivery before resetting; stale-result assertions
+  remain intact. No live Reddit DOM was accessed by these fixtures.
+- All 32 PostgreSQL/Redis integration tests pass on isolated ports 55434/56381, including migration
+  upgrade/rollback preservation and rejection while Reddit rows exist; schema readback is 0013.
+  `quality:tuning` passes with zero case-level ranking regressions and 5,000-template warm p95
+  14.552ms. npm/Python security audits pass. Example-HTTPS extension packaging/permission validation
+  passes; its ignored ZIP is a validation artifact, not a production release candidate.
+- Documentation/local-anchor/new-file whitespace checks and `git diff --check` pass; AGENTS.md
+  remains 73 lines. No credentials, production configuration/data/schema, extension reload,
+  deployment, publication, staging or commit changes. Pre-existing documentation/assessment work
+  is preserved. Only task-owned test services and temporary browser artifacts were cleaned up.
+- Next: resolve permitted live access/external inference, validate current signed-in Reddit native
+  drafts without publication, author/score the Reddit human-review set, and meet the linked pilot
+  gates. Before any rollout, apply 0013, deploy the compatible API/privacy source, and prepare a
+  new appropriately versioned production-origin extension package through the release runbooks.
+
+## Reddit integration planning — 2026-11-04
+
+- Requested outcome: an actionable plan to add Reddit alongside X/LinkedIn. Baseline `07094cd`;
+  pre-existing PROGRESS edits and the untracked October 19 product assessment are preserved.
+- Added [Reddit action plan](docs/reddit-integration-plan.md) and linked a proposed track in the
+  launch backlog. Scope: desktop detail-page extension pilot, capability-first generation,
+  top-level then nested replies, exact parent/composer ownership, native confirmation, anonymous
+  measurements, synthetic human review, release proof and explicit pilot criteria.
+- Reviewed source architecture, adapters, intent/attachment paths, packaging validators and the
+  X/LinkedIn-only API/database measurement constraint. Checked current official Reddit image,
+  access/commercial, collection and Devvit AI rules; sources and unresolved applicability are
+  recorded in the plan. Access and external inference approval are dependencies, not established.
+- Acceptance for this documentation task: concrete phased work, implementation locations,
+  observable exit criteria, estimates, validation and rollout/rollback; local links and whitespace
+  checks pass and AGENTS.md remains 73 lines. No runtime/configuration/data changes or live Reddit
+  checks were performed; runtime suites are unnecessary for this docs-only scope.
+- Next: resolve the exact permitted data flow and build authored local composer fixtures; validate
+  live upload behavior only under that route. Existing LinkedIn live QA remains deferred.
+- User refinement: nested replies must use both the exact selected comment and root-post context,
+  with bounded extraction for huge/deep threads. Both reply types are required before the pilot.
+  Future UI/UX changes must propagate across X/LinkedIn/Reddit through common components/styles;
+  adapters own native integration. Updated the plan/backlog and recorded design requirement D013.
+  Added acceptance for context/cache/fallback separation, huge-thread fixtures and shared UI
+  verification. Documentation links/anchors and whitespace checks pass; runtime remains unchanged.
 ## Readability production release — 2026-11-06
 
 - Requested outcome: ship wrapped caption fitting, uncropped cards and larger readable review;
@@ -396,6 +787,34 @@ This is the current session handoff. Replace stale state; git retains history. T
   Next action: review/commit the coherent change, then controlled migration/API/extension and privacy
   page rollout with real X/LinkedIn DOM QA. Local fixtures do not establish hosted compatibility.
 
+## Product and evaluation assessment — 2026-10-19
+
+- Requested outcome: assess overall product improvements, suggestion latency/quality, X/Reddit
+  browsing experience, and evaluation sufficiency. Scope: code/corpus review, current local
+  baseline checks, and an evidence-backed proposal; no runtime or production changes.
+  Acceptance: distinguish measured findings from hypotheses, identify evaluation blind spots,
+  and give a bounded implementation sequence with observable success criteria.
+- Completed [assessment](docs/product-assessment-2026-10-19.md) at `149d4b7`, preserving all
+  pre-existing progress edits. Identified the five-second client deadline versus serial trend
+  lookup plus 4.5-second inference budgets, browser milestone/event semantics, and Reddit's
+  missing adapter/capability handling. Prioritize deadline/measurement correctness, human taste
+  evaluation and reply controls, then a narrow Reddit pilot. These are proposals, not deployments
+  or accepted replacements for D003/D004/D010 or the launch-plan backlog.
+- Fresh deterministic evaluation passed: 104 cases, top-1/3/5/12 acceptable family rates
+  74.0%/90.4%/99.0%/99.0%, with rejected-family intrusion on 10 top-five and 23 shortlist cases;
+  case-level baseline unchanged; local ranking p95 0.414ms, synthetic 5000-template p95 15.841ms.
+  Corpus review found exactly three expected families per case, no no-fit cases, source lengths
+  66–166 characters, 104 singleton categories, and no explicit platform/provenance/holdout fields.
+  Existing live comparison has twelve distinct posts and unfilled human humor scores.
+- Verification: API evaluation tests 16 passed; selected extension tests 22 passed with the
+  repository's tsx loader; benchmark audit passed without findings. Initial evaluation output
+  directory and Node loader invocation errors were corrected and the checks rerun successfully.
+  No live model calls, customer-data inspection, browser QA, deployment, or catalog changes.
+  Documentation links/anchors, AGENTS.md length, and diff/whitespace checks passed.
+- Next action: implement the bounded deadline/browser-observability task, then collect a genuine
+  human taste baseline and reviewed development/holdout cases before tuning quality. Adopted work
+  should be tracked in the existing launch plan. The assessment does not establish hosted readiness.
+
 ## Luna production migration — 2026-10-19
 
 - Requested outcome: switch the purpose-specific chat/vision model settings to
@@ -423,7 +842,26 @@ This is the current session handoff. Replace stale state; git retains history. T
 - Production environment preflight passed with zero warnings. Backup `20261019T064705Z` contains
   98 objects and 18 tables, schema `20260902_0010`; restored/verified on isolated port 55433,
   archived with the existing AES-256/Keychain workflow, and removed the verified plaintext copy.
-  Release commit, environment synchronization, deployment, and hosted smoke are next.
+  No backup or schema migration was used to change production data.
+- Release `149d4b7` is committed and pushed to `main`; the pre-existing October 13 progress
+  section was deliberately excluded from the commit and remains intact in the working tree.
+  Updated exactly the four production runtime model variables to Luna, then read back all four;
+  every other non-system Vercel variable compared unchanged, including Gemini Embedding 2 and
+  the 172800-second freshness limit. Offline template selectors are updated in source/local env.
+- Git-triggered API deployment `dpl_4dmQ9LNDKYok8xVPgumr4pXsx47T` is READY, URL
+  `meme-drop-jybxwpsjo-moyezrabbaniworkgmailcoms-projects.vercel.app`; canonical
+  `api.memedrop.moyezrabbani.dev` resolves to that deployment. `/live` and `/health` return 200;
+  snapshot 156 is fresh with four cards. QStash readback remains daily `0 0 * * *`, three retries.
+- Hosted black-box smoke: default synthetic scenario returned valid `no_fit`, matching replay,
+  and zero charge. A known fixed benchmark fixture then generated one authenticated WebP
+  (57,120 bytes), replayed identically, and settled exactly one credit. Initial generation 3.73s,
+  replay 0.19s; operator test balance moved from one to zero. Both temporary API keys were revoked;
+  no active operator keys remain. Inputs, captions, and credentials are absent from retained logs.
+- Local readiness and release dry-run are complete; documentation/diff checks passed. No prompt,
+  caption-validation, fallback, template-eligibility, cadence, or embedding migration was performed
+  beyond supplying the unchanged tagging output schema. Temporary test services, archive checkout,
+  operator scripts, and pulled env files were removed. Next action: inspect the next scheduled Luna trend refresh and actual
+  production cost/quality before considering further cadence or routing changes.
 
 ## Three-model evaluation rerun — 2026-10-19
 
@@ -497,6 +935,26 @@ This is the current session handoff. Replace stale state; git retains history. T
   AGENTS.md limit, and final diff/whitespace review passed. Next action: human taste review and
   a purpose-specific Luna migration, beginning with trends; resolve tagging/schema and embedding
   configuration findings before any production rollout.
+
+## CPU usage follow-up — 2026-10-13
+
+- Outcome: explain idle production usage; the operator clarified the metric is Fluid Active CPU.
+  Scope is read-only diagnosis, with no runtime or scheduler changes. Acceptance: distinguish CPU
+  from transfer, check recent request paths, and separate measured evidence from attribution estimates.
+- Baseline: clean `main` at `05a4abe`. Reviewed the existing maintenance evidence and current
+  API health, startup, and workflow code. `vercel logs` for production API over the last hour
+  returned six retained records, all `/health`, matching the ten-minute monitor cadence.
+- `vercel usage --group-by project --json --cwd apps/api` still returns `Costs not found (404)`;
+  the October 7 dashboard measurements below remain historical, not current-cycle measurements.
+  Vercel's current function pricing docs confirm Active CPU measures execution, excludes external
+  I/O wait, and includes four monthly hours on Hobby.
+- Background scheduling remains the leading explanation: 4,320 health calls per 30 days plus
+  approximately 750–900 daily-workflow calls and weekly cleanup. Startup imports, catalog loading,
+  client construction, and workflow processing are CPU attribution candidates, not measured shares.
+  A rolling 30-day chart still includes the heavier cadence before October 7.
+- Next action: obtain current dashboard CPU by day and compare before/after October 7; profile
+  startup and maintenance execution before choosing a reduction. Runtime tests were unnecessary
+  for this diagnosis. Documentation diff checks passed; no settings or credentials were changed.
 
 ## Current maintenance change — 2026-10-07
 
