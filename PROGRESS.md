@@ -43,9 +43,20 @@ This is the current session handoff. Replace stale state; git retains history. T
   SHA-256 `b0c51995ae954f47c83c03e3b53350f2580724bd6d8bfb0ffa1c247b1819926e`, 29 files;
   X/Twitter/LinkedIn/Reddit/canonical API hosts only. It is not installed or distributed.
   Canonical API `/live` and `/health` return 200 after migration, before the Git merges.
-- Next: push this reconciled merge to PR #6, merge #5 and #6 through normal GitHub controls,
-  verify main includes their heads and hosted rollout status, restore account and remove only
-  task-owned local test services. GitHub CI billing remains a separately reported limitation.
+- Complete: #5 merged as `a656004`, #6 merged as `f729157`, through normal merge controls;
+  no protections or check statuses changed. Main contains #5 head `eb64d0d`, reconciled #6 head
+  `de276eb` and redundant #1 head `5aca04f`. No open PRs remain. GitHub run `42882858326`
+  still refused jobs before any steps due to the confirmed account billing lock; fresh local
+  verification above covers the identical merged application tree.
+- Local checkout fast-forwarded to main with clean source; installed unpacked extension still
+  reports 0.0.5. Task-owned PostgreSQL/Redis containers and volumes were removed, shared services
+  left intact. Every GitHub mutation batch used verified `moyezr` and restored `moyez-dev`.
+- Both main production deployments are Ready/success: API `dpl_51ReBBM47vVWpu8H21HvpwTWgWWJ`,
+  web `dpl_GunzhCH4r23GjDeaHwBw9dDBz9Yd`. Canonical API `/live` and `/health` return 200,
+  `/openapi.json` exposes reply context and the hosted privacy page includes Reddit. No paid
+  hosted generation/credit-settlement smoke was run for this merge task.
+  This source merge does not distribute/reload the extension, establish Reddit access permission,
+  human quality approval or a pilot, or publish social content.
 
 
 ## Push all pending product work — 2026-11-11
