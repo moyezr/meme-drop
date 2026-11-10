@@ -158,19 +158,16 @@ function layoutMemeTextRegion(
   const manifestMax = region.font?.max_size ?? 52;
   const manifestMin = region.font?.min_size ?? 12;
   const minFont = Math.max(10, manifestMin);
-  const maxFont = estimateImpactFontSize(ctx, text, safeBounds.width, safeBounds.height, {
-    minFont,
-    maxFont: manifestMax,
-    fontScale,
-    font,
-  });
   const maxLines = region.max_lines || 4;
-  let fontSize = maxFont;
+  // Fit the complete wrapped caption, not its single-line width. Dense panels
+  // often have room for two lines at a much more readable size.
+  let fontSize = Math.max(minFont, Math.min(manifestMax, manifestMax * fontScale));
   let wrapped = wrapMemeTextLines(ctx, text, safeBounds.width, fontSize, maxLines, font);
 
   while (
     fontSize - 0.5 >= minFont &&
-    (wrapped.lines.length * fontSize * font.lineHeightRatio > safeBounds.height ||
+    (wrapped.truncated ||
+      wrapped.lines.length * fontSize * font.lineHeightRatio > safeBounds.height ||
       wrapped.lines.some((line) => measureMemeText(ctx, line, fontSize, font) > safeBounds.width))
   ) {
     fontSize -= 0.5;
@@ -296,33 +293,6 @@ function breakLongWord(ctx: CanvasRenderingContext2D, word: string, maxWidth: nu
   }
   if (current) pieces.push(current);
   return pieces;
-}
-
-function estimateImpactFontSize(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  width: number,
-  height: number,
-  options: {
-    minFont: number;
-    maxFont: number;
-    fontScale: number;
-    font: ResolvedMemeTextFont;
-  }
-): number {
-  const words = text.split(/\s+/).filter(Boolean);
-  const longestWordLength = words.reduce((max, word) => Math.max(max, word.length), 1);
-  const targetLineCount = Math.max(1, Math.min(4, Math.ceil(text.length / 18)));
-  const roughByLength = width / Math.max(longestWordLength * 0.72, text.length * 0.24);
-  const roughByHeight = height / (targetLineCount * options.font.lineHeightRatio);
-  let size = Math.min(options.maxFont, Math.max(options.minFont, roughByLength, roughByHeight));
-  size *= options.fontScale;
-  size = Math.min(options.maxFont, Math.max(options.minFont, size));
-
-  ctx.font = memeCanvasFont(size, options.font);
-  if (ctx.measureText(text).width <= width) return size;
-
-  return Math.max(options.minFont, Math.min(size, width / Math.max(1, text.length * 0.54)));
 }
 
 function transformOverlayText(

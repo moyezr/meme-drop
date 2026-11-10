@@ -16,7 +16,7 @@ from memedrop_api.app import create_app
 from memedrop_api.config import Settings
 from memedrop_api.performance_metrics import BrowserPerformanceSample, PerformanceCleanupResult
 from memedrop_api.rate_limit import MemoryRateLimitStore
-from memedrop_api.schemas import TweetContext
+from memedrop_api.schemas import ReplyContext, TweetContext
 from memedrop_api.services.catalog import MemeCatalog, MemeTemplate
 from memedrop_api.services.openrouter import JointSuggestionResult, TemplateSelection
 from memedrop_api.services.storage import LocalMemeStorage
@@ -48,6 +48,7 @@ suggestion_calls = 0
 suggestion_pending = 0
 fixture_revision = 0
 performance_samples: list[dict[str, object]] = []
+reply_context_checks: list[dict[str, object]] = []
 
 
 class FixturePerformanceStore:
@@ -69,13 +70,17 @@ class FixtureStore(FakeStore):
     async def list_global_memes(self) -> list[dict[str, Any]]:
         if fixture_mode == "error":
             raise TimeoutError("Fixture catalog unavailable")
-        return await super().list_global_memes()
+        rows = await super().list_global_memes()
+        return rows if fixture_mode == "dense" else rows[:2]
 
 
 store = FixtureStore()
-for index, template_id in enumerate(("surprised-pikachu", "this-is-fine"), start=1):
+for index, template_id in enumerate(
+    ("surprised-pikachu", "this-is-fine", "two-buttons", "gru-s-plan"), start=1
+):
     template = next(item for item in catalog.verified_templates if item.template_id == template_id)
-    image = Image.new("RGB", (480, 480), (246, 210, 96))
+    dimensions = (600, 908) if index == 3 else (700, 449) if index == 4 else (480, 480)
+    image = Image.new("RGB", dimensions, (246, 210, 96))
     ImageDraw.Draw(image).rectangle((40, 120, 440, 320), fill=(98, 130, 180))
     image.save(root / f"fixture-{index}.png")
     store.memes.append(
@@ -101,9 +106,42 @@ class FixtureGateway:
         steering_instruction: str | None = None,
         trend_cards: Sequence[TrendCard] = (),
         timeout_ms: int | None = None,
+        reply_context: ReplyContext | None = None,
     ) -> JointSuggestionResult:
+        if reply_context is not None:
+            reply_context_checks.append(
+                {
+                    "kind": reply_context.target_kind,
+                    "has_selected_comment": tweet_text.startswith("I warned them."),
+                    "has_post_title": reply_context.post_title == "Our synthetic Friday launch",
+                    "has_post_body": reply_context.post_body.startswith("We skipped tests"),
+                    "target_length": len(tweet_text),
+                    "body_length": len(reply_context.post_body),
+                    "truncated": reply_context.truncated,
+                }
+            )
         if fixture_mode == "slow":
             await asyncio.sleep(20)
+        if fixture_mode == "dense":
+            return JointSuggestionResult(
+                selections=[
+                    TemplateSelection("two-buttons", "review or rush", 0.96),
+                    TemplateSelection("gru-s-plan", "the plan backfires", 0.9),
+                ][:limit],
+                captions={
+                    "two-buttons": {
+                        "left_button": "Ship without tests",
+                        "right_button": "Wait for review",
+                        "person": "Friday deployment",
+                    },
+                    "gru-s-plan": {
+                        "step_1": "Skip the tests",
+                        "step_2": "Deploy on Friday",
+                        "step_3": "Service goes down",
+                        "realization": "My weekend is gone",
+                    },
+                },
+            )
         return JointSuggestionResult(
             selections=[
                 TemplateSelection("surprised-pikachu", "predictable result", 0.96),
@@ -177,7 +215,7 @@ async def count_requests(request: Request, call_next):  # type: ignore[no-untype
 
 @app.post("/_fixture/reset")
 async def reset(
-    mode: Literal["success", "slow", "error", "broken_media"] = "success",
+    mode: Literal["success", "slow", "error", "broken_media", "dense"] = "success",
 ) -> dict[str, bool]:
     global fixture_mode, suggestion_calls, fixture_revision
     fixture_mode = mode
@@ -189,6 +227,7 @@ async def reset(
         rate_limiter.buckets.clear()
     store.usage_events.clear()
     performance_samples.clear()
+    reply_context_checks.clear()
     service.cache.clear()
     service._global_candidates = None
     for index, row in enumerate(store.memes, start=1):
@@ -203,4 +242,5 @@ async def state() -> dict[str, object]:
         "suggestion_pending": suggestion_pending,
         "events": store.usage_events,
         "performance_samples": performance_samples,
+        "reply_context_checks": reply_context_checks,
     }

@@ -52,7 +52,7 @@ export interface MemeReplyButtonController {
 
 export function initMemeReplyButtons(
   platform: PlatformAdapter,
-  onMemeReply: (source: MemeReplySource, post: HTMLElement) => void
+  onMemeReply: (source: MemeReplySource, post: HTMLElement) => void | boolean
 ): MemeReplyButtonController {
   let forwardingNativeReply = false;
   let scanQueued = false;
@@ -74,9 +74,11 @@ export function initMemeReplyButtons(
 
   const injectButton = (post: HTMLElement) => {
     if (platform.id === "x" && post.closest(platform.selectors.composeScope)) return;
-    const nativeReply = post.querySelector<HTMLElement>(platform.selectors.nativeReply);
+    const nativeReply = platform.findNativeReply
+      ? platform.findNativeReply(post) : post.querySelector<HTMLElement>(platform.selectors.nativeReply);
     const actionGroup = nativeReply ? platform.findActionGroup(nativeReply) : null;
     if (!nativeReply || !actionGroup || actionGroup.querySelector(`[${BUTTON_ATTRIBUTE}]`)) return;
+    ensureStyles(nativeReply.getRootNode());
 
     const actionUnit = directChildContaining(actionGroup, nativeReply);
     if (!actionUnit) return;
@@ -103,11 +105,12 @@ export function initMemeReplyButtons(
       event.preventDefault();
       event.stopPropagation();
 
-      onMemeReply(platform.extractReplySource(post, nativeReply), post);
+      if (onMemeReply(platform.extractReplySource(post, nativeReply), post) === false) return;
 
       forwardingNativeReply = true;
       try {
-        nativeReply.click();
+        if (platform.openNativeReply) platform.openNativeReply(post, nativeReply);
+        else nativeReply.click();
       } finally {
         forwardingNativeReply = false;
       }
@@ -124,6 +127,10 @@ export function initMemeReplyButtons(
   return {
     destroy() {
       observer.disconnect();
+      for (const post of platform.findPosts()) {
+        const native = platform.findNativeReply?.(post);
+        if (native) platform.findActionGroup(native)?.querySelector(`[${BUTTON_ATTRIBUTE}]`)?.parentElement?.remove();
+      }
       document.querySelectorAll(`[${BUTTON_ATTRIBUTE}]`).forEach((button) => {
         button.parentElement?.remove();
       });
@@ -134,18 +141,19 @@ export function initMemeReplyButtons(
   };
 }
 
-function directChildContaining(parent: HTMLElement, descendant: HTMLElement): HTMLElement | null {
+function directChildContaining(parent: HTMLElement | ShadowRoot, descendant: HTMLElement): HTMLElement | null {
   let current: HTMLElement | null = descendant;
-  while (current?.parentElement && current.parentElement !== parent) {
+  while (current?.parentNode && current.parentNode !== parent) {
     current = current.parentElement;
   }
-  return current?.parentElement === parent ? current : null;
+  return current?.parentNode === parent ? current : null;
 }
 
-function ensureStyles(): void {
-  if (document.getElementById(STYLE_ID)) return;
+function ensureStyles(root: Node = document): void {
+  const container = root instanceof ShadowRoot ? root : document.head;
+  if (container.querySelector(`#${STYLE_ID}`)) return;
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = MEME_REPLY_BUTTON_STYLES;
-  document.head.appendChild(style);
+  container.appendChild(style);
 }

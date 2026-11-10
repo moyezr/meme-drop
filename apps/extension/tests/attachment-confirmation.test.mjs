@@ -10,7 +10,7 @@ function fixture() {
   const state = { images: [], busy: false };
   const scope = {
     isConnected: true,
-    querySelectorAll: () => state.images,
+    querySelectorAll: (selector) => selector === "busy" ? state.busy ? [{}] : [] : state.images,
     querySelector: () => state.busy ? {} : null,
   };
   return { state, scope };

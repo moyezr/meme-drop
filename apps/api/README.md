@@ -21,9 +21,19 @@ columns, install identity semantics, and extension-facing error contract.
 - preview-thumbnail/original-attachment media path and `Server-Timing` diagnostics
 - content-free browser performance samples with bounded retention and aggregate-only reporting
 - authored-synthetic human evaluation with offline rendered review and structured score exports
+- bounded optional Reddit `reply_context` for `/api/v1/suggest` and `/api/v1/suggest/caption`, with
+  selected-comment/post separation and compatible anonymous performance measurements
 
 FastAPI has route parity and is the runtime used by root development, build, database, container,
 and deployment commands.
+
+Reddit requests keep the selected reply target in `tweet_text` (at most 2,000 characters) and send
+`reply_context` with `platform: "reddit"`, `target_kind: "post" | "comment"`, `post_title` (1–300
+characters), `post_body` (0–1,200 characters) and a boolean `truncated`. Extra fields are rejected.
+Both sources participate in cache identity, inference and reviewed deterministic fallback; they
+remain transient and do not enter usage feedback categories. Legacy requests are unchanged.
+Apply migration `20261104_0013` before deploying Reddit measurement support, then release the
+extension. Local fixtures do not establish live Reddit compatibility or permitted processing.
 
 See [evaluation and baseline workflow](../../docs/evaluation.md) for `npm run eval:human`,
 `npm run baseline:suggestions`, score handling, privacy boundaries and interpretation limits.

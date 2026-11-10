@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from memedrop_api.identity import InstallHeader, resolve_install_identity
 from memedrop_api.schemas import CaptionRequest, SuggestRequest
+from memedrop_api.services.reply_context import reply_source_text
 from memedrop_api.services.suggestion_engine import SuggestionService
 
 router = APIRouter(prefix="/api/v1", tags=["suggestions"])
@@ -33,6 +34,7 @@ async def suggest(
             refresh=body.refresh,
             cache_key=body.cache_key,
             steering_instruction=body.steering_instruction,
+            reply_context=body.reply_context,
             deadline=request.state.suggestion_deadline,
         )
         return JSONResponse(
@@ -54,7 +56,9 @@ def elapsed_ms(started: float) -> float:
 async def caption(body: CaptionRequest, request: Request) -> dict[str, object] | JSONResponse:
     service: SuggestionService = request.app.state.suggestion_service
     try:
-        overlay = await service.get_tailored_overlay(body.tweet_text, body.meme_id)
+        overlay = await service.get_tailored_overlay(
+            reply_source_text(body.tweet_text, body.reply_context), body.meme_id
+        )
         return {"tailored_overlay": overlay}
     except Exception:
         return JSONResponse(

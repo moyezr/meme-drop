@@ -1,6 +1,9 @@
+import type { ReplyContext } from "@memedrop/shared";
+
 export interface MemeReplySource {
   tweetText: string | null;
   tweetId: string | null;
+  replyContext?: ReplyContext;
 }
 
 interface PendingMemeReply extends MemeReplySource {
@@ -31,6 +34,7 @@ export class MemeReplyIntent {
     return {
       tweetText: pending.tweetText,
       tweetId: pending.tweetId,
+      ...(pending.replyContext ? { replyContext: pending.replyContext } : {}),
     };
   }
 

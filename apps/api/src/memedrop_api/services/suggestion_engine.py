@@ -16,7 +16,7 @@ from uuid import UUID
 
 from memedrop_api.config import Settings
 from memedrop_api.repositories import BackendStore
-from memedrop_api.schemas import TweetContext
+from memedrop_api.schemas import ReplyContext, TweetContext
 from memedrop_api.services.catalog import MemeCatalog, MemeTemplate
 from memedrop_api.services.context_analyzer import heuristic_tweet_context
 from memedrop_api.services.meme_text import (
@@ -25,6 +25,7 @@ from memedrop_api.services.meme_text import (
     clean_generated_regions,
 )
 from memedrop_api.services.openrouter import SuggestionModelGateway, TemplateSelection
+from memedrop_api.services.reply_context import reply_source_text
 from memedrop_api.services.trend_context import (
     MAX_TREND_CARDS,
     TrendRetriever,
@@ -705,11 +706,25 @@ class SuggestionService:
         cache_key: str | None = None,
         steering_instruction: str | None = None,
         deadline: float | None = None,
+        reply_context: ReplyContext | None = None,
     ) -> SuggestionRun:
         service_deadline = asyncio.get_running_loop().time() + SUGGESTION_TIMEOUT_MS / 1000
         deadline = min(service_deadline, deadline) if deadline is not None else service_deadline
         normalized_limit = max(1, min(5, int(limit or 5)))
+        source_text = reply_source_text(tweet_text, reply_context)
+        # The selected comment owns stance/intent. Background can supply topic and
+        # retrieval terms without turning a disagreement into the post's celebration.
         context = heuristic_tweet_context(tweet_text)
+        if reply_context is not None:
+            background = heuristic_tweet_context(
+                f"{reply_context.post_title}\n{reply_context.post_body}"
+            )
+            context = context.model_copy(
+                update={
+                    "topic": background.topic if context.topic == "other" else context.topic,
+                    "keywords": list(dict.fromkeys([*context.keywords, *background.keywords]))[:6],
+                }
+            )
         trend_lookup_started = time.perf_counter()
         try:
             async with asyncio.timeout_at(
@@ -723,7 +738,7 @@ class SuggestionService:
         trend_lookup_ms = elapsed_ms(trend_lookup_started)
         has_trend_context = bool(trend_retrieval.cards)
         key = suggestion_request_key(
-            tweet_text,
+            source_text,
             user_id=user_id,
             limit=normalized_limit,
             cache_key=cache_key,
@@ -754,6 +769,7 @@ class SuggestionService:
                     trend_cards=trend_retrieval.cards,
                     trend_lookup_ms=trend_lookup_ms,
                     deadline=deadline,
+                    reply_context=reply_context,
                 )
             )
             self._inflight_suggestions[flight_key] = task
@@ -786,6 +802,7 @@ class SuggestionService:
         trend_cards: tuple[TrendCard, ...],
         trend_lookup_ms: float,
         deadline: float,
+        reply_context: ReplyContext | None = None,
     ) -> SuggestionRun:
         started = time.perf_counter()
         work_deadline = deadline - SUGGESTION_FALLBACK_RESERVE_MS / 1000
@@ -805,8 +822,9 @@ class SuggestionService:
         # Rank every candidate locally, but bound model input independently from the number
         # returned to the user. This keeps inference cost fixed as the catalog grows.
         local_rank_started = time.perf_counter()
+        source_text = reply_source_text(tweet_text, reply_context)
         ranking_text = (
-            f"{tweet_text}\n{steering_instruction}" if steering_instruction else tweet_text
+            f"{source_text}\n{steering_instruction}" if steering_instruction else source_text
         )
         ranked = fallback_template_selections(
             ranking_text,
@@ -844,6 +862,7 @@ class SuggestionService:
                     steering_instruction=steering_instruction,
                     trend_cards=trend_cards,
                     timeout_ms=model_budget_ms,
+                    **({"reply_context": reply_context} if reply_context is not None else {}),
                 )
         except TimeoutError:
             # A bounded provider miss is an expected availability condition, not an
@@ -880,7 +899,7 @@ class SuggestionService:
                 reject_overlong=True,
             )
             if not regions and self.settings.contextual_caption_fallback:
-                regions = build_fallback_caption_set(tweet_text, context, candidate.template) or {}
+                regions = build_fallback_caption_set(source_text, context, candidate.template) or {}
             if not regions:
                 # Returning fewer useful suggestions is better than rendering an
                 # uncaptioned template or fabricating a structurally meaningless joke.
@@ -905,7 +924,9 @@ class SuggestionService:
                     "source": "global",
                     # This is deliberately the only analysis exposed to clients: it is
                     # structured for usage feedback and contains no source post text.
-                    "feedback_context": usage_feedback_context(
+                    "feedback_context": {}
+                    if reply_context
+                    else usage_feedback_context(
                         context,
                         suggestion_mode="steered" if steering_instruction else "automatic",
                     ),

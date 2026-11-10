@@ -1,7 +1,7 @@
 # MemeDrop
 
-MemeDrop is a Chrome extension that suggests relevant meme replies for X, generates concise overlay
-text, accepts optional guidance about the joke direction, and learns from which suggestions people
+MemeDrop is a Chrome extension that suggests relevant meme replies for X and LinkedIn, generates
+concise overlay text, accepts optional guidance about the joke direction, and learns from which suggestions people
 use or dismiss.
 
 This is a Turborepo monorepo, but its applications deploy independently:
@@ -11,7 +11,7 @@ This is a Turborepo monorepo, but its applications deploy independently:
 | `apps/api` | FastAPI, recommendation pipeline, PostgreSQL, object storage | Vercel project rooted at `apps/api` |
 | `apps/catalog` | React/Vite internal catalog annotation workbench | Local development only |
 | `apps/template-pipeline` | Idempotent template discovery, media ingest, and machine draft annotation | Local development only |
-| `apps/extension` | React/Vite Chrome extension for X | Chrome Web Store package |
+| `apps/extension` | Shared React/Vite Chrome extension for X/LinkedIn; experimental desktop Reddit adapter | Chrome Web Store package |
 | `apps/web` | Next.js marketing, docs, and customer application | Vercel project rooted at `apps/web` |
 | `apps/smoke-agent` | Black-box TypeScript consumer of the public agent API | Local/CI smoke tooling |
 | `packages/shared` | TypeScript API contracts and template manifests | workspace dependency |
@@ -135,6 +135,13 @@ data. The deterministic local ranker is the availability and release-quality flo
 reranking is enabled.
 
 ## Suggestion path
+
+The experimental Reddit adapter supports desktop detail-page post and comment replies through the
+same MemeDrop panel and controls. Comment requests carry the selected comment plus bounded original
+post context. It requires one owned, visible, image-capable composer; unsupported or ambiguous
+surfaces make no suggestion request. Synthetic regression coverage and limited live desktop
+draft/attachment QA are recorded in [PROGRESS.md](PROGRESS.md). Permitted Reddit access, human quality
+review and broader pilot verification remain prerequisites. See the [integration plan](docs/reddit-integration-plan.md).
 
 Each X post yields **at most five** user-visible, ready-to-attach replies. The API scores every
 verified catalog candidate locally, sends no more than 12 strong and varied candidates to one joint

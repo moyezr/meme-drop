@@ -66,6 +66,7 @@ class FakeGateway:
         steering_instruction=None,
         trend_cards=(),
         timeout_ms=None,
+        reply_context=None,
     ):
         self.joint_calls += 1
         self.seen_timeouts.append(timeout_ms)
@@ -375,6 +376,7 @@ async def test_concurrent_identical_suggestions_share_one_model_call() -> None:
         steering_instruction=None,
         trend_cards=(),
         timeout_ms=None,
+        reply_context=None,
     ):
         model_started.set()
         await allow_model.wait()
@@ -416,6 +418,7 @@ async def test_concurrent_refreshes_share_work_but_not_completed_cache() -> None
         steering_instruction=None,
         trend_cards=(),
         timeout_ms=None,
+        reply_context=None,
     ):
         model_started.set()
         await allow_model.wait()
@@ -460,6 +463,7 @@ async def test_singleflight_key_does_not_share_requests_across_users_or_tweet_te
         steering_instruction=None,
         trend_cards=(),
         timeout_ms=None,
+        reply_context=None,
     ):
         model_started.set()
         await allow_model.wait()

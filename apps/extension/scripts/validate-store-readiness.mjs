@@ -66,6 +66,7 @@ function validateManifest(sourceManifest, output) {
     "https://x.com/*",
     "https://twitter.com/*",
     "https://www.linkedin.com/*",
+    "https://www.reddit.com/*",
   ];
   for (const host of requiredHosts) {
     if (!hostPermissions.includes(host)) {
@@ -154,6 +155,7 @@ function validateListing(output) {
     "https://x.com/*",
     "https://twitter.com/*",
     "https://www.linkedin.com/*",
+    "https://www.reddit.com/*",
     "api_host",
   ]) {
     if (!justifications[key] || String(justifications[key]).length < 20) {

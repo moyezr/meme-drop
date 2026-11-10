@@ -706,7 +706,9 @@ class SuggestionPerformanceSample(Base):
     __tablename__ = "suggestion_performance_samples"
     __table_args__ = (
         CheckConstraint("kind IN ('request', 'attachment')", name="performance_kind_check"),
-        CheckConstraint("platform IN ('x', 'linkedin')", name="performance_platform_check"),
+        CheckConstraint(
+            "platform IN ('x', 'linkedin', 'reddit')", name="performance_platform_check"
+        ),
         CheckConstraint(
             "elapsed_ms >= 0 AND elapsed_ms <= 120000", name="performance_elapsed_check"
         ),

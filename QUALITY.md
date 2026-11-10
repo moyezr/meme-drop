@@ -100,6 +100,11 @@ judgments are provisional until humans review them. Missing scores stay null; ou
 empty/error cases, rendering failures and fallback stages remain visible. This seed supplements
 the unchanged automated benchmark and cannot automatically promote a model, prompt or template.
 
+Dense caption layout must use available lines before shrinking and shrink past an ellipsized
+layout when a smaller complete fit is allowed. Renderer tests retain minimum-size overflow and
+character/line-limit diagnostics. Compare synthetic multi-panel samples at actual attachment size;
+do not treat an enlarged screenshot alone as readable native output.
+
 When changing ranking, record stage timings and compare results on the same corpus. Relevance,
 diversity, caption quality, fallback availability, and p95 latency are joint constraints; an average
 score improvement does not justify a slow or brittle request path.
@@ -254,16 +259,32 @@ npm run quality:suggestion-browser
 ```
 
 This loads the built extension in Chromium against a real loopback FastAPI fixture with a stubbed
-provider and synthetic X/LinkedIn DOM. It exercises visible captions, confirmed uploads, clipboard
+provider and synthetic X/LinkedIn/Reddit DOM. It exercises visible captions, confirmed uploads, clipboard
 fallback, neutral closure, slow-provider fallback, native Reply without inference, errors, broken
 media, and navigation during generation. It does not establish compatibility with today's hosted
 platform DOM or hosted provider performance. Port 3001 must be unused; the runner refuses to reuse
 another project's process and removes its own temporary profile/media. An existing compatible full
 Chromium executable can be selected with `MEMEDROP_CHROMIUM_EXECUTABLE`.
 
+Shared readability cases on X, LinkedIn and Reddit verify uncropped image containment, complete
+selectable caption text, a larger preview, keyboard return, short-window layout with Guide open,
+no generation/selection from review alone, and explicit attachment with native draft preservation.
+
 LinkedIn coverage includes pre-opened unfocused editors with existing synthetic draft text, no-scroll
 focus, ambiguity before mount grace expires, and nested/other-post file inputs. A single Meme action
 must keep the correct editor bound; native Comment alone must not request inference or alter focus.
+
+Reddit coverage includes top-level and selected-comment replies through the common panel, separate
+bounded root-post context, open/closed shadow-root editors, 2,000 unrelated comments with deep
+nesting, long text, existing draft/foreign composer preservation, disabled/missing image controls,
+wrong root identity, unsupported context, stale-context/navigation cancellation, 240px PNG preparation
+and removable native preview confirmation. Native cases include nested projected body slots,
+focus-triggered post opening, external composer hosts, separate image/video shadow toolbars,
+media identity/key confirmation and switching from an active post to a delayed comment editor.
+Apply `20261104_0013` before the API/extension rollout;
+tests cover preserving old rows and blocking a lossy schema downgrade. Limited live draft-only QA
+is recorded in [PROGRESS.md](PROGRESS.md); broader frontend coverage, access/processing permission
+and human quality review remain separate pilot gates.
 
 Feedback tests must verify version 2 semantics, random identities, bounded categorical context,
 and concurrent database retry deduplication. Copying, ordinary closure, and attachment failures

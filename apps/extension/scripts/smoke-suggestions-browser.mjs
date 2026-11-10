@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { repositoryOnlyEnvironment } from "../../../scripts/deployment-readiness.mjs";
+import { redditFixtureHtml } from "./reddit-fixture.mjs";
 
 const repository = fileURLToPath(new URL("../../../", import.meta.url));
 const extension = process.env.MEMEDROP_BROWSER_EXTENSION_DIR
@@ -18,6 +19,18 @@ let backend;
 let context;
 let scenarioId = 100;
 const fileChooserCounts = new WeakMap();
+let sharedCardAppearance;
+
+async function verifySharedCardAppearance(card) {
+  const appearance = await card.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { radius: style.borderRadius, width: style.width, background: style.backgroundColor,
+      imageFit: getComputedStyle(element.querySelector('img')).objectFit };
+  });
+  if (!sharedCardAppearance) sharedCardAppearance = appearance;
+  assert.deepEqual(appearance, sharedCardAppearance, "all platforms render the same shared card styles");
+  assert.equal(appearance.imageFit, "contain", "every platform preserves the full captioned image");
+}
 
 async function until(check, label, timeout = 10_000) {
   const end = Date.now() + timeout;
@@ -186,23 +199,26 @@ function fixtureHtml(platform, confirmation, commentLink = false, portal = false
   </script></body></html>`;
 }
 
-async function openScenario({ platform = "x", mode = "success", confirmation = "confirm", waitReady = true, request = true, commentLink = false, portal = false, photoInputMode = "single", editorMode = "new" } = {}) {
+async function openScenario({ platform = "x", mode = "success", confirmation = "confirm", waitReady = true, request = true, commentLink = false, portal = false, photoInputMode = "single", editorMode = "new", reddit = {} } = {}) {
   scenarioId++;
   const reset = await fetch(`${api}/_fixture/reset?mode=${mode}`, { method: "POST" });
   assert.equal(reset.status, 200, "fixture scenario reset must succeed");
   const page = await context.newPage();
   fileChooserCounts.set(page, 0);
   page.on("filechooser", () => fileChooserCounts.set(page, fileChooserCounts.get(page) + 1));
-  const origin = platform === "linkedin" ? "https://www.linkedin.com" : "https://x.com";
+  const origin = platform === "reddit" ? "https://www.reddit.com" : platform === "linkedin" ? "https://www.linkedin.com" : "https://x.com";
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
   await page.route(`${origin}/**`, (route) => {
     if (route.request().isNavigationRequest()) {
-      return route.fulfill({ contentType: "text/html", body: fixtureHtml(platform, confirmation, commentLink, portal, photoInputMode, editorMode) });
+      return route.fulfill({ contentType: "text/html", body: platform === "reddit"
+        ? redditFixtureHtml(scenarioId, confirmation, reddit)
+        : fixtureHtml(platform, confirmation, commentLink, portal, photoInputMode, editorMode) });
     }
     return route.abort();
   });
-  await page.goto(`${origin}/${platform === "linkedin" ? "feed/" : "home"}`);
-  const action = page.locator('[data-memedrop-reply="true"]');
+  await page.goto(`${origin}/${platform === "reddit" ? `r/fixture/comments/${scenarioId.toString(36)}/synthetic/` : platform === "linkedin" ? "feed/" : "home"}`);
+  const action = page.locator(platform === "reddit"
+    ? '[data-fixture-target] > .actions [data-memedrop-reply="true"]' : '[data-memedrop-reply="true"]');
   await action.waitFor();
   if (editorMode === "preexisting-offscreen") {
     await page.evaluate(() => { window.__scrollBeforeMeme = window.scrollY; });
@@ -256,6 +272,7 @@ try {
     const { platform, label } = scenario;
     const { page, usable } = await openScenario(scenario);
     assert.equal((await fixtureState()).suggestion_calls, 1, `${label} extracts source and requests once`);
+    await verifySharedCardAppearance(usable.first());
     if (scenario.editorMode === "preexisting") {
       assert.equal(await page.locator('#owned-editor').evaluate((editor) => editor === window.__initialEditor), true,
         "native Comment preserves the already mounted editor");
@@ -509,6 +526,204 @@ try {
     assert.equal(await page.locator('.meme-card[aria-disabled="false"]').count(), 0);
     await page.close();
     console.log("[MemeDrop] navigation during generation: late result ignored PASS");
+  }
+  for (const reddit of [{ kind: "post" }, { kind: "comment" }, { shadow: true, actionShadow: true, disableDuringUpload: true }, { huge: true, long: true }]) {
+    const { page, usable } = await openScenario({ platform: "reddit", reddit });
+    const state = await fixtureState();
+    assert.equal(state.suggestion_calls, 1);
+    assert.equal(state.reply_context_checks.length, 1);
+    const check = state.reply_context_checks[0];
+    assert.equal(check.has_post_title, true);
+    assert.equal(check.has_post_body, true);
+    if (reddit.kind !== "post") assert.equal(check.has_selected_comment, true);
+    assert.ok(check.target_length <= 2000 && check.body_length <= 1200);
+    assert.equal(check.truncated, Boolean(reddit.long));
+    assert.equal(await page.locator('#memedrop-suggestion-panel .title').count(), 1, "same shared panel");
+    await verifySharedCardAppearance(usable.first());
+    if (process.env.MEMEDROP_BROWSER_SCREENSHOT_DIR) {
+      await mkdir(process.env.MEMEDROP_BROWSER_SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({ path: path.join(process.env.MEMEDROP_BROWSER_SCREENSHOT_DIR,
+        `reddit-${reddit.kind || "comment"}-${reddit.shadow ? "shadow" : reddit.huge ? "huge" : "basic"}.png`) });
+    }
+    await usable.first().click();
+    await until(async () => (await eventsFor("inserted")).length === 1, "Reddit exact native attachment");
+    assert.equal(await page.evaluate(() => {
+      const scope = window.__selectedComposer;
+      return (scope.shadowRoot || scope).querySelector('[contenteditable]').textContent;
+    }), "Existing synthetic draft");
+    const uploads = await page.evaluate(() => window.__uploads);
+    assert.equal(uploads.length, 1);
+    assert.ok(uploads[0].width <= 240 && uploads[0].height <= 240);
+    assert.equal(await page.evaluate(() => {
+      const scope = window.__otherComposer;
+      return (scope.shadowRoot || scope).querySelector('input').files.length;
+    }), 0);
+    assert.equal(await page.evaluate(() => window.__submitClicks), 0);
+    assert.equal(fileChooserCounts.get(page), 0);
+    const samples = await until(async () => {
+      const rows = await performanceFor("attachment", "inserted");
+      return rows.length ? rows : null;
+    }, "Reddit anonymous attachment sample");
+    assert.equal(samples[0].platform, "reddit");
+    samples.forEach(assertContentFree);
+    assert.ok((await fixtureState()).events.every((event) =>
+      !Object.keys(event.tweet_context || {}).some((key) => key !== "suggestion_mode")));
+    await page.close();
+    console.log(`[MemeDrop] Reddit ${reddit.kind || "comment"}${reddit.shadow ? " open-shadow" : ""}${reddit.huge ? " huge/deep thread" : ""}: shared UI, bounded context and native draft PASS`);
+  }
+  for (const reddit of [{ capability: "absent" }, { capability: "disabled" }, { missingContext: true },
+    { ambiguous: true }, { wrongPost: true }, { nsfw: true }, { missingBody: true }, { ambiguousBody: true },
+    { closedShadow: true }, { duplicateInput: true }]) {
+    const { page } = await openScenario({ platform: "reddit", reddit, waitReady: false });
+    await page.locator('#memedrop-suggestion-panel .empty').waitFor();
+    assert.equal((await fixtureState()).suggestion_calls, 0, "unsupported context/capability never calls inference");
+    assert.equal(await page.locator('.meme-card').count(), 0);
+    await page.close();
+    console.log("[MemeDrop] Reddit unavailable capability/context or ambiguous composer: zero inference PASS");
+  }
+  {
+    const { page } = await openScenario({ platform: "reddit", request: false });
+    await page.waitForTimeout(400);
+    assert.equal((await fixtureState()).suggestion_calls, 0);
+    assert.equal(await page.locator('#memedrop-suggestion-panel').count(), 0);
+    await page.locator('[data-fixture-target] > .actions [data-memedrop-reply="true"]').click();
+    await page.locator('.meme-card[aria-disabled="false"]').first().waitFor();
+    assert.equal((await fixtureState()).suggestion_calls, 1);
+    assert.equal(await page.evaluate(() => window.__nativeReplyClicks), 1,
+      "Meme binds the pre-opened editor without toggling native Reply again");
+    assert.equal(await page.evaluate(() => window.__selectedComposer.querySelector('[contenteditable]').textContent),
+      "Existing synthetic draft");
+    await until(async () => (await eventsFor("shown")).length === 2,
+      "pre-opened Reddit impressions finish before the next fixture reset");
+    await until(async () => (await performanceFor("request", "usable")).length === 1,
+      "pre-opened Reddit request measurement");
+    await page.close();
+    console.log("[MemeDrop] Reddit native Reply: zero inference; later Meme binds the same draft without toggling PASS");
+  }
+  for (const change of ["navigation", "comment", "post", "capability"]) {
+    const { page } = await openScenario({ platform: "reddit", mode: "slow", waitReady: false });
+    await until(async () => (await fixtureState()).suggestion_calls === 1, "Reddit in-flight request");
+    await page.evaluate((change) => {
+      if (change === "navigation") history.pushState({}, "", "/r/fixture/comments/another/synthetic/");
+      if (change === "comment") document.querySelector('[slot="comment"]').textContent = "Changed synthetic comment";
+      if (change === "post") document.querySelector('shreddit-post').setAttribute('post-title', 'Changed synthetic post');
+      if (change === "capability") {
+        const scope = window.__selectedComposer;
+        (scope.shadowRoot || scope).querySelector('[aria-label="Add an image"]').disabled = true;
+      }
+    }, change);
+    await until(async () => (await fixtureState()).suggestion_pending === 0, "Reddit stale request completes");
+    assert.equal((await eventsFor("shown")).length, 0);
+    assert.equal((await eventsFor("inserted")).length, 0);
+    assert.equal(await page.locator('.meme-card[aria-disabled="false"]').count(), 0);
+    await page.close();
+    console.log(`[MemeDrop] Reddit ${change} change cancels stale context/results PASS`);
+  }
+  {
+    const { page, usable } = await openScenario({ platform: "reddit", reddit: { removable: false } });
+    await usable.first().click();
+    await until(async () => (await eventsFor("copied")).length === 1, "Reddit non-removable preview stays neutral");
+    assert.equal((await eventsFor("inserted")).length, 0);
+    await page.close();
+    console.log("[MemeDrop] Reddit preview without native remove control: copied, never inserted PASS");
+  }
+  for (const kind of ["post", "comment"]) {
+    const { page, usable } = await openScenario({ platform: "reddit", reddit: { nativeStructure: true, kind } });
+    const contextChecks = (await fixtureState()).reply_context_checks;
+    assert.ok(contextChecks.length > 0);
+    assert.ok(contextChecks.every(row => row.kind === kind && row.has_post_body && row.has_post_title));
+    assert.ok(contextChecks.every(row => row.body_length === "We skipped tests and deployed Friday.".length),
+      "nested native body slots supply the post once without shadow-control text");
+    await verifySharedCardAppearance(usable.first());
+    assert.equal(await page.evaluate(() => window.__rootOpenClicks), kind === "post" ? 1 : 0);
+    assert.equal(await page.evaluate(() => window.__nativeReplyClicks), kind === "post" ? 0 : 1);
+    await usable.first().click();
+    await until(async () => (await eventsFor("inserted")).length === 1, "native Reddit RTE attachment confirmation");
+    assert.equal(await page.evaluate(() => window.__selectedComposer.querySelector('[contenteditable]').textContent),
+      "Existing synthetic draft");
+    const inputs = await page.evaluate(() => window.__nativeInputs.map(row => ({
+      id:row.id,image:row.image.files.length,video:row.video.files.length,
+    })));
+    assert.equal(inputs.filter(row => row.image === 1).length, 1);
+    assert.ok(inputs.every(row => row.video === 0));
+    assert.equal(await page.evaluate(() => window.__submitClicks), 0);
+    assert.equal(fileChooserCounts.get(page), 0);
+    await page.close();
+    console.log(`[MemeDrop] Reddit native ${kind}: tracked Reply, external host, nested image/video toolbar and editable media identity PASS`);
+  }
+  {
+    const { page, usable } = await openScenario({ platform: "reddit", reddit: {
+      nativeStructure: true, kind: "post", switchToComment: true,
+    } });
+    await page.locator('shreddit-comment[thingid="t1_selected"] [data-memedrop-reply]').click();
+    await until(async () => (await fixtureState()).suggestion_calls === 2,
+      "switch from active post to asynchronously mounted comment editor");
+    await usable.first().waitFor();
+    const checks=(await fixtureState()).reply_context_checks;
+    assert.deepEqual(checks.map(row=>row.kind),["post","comment"]);
+    assert.ok(checks[1].has_selected_comment && checks[1].has_post_title && checks[1].has_post_body);
+    await usable.first().click();
+    await until(async () => (await eventsFor("inserted")).length === 1, "switched comment attachment");
+    assert.equal(await page.evaluate(()=>window.__postComposer.querySelector('[contenteditable]').textContent),
+      "Existing synthetic draft");
+    assert.equal(await page.evaluate(()=>window.__selectedComposer.querySelector('[contenteditable]').textContent),
+      "Existing synthetic draft");
+    const uploads=await page.evaluate(()=>window.__uploads);
+    assert.equal(uploads.length,1);
+    assert.equal(uploads[0].target,"t1_selected");
+    assert.equal(await page.evaluate(()=>window.__submitClicks),0);
+    assert.equal(fileChooserCounts.get(page),0);
+    await page.close();
+    console.log("[MemeDrop] Reddit switch from active post to delayed comment editor: one click, correct context and preserved drafts PASS");
+  }
+  for (const nativeImageMode of ["mismatch", "missing-key", "outside-editor"]) {
+    const { page, usable } = await openScenario({ platform: "reddit", reddit: { nativeStructure: true, nativeImageMode } });
+    await usable.first().click();
+    await until(async () => (await eventsFor("copied")).length === 1, "unconfirmed native RTE image remains neutral");
+    assert.equal((await eventsFor("inserted")).length, 0);
+    await page.close();
+    console.log(`[MemeDrop] Reddit native image ${nativeImageMode}: no false insertion PASS`);
+  }
+  for (const platform of ["x", "linkedin", "reddit"]) {
+    const { page, usable } = await openScenario({ platform, mode: "dense", reddit: { nativeStructure: true } });
+    await verifySharedCardAppearance(usable.first());
+    await page.getByRole('button', { name: 'Guide', exact: true }).click();
+    const preview = page.getByRole('button', { name: 'Preview Two Buttons', exact: true });
+    await preview.click();
+    const detail = page.getByRole('region', { name: 'Meme preview', exact: true });
+    await detail.waitFor();
+    assert.deepEqual(await detail.locator('.preview-captions li').allTextContents(),
+      ['Ship without tests', 'Wait for review', 'Friday deployment']);
+    assert.ok(await detail.locator('img').evaluate(img => img.getBoundingClientRect().width > 300));
+    await page.setViewportSize({ width: 820, height: 560 });
+    const bounds=await page.locator('#memedrop-suggestion-panel .panel').evaluate(panel=>{
+      const r=panel.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:innerHeight};
+    });
+    assert.ok(bounds.top >= 0 && bounds.bottom <= bounds.height,
+      'the complete review panel stays in a short viewport even with Guide previously open');
+    await detail.getByRole('button', { name: 'Attach meme', exact: true }).waitFor({ state: 'visible' });
+    assert.equal((await fixtureState()).suggestion_calls, 1, 'reading makes no new generation call');
+    assert.equal((await eventsFor('clicked')).length, 0, 'reading does not select/attach');
+    assert.equal((await eventsFor('inserted')).length, 0);
+    await page.keyboard.press('Escape');
+    await detail.waitFor({ state: 'detached' });
+    assert.equal(await preview.evaluate(el => el === el.getRootNode().activeElement), true);
+    assert.equal(await page.locator('#memedrop-suggestion-panel').evaluate(host=>host.style.bottom),'80px',
+      'returning restores the original strip position');
+    await preview.click();
+    await detail.getByRole('button', { name: 'Attach meme', exact: true }).click();
+    await until(async () => (await eventsFor('inserted')).length === 1, 'reviewed dense caption attachment');
+    assert.equal((await fixtureState()).suggestion_calls, 1);
+    assert.equal(fileChooserCounts.get(page), 0);
+    if (platform === 'reddit') {
+      assert.equal(await page.evaluate(()=>window.__selectedComposer.querySelector('[contenteditable]').textContent),
+        'Existing synthetic draft');
+      assert.equal(await page.evaluate(()=>window.__submitClicks),0);
+      const uploads=await page.evaluate(()=>window.__uploads);
+      assert.ok(uploads[0].width <= 240 && uploads[0].height <= 240);
+    }
+    await page.close();
+    console.log(`[MemeDrop] ${platform} dense captions: uncropped shared preview, readable transcript, keyboard return and explicit attachment PASS`);
   }
   console.log("[MemeDrop] packaged extension / real FastAPI / Chromium fixture smoke passed");
 } finally {

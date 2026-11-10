@@ -11,12 +11,12 @@ import {
   MAX_STEERING_INSTRUCTION_LENGTH,
   normalizeSteeringInstruction,
 } from "../shared/suggestion-request";
-import type { MemeTextOverlay } from "@memedrop/shared";
+import type { MemeTextOverlay, ReplyContext } from "@memedrop/shared";
 import { drawMemeTextOverlay } from "@memedrop/shared/overlay-renderer";
 import { ensureMemeOverlayFonts } from "./overlay-fonts";
 import { SuggestionPerformanceTracker, roundDuration } from "../shared/suggestion-performance";
 import { fetchMediaBlobWithTimeout } from "../shared/media-fetch";
-import { attachmentImageSnapshot, waitForNativeAttachment, captureComposerFileInput } from "./attachment-confirmation";
+import { attachmentImageSnapshot, waitForNativeAttachment, captureComposerFileInput, queryComposer } from "./attachment-confirmation";
 import { SuggestionBaselineTracker, projectPerformanceSample, type PerformanceSample } from "../shared/performance-sample";
 import type { SuggestionPerformanceSnapshot } from "../shared/suggestion-performance";
 
@@ -53,6 +53,7 @@ interface Suggestion {
   score: number;
   source: "user" | "global";
   tweet_text?: string;
+  reply_context?: ReplyContext;
   feedback_context?: Record<string, unknown>;
   impression_id?: string;
   position?: number;
@@ -70,6 +71,7 @@ let insertingSuggestionId: string | null = null;
 let currentSteeringInstruction = "";
 let steeringEditorOpen = false;
 let preferredComposerTarget: Element | null = null;
+let preferredComposerGuard: (() => boolean) | null = null;
 let panelGeneration = 0;
 const previewObservers = new Map<Element, IntersectionObserver>();
 const failedPreviewIds = new Set<string>();
@@ -81,6 +83,8 @@ function disconnectPreviewObservers() {
 let browserPerformance: SuggestionPerformanceTracker | null = null;
 let baselinePerformance: SuggestionBaselineTracker | null = null;
 let insertionInFlight = false;
+
+export function isSuggestionAttachmentInFlight(): boolean { return insertionInFlight; }
 
 function sendPerformanceSample(sample: PerformanceSample) {
   // Direct extension messaging only: page-dispatched CustomEvents are not collected.
@@ -123,8 +127,9 @@ function panelContainer(): HTMLElement {
     ? preferredComposerTarget : document.body;
 }
 
-export function setSuggestionComposerTarget(target: Element | null) {
+export function setSuggestionComposerTarget(target: Element | null, isCurrent?: () => boolean) {
   preferredComposerTarget = target;
+  preferredComposerGuard = isCurrent || null;
   if (panelHost) panelContainer().appendChild(panelHost);
   for (const [card, observer] of previewObservers) {
     observer.unobserve(card);
@@ -309,9 +314,11 @@ export const PANEL_STYLES = `
   .meme-strip::-webkit-scrollbar { height: 4px; }
   .meme-strip::-webkit-scrollbar-track { background: transparent; }
   .meme-strip::-webkit-scrollbar-thumb { background: #3d444d; border-radius: 999px; }
+  .meme-strip[hidden] { display: none; }
+  .meme-option { flex: 0 0 160px; }
   .meme-card {
     flex-shrink: 0;
-    width: 116px;
+    width: 160px;
     padding: 0;
     overflow: hidden;
     position: relative;
@@ -335,16 +342,15 @@ export const PANEL_STYLES = `
     border-color: #8b949e;
   }
   .meme-card img {
-    width: 116px;
-    height: 116px;
-    object-fit: cover;
+    width: 158px;
+    height: 160px;
+    object-fit: contain;
     display: block;
     background: #21262d;
   }
   .source-badge {
-    position: absolute;
-    top: 6px;
-    left: 6px;
+    display: inline-block;
+    margin: 6px 0 0 8px;
     padding: 3px 5px;
     border: 1px solid rgba(240, 246, 252, 0.12);
     border-radius: 999px;
@@ -357,9 +363,8 @@ export const PANEL_STYLES = `
     backdrop-filter: blur(6px);
   }
   .tailored-badge {
-    position: absolute;
-    top: 6px;
-    right: 6px;
+    display: inline-block;
+    margin: 6px 0 0 4px;
     padding: 3px 5px;
     border-radius: 999px;
     background: rgba(240, 246, 252, 0.9);
@@ -385,6 +390,35 @@ export const PANEL_STYLES = `
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .preview-btn, .preview-back, .preview-attach {
+    border: 1px solid #3d444d;
+    border-radius: 8px;
+    background: #21262d;
+    color: #f1f3f4;
+    padding: 7px 10px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .preview-btn { width: 100%; margin-top: 6px; }
+  .preview-btn:disabled { opacity: 0.5; cursor: default; }
+  .panel.is-previewing { display: flex; flex-direction: column; max-height: calc(100vh - 48px); cursor: default; }
+  .is-previewing .header { flex-shrink: 0; }
+  .is-previewing .steering-control, .is-previewing .steering-btn { display: none; }
+  .expanded-preview {
+    display: flex; flex-direction: column; flex: 1; min-height: 0;
+    width: min(480px, calc(100vw - 76px));
+  }
+  .preview-back { align-self: flex-start; flex-shrink: 0; }
+  .preview-heading { margin: 10px 0; font-size: 14px; font-weight: 500; }
+  .preview-content { flex: 1; min-height: 0; overflow-y: auto; }
+  .preview-image { display: block; width: 100%; height: auto; max-height: 45vh; object-fit: contain; }
+  .preview-captions { margin: 12px 0; padding-left: 24px; font-size: 14px; line-height: 1.5; user-select: text; }
+  .preview-captions li { padding: 3px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .preview-attach { width: 100%; margin-top: 10px; flex-shrink: 0; }
+  .preview-attach:focus-visible, .preview-back:focus-visible, .preview-btn:focus-visible {
+    outline: 2px solid #f1f3f4; outline-offset: 2px;
   }
   .card-overlay {
     position: absolute;
@@ -719,6 +753,18 @@ function renderSuggestions(suggestions: Suggestion[]) {
       card.setAttribute("role", "button");
       card.setAttribute("aria-disabled", "true");
       card.setAttribute("aria-label", `Use ${s.name || "meme"}`);
+      const option = document.createElement("div");
+      option.className = "meme-option";
+      const previewButton = document.createElement("button");
+      previewButton.type = "button";
+      previewButton.className = "preview-btn";
+      previewButton.disabled = true;
+      previewButton.textContent = "Read captions";
+      previewButton.setAttribute("aria-label", `Preview ${s.name || "meme"}`);
+      previewButton.addEventListener("click", () => {
+        if (img.dataset.usable !== "true" || !isCurrentSuggestion(s, generation)) return;
+        showExpandedPreview(panel, strip, s, img, previewButton, generation, () => card.click());
+      });
 
       const img = document.createElement("img");
       img.src = s.tailored_overlay?.enabled && !s.tailored_image_data_url ? IMAGE_PLACEHOLDER : getBestImageSrc(s);
@@ -815,7 +861,8 @@ function renderSuggestions(suggestions: Suggestion[]) {
         }
       });
 
-      strip.appendChild(card);
+      option.append(card, previewButton);
+      strip.appendChild(option);
     }
 
     panel.appendChild(header);
@@ -831,11 +878,80 @@ function renderSuggestions(suggestions: Suggestion[]) {
   shadowRoot.appendChild(panel);
 }
 
+/** One readable review surface for every platform; reviewing never attaches. */
+function showExpandedPreview(
+  panel: HTMLElement, strip: HTMLElement, suggestion: Suggestion, image: HTMLImageElement,
+  trigger: HTMLButtonElement, generation: number, attach: () => void
+) {
+  panel.querySelector(".expanded-preview")?.remove();
+  const host = panelHost!;
+  const previousPosition = {
+    top: host.style.top, right: host.style.right, bottom: host.style.bottom, left: host.style.left,
+  };
+  // Review can be much taller than the strip. Anchor it inside the viewport,
+  // then restore the user's strip position when they return.
+  Object.assign(host.style, { top: "auto", left: "auto", right: "24px", bottom: "24px" });
+  const preview = document.createElement("section");
+  preview.className = "expanded-preview";
+  preview.setAttribute("aria-label", "Meme preview");
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "preview-back";
+  back.textContent = "Back to suggestions";
+  const heading = document.createElement("h2");
+  heading.className = "preview-heading";
+  heading.textContent = suggestion.name;
+  const content = document.createElement("div");
+  content.className = "preview-content";
+  const fullImage = document.createElement("img");
+  fullImage.className = "preview-image";
+  fullImage.src = image.currentSrc || image.src;
+  fullImage.alt = suggestion.name;
+  content.appendChild(fullImage);
+  const captions = document.createElement("ol");
+  captions.className = "preview-captions";
+  for (const region of suggestion.tailored_overlay?.regions || []) {
+    const item = document.createElement("li");
+    item.textContent = region.text;
+    captions.appendChild(item);
+  }
+  if (captions.children.length) content.appendChild(captions);
+  const use = document.createElement("button");
+  use.type = "button";
+  use.className = "preview-attach";
+  use.textContent = "Attach meme";
+  use.addEventListener("click", () => {
+    if (isCurrentSuggestion(suggestion, generation)) attach();
+  });
+  const close = () => {
+    preview.remove();
+    panel.classList.remove("is-previewing");
+    strip.hidden = false;
+    if (isCurrentSuggestion(suggestion, generation)) {
+      Object.assign(host.style, previousPosition);
+      trigger.focus({ preventScroll: true });
+    }
+  };
+  back.addEventListener("click", close);
+  preview.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  });
+  strip.hidden = true;
+  panel.classList.add("is-previewing");
+  preview.append(back, heading, content, use);
+  panel.appendChild(preview);
+  back.focus({ preventScroll: true });
+}
+
 function setupDrag(panel: HTMLElement) {
   panel.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
     // Interactive controls must keep their native click, selection, and focus behavior.
-    if (target.closest(".meme-card, button, input, form")) return;
+    if (panel.classList.contains("is-previewing") ||
+        target.closest(".meme-card, .expanded-preview, button, input, form")) return;
 
     isDragging = true;
     panel.classList.add("dragging");
@@ -935,6 +1051,7 @@ async function requestTailoredCaption(
     payload: {
       tweet_text: suggestion.tweet_text,
       meme_id: suggestion.meme_id,
+      ...(suggestion.reply_context ? { reply_context: suggestion.reply_context } : {}),
     },
   });
 
@@ -962,19 +1079,20 @@ type InsertMemeInput = {
  * Files coming through its file input; re-encoding normalizes everything
  * (including unknown types served by `/memes/...`) into a format X accepts.
  */
-async function toPngFile(blob: Blob, filename = "meme.png"): Promise<File> {
-  if (blob.type === "image/png") {
+async function toPngFile(blob: Blob, filename = "meme.png", maxDimension?: number): Promise<File> {
+  if (blob.type === "image/png" && !maxDimension) {
     return new File([blob], filename, { type: "image/png" });
   }
 
   const bitmap = await createImageBitmap(blob);
   try {
     const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
+    const dimensions = maxDimension ? getPreviewDimensions(bitmap.width, bitmap.height, maxDimension) : bitmap;
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2d context unavailable");
-    ctx.drawImage(bitmap, 0, 0);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
     const pngBlob: Blob = await new Promise((resolve, reject) => {
       canvas.toBlob(
@@ -1010,6 +1128,8 @@ async function showUsablePreview(suggestion: Suggestion, img: HTMLImageElement, 
     const card = img.closest<HTMLElement>(".meme-card");
     if (!card) return;
     card.setAttribute("aria-disabled", "false");
+    const previewButton = card.parentElement?.querySelector<HTMLButtonElement>(".preview-btn");
+    if (previewButton) previewButton.disabled = false;
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting || entry.intersectionRatio < 0.5 || document.visibilityState !== "visible" || !isPanelVisible()) continue;
@@ -1064,6 +1184,7 @@ async function renderMemeWithOverlay(
 
 /** Use only the intended composer; an unrelated input cannot confirm success. */
 function findComposerScope(platform: PlatformAdapter, preferredTarget?: Element | null): Element | null {
+  if (platform.resolveComposerScope) return platform.resolveComposerScope(preferredTarget);
   const hasOwnedComposer = (scope: Element | null): scope is Element => {
     if (!scope?.isConnected) return false;
     if (platform.id !== "linkedin") return Boolean(scope.querySelector(platform.selectors.composer));
@@ -1090,7 +1211,8 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
   insertionInFlight = true;
   const generation = payload.generation ?? panelGeneration;
   const suggestion = payload.suggestion || currentSuggestions.find((s) => s.meme_id === payload.memeId);
-  const isCurrent = () => generation === panelGeneration;
+  const sessionGuard = preferredComposerGuard;
+  const isCurrent = () => generation === panelGeneration && (!sessionGuard || sessionGuard());
   const selectedAt = payload.selectionStartedAt ?? performance.now();
   let preparedAt: number | undefined;
   let outcome: "inserted" | "copied" | "failed" | "cancelled" = "failed";
@@ -1112,7 +1234,7 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
       : null);
     if (tailored && suggestion) suggestion.tailored_image_data_url = tailored;
     const raw = await resolveMemeBlob(payload.imageUrl, tailored ?? payload.imageDataUrl);
-    const file = await toPngFile(raw);
+    const file = await toPngFile(raw, "meme.png", getPlatformAdapter()?.attachmentMaxDimension);
     preparedAt = performance.now();
     if (!isCurrent()) return outcome = "cancelled";
     const platform = getPlatformAdapter();
@@ -1120,17 +1242,23 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
     if (platform && scope) {
       const isCurrentScope = () => isCurrent() && scope.isConnected &&
         (!(scope instanceof HTMLDialogElement) || scope.open);
-      const before = attachmentImageSnapshot(scope, platform.selectors.attachmentImage);
-      const inputs = Array.from(scope.querySelectorAll<HTMLInputElement>(platform.selectors.fileInput))
+      const query = platform.queryComposerElements || queryComposer;
+      if (platform.canAttachImage && !platform.canAttachImage(scope)) throw new Error("Images unavailable");
+      const before = attachmentImageSnapshot(scope, platform.selectors.attachmentImage, query);
+      if (platform.canAttachImage && before.size) throw new Error("Composer already has media");
+      const inputs = (query(scope, platform.selectors.fileInput) as HTMLInputElement[])
         .filter((candidate) => platform.id !== "linkedin" ||
           candidate.closest(platform.selectors.composeScope) === scope);
-      let input = (platform.id === "linkedin" ? inputs.length === 1 : inputs.length > 0)
+      if (platform.canAttachImage && inputs.some((input) => input.files?.length)) {
+        throw new Error("Composer already has media");
+      }
+      let input = (platform.id === "linkedin" || platform.resolveComposerScope ? inputs.length === 1 : inputs.length > 0)
         ? inputs[0] : null;
       const activator = platform.selectors.fileInputActivator;
       if (!input && inputs.length === 0 && activator) {
-        const control = scope.querySelector(activator);
-        if (control?.closest(platform.selectors.composeScope) === scope) {
-          input = captureComposerFileInput(scope, activator, platform.selectors.fileInput, isCurrentScope);
+        const control = query(scope, activator)[0];
+        if (control && (platform.resolveComposerScope || control.closest(platform.selectors.composeScope) === scope)) {
+          input = captureComposerFileInput(scope, activator, platform.selectors.fileInput, isCurrentScope, query);
         }
       }
       if (!isCurrentScope()) return outcome = "cancelled";
@@ -1152,7 +1280,8 @@ export async function insertMemeByUrl(payload: InsertMemeInput): Promise<"insert
         }
       }
       if (dispatched && await waitForNativeAttachment(scope, platform.selectors.attachmentImage,
-        platform.selectors.attachmentBusy, before, isCurrentScope)) {
+        platform.selectors.attachmentBusy, before, isCurrentScope, 4_000, query,
+        () => platform.hasRemovableAttachment?.(scope) ?? true)) {
         if (!isCurrentScope()) return outcome = "cancelled";
         logOutcome("inserted");
         outcome = "inserted";

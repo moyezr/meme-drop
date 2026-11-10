@@ -330,6 +330,22 @@ test("release package validator accepts a minimal valid package", async () => {
   assert.match(stdout, /release package validated/);
 });
 
+test("release package validator rejects unreviewed wildcard hosts", async () => {
+  const manifest = releaseManifest();
+  manifest.host_permissions.push("https://*.reddit.com/*");
+  const zipPath = await createReleaseZip({ manifest });
+  await assert.rejects(
+    execFileAsync("node", ["scripts/validate-release-package.mjs", "--zip", zipPath], {
+      cwd: path.join(rootDir, "apps/extension"),
+      env: { ...process.env, VITE_API_BASE_URL: "https://api.memedrop.example" },
+    }),
+    (error) => {
+      assert.match(error.stderr || "", /contains unexpected host permissions/);
+      return true;
+    }
+  );
+});
+
 test("release package validator rejects local host permissions", async () => {
   const manifest = releaseManifest();
   manifest.host_permissions.push("http://localhost:3001/*");
@@ -376,6 +392,7 @@ function releaseManifest() {
       "https://x.com/*",
       "https://twitter.com/*",
       "https://www.linkedin.com/*",
+      "https://www.reddit.com/*",
       "https://api.memedrop.example/*",
     ],
     background: {

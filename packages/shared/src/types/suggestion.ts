@@ -48,8 +48,18 @@ export interface TweetContext extends FeedbackContext {
   keywords: string[];
 }
 
+/** Bounded root-post context; tweet_text remains the exact reply target. */
+export interface ReplyContext {
+  platform: "reddit";
+  target_kind: "post" | "comment";
+  post_title: string;
+  post_body: string;
+  truncated: boolean;
+}
+
 export interface SuggestionRequest {
   tweet_text: string;
+  reply_context?: ReplyContext;
   /** At most five user-facing suggestions; retrieval may consider more internally. */
   limit?: 1 | 2 | 3 | 4 | 5;
   refresh?: boolean;

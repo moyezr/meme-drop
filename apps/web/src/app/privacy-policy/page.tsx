@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
           A plain-language disclosure of how the MemeDrop private beta handles information, and
           which hosted-provider and billing details remain to be finalized before public launch.
         </p>
-        <p className="policyMeta">Effective date: October 23, 2026</p>
+        <p className="policyMeta">Effective date: November 4, 2026</p>
       </header>
 
       <aside className="notice" aria-label="Pre-launch policy status">
@@ -62,6 +62,12 @@ export default function PrivacyPolicyPage() {
           submitted post or text and any optional creative direction. That content is used to rank
           templates and create caption text. Do not submit passwords, financial details, health
           information, or other sensitive personal information.
+        </p>
+        <p>
+          For experimental Reddit comment replies, the extension uses the selected comment and
+          a bounded title and body from the original post. It does not collect the whole thread.
+          This context may be sent to OpenRouter for selection and captions. Reddit support remains
+          subject to permitted access and live verification before pilot distribution.
         </p>
         <h3>Generated media</h3>
         <p>
@@ -93,6 +99,7 @@ export default function PrivacyPolicyPage() {
           ordinary closure is not treated as rejection. Ambiguous older events do not train the
           corrected ranking.
         </p>
+        <p>Reddit replies omit inferred context categories from usage feedback.</p>
         <h3>Suggestion performance measurements</h3>
         <p>
           The extension sends bounded durations, suggestion counts, outcome categories, platform,

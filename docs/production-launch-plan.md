@@ -1,6 +1,6 @@
 # MemeDrop production launch plan
 
-Last updated: 2026-11-02 (LinkedIn editor binding follow-up; other status retains recorded evidence)
+Last updated: 2026-11-06 (LinkedIn live verification; Reddit track retains recorded evidence)
 
 This document is the source of truth for the work required to launch MemeDrop as a reliable
 "humor layer for AI agents." Update task status and acceptance evidence here as implementation
@@ -246,8 +246,10 @@ access.
   API/privacy and extension 0.0.4 are rolled out; X/LinkedIn request and native-attachment collection
   verified. A post-QA cutoff starts normal-use observation; initial coverage is zero. LinkedIn's
   pre-opened inline editor fix is merged for extension 0.0.5 with packaged-browser regression
-  coverage and passing main CI; production reload and live LinkedIn QA remain explicitly deferred.
-  See PROGRESS.md.
+  coverage and passing main CI. Exact production 0.0.5 reloaded and live LinkedIn binding/native
+  attachment verified November 6 with preserved draft and no publication; QA media/text removed.
+  The first request timed out before a model/cache-miss retry succeeded. Keep this operator QA
+  separate from ordinary-use evidence. See PROGRESS.md for the bounded QA interval and package.
 - [ ] Track estimated and reconciled cost per successful generation and per customer.
 - [~] Add dashboards and alerts for elevated errors, provider timeouts, stale trends, Redis or
   PostgreSQL failures, credit-transaction anomalies, storage cleanup lag, and unusual user usage.
@@ -325,6 +327,31 @@ It still controls which templates can appear in production suggestions.
 
 Done is continuous: production uses only verified templates, every promoted batch passes existing
 quality gates, and catalog growth does not regress relevance, readability, safety, or latency.
+
+## Reddit extension pilot
+
+Detailed scope, dependencies, implementation boundaries and acceptance criteria are in the
+[Reddit integration action plan](reddit-integration-plan.md). This is an experimental extension track;
+it does not change the existing API/web beta boundary or establish Reddit readiness.
+
+- [?] Resolve permitted Reddit access/distribution and external AI processing for the exact flow.
+- [~] Prove exact composer binding, native image capability and upload constraints: limited live
+  desktop draft-only QA covers post/comment attachments with both drafts preserved; broaden pilot coverage.
+- [~] Keep panel/cards/controls/styles shared across X, LinkedIn and Reddit; local browser coverage
+  compares the common card appearance. Native integration stays at the adapter boundary.
+- [~] Implement desktop post-detail top-level comments using the existing extension and FastAPI;
+  local fixtures and limited live desktop draft-only verification pass; production rollout remains pending.
+- [~] Add nested replies using selected-comment plus root-post context, bounded for huge threads,
+  with hashed cache separation and cancellation. Live checks cover distinct selected-comment and
+  post title/body fields, including validated hosted-model replies and native attachments for both
+  targets with draft preservation; both reply types remain required in the release/pilot review.
+- [~] Add compatible Reddit measurement schema and browser regression cases (implemented locally);
+  author and human-score the Reddit review set before rollout.
+- [ ] Verify the release package and live native drafts, then run a bounded opt-in pilot.
+
+Done: permitted route recorded, existing quality gates preserved, correct native attachment and
+draft preservation verified, and the linked pilot criteria met. Local fixtures and migration tests
+are implementation evidence; they do not establish hosted Reddit readiness.
 
 ## Open architecture and product decisions
 

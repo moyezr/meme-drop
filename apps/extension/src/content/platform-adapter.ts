@@ -1,7 +1,8 @@
 import type { MemeReplySource } from "../shared/meme-reply-intent";
 import { tweetIdFromStatusHref } from "../shared/meme-reply-intent";
+import { REDDIT_ADAPTER } from "./reddit-adapter";
 
-export type SupportedPlatform = "x" | "linkedin";
+export type SupportedPlatform = "x" | "linkedin" | "reddit";
 
 export interface PlatformAdapter {
   id: SupportedPlatform;
@@ -20,8 +21,20 @@ export interface PlatformAdapter {
   };
   isRouteCompose(url: string): boolean;
   findPosts(root?: ParentNode): HTMLElement[];
-  findActionGroup(nativeReply: HTMLElement): HTMLElement | null;
+  findActionGroup(nativeReply: HTMLElement): HTMLElement | ShadowRoot | null;
   extractReplySource(post: HTMLElement, nativeReply: HTMLElement): MemeReplySource;
+  findNativeReply?(post: HTMLElement): HTMLElement | null;
+  openNativeReply?(post: HTMLElement, nativeReply: HTMLElement): void;
+  inlineComposer?: {
+    candidates(target: HTMLElement): HTMLElement[];
+    canSuggest(scope: Element): boolean;
+    isSourceCurrent(target: HTMLElement, source: MemeReplySource): boolean;
+  };
+  queryComposerElements?(scope: Element, selector: string): Element[];
+  resolveComposerScope?(target?: Element | null): Element | null;
+  canAttachImage?(scope: Element): boolean;
+  hasRemovableAttachment?(scope: Element): boolean;
+  attachmentMaxDimension?: number;
 }
 
 const X_POST_TEXT = 'div[data-testid="tweetText"]';
@@ -145,6 +158,7 @@ function isBefore(element: Element, reference: Element): boolean {
 
 export function getPlatformAdapter(hostname = window.location.hostname): PlatformAdapter | null {
   const normalized = hostname.toLowerCase();
+  if (normalized === "www.reddit.com") return REDDIT_ADAPTER;
   if (normalized === "x.com" || normalized.endsWith(".x.com")) return X_ADAPTER;
   if (normalized === "twitter.com" || normalized.endsWith(".twitter.com")) return X_ADAPTER;
   if (normalized === "linkedin.com" || normalized.endsWith(".linkedin.com")) {
